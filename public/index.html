@@ -1,0 +1,184 @@
+﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Löwen Dart – Kiosk Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #f1f1f1; font-family: "Segoe UI", system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+    header { background: #111; border-bottom: 3px solid #e63946; padding: 13px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    header .logo { font-size: 1.9rem; }
+    header h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: 1px; }
+    header .subtitle { font-size: 0.8rem; color: #777; margin-top: 3px; }
+    .header-right { display: flex; align-items: center; gap: 14px; }
+    #clock { font-size: 1.4rem; font-weight: 600; letter-spacing: 2px; color: #e63946; font-variant-numeric: tabular-nums; min-width: 90px; text-align: right; }
+    #date-label { font-size: 0.78rem; color: #666; text-align: right; }
+    .btn-edit { background: #1e1e1e; border: 1px solid #333; color: #aaa; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; transition: background .2s,color .2s,border-color .2s; white-space: nowrap; font-family: inherit; }
+    .btn-edit:hover, .btn-edit.active { background: #e63946; border-color: #e63946; color: #fff; }
+    main { flex: 1; padding: 18px 32px 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+    .section-header { display: flex; align-items: center; margin-bottom: 12px; margin-top: 20px; }
+    .section-header:first-child { margin-top: 0; }
+    .section-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 3px; color: #555; font-weight: 600; white-space: nowrap; }
+    .section-divider { flex: 1; height: 1px; background: #222; margin-left: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+    #fixedGrid { grid-template-columns: repeat(4, 1fr); }
+    .card { background: #161616; border-radius: 12px; padding: 18px 16px 14px; border: 2px solid transparent; transition: transform .18s,box-shadow .18s; text-decoration: none; color: inherit; display: block; position: relative; overflow: hidden; }
+    .card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent,#444); }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 10px 32px rgba(0,0,0,.5); }
+    .card .icon { font-size: 2.1rem; margin-bottom: 8px; display: block; }
+    .card h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 5px; }
+    .card p { font-size: 0.78rem; color: #888; line-height: 1.45; }
+    .card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+    .badge { font-size: .72rem; padding: 4px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
+    .card-arrow { font-size: 1rem; opacity: .5; transition: opacity .2s,transform .2s; }
+    .card:hover .card-arrow { opacity: 1; transform: translateX(4px); }
+    .delete-btn { display: none; position: absolute; top: 10px; right: 10px; background: #e63946; border: none; color: #fff; border-radius: 50%; width: 28px; height: 28px; font-size: .9rem; cursor: pointer; z-index: 10; align-items: center; justify-content: center; font-family: inherit; }
+    body.edit-mode .card.custom-card .delete-btn { display: flex; }
+    body.edit-mode .card.custom-card { border-style: dashed; }
+    .add-card { background: #111; border-radius: 14px; padding: 26px 22px; border: 2px dashed #2a2a2a; cursor: pointer; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; transition: border-color .2s,background .2s; min-height: 160px; }
+    .add-card:hover { border-color: #e63946; background: #190e0f; }
+    .add-card .plus { font-size: 2rem; color: #3a3a3a; }
+    .add-card span { font-size: .85rem; color: #444; }
+    body.edit-mode .add-card { display: flex; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #1a1a1a; border: 1px solid #2e2e2e; border-radius: 16px; padding: 32px; width: min(500px,90vw); display: flex; flex-direction: column; gap: 16px; }
+    .modal h3 { font-size: 1.2rem; }
+    .modal label { font-size: .8rem; color: #888; display: block; margin-bottom: 5px; }
+    .modal input, .modal textarea { width: 100%; background: #111; border: 1px solid #2e2e2e; border-radius: 8px; color: #f1f1f1; padding: 10px 14px; font-size: .9rem; outline: none; font-family: inherit; }
+    .modal input:focus, .modal textarea:focus { border-color: #e63946; }
+    .modal textarea { resize: vertical; min-height: 70px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+    .btn-cancel { background: #222; border: 1px solid #333; color: #aaa; padding: 9px 20px; border-radius: 8px; cursor: pointer; font-size: .88rem; font-family: inherit; }
+    .btn-save { background: #e63946; border: none; color: #fff; padding: 9px 22px; border-radius: 8px; cursor: pointer; font-size: .88rem; font-weight: 600; font-family: inherit; }
+    .color-row { display: flex; gap: 10px; align-items: center; }
+    .color-row input[type="color"] { width: 48px; height: 38px; padding: 2px; border-radius: 6px; border: 1px solid #2e2e2e; background: #111; cursor: pointer; flex-shrink: 0; }
+    .color-row input[type="text"] { flex: 1; }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: #aaa; }
+    .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+    footer { text-align: center; padding: 14px; font-size: .72rem; color: #2a2a2a; border-top: 1px solid #141414; }
+    .btn-admin { display: flex; align-items: center; justify-content: center; background: #1a1a1a; border: 1px solid #252525; color: #555; width: 36px; height: 36px; border-radius: 8px; text-decoration: none; font-size: 1rem; transition: background .2s,color .2s,border-color .2s; flex-shrink: 0; }
+    .btn-admin:hover { background: #252525; color: #f1f1f1; border-color: #444; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <span class="logo">🎯</span>
+      <div>
+        <h1>Löwen Dart – Kiosk Hub</h1>
+        <div class="subtitle">Zentrales Steuerungspanel</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div>
+        <div id="clock">--:--:--</div>
+        <div id="date-label">---</div>
+      </div>
+      <a href="/admin.html" class="btn-admin" title="Admin-Panel">⚙</a>
+      <button class="btn-edit" id="editBtn" onclick="toggleEdit()">✏️ Bearbeiten</button>
+    </div>
+  </header>
+  <main>
+    <div class="section-header">
+      <span class="section-title">Dashboards</span>
+      <div class="section-divider"></div>
+    </div>
+    <div class="grid" id="fixedGrid"></div>
+    <div class="section-header" style="margin-top:24px">
+      <span class="section-title">Eigene Kacheln</span>
+      <div class="section-divider"></div>
+    </div>
+    <div class="grid" id="customGrid">
+      <div class="add-card" id="addCard" onclick="openModal()">
+        <span class="plus">+</span>
+        <span>Neue Kachel hinzufügen</span>
+      </div>
+    </div>
+  </main>
+  <footer>Löwen Dart Club &mdash; Kiosk Hub v2.0</footer>
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <h3>Neue Kachel erstellen</h3>
+      <div><label>Titel *</label><input type="text" id="f-title" placeholder="z.B. Mein Dashboard" /></div>
+      <div><label>Icon (Emoji)</label><input type="text" id="f-icon" placeholder="🔗" maxlength="4" style="width:80px" /></div>
+      <div><label>Beschreibung</label><textarea id="f-desc" placeholder="Kurze Beschreibung"></textarea></div>
+      <div><label>URL / Pfad *</label><input type="text" id="f-route" placeholder="https://... oder /panels/..." /></div>
+      <div>
+        <label>Akzentfarbe</label>
+        <div class="color-row">
+          <input type="color" id="f-color-picker" value="#6c757d" oninput="document.getElementById('f-color').value=this.value" />
+          <input type="text" id="f-color" value="#6c757d" oninput="document.getElementById('f-color-picker').value=this.value" placeholder="#6c757d" />
+        </div>
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="f-external" />
+        Externer Link (öffnet in neuem Tab)
+      </label>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+        <button class="btn-save" onclick="saveCard()">Kachel speichern</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    function updateClock(){const n=new Date();document.getElementById('clock').textContent=n.toLocaleTimeString('de-DE');document.getElementById('date-label').textContent=n.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});}
+    updateClock();setInterval(updateClock,1000);
+    function makeCard(d,isCustom){
+      const card=document.createElement('a');
+      card.href=d.route;
+      if(d.external){card.target='_blank';card.rel='noopener noreferrer';}
+      card.className='card'+(isCustom?' custom-card':'');
+      card.style.setProperty('--accent',d.color);
+      card.style.borderColor=d.color+'44';
+      card.innerHTML=(isCustom?'<button class="delete-btn" title="Löschen">✕</button>':'')+
+        '<span class="icon">'+(d.icon||'🔗')+'</span>'+
+        '<h2>'+d.title+'</h2>'+
+        '<p>'+(d.description||'')+'</p>'+
+        '<div class="card-footer">'+
+          '<span class="badge" style="background:'+d.color+'22;color:'+d.color+'">'+(d.badge||'Custom')+'</span>'+
+          '<span class="card-arrow">→</span>'+
+        '</div>';
+      if(isCustom){
+        card.querySelector('.delete-btn').addEventListener('click',async(e)=>{
+          e.preventDefault();e.stopPropagation();
+          if(!confirm('"'+d.title+'" wirklich löschen?'))return;
+          const r=await fetch('/api/dashboards/custom/'+d.id,{method:'DELETE'});
+          if(r.ok)card.remove();
+        });
+      }
+      return card;
+    }
+    async function loadFixed(){const l=await fetch('/api/dashboards/fixed').then(r=>r.json());const g=document.getElementById('fixedGrid');l.forEach(d=>g.appendChild(makeCard(d,false)));}
+    async function loadCustom(){const l=await fetch('/api/dashboards/custom').then(r=>r.json());const a=document.getElementById('addCard');l.forEach(d=>document.getElementById('customGrid').insertBefore(makeCard(d,true),a));}
+    loadFixed();loadCustom();
+    fetch('/api/settings').then(r=>r.json()).then(s=>{if(s&&s.hubTitle){document.querySelector('header h1').textContent=s.hubTitle;document.title=s.hubTitle;}});
+    function toggleEdit(){
+      document.body.classList.toggle('edit-mode');
+      const active=document.body.classList.contains('edit-mode');
+      const btn=document.getElementById('editBtn');
+      btn.classList.toggle('active',active);
+      btn.textContent=active?'✔ Fertig':'✏️ Bearbeiten';
+    }
+    function openModal(){document.getElementById('modalOverlay').classList.add('open');}
+    function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+    document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+    async function saveCard(){
+      const title=document.getElementById('f-title').value.trim();
+      const route=document.getElementById('f-route').value.trim();
+      if(!title||!route){alert('Titel und URL sind Pflichtfelder.');return;}
+      const payload={title,icon:document.getElementById('f-icon').value.trim()||'🔗',description:document.getElementById('f-desc').value.trim(),color:document.getElementById('f-color').value.trim()||'#6c757d',route,external:document.getElementById('f-external').checked};
+      const res=await fetch('/api/dashboards/custom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if(!res.ok){alert('Fehler beim Speichern.');return;}
+      const d=await res.json();
+      document.getElementById('customGrid').insertBefore(makeCard(d,true),document.getElementById('addCard'));
+      ['f-title','f-icon','f-desc','f-route'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('f-color').value='#6c757d';document.getElementById('f-color-picker').value='#6c757d';
+      document.getElementById('f-external').checked=false;
+      closeModal();
+    }
+  </script>
+</body>
+</html>

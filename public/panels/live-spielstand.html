@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live-Spielstand</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d0d0d; color: #f1f1f1; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+    .topbar { background: #1a1a1a; border-bottom: 2px solid #f4a261; padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+    .topbar a { color: #888; text-decoration: none; font-size: 0.9rem; }
+    .topbar a:hover { color: #fff; }
+    .topbar h2 { font-size: 1.3rem; flex: 1; }
+    .live-badge { background: #e63946; color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    main { padding: 32px; max-width: 800px; margin: 0 auto; }
+    .scoreboard {
+      background: #1a1a1a;
+      border-radius: 16px;
+      padding: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      margin-top: 24px;
+      border: 2px solid #f4a261;
+      text-align: center;
+    }
+    .player-score .name { font-size: 1.1rem; color: #aaa; margin-bottom: 8px; }
+    .player-score .score { font-size: 5rem; font-weight: 700; color: #f4a261; line-height: 1; }
+    .player-score .legs { font-size: 0.85rem; color: #888; margin-top: 8px; }
+    .vs { font-size: 1.5rem; color: #444; font-weight: 700; }
+    .placeholder { background: #1a1a1a; border-radius: 12px; padding: 40px; text-align: center; border: 2px dashed #f4a261; color: #888; margin-top: 24px; }
+    .placeholder .icon { font-size: 3rem; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="/">← Zurück</a>
+    <h2>⚡ Live-Spielstand</h2>
+    <span class="live-badge">LIVE</span>
+  </div>
+  <main>
+    <div class="scoreboard">
+      <div class="player-score">
+        <div class="name">Spieler 1</div>
+        <div class="score" id="score1">501</div>
+        <div class="legs">Legs: <strong>2</strong></div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="player-score">
+        <div class="name">Spieler 2</div>
+        <div class="score" id="score2">501</div>
+        <div class="legs">Legs: <strong>1</strong></div>
+      </div>
+    </div>
+    <div class="placeholder">
+      <div class="icon">⚡</div>
+      <p>Live-Daten werden hier angezeigt, sobald die Spielsteuerung verbunden ist.</p>
+    </div>
+  </main>
+</body>
+</html>

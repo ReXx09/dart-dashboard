@@ -1,0 +1,13 @@
+services:
+  dart-dashboard:
+    build: .
+    container_name: dart-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Einstellungen & Kacheln bleiben auch nach Container-Updates erhalten
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000

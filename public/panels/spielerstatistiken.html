@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spielerstatistiken</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d0d0d; color: #f1f1f1; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+    .topbar { background: #1a1a1a; border-bottom: 2px solid #e63946; padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+    .topbar a { color: #888; text-decoration: none; font-size: 0.9rem; }
+    .topbar a:hover { color: #fff; }
+    .topbar h2 { font-size: 1.3rem; flex: 1; }
+    main { padding: 32px; max-width: 1000px; margin: 0 auto; }
+    .placeholder {
+      background: #1a1a1a;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      border: 2px dashed #e63946;
+      color: #888;
+      margin-top: 24px;
+    }
+    .placeholder .icon { font-size: 3rem; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th { background: #222; padding: 12px 16px; text-align: left; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #aaa; }
+    td { padding: 12px 16px; border-bottom: 1px solid #222; }
+    tr:hover td { background: #1a1a1a; }
+    .rank { color: #e63946; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="/">← Zurück</a>
+    <h2>🎯 Spielerstatistiken</h2>
+  </div>
+  <main>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Spieler</th>
+          <th>Spiele</th>
+          <th>Siege</th>
+          <th>Ø Score</th>
+          <th>Best Leg</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td class="rank">1</td><td>Max Mustermann</td><td>24</td><td>18</td><td>72.4</td><td>12</td></tr>
+        <tr><td class="rank">2</td><td>Lisa Schmidt</td><td>22</td><td>15</td><td>68.1</td><td>14</td></tr>
+        <tr><td class="rank">3</td><td>Tom Bauer</td><td>20</td><td>12</td><td>65.8</td><td>15</td></tr>
+      </tbody>
+    </table>
+    <div class="placeholder">
+      <div class="icon">📊</div>
+      <p>Echte Spielerdaten werden hier angezeigt, sobald die API angebunden ist.</p>
+    </div>
+  </main>
+</body>
+</html>
