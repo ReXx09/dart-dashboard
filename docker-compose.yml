@@ -6,12 +6,11 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Einstellungen & Kacheln bleiben auch nach Container-Updates erhalten
-      - ./data:/app/data
+      # Einstellungen & Kacheln bleiben auch nach Container-Updates erhalten.
+      # Auf Unraid: /mnt/user/appdata/dart-dashboard/data
+      # Lokal (PC/Dev): ./data
+      - ${DATA_PATH:-./data}:/app/data
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # ADB_PATH wird automatisch auf 'adb' gesetzt (im Container via android-tools)
-      # Nur setzen wenn ein externer ADB-Pfad gewünscht ist:
-      # - ADB_PATH=/usr/bin/adb
-      - FIRESTICK_IP=192.168.8.177
+      - FIRESTICK_IP=${FIRESTICK_IP:-192.168.8.177}
