@@ -401,14 +401,28 @@ function autoLaunchKiosk() {
   const s = getSettings();
   const adbPath = s.adbPath || ADB_DEFAULT;
   const device  = `${s.firestickIp || '192.168.8.177'}:5555`;
+  const dashUrl = `http://${getLocalIP()}:${PORT}`;
   exec(`"${adbPath}" connect ${device}`, (err, stdout) => {
     if (err || (!stdout.includes('connected') && !stdout.includes('already connected'))) {
       console.log('[Kiosk] Fire Stick nicht erreichbar – Start übersprungen.');
       return;
     }
-    exec(`"${adbPath}" -s ${device} shell am start -n de.ozerov.fully/.MainActivity`, (e) => {
+    // Fully Kiosk mit der aktuellen Dashboard-URL starten
+    const cmd = `"${adbPath}" -s ${device} shell am start -n de.ozerov.fully/.MainActivity -d "${dashUrl}"`;
+    exec(cmd, (e) => {
       if (e) console.log('[Kiosk] Fully Kiosk Start fehlgeschlagen:', e.message);
-      else   console.log('[Kiosk] Fully Kiosk gestartet auf ' + device);
+      else   console.log('[Kiosk] Fully Kiosk gestartet → ' + dashUrl);
     });
   });
 }
+
+// Kiosk-URL manuell neu setzen (nützlich nach Port-Änderungen)
+app.post('/api/kiosk-reload', (_req, res) => {
+  const s = getSettings();
+  const adbPath = s.adbPath || ADB_DEFAULT;
+  const device  = `${s.firestickIp || '192.168.8.177'}:5555`;
+  const dashUrl = `http://${getLocalIP()}:${PORT}`;
+  exec(`"${adbPath}" -s ${device} shell am start -n de.ozerov.fully/.MainActivity -d "${dashUrl}"`, (err) => {
+    res.json({ ok: !err, url: dashUrl, error: err ? err.message : null });
+  });
+});

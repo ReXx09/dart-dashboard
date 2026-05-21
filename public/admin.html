@@ -237,6 +237,7 @@
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <button class="btn" onclick="fullyStop()" style="background:#c62828;color:#fff">&#9209; Fully beenden</button>
         <button class="btn" onclick="fullyStart()" style="background:#2e7d32;color:#fff">&#9654; Fully starten</button>
+        <button class="btn" onclick="kioskReload()" style="background:#1565c0;color:#fff" title="Sendet die aktuelle Dashboard-URL an Fully Kiosk">&#128257; URL neu laden</button>
         <span id="fullyStatus" style="color:#666;font-size:.82rem"></span>
       </div>
 
@@ -647,6 +648,22 @@
       status.textContent = 'Netzwerkfehler';
     }
     setTimeout(() => { status.textContent = ''; }, 3000);
+  }
+
+  async function kioskReload() {
+    const status = document.getElementById('fullyStatus');
+    status.style.color = '#666';
+    status.textContent = 'Sende URL an Fully Kiosk…';
+    try {
+      const r = await fetch('/api/kiosk-reload', { method: 'POST' });
+      const d = await r.json();
+      status.style.color = d.ok ? '#4caf50' : '#e63946';
+      status.textContent = d.ok ? ('Kiosk lädt: ' + d.url + ' ✓') : ('Fehler: ' + (d.error || ''));
+    } catch(e) {
+      status.style.color = '#e63946';
+      status.textContent = 'Netzwerkfehler';
+    }
+    setTimeout(() => { status.textContent = ''; }, 5000);
   }
 
   async function fullyStop() {
