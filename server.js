@@ -25,6 +25,7 @@ function getLocalIP() {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const PUBLIC_PORT = process.env.PUBLIC_PORT || PORT;
 
 const DATA_DIR       = path.join(__dirname, 'data');
 const CUSTOM_FILE    = path.join(DATA_DIR, 'custom-dashboards.json');
@@ -401,7 +402,7 @@ function autoLaunchKiosk() {
   const s = getSettings();
   const adbPath = s.adbPath || ADB_DEFAULT;
   const device  = `${s.firestickIp || '192.168.8.177'}:5555`;
-  const dashUrl = `http://${getLocalIP()}:${PORT}`;
+  const dashUrl = `http://${s.serverIp || getLocalIP()}:${PUBLIC_PORT}`;
   exec(`"${adbPath}" connect ${device}`, (err, stdout) => {
     if (err || (!stdout.includes('connected') && !stdout.includes('already connected'))) {
       console.log('[Kiosk] Fire Stick nicht erreichbar – Start übersprungen.');
@@ -421,7 +422,7 @@ app.post('/api/kiosk-reload', (_req, res) => {
   const s = getSettings();
   const adbPath = s.adbPath || ADB_DEFAULT;
   const device  = `${s.firestickIp || '192.168.8.177'}:5555`;
-  const dashUrl = `http://${getLocalIP()}:${PORT}`;
+  const dashUrl = `http://${s.serverIp || getLocalIP()}:${PUBLIC_PORT}`;
   exec(`"${adbPath}" -s ${device} shell am start -n de.ozerov.fully/.MainActivity -d "${dashUrl}"`, (err) => {
     res.json({ ok: !err, url: dashUrl, error: err ? err.message : null });
   });
