@@ -326,13 +326,13 @@
       Du kannst die Buttons oben direkt verwenden &mdash; Brave öffnet sich auf dem Fire Stick.
 
       <h4 style="margin-top:14px">Neu installieren / aktualisieren</h4>
-      APK-Pfad eingeben (ARM-APK von github.com/brave/brave-browser/releases):
-      <code>https://github.com/brave/brave-browser/releases/download/v1.57.57/BraveMonoarm.apk</code>
+      Download-URL der ARM-APK eingeben (von github.com/brave/brave-browser/releases):<br>
+      <code style="font-size:.72rem;word-break:break-all">https://github.com/brave/brave-browser/releases/download/v1.57.57/BraveMonoarm.apk</code>
       <div class="apk-row">
-        <input type="text" id="apkPathInput" placeholder="C:\Users\...\brave.apk" />
+        <input type="text" id="apkPathInput" placeholder="https://github.com/.../BraveMonoarm.apk" />
         <button class="btn-install" onclick="installBrave()">&#128229; Installieren</button>
       </div>
-      <div id="installStatus" style="margin-top:8px;font-size:.75rem;color:#555;min-height:16px"></div>
+      <div id="installStatus" style="margin-top:8px;font-size:.75rem;color:#555;min-height:16px">Der Server lädt die APK herunter und installiert sie direkt auf dem Fire Stick &mdash; kein lokaler Dateipfad nötig.</div>
 
       <h4 style="margin-top:14px">3. Fertig</h4>
       Nach der Installation können alle Buttons oben genutzt werden.

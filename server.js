@@ -2,6 +2,8 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const http = require('http');
+const https = require('https');
 const { exec, spawn } = require('child_process');
 
 // SSE-Clients – alle offenen Dashboards sofort benachrichtigen
@@ -201,16 +203,37 @@ app.post('/api/adb/launch', (req, res) => {
 
 app.post('/api/adb/install', (req, res) => {
   const { apkPath } = req.body;
-  if (!apkPath || !apkPath.endsWith('.apk'))
-    return res.status(400).json({ error: 'APK-Pfad ungültig' });
+  if (!apkPath) return res.status(400).json({ error: 'URL oder Pfad fehlt' });
   const s = getSettings();
-  const adbPath = `"${(s.adbPath || ADB_DEFAULT).replace(/"/g, '')}"`;
-  const device  = `${s.firestickIp || '192.168.8.177'}:5555`;
-  const cmd = `${adbPath} -s ${device} install -r "${apkPath}"`;
-  exec(cmd, { timeout: 120000 }, (err, stdout, stderr) => {
-    if (err) return res.status(500).json({ error: (stderr || err.message).trim() });
-    res.json({ ok: true, output: stdout.trim() });
-  });
+  const adbBin = `"${(s.adbPath || ADB_DEFAULT).replace(/"/g, '')}"` ;
+  const device = `${s.firestickIp || '192.168.8.177'}:5555`;
+
+  const doInstall = (localPath, cleanup) => {
+    exec(`${adbBin} -s ${device} install -r "${localPath}"`, { timeout: 120000 }, (err, stdout, stderr) => {
+      if (cleanup) fs.unlink(localPath, () => {});
+      if (err) return res.status(500).json({ error: (stderr || err.message).trim() });
+      res.json({ ok: true, output: stdout.trim() });
+    });
+  };
+
+  if (/^https?:\/\//i.test(apkPath)) {
+    // URL → APK in temporäre Datei herunterladen, dann installieren
+    const tmpFile = path.join(os.tmpdir(), 'apk-install-' + Date.now() + '.apk');
+    const proto = apkPath.startsWith('https') ? https : http;
+    proto.get(apkPath, (response) => {
+      if (response.statusCode !== 200) {
+        return res.status(500).json({ error: 'Download fehlgeschlagen: HTTP ' + response.statusCode });
+      }
+      const file = fs.createWriteStream(tmpFile);
+      response.pipe(file);
+      file.on('finish', () => file.close(() => doInstall(tmpFile, true)));
+      file.on('error', (e) => { fs.unlink(tmpFile, () => {}); res.status(500).json({ error: e.message }); });
+    }).on('error', (e) => res.status(500).json({ error: 'Download-Fehler: ' + e.message }));
+  } else {
+    // Lokaler Pfad im Container (nur für Entwicklung)
+    if (!apkPath.endsWith('.apk')) return res.status(400).json({ error: 'Kein gültiger APK-Pfad' });
+    doInstall(apkPath, false);
+  }
 });
 
 app.get('/api/brave-urls', (_req, res) => res.json(getBraveUrls()));
