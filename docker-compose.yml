@@ -11,3 +11,4 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - FIRESTICK_IP=${FIRESTICK_IP:-192.168.8.177}
+      - SERVER_IP=${SERVER_IP:-}

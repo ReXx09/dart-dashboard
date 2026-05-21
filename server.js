@@ -5,6 +5,7 @@ const os = require('os');
 const { exec } = require('child_process');
 
 function getLocalIP() {
+  if (process.env.SERVER_IP) return process.env.SERVER_IP;
   for (const iface of Object.values(os.networkInterfaces())) {
     for (const alias of iface) {
       if (alias.family === 'IPv4' && !alias.internal && !alias.address.startsWith('169.254.'))
