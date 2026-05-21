@@ -49,6 +49,7 @@
     .modal label { font-size: .8rem; color: #888; display: block; margin-bottom: 5px; }
     .modal input, .modal textarea { width: 100%; background: #111; border: 1px solid #2e2e2e; border-radius: 8px; color: #f1f1f1; padding: 10px 14px; font-size: .9rem; outline: none; font-family: inherit; }
     .modal input:focus, .modal textarea:focus { border-color: #e63946; }
+    .modal button:focus { outline: 2px solid #e63946; outline-offset: 2px; }
     .modal textarea { resize: vertical; min-height: 70px; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
     .btn-cancel { background: #222; border: 1px solid #333; color: #aaa; padding: 9px 20px; border-radius: 8px; cursor: pointer; font-size: .88rem; font-family: inherit; }
@@ -172,7 +173,7 @@
     </div>
   </div>
   <div class="modal-overlay" id="modalOverlay">
-    <div class="modal">
+    <div class="modal" tabindex="-1">
       <h3>Neue Kachel erstellen</h3>
       <div><label>Titel *</label><input type="text" id="f-title" placeholder="z.B. Mein Dashboard" /></div>
       <div><label>Icon (Emoji)</label><input type="text" id="f-icon" placeholder="🔗" maxlength="4" style="width:80px" /></div>
@@ -248,9 +249,28 @@
     }
     function manualReload(){location.reload();}
 
-    function openModal(){document.getElementById('modalOverlay').classList.add('open');}
-    function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+    // SSE – sofortiger Reload wenn Admin etwas ändert
+    (function(){
+      const sse = new EventSource('/api/events');
+      sse.addEventListener('reload', () => location.reload());
+      // Bei Verbindungsabbruch reconnectet EventSource automatisch
+    })();
+
+    function openModal(){
+      document.getElementById('modalOverlay').classList.add('open');
+      // Hintergrund für D-Pad sperren (Fire TV: kein Fokus mehr auf Kacheln dahinter)
+      document.querySelector('header').inert=true;
+      document.querySelector('main').inert=true;
+      setTimeout(()=>document.getElementById('f-title').focus(),50);
+    }
+    function closeModal(){
+      document.getElementById('modalOverlay').classList.remove('open');
+      document.querySelector('header').inert=false;
+      document.querySelector('main').inert=false;
+      document.getElementById('addCard').focus();
+    }
     document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+    document.getElementById('modalOverlay').addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
     async function saveCard(){
       const title=document.getElementById('f-title').value.trim();
       const route=document.getElementById('f-route').value.trim();

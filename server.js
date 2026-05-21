@@ -2,7 +2,13 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
+
+// SSE-Clients – alle offenen Dashboards sofort benachrichtigen
+const sseClients = new Set();
+function broadcastReload() {
+  sseClients.forEach(res => { try { res.write('event: reload\ndata: 1\n\n'); } catch { sseClients.delete(res); } });
+}
 
 function getLocalIP() {
   if (process.env.SERVER_IP) return process.env.SERVER_IP;
@@ -99,6 +105,7 @@ app.put('/api/dashboards/fixed/:id', (req, res) => {
   const ov = readJson(OVERRIDES_FILE, {});
   ov[req.params.id] = { ...(ov[req.params.id] || {}), ...req.body };
   writeJson(OVERRIDES_FILE, ov);
+  broadcastReload();
   res.json({ ...def, ...ov[req.params.id] });
 });
 
@@ -111,6 +118,7 @@ app.post('/api/dashboards/custom', (req, res) => {
   const entry = { id: 'custom-' + Date.now(), title, icon: icon || '🔗', description: description || '', color: color || '#6c757d', route, external: !!external, badge: badge || 'Custom' };
   list.push(entry);
   saveCustom(list);
+  broadcastReload();
   res.status(201).json(entry);
 });
 app.put('/api/dashboards/custom/:id', (req, res) => {
@@ -119,6 +127,7 @@ app.put('/api/dashboards/custom/:id', (req, res) => {
   if (i === -1) return res.status(404).json({ error: 'Nicht gefunden' });
   list[i] = { ...list[i], ...req.body, id: list[i].id };
   saveCustom(list);
+  broadcastReload();
   res.json(list[i]);
 });
 app.delete('/api/dashboards/custom/:id', (req, res) => {
@@ -127,6 +136,7 @@ app.delete('/api/dashboards/custom/:id', (req, res) => {
   list = list.filter(d => d.id !== req.params.id);
   if (list.length === before) return res.status(404).json({ error: 'Nicht gefunden' });
   saveCustom(list);
+  broadcastReload();
   res.json({ ok: true });
 });
 
@@ -135,6 +145,7 @@ app.get('/api/players', (req, res) => res.json(getPlayers()));
 app.put('/api/players', (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
   savePlayers(req.body);
+  broadcastReload();
   res.json({ ok: true });
 });
 
@@ -151,7 +162,21 @@ app.get('/api/settings', (req, res) => res.json(getSettings()));
 app.put('/api/settings', (req, res) => {
   const s = { ...getSettings(), ...req.body };
   saveSettings(s);
+  broadcastReload();
   res.json(s);
+});
+
+// SSE – Live-Push an alle offenen Dashboard-Browser
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  res.write('data: connected\n\n');
+  sseClients.add(res);
+  // Keepalive alle 25s (verhindert Timeout bei Proxys/Firewalls)
+  const ka = setInterval(() => { try { res.write(':ka\n\n'); } catch { clearInterval(ka); sseClients.delete(res); } }, 25000);
+  req.on('close', () => { clearInterval(ka); sseClients.delete(res); });
 });
 
 // ── ADB / Brave ──
@@ -272,6 +297,22 @@ app.post('/api/adb-tap', (req, res) => {
   exec(`"${adbPath}" -s ${device} shell input tap ${xi} ${yi}`, (err, stdout) => {
     res.json({ ok: !err, stdout, error: err ? err.message : null });
   });
+});
+
+// Text-Eingabe per ADB (spawn statt exec → kein Shell-Injection-Risiko)
+app.post('/api/adb-text', (req, res) => {
+  const { text } = req.body || {};
+  if (!text || typeof text !== 'string' || text.length > 200) {
+    return res.status(400).json({ ok: false, error: 'Ungültiger Text' });
+  }
+  const s = getSettings();
+  const adbPath = s.adbPath || ADB_DEFAULT;
+  const device  = `${s.firestickIp || '192.168.8.177'}:5555`;
+  // Leerzeichen müssen für Android input text als %s kodiert werden
+  const androidText = text.replace(/ /g, '%s');
+  const child = spawn(adbPath, ['-s', device, 'shell', 'input', 'text', androidText]);
+  child.on('close', (code) => res.json({ ok: code === 0 }));
+  child.on('error', (err) => res.status(500).json({ ok: false, error: err.message }));
 });
 
 // Screenshot vom Fire TV aufnehmen und als PNG zurückgeben

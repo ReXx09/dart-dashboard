@@ -205,6 +205,49 @@
     .firetv-btns .btn-shot:hover { background: #FB542B; color: #fff; border-color: #FB542B; }
     #ftStatus { font-size: .72rem; color: #555; margin-top: 6px; min-height: 14px; }
 
+    /* ── Live-Modus ── */
+    .firetv-screen-wrap.live {
+      border: 2px solid #e63946;
+      box-shadow: 0 0 14px rgba(230,57,70,.3);
+      animation: livePulse 2s ease-in-out infinite;
+    }
+    @keyframes livePulse {
+      0%,100% { border-color: #e63946; box-shadow: 0 0 14px rgba(230,57,70,.3); }
+      50%      { border-color: #ff8a80; box-shadow: 0 0 24px rgba(230,57,70,.5); }
+    }
+    .firetv-panel-title { display: flex; align-items: center; gap: 8px; }
+    .live-badge {
+      display: none; align-items: center; gap: 5px;
+      font-size: .62rem; color: #e63946; font-weight: 700; letter-spacing: 1px;
+    }
+    .live-badge.visible { display: flex; }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #e63946;
+      animation: dotBlink 1s step-start infinite;
+    }
+    @keyframes dotBlink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+    .kb-area {
+      display: none; margin-top: 8px; background: #0d0d0d;
+      border: 1px solid #2a2a2a; border-radius: 8px; padding: 8px 10px;
+    }
+    .kb-area.visible { display: block; }
+    .kb-area-label {
+      font-size: .66rem; color: #444; text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+    .kb-preview {
+      color: #aaa; min-height: 18px; font-family: monospace; font-size: .82rem;
+      letter-spacing: 1px; border-bottom: 1px solid #1e1e1e; padding-bottom: 4px;
+      margin-bottom: 5px; word-break: break-all;
+    }
+    .kb-hint {
+      font-size: .66rem; color: #333;
+    }
+    #kbCapture {
+      position: absolute; opacity: 0; pointer-events: none;
+      width: 1px; height: 1px; top: 0; left: 0;
+    }
+
     @media (max-width: 860px) {
       .split-wrap { flex-direction: column; }
       .col-right  { flex: 1 1 auto; width: 100%; }
@@ -301,9 +344,13 @@
     <!-- ── RECHTE SPALTE: Fire TV Live-Ansicht ── -->
     <div class="col-right">
       <div class="firetv-panel">
-        <div class="firetv-panel-title">&#128247; Fire TV – Live-Ansicht</div>
+        <div class="firetv-panel-title">
+          &#128247; Fire TV – Live-Ansicht
+          <span class="live-badge" id="liveBadge"><span class="live-dot"></span> LIVE</span>
+        </div>
 
         <div class="firetv-screen-wrap" id="ftWrap">
+          <textarea id="kbCapture" autocomplete="off" spellcheck="false" tabindex="-1"></textarea>
           <div class="firetv-placeholder" id="ftPlaceholder">Screenshot aufnehmen &#8593;</div>
           <img id="ftImg" src="" alt="" style="display:none" onclick="ftTap(event, this)">
           <div id="ftTapMarker"></div>
@@ -312,6 +359,7 @@
 
         <div class="firetv-btns">
           <button class="btn-shot" onclick="ftScreenshot()">&#128247; Screenshot</button>
+          <button id="liveBtn" onclick="toggleLive()">&#9654; Live</button>
           <button onclick="ftKey(61)">&#8633; Tab</button>
           <button onclick="ftKey(23)">&#9654; OK</button>
           <button onclick="ftKey(66)">&#9166; Enter</button>
@@ -322,6 +370,11 @@
           <button onclick="fullyStart()" style="background:#2e7d32">&#9654; Fully starten</button>
         </div>
         <div id="ftStatus"></div>
+        <div class="kb-area" id="kbArea">
+          <div class="kb-area-label">&#9000; Tastatureingabe aktiv</div>
+          <div class="kb-preview" id="kbPreview">Klicke auf den Bildschirm und tippe…</div>
+          <div class="kb-hint">Buchstaben/Zahlen → Texteingabe &nbsp;·&nbsp; Enter/Backspace/Pfeile → Tasten</div>
+        </div>
       </div>
     </div><!-- /col-right -->
 
@@ -511,6 +564,111 @@
 
     // ── Fire TV Live-Ansicht ──
     let _ftW = 1920, _ftH = 1080;
+    let liveMode = false, liveInterval = null;
+    let textBuffer = '', textTimer = null;
+
+    // Android-Keycode-Mapping für Sondertasten
+    const KEYMAP = {
+      'Backspace': 67, 'Enter': 66, 'Tab': 61, 'Escape': 4,
+      'ArrowUp': 19, 'ArrowDown': 20, 'ArrowLeft': 21, 'ArrowRight': 22,
+      'Delete': 112, 'Home': 122, 'End': 123, 'PageUp': 92, 'PageDown': 93,
+    };
+
+    // ── Live-Modus toggle ──
+    function toggleLive() {
+      liveMode = !liveMode;
+      const btn    = document.getElementById('liveBtn');
+      const wrap   = document.getElementById('ftWrap');
+      const badge  = document.getElementById('liveBadge');
+      const kbArea = document.getElementById('kbArea');
+      if (liveMode) {
+        btn.textContent = '⏹ Live stopp';
+        btn.style.cssText = 'background:#c62828;border-color:#c62828;color:#fff;font-weight:600';
+        wrap.classList.add('live');
+        badge.classList.add('visible');
+        kbArea.classList.add('visible');
+        liveInterval = setInterval(ftScreenshotSilent, 1000);
+        ftScreenshot();
+        document.getElementById('kbCapture').focus();
+      } else {
+        btn.textContent = '▶ Live';
+        btn.style.cssText = '';
+        wrap.classList.remove('live');
+        badge.classList.remove('visible');
+        kbArea.classList.remove('visible');
+        clearInterval(liveInterval);
+        liveInterval = null;
+      }
+    }
+
+    // Screenshot ohne Status-Update (für das 1s-Polling im Live-Modus)
+    async function ftScreenshotSilent() {
+      try {
+        const r = await fetch('/api/firetv-screenshot');
+        const d = await r.json();
+        if (!d.ok) return;
+        _ftW = d.width; _ftH = d.height;
+        const img = document.getElementById('ftImg');
+        img.src = '/api/firetv-screen.png?t=' + d.ts;
+        img.style.display = 'block';
+        document.getElementById('ftPlaceholder').style.display = 'none';
+        document.getElementById('ftHint').style.display = 'block';
+      } catch { /* still in background, ignore */ }
+    }
+
+    // ── Tastatur-Capture ──
+    const kbCapture = document.getElementById('kbCapture');
+
+    kbCapture.addEventListener('keydown', async (e) => {
+      e.preventDefault();
+      const kc = KEYMAP[e.key];
+      if (kc !== undefined) {
+        // Sondertaste: gepufferten Text zuerst leeren, dann Keyevent senden
+        await flushTextBuffer();
+        await fetch('/api/adb-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keycode: kc })
+        });
+        setKbPreview('[' + e.key + '] ✓');
+        if (liveMode) setTimeout(ftScreenshotSilent, 400);
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // Druckbares Zeichen: puffern und mit 200ms Debounce senden
+        textBuffer += e.key;
+        setKbPreview(textBuffer + '▌');
+        clearTimeout(textTimer);
+        textTimer = setTimeout(flushTextBuffer, 200);
+      }
+    });
+
+    // Im Live-Modus: Fokus bei Blur sofort wiederherstellen
+    kbCapture.addEventListener('blur', () => {
+      if (liveMode) setTimeout(() => kbCapture.focus(), 30);
+    });
+
+    async function flushTextBuffer() {
+      clearTimeout(textTimer);
+      if (!textBuffer) return;
+      const text = textBuffer;
+      textBuffer = '';
+      setKbPreview(text + ' → sendet…');
+      try {
+        await fetch('/api/adb-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        setKbPreview(text + ' ✓');
+        if (liveMode) setTimeout(ftScreenshotSilent, 400);
+      } catch {
+        setKbPreview('Fehler beim Senden');
+      }
+    }
+
+    function setKbPreview(txt) {
+      const el = document.getElementById('kbPreview');
+      if (el) el.textContent = txt;
+    }
 
     async function ftScreenshot() {
       const status = document.getElementById('ftStatus');
@@ -552,7 +710,10 @@
       }).then(r => r.json()).then(d => {
         status.style.color = d.ok ? '#4caf50' : '#e63946';
         status.textContent = d.ok ? `Tap ${tapX},${tapY} ✓` : ('Fehler: ' + (d.error || ''));
-        if (d.ok) setTimeout(ftScreenshot, 800); // Auto-Refresh nach Tap
+        if (d.ok) {
+          setTimeout(ftScreenshot, 800); // Auto-Refresh nach Tap
+          if (liveMode) document.getElementById('kbCapture').focus();
+        }
       }).catch(() => {
         status.style.color = '#e63946';
         status.textContent = 'Netzwerkfehler';
