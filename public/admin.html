@@ -554,7 +554,7 @@
 
   function updateKioskUrl() {
     const ip = document.getElementById('s-serverip').value.trim() || '&lt;IP&gt;';
-    document.getElementById('kioskUrl').textContent = `http://${ip}:3000`;
+    document.getElementById('kioskUrl').textContent = `http://${ip}:${window.location.port || 3000}`;
   }
 
   async function saveKioskIp() {
