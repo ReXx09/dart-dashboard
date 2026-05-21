@@ -18,7 +18,7 @@
     ghcr.io/rexx09/loewen-dart-dashboard:latest
   </Overview>
   <Category>Tools: MediaApp:Video</Category>
-  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <WebUI>http://[IP]:[PORT:3100]/</WebUI>
   <TemplateURL/>
   <Icon>https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/dart.png</Icon>
   <ExtraParams/>
@@ -32,19 +32,19 @@
     Zentrales Kiosk-Dashboard für den Löwen Dart Club.
     Steuert einen Amazon Fire Stick via ADB (Screenshot, Tap, Tasten),
     verwaltet Dashboard-Kacheln, Browser-Links und Media-Streaming-Shortcuts.
-    Läuft auf Port 3000.
+    Läuft auf Port 3100.
   </Description>
 
   <!-- Port-Konfiguration -->
   <Config Name="Web-Interface Port"
           Target="3000"
-          Default="3000"
+          Default="3100"
           Mode="tcp"
-          Description="Port auf dem das Dashboard erreichbar ist (z.B. http://unraid-ip:3000)"
+          Description="Port auf dem das Dashboard erreichbar ist (z.B. http://unraid-ip:3100)"
           Type="Port"
           Display="always"
           Required="true"
-          Mask="false">3000</Config>
+          Mask="false">3100</Config>
 
   <!-- Datenpfad -->
   <Config Name="Datenpfad"
