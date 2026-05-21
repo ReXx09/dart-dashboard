@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>loewen-dart-dashboard</Name>
+  <Repository>ghcr.io/rexx09/loewen-dart-dashboard:latest</Repository>
+  <Registry>https://github.com/Rexx09?tab=packages</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project/>
+  <Overview>
+    Zentrales Kiosk-Dashboard für den Löwen Dart Club.
+    Steuert einen Amazon Fire Stick via ADB, verwaltet Kacheln, Browser-Links
+    und Media-Streaming-Shortcuts. Läuft auf Port 3000.
+
+    Image wird automatisch von GitHub Container Registry gezogen:
+    ghcr.io/rexx09/loewen-dart-dashboard:latest
+  </Overview>
+  <Category>Tools: MediaApp:Video</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/dart.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Description>
+    Zentrales Kiosk-Dashboard für den Löwen Dart Club.
+    Steuert einen Amazon Fire Stick via ADB (Screenshot, Tap, Tasten),
+    verwaltet Dashboard-Kacheln, Browser-Links und Media-Streaming-Shortcuts.
+    Läuft auf Port 3000.
+  </Description>
+
+  <!-- Port-Konfiguration -->
+  <Config Name="Web-Interface Port"
+          Target="3000"
+          Default="3000"
+          Mode="tcp"
+          Description="Port auf dem das Dashboard erreichbar ist (z.B. http://unraid-ip:3000)"
+          Type="Port"
+          Display="always"
+          Required="true"
+          Mask="false">3000</Config>
+
+  <!-- Datenpfad -->
+  <Config Name="Datenpfad"
+          Target="/app/data"
+          Default="/mnt/user/appdata/loewen-dart-dashboard"
+          Mode="rw"
+          Description="Speicherort für Einstellungen, Kacheln und Fire-TV-Screenshots (persistent)"
+          Type="Path"
+          Display="always"
+          Required="true"
+          Mask="false">/mnt/user/appdata/loewen-dart-dashboard</Config>
+
+  <!-- Umgebungsvariablen -->
+  <Config Name="Fire Stick IP"
+          Target="FIRESTICK_IP"
+          Default="192.168.8.177"
+          Mode=""
+          Description="IP-Adresse des Amazon Fire Sticks im WLAN (ADB muss auf dem Fire Stick aktiviert sein)"
+          Type="Variable"
+          Display="always"
+          Required="true"
+          Mask="false">192.168.8.177</Config>
+
+  <Config Name="NODE_ENV"
+          Target="NODE_ENV"
+          Default="production"
+          Mode=""
+          Description="Node.js Umgebung"
+          Type="Variable"
+          Display="advanced"
+          Required="false"
+          Mask="false">production</Config>
+
+  <Config Name="PORT"
+          Target="PORT"
+          Default="3000"
+          Mode=""
+          Description="Interner Server-Port (muss mit dem Port-Mapping oben übereinstimmen)"
+          Type="Variable"
+          Display="advanced"
+          Required="false"
+          Mask="false">3000</Config>
+
+  <Config Name="ADB Pfad"
+          Target="ADB_PATH"
+          Default="adb"
+          Mode=""
+          Description="Pfad zur ADB-Binary (Standard: 'adb' – ist im Container bereits installiert)"
+          Type="Variable"
+          Display="advanced"
+          Required="false"
+          Mask="false">adb</Config>
+
+</Container>

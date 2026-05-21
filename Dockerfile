@@ -1,6 +1,9 @@
 # Multi-Arch: läuft auf Raspi (arm64/arm/v7) und Unraid (amd64)
 FROM node:20-alpine
 
+# ADB für Fire-Stick-Steuerung (android-tools enthält adb)
+RUN apk add --no-cache android-tools
+
 WORKDIR /app
 
 # Abhängigkeiten zuerst (Layer-Cache)

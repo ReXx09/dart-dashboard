@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grafana</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #0f0f0f; font-family: 'Segoe UI', sans-serif; }
+    .topbar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 8px 18px; height: 46px;
+      background: #161616; border-bottom: 1px solid #222;
+    }
+    .back-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: #1e1e1e; border: 1px solid #333; color: #ccc;
+      padding: 6px 16px; border-radius: 8px; cursor: pointer;
+      text-decoration: none; font-size: 0.84rem; white-space: nowrap;
+      transition: background .2s, border-color .2s, color .2s;
+    }
+    .back-btn:hover { background: #f46800; border-color: #f46800; color: #fff; }
+    .topbar-title { font-size: 0.98rem; color: #f1f1f1; font-weight: 600; }
+    .topbar-url  { font-size: 0.72rem; color: #444; margin-left: auto; }
+    #grafana-frame { display: block; width: 100%; height: calc(100vh - 46px); border: none; }
+    #error-box {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      height: calc(100vh - 46px); gap: 14px; color: #888; text-align: center; padding: 32px;
+    }
+    #error-box .icon { font-size: 3rem; }
+    #error-box h2 { font-size: 1.1rem; color: #f46800; }
+    #error-box p  { font-size: 0.82rem; line-height: 1.6; max-width: 480px; }
+    #error-box code { background: #1a1a1a; border: 1px solid #2e2e2e; border-radius: 6px; padding: 10px 16px; display: block; font-size: 0.78rem; color: #aaa; margin-top: 6px; text-align: left; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="/" class="back-btn">&#8592; Zurück</a>
+    <span class="topbar-title">&#128202; Grafana</span>
+    <span class="topbar-url" id="grafana-url-label"></span>
+  </div>
+
+  <iframe id="grafana-frame" title="Grafana Dashboard" allow="fullscreen"></iframe>
+
+  <div id="error-box">
+    <div class="icon">&#128202;</div>
+    <h2>Grafana nicht erreichbar</h2>
+    <p>
+      Grafana läuft möglicherweise nicht oder blockiert das Einbetten (X-Frame-Options).<br>
+      Um das Einbetten zu erlauben, füge in <strong>grafana.ini</strong> unter <code>[security]</code> folgendes ein:
+    </p>
+    <code>[security]<br>allow_embedding = true</code>
+    <p style="margin-top:8px">Danach Grafana neu starten: <code style="display:inline;padding:2px 8px">systemctl restart grafana-server</code></p>
+  </div>
+
+  <script>
+    async function loadGrafanaUrl() {
+      try {
+        const list = await fetch('/api/dashboards/fixed').then(r => r.json());
+        const entry = list.find(d => d.id === 'grafana' || d.title === 'Grafana');
+        // Use stored route (external URL) as iframe src
+        const url = entry ? entry.route : null;
+        if (!url) { showError(); return; }
+        document.getElementById('grafana-url-label').textContent = url;
+        const frame = document.getElementById('grafana-frame');
+        frame.src = url;
+        frame.addEventListener('error', showError);
+        // Detect X-Frame-Options block: frame stays blank after short delay
+        setTimeout(() => {
+          try {
+            // If cross-origin frame blocked, contentDocument is null or access throws
+            const doc = frame.contentDocument;
+            if (!doc || doc.body === null) showError();
+          } catch (_) { showError(); }
+        }, 4000);
+      } catch (_) { showError(); }
+    }
+
+    function showError() {
+      document.getElementById('grafana-frame').style.display = 'none';
+      document.getElementById('error-box').style.display = 'flex';
+    }
+
+    loadGrafanaUrl();
+  </script>
+</body>
+</html>

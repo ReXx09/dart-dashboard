@@ -1,0 +1,45 @@
+name: Docker Build & Push to GHCR
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:   # Manuell auslösbar (GitHub → Actions → Run workflow)
+
+env:
+  IMAGE: ghcr.io/rexx09/loewen-dart-dashboard
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # Nötig für ghcr.io Push
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: QEMU (für Multi-Arch)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login zu GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64   # amd64 = Unraid, arm64 = Raspberry Pi
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

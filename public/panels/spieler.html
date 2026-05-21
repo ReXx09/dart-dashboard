@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spieler-Verwaltung – HB8</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #f1f1f1; font-family: "Segoe UI", system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* TOPBAR */
+    .topbar { background: #111; border-bottom: 3px solid #e63946; padding: 10px 28px; display: flex; align-items: center; gap: 12px; }
+    .topbar a { color: #666; text-decoration: none; font-size: 0.82rem; transition: color .2s; }
+    .topbar a:hover { color: #f1f1f1; }
+    .topbar .sep { color: #333; }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+    .topbar .status-badge { font-size: 0.78rem; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 20px; padding: 4px 12px; color: #888; }
+    .topbar .status-badge span { color: #e63946; font-weight: 700; }
+
+    /* MAIN */
+    main { flex: 1; padding: 14px 28px 16px; max-width: 1100px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+
+    /* HEADER ROW */
+    .page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .page-header-left h2 { font-size: 1rem; font-weight: 700; }
+    .page-header-left p { font-size: 0.78rem; color: #555; margin-top: 3px; }
+    .btn-save { background: #e63946; color: #fff; border: none; border-radius: 8px; padding: 10px 24px; font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: background .2s; }
+    .btn-save:hover { background: #c1121f; }
+    .btn-save:disabled { background: #333; color: #555; cursor: default; }
+
+    /* SLOTS GRID */
+    .slots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+    /* SLOT CARD */
+    .slot-card { background: #161616; border-radius: 10px; border: 2px solid #1e1e1e; padding: 10px 14px; display: flex; flex-direction: column; gap: 7px; transition: border-color .2s; }
+    .slot-card.active { border-color: var(--sc, #e63946); }
+    .slot-card.active .slot-num { background: var(--sc, #e63946); color: #fff; }
+
+    .slot-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .slot-num { width: 26px; height: 26px; border-radius: 50%; background: #222; color: #555; font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .2s, color .2s; }
+    .slot-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #444; flex: 1; }
+
+    /* Toggle */
+    .toggle { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track { position: absolute; inset: 0; background: #222; border-radius: 11px; cursor: pointer; transition: background .2s; border: 1px solid #2e2e2e; }
+    .toggle-track::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #444; transition: transform .2s, background .2s; }
+    .toggle input:checked + .toggle-track { background: #e6394633; border-color: #e63946; }
+    .toggle input:checked + .toggle-track::after { transform: translateX(16px); background: #e63946; }
+
+    /* Name input */
+    .slot-name-input { background: #111; border: 1px solid #2a2a2a; border-radius: 7px; color: #f1f1f1; font-size: 0.9rem; padding: 6px 10px; width: 100%; outline: none; transition: border-color .2s; }
+    .slot-name-input:focus { border-color: #e63946; }
+    .slot-name-input::placeholder { color: #333; }
+
+    /* Color row */
+    .slot-colors { display: flex; gap: 6px; align-items: center; }
+    .slot-colors span { font-size: 0.65rem; color: #444; text-transform: uppercase; letter-spacing: 1px; }
+    .color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .15s, border-color .15s; flex-shrink: 0; }
+    .color-dot:hover { transform: scale(1.2); }
+    .color-dot.selected { border-color: #fff; transform: scale(1.15); }
+
+    /* Info row */
+    .slot-info { font-size: 0.72rem; color: #333; min-height: 16px; }
+    .slot-card.active .slot-info { color: #555; }
+
+    /* ACTIVE PLAYERS SUMMARY */
+    .summary-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .player-chip { display: flex; align-items: center; gap: 6px; background: #161616; border: 1px solid #2a2a2a; border-radius: 20px; padding: 5px 12px 5px 8px; font-size: 0.8rem; }
+    .player-chip .chip-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .player-chip .chip-slot { font-size: 0.65rem; color: #555; }
+    .empty-hint { font-size: 0.8rem; color: #333; font-style: italic; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: 0.88rem; opacity: 0; transition: all .3s; z-index: 999; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Section header */
+    .section-header { display: flex; align-items: center; gap: 12px; }
+    .section-header h2 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #555; font-weight: 600; white-space: nowrap; }
+    .section-header .line { flex: 1; height: 1px; background: #1e1e1e; }
+
+    footer { text-align: center; padding: 8px; font-size: .65rem; color: #222; border-top: 1px solid #111; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <a href="/panels/privat-dart.html">← Privat Dart</a>
+    <span class="sep">›</span>
+    <h1>👤 Spieler-Verwaltung</h1>
+    <div class="status-badge">HB8 — max. <span>8</span> Spieler</div>
+    <span id="clock-mini" style="font-size:0.85rem;color:#e63946;font-variant-numeric:tabular-nums;letter-spacing:1px;margin-left:8px">--:--:--</span>
+  </div>
+
+  <main>
+
+    <div class="page-header">
+      <div class="page-header-left">
+        <h2>Spieler-Slots – HB8</h2>
+        <p>Gib jedem Slot einen Namen und aktiviere ihn, damit Scores korrekt zugeordnet werden.</p>
+      </div>
+      <button class="btn-save" id="saveBtn" onclick="saveAll()">💾 Speichern</button>
+    </div>
+
+    <!-- ACTIVE SUMMARY -->
+    <div>
+      <div class="section-header" style="margin-bottom:10px">
+        <h2>Aktive Spieler</h2>
+        <div class="line"></div>
+      </div>
+      <div class="summary-row" id="summaryRow">
+        <span class="empty-hint">Noch keine aktiven Spieler</span>
+      </div>
+    </div>
+
+    <!-- SLOTS -->
+    <div class="slots-grid" id="slotsGrid"></div>
+
+  </main>
+
+  <footer>Löwen Dart Club – HB8 Spieler-Verwaltung</footer>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const COLORS = [
+      '#e63946','#f4a261','#2a9d8f','#457b9d',
+      '#9b5de5','#2ec4b6','#f0b429','#52b788'
+    ];
+
+    let players = [];
+    let dirty = false;
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    function updateClock() {
+      document.getElementById('clock-mini').textContent =
+        new Date().toLocaleTimeString('de-DE');
+    }
+
+    async function load() {
+      players = await fetch('/api/players').then(r => r.json());
+      renderSlots();
+      renderSummary();
+    }
+
+    function renderSlots() {
+      const grid = document.getElementById('slotsGrid');
+      grid.innerHTML = '';
+      players.forEach((p, idx) => {
+        const color = p.color || COLORS[idx];
+        const card = document.createElement('div');
+        card.className = 'slot-card' + (p.active ? ' active' : '');
+        card.style.setProperty('--sc', color);
+        card.dataset.slot = p.slot;
+
+        const colorDots = COLORS.map((c, ci) =>
+          `<span class="color-dot${c === color ? ' selected' : ''}" style="background:${c}" data-ci="${ci}" title="${c}" onclick="pickColor(${idx},${ci},event)"></span>`
+        ).join('');
+
+        card.innerHTML = `
+          <div class="slot-head">
+            <div class="slot-num">${p.slot}</div>
+            <div class="slot-label">Spieler ${p.slot}</div>
+            <label class="toggle" title="Aktiv/Inaktiv">
+              <input type="checkbox" ${p.active ? 'checked' : ''} onchange="toggleActive(${idx},this)">
+              <div class="toggle-track"></div>
+            </label>
+          </div>
+          <input class="slot-name-input" type="text"
+            placeholder="Name eingeben…"
+            value="${escHtml(p.name || '')}"
+            maxlength="24"
+            oninput="setName(${idx},this.value)" />
+          <div class="slot-colors">
+            <span>Farbe</span>
+            ${colorDots}
+          </div>
+          <div class="slot-info" id="info-${idx}">${p.name ? `Slot ${p.slot}: ${escHtml(p.name)}` : 'Kein Name'}</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderSummary() {
+      const row = document.getElementById('summaryRow');
+      const active = players.filter(p => p.active && p.name);
+      if (!active.length) {
+        row.innerHTML = '<span class="empty-hint">Noch keine aktiven Spieler</span>';
+        return;
+      }
+      row.innerHTML = active.map((p, i) => {
+        const color = p.color || COLORS[players.indexOf(p)];
+        return `<div class="player-chip">
+          <span class="chip-dot" style="background:${color}"></span>
+          <span class="chip-slot">S${p.slot}</span>
+          <span>${escHtml(p.name)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function setName(idx, val) {
+      players[idx].name = val;
+      const info = document.getElementById(`info-${idx}`);
+      if (info) info.textContent = val ? `Slot ${players[idx].slot}: ${val}` : 'Kein Name';
+      renderSummary();
+      markDirty();
+    }
+
+    function toggleActive(idx, el) {
+      players[idx].active = el.checked;
+      const card = el.closest('.slot-card');
+      card.classList.toggle('active', el.checked);
+      renderSummary();
+      markDirty();
+    }
+
+    function pickColor(playerIdx, colorIdx, e) {
+      // Update all dots in this card
+      const card = e.target.closest('.slot-card');
+      card.querySelectorAll('.color-dot').forEach((d, i) =>
+        d.classList.toggle('selected', i === colorIdx)
+      );
+      const color = COLORS[colorIdx];
+      card.style.setProperty('--sc', color);
+      if (players[playerIdx].active) {
+        card.querySelector('.slot-num').style.background = color;
+      }
+      players[playerIdx].color = color;
+      markDirty();
+    }
+
+    function markDirty() {
+      dirty = true;
+      document.getElementById('saveBtn').disabled = false;
+    }
+
+    async function saveAll() {
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = '…';
+      await fetch('/api/players', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(players)
+      });
+      dirty = false;
+      btn.textContent = '💾 Speichern';
+      showToast('Spieler gespeichert ✓');
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2600);
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -9,49 +9,49 @@
     body { background: #0a0a0a; color: #f1f1f1; font-family: "Segoe UI", system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
 
     /* TOPBAR */
-    .topbar { background: #111; border-bottom: 3px solid #e63946; padding: 16px 36px; display: flex; align-items: center; gap: 16px; }
-    .topbar a { color: #666; text-decoration: none; font-size: 0.88rem; transition: color .2s; }
+    .topbar { background: #111; border-bottom: 3px solid #e63946; padding: 10px 28px; display: flex; align-items: center; gap: 12px; }
+    .topbar a { color: #666; text-decoration: none; font-size: 0.82rem; transition: color .2s; }
     .topbar a:hover { color: #f1f1f1; }
     .topbar .sep { color: #333; }
-    .topbar h1 { font-size: 1.35rem; font-weight: 700; flex: 1; }
-    #clock-mini { font-size: 0.9rem; color: #e63946; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+    #clock-mini { font-size: 0.85rem; color: #e63946; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
 
     /* MAIN */
-    main { flex: 1; padding: 32px 36px; max-width: 1300px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 36px; }
+    main { flex: 1; padding: 14px 28px 16px; max-width: 1300px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 14px; }
 
     /* STAT TILES */
-    .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
-    .stat-tile { background: #161616; border-radius: 12px; padding: 22px 20px; border-left: 4px solid var(--c, #e63946); }
-    .stat-tile .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px; color: #555; margin-bottom: 10px; }
-    .stat-tile .value { font-size: 2rem; font-weight: 800; color: var(--c, #e63946); font-variant-numeric: tabular-nums; }
-    .stat-tile .sub { font-size: 0.78rem; color: #555; margin-top: 4px; }
+    .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .stat-tile { background: #161616; border-radius: 10px; padding: 12px 14px; border-left: 4px solid var(--c, #e63946); }
+    .stat-tile .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1.5px; color: #555; margin-bottom: 5px; }
+    .stat-tile .value { font-size: 1.55rem; font-weight: 800; color: var(--c, #e63946); font-variant-numeric: tabular-nums; }
+    .stat-tile .sub { font-size: 0.72rem; color: #555; margin-top: 3px; }
 
     /* SECTION */
-    .section-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-    .section-header h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 3px; color: #555; font-weight: 600; white-space: nowrap; }
+    .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .section-header h2 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #555; font-weight: 600; white-space: nowrap; }
     .section-header .line { flex: 1; height: 1px; background: #1e1e1e; }
 
     /* NAV CARDS (Sub-Panels) */
-    .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
-    .nav-card { background: #161616; border-radius: 12px; padding: 22px 20px 18px; text-decoration: none; color: inherit; display: block; border: 2px solid var(--c, #333); position: relative; overflow: hidden; transition: transform .18s, box-shadow .18s; }
+    .nav-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .nav-card { background: #161616; border-radius: 10px; padding: 12px 14px 10px; text-decoration: none; color: inherit; display: block; border: 2px solid var(--c, #333); position: relative; overflow: hidden; transition: transform .18s, box-shadow .18s; }
     .nav-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--c, #444); }
-    .nav-card:hover { transform: translateY(-4px); box-shadow: 0 10px 32px rgba(0,0,0,.5); }
-    .nav-card .nav-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
-    .nav-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 5px; }
-    .nav-card p { font-size: 0.78rem; color: #777; line-height: 1.5; }
-    .nav-card .nav-arrow { position: absolute; bottom: 18px; right: 18px; font-size: 1rem; color: var(--c, #444); opacity: .6; transition: opacity .2s, transform .2s; }
+    .nav-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+    .nav-card .nav-icon { font-size: 1.55rem; margin-bottom: 6px; display: block; }
+    .nav-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 3px; }
+    .nav-card p { font-size: 0.73rem; color: #777; line-height: 1.4; }
+    .nav-card .nav-arrow { position: absolute; bottom: 10px; right: 12px; font-size: 0.9rem; color: var(--c, #444); opacity: .6; transition: opacity .2s, transform .2s; }
     .nav-card:hover .nav-arrow { opacity: 1; transform: translateX(4px); }
 
     /* SPLIT LAYOUT */
-    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 780px) { .split { grid-template-columns: 1fr; } }
 
     /* TABLE */
-    .panel-box { background: #161616; border-radius: 12px; padding: 24px; }
-    .panel-box h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 2px; color: #555; margin-bottom: 16px; }
+    .panel-box { background: #161616; border-radius: 10px; padding: 12px 14px; }
+    .panel-box h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 2px; color: #555; margin-bottom: 10px; }
     table { width: 100%; border-collapse: collapse; }
-    th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #444; padding: 8px 12px; text-align: left; border-bottom: 1px solid #1e1e1e; }
-    td { padding: 10px 12px; border-bottom: 1px solid #1a1a1a; font-size: 0.88rem; }
+    th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: #444; padding: 5px 10px; text-align: left; border-bottom: 1px solid #1e1e1e; }
+    td { padding: 7px 10px; border-bottom: 1px solid #1a1a1a; font-size: 0.82rem; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #1d1d1d; }
     .rank-1 { color: #ffd700; font-weight: 800; }
@@ -61,9 +61,9 @@
     .win-rate { display: inline-block; height: 6px; border-radius: 3px; background: #e63946; vertical-align: middle; margin-right: 6px; }
 
     /* MATCHES */
-    .match-list { display: flex; flex-direction: column; gap: 10px; }
-    .match-item { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: #111; border-radius: 10px; border-left: 3px solid var(--mc, #333); }
-    .match-item .match-teams { flex: 1; font-size: 0.9rem; }
+    .match-list { display: flex; flex-direction: column; gap: 7px; }
+    .match-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #111; border-radius: 8px; border-left: 3px solid var(--mc, #333); }
+    .match-item .match-teams { flex: 1; font-size: 0.82rem; }
     .match-item .match-teams strong { font-weight: 700; }
     .match-item .match-time { font-size: 0.75rem; color: #555; white-space: nowrap; }
     .badge-live { background: #e6394622; color: #e63946; font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 10px; letter-spacing: .5px; }
@@ -71,7 +71,7 @@
     .badge-soon { background: #f4a26122; color: #f4a261; font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 10px; }
     .match-score { font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; color: #aaa; white-space: nowrap; }
 
-    footer { text-align: center; padding: 14px; font-size: .7rem; color: #222; border-top: 1px solid #111; }
+    footer { text-align: center; padding: 8px; font-size: .65rem; color: #222; border-top: 1px solid #111; }
   </style>
 </head>
 <body>
@@ -144,8 +144,12 @@
           <h3>Spielplan & Turnier</h3>
           <p>Anstehende Spiele, Turnierübersicht & Ergebnisse</p>
           <span class="nav-arrow">→</span>
-        </a>
-      </div>
+        </a>        <a class="nav-card" href="/panels/spieler.html" style="--c:#9b5de5">
+          <span class="nav-icon">👤</span>
+          <h3>Spieler-Verwaltung</h3>
+          <p>HB8-Slots benennen &amp; Scores zuordnen</p>
+          <span class="nav-arrow">→</span>
+        </a>      </div>
     </div>
 
     <!-- SPLIT: RANGLISTE + LETZTE SPIELE -->

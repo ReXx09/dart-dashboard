@@ -16,6 +16,10 @@
     header .sub{font-size:.75rem;color:#555;margin-top:2px}
     .back-link{color:#666;text-decoration:none;font-size:.85rem;padding:8px 16px;border:1px solid #252525;border-radius:8px;transition:color .2s,border-color .2s;white-space:nowrap}
     .back-link:hover{color:#f1f1f1;border-color:#555}
+    .header-right{display:flex;align-items:center;gap:10px}
+    .btn-restart-hd{background:#180a0b;border:1px solid #2d1213;color:#c0303d;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:.8rem;font-family:inherit;transition:background .2s,border-color .2s,color .2s;white-space:nowrap}
+    .btn-restart-hd:hover{background:#e63946;border-color:#e63946;color:#fff}
+    .btn-restart-hd:disabled{opacity:.45;cursor:not-allowed}
 
     /* TABS */
     .tabs{background:#0f0f0f;border-bottom:1px solid #1a1a1a;padding:0 36px;display:flex;gap:2px;flex-shrink:0}
@@ -118,7 +122,10 @@
       <div class="sub">Löwen Dart Dashboard</div>
     </div>
   </div>
-  <a href="/" class="back-link">← Zum Hub</a>
+  <div class="header-right">
+    <button class="btn-restart-hd" id="hdRestartBtn" onclick="restartServer()">&#9881; Server neu starten</button>
+    <a href="/" class="back-link">&#8592; Zum Hub</a>
+  </div>
 </header>
 
 <nav class="tabs">
@@ -153,10 +160,45 @@
 <div id="tab-einstellungen" class="tab-pane">
 
   <div class="settings-card">
+    <h3>ADB &amp; Fire Stick</h3>
+    <div class="field">
+      <label>ADB-Pfad (adb.exe)</label>
+      <input type="text" id="s-adbpath" placeholder="C:\...\platform-tools\adb.exe" />
+    </div>
+    <div class="field">
+      <label>Fire Stick IP-Adresse</label>
+      <input type="text" id="s-firestickip" placeholder="192.168.8.177" style="width:200px" />
+    </div>
+    <div class="save-row">
+      <button class="btn btn-primary" onclick="saveAdbSettings()">Speichern</button>
+      <button class="btn" onclick="testAdb()" style="background:#1a1a1a;border:1px solid #333;color:#aaa;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:.85rem;font-family:inherit">&#128279; Verbindung testen</button>
+      <span id="adb-test-status" style="font-size:.78rem;color:#555;margin-left:4px"></span>
+    </div>
+  </div>
+
+  <div class="settings-card">
     <h3>Hub-Konfiguration</h3>
     <div class="field">
       <label>Hub-Titel (wird auf der Hauptseite angezeigt)</label>
       <input type="text" id="s-title" placeholder="Löwen Dart – Kiosk Hub" />
+    </div>
+    <div class="field">
+      <label>Auto-Reload (Minuten, <code style="color:#f4a261">0</code> = deaktiviert)</label>
+      <input type="number" id="s-autoreload" min="0" max="60" step="1" placeholder="5" style="width:110px" />
+    </div>
+    <div class="field" style="border-top:1px solid #1e1e1e;padding-top:14px;margin-top:2px">
+      <label style="margin-bottom:10px">Bildschirmschoner</label>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#aaa;cursor:pointer">
+          <input type="checkbox" id="s-ss-enabled" style="width:16px;height:16px;cursor:pointer" />
+          Aktiviert
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#aaa">
+          Timeout:
+          <input type="number" id="s-ss-minutes" min="1" max="60" step="1" placeholder="2" style="width:80px" />
+          Minuten
+        </label>
+      </div>
     </div>
     <div class="save-row">
       <button class="btn btn-primary" onclick="saveSettings()">Speichern</button>
@@ -176,6 +218,44 @@
     </div>
     <div class="save-row">
       <button class="btn btn-primary" onclick="saveKioskIp()">Speichern</button>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <h3>&#128246; Fire TV – Fernsteuerung</h3>
+    <p class="info-txt">Screenshot vom Fire TV aufnehmen &ndash; dann einfach auf den Button im Bild klicken um ihn zu best&auml;tigen.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="takeScreenshot()" id="screenshotBtn">&#128247; Screenshot aufnehmen</button>
+        <button class="btn" onclick="adbKey(23)" style="background:#1a1a1a;border:1px solid #333;color:#ccc">&#9654; OK</button>
+        <button class="btn" onclick="adbKey(66)" style="background:#1a1a1a;border:1px solid #333;color:#ccc">&#9166; Enter</button>
+        <button class="btn" onclick="adbKey(4)"  style="background:#1a1a1a;border:1px solid #333;color:#ccc">&#8592; Zur&uuml;ck</button>
+        <span id="screenshotStatus" style="color:#666;font-size:.82rem"></span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <button class="btn" onclick="fullyStop()" style="background:#c62828;color:#fff">&#9209; Fully beenden</button>
+        <button class="btn" onclick="fullyStart()" style="background:#2e7d32;color:#fff">&#9654; Fully starten</button>
+        <span id="fullyStatus" style="color:#666;font-size:.82rem"></span>
+      </div>
+
+      <!-- Screenshot-Vorschau: Klick → ADB-Tap an exakter Stelle -->
+      <div id="screenshotWrap" style="display:none;position:relative;border:1px solid #333;border-radius:8px;overflow:hidden;cursor:crosshair;max-width:100%">
+        <img id="screenshotImg" src="" alt="Fire TV Screen" style="width:100%;display:block;user-select:none" onclick="onScreenshotClick(event, this)">
+        <div id="tapMarker" style="display:none;position:absolute;width:24px;height:24px;border-radius:50%;border:3px solid #FB542B;transform:translate(-50%,-50%);pointer-events:none"></div>
+        <div style="position:absolute;bottom:6px;right:8px;font-size:.72rem;color:#aaa;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:4px;pointer-events:none">Auf Button klicken zum Tippen</div>
+      </div>
+      <span id="tapStatus" style="color:#666;font-size:.82rem"></span>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <h3>Server</h3>
+    <p class="info-txt">Startet den Node.js-Server neu (z.&nbsp;B. nach Konfigurations&auml;nderungen). Starte den Server &uuml;ber <code style="color:#aaa;background:#111;padding:1px 6px;border-radius:4px">start.bat</code> damit der Neustart funktioniert.</p>
+    <div class="save-row">
+      <button class="btn" id="restartBtn" onclick="restartServer()" style="background:#1a1a1a;border:1px solid #333;color:#e63946">&#9881; Server neu starten</button>
+      <span id="restartStatus" style="color:#666;font-size:.82rem"></span>
     </div>
   </div>
 
@@ -428,6 +508,32 @@
     else alert('Fehler beim Löschen.');
   }
 
+  async function saveAdbSettings() {
+    const adbPath     = document.getElementById('s-adbpath').value.trim();
+    const firestickIp = document.getElementById('s-firestickip').value.trim();
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adbPath, firestickIp })
+    });
+    showToast('ADB-Einstellungen gespeichert ✓');
+  }
+
+  async function testAdb() {
+    const el = document.getElementById('adb-test-status');
+    el.textContent = 'Teste…'; el.style.color = '#f4a261';
+    try {
+      const r = await fetch('/api/adb/launch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://www.google.com' })
+      });
+      const d = await r.json();
+      if (r.ok) { el.textContent = '✓ Verbindung OK'; el.style.color = '#2ec4b6'; }
+      else       { el.textContent = '✗ ' + d.error;     el.style.color = '#e63946'; }
+    } catch { el.textContent = '✗ Server nicht erreichbar'; el.style.color = '#e63946'; }
+  }
+
   // ── Settings ──
   async function loadSettingsForm() {
     const [s, info] = await Promise.all([
@@ -435,7 +541,12 @@
       fetch('/api/server-info').then(r => r.json())
     ]);
     document.getElementById('s-title').value = s.hubTitle || '';
+    document.getElementById('s-autoreload').value = s.autoReloadMinutes !== undefined ? s.autoReloadMinutes : 5;
+    document.getElementById('s-ss-enabled').checked = s.screensaverEnabled !== false;
+    document.getElementById('s-ss-minutes').value = s.screensaverMinutes !== undefined ? s.screensaverMinutes : 2;
     document.getElementById('s-serverip').value = s.serverIp || info.detectedIp || '';
+    document.getElementById('s-adbpath').value = s.adbPath || '';
+    document.getElementById('s-firestickip').value = s.firestickIp || '';
     document.getElementById('detectedIpHint').textContent = info.detectedIp ? `(erkannt: ${info.detectedIp})` : '';
     updateKioskUrl();
   }
@@ -460,13 +571,143 @@
     navigator.clipboard.writeText(url).then(() => showToast('URL kopiert ✓'));
   }
 
+  let _screenW = 1920, _screenH = 1080;
+
+  async function takeScreenshot() {
+    const btn    = document.getElementById('screenshotBtn');
+    const status = document.getElementById('screenshotStatus');
+    btn.disabled = true;
+    status.style.color = '#666';
+    status.textContent = 'Screenshot wird aufgenommen…';
+    try {
+      const r = await fetch('/api/firetv-screenshot');
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || 'Fehler');
+      _screenW = d.width;
+      _screenH = d.height;
+      const img  = document.getElementById('screenshotImg');
+      const wrap = document.getElementById('screenshotWrap');
+      img.src = '/api/firetv-screen.png?t=' + d.ts;
+      wrap.style.display = 'block';
+      status.style.color = '#4caf50';
+      status.textContent = `${_screenW}×${_screenH} ✓ – auf Button tippen`;
+    } catch(e) {
+      status.style.color = '#e63946';
+      status.textContent = 'Fehler: ' + e.message;
+    }
+    btn.disabled = false;
+  }
+
+  async function onScreenshotClick(e, img) {
+    const rect   = img.getBoundingClientRect();
+    const scaleX = _screenW / rect.width;
+    const scaleY = _screenH / rect.height;
+    const tapX   = Math.round((e.clientX - rect.left) * scaleX);
+    const tapY   = Math.round((e.clientY - rect.top)  * scaleY);
+
+    // Markierung anzeigen
+    const marker = document.getElementById('tapMarker');
+    marker.style.left = (e.clientX - rect.left) + 'px';
+    marker.style.top  = (e.clientY - rect.top)  + 'px';
+    marker.style.display = 'block';
+
+    const status = document.getElementById('tapStatus');
+    status.style.color = '#666';
+    status.textContent = `Tippe auf ${tapX}, ${tapY}…`;
+    try {
+      const r = await fetch('/api/adb-tap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: tapX, y: tapY })
+      });
+      const d = await r.json();
+      status.style.color = d.ok ? '#4caf50' : '#e63946';
+      status.textContent = d.ok ? `Tap ${tapX},${tapY} gesendet ✓` : ('Fehler: ' + (d.error || ''));
+    } catch(e2) {
+      status.style.color = '#e63946';
+      status.textContent = 'Netzwerkfehler';
+    }
+  }
+
+  async function adbKey(keycode) {
+    const status = document.getElementById('screenshotStatus');
+    status.style.color = '#666';
+    status.textContent = 'Sende Taste…';
+    try {
+      const r = await fetch('/api/adb-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keycode })
+      });
+      const d = await r.json();
+      status.style.color = d.ok ? '#4caf50' : '#e63946';
+      status.textContent = d.ok ? 'Taste gesendet ✓' : ('Fehler: ' + (d.error || ''));
+    } catch(e) {
+      status.style.color = '#e63946';
+      status.textContent = 'Netzwerkfehler';
+    }
+    setTimeout(() => { status.textContent = ''; }, 3000);
+  }
+
+  async function fullyStop() {
+    const status = document.getElementById('fullyStatus');
+    status.style.color = '#666';
+    status.textContent = 'Beende Fully Kiosk…';
+    try {
+      const r = await fetch('/api/fully-stop', { method: 'POST' });
+      const d = await r.json();
+      status.style.color = d.ok ? '#4caf50' : '#e63946';
+      status.textContent = d.ok ? 'Fully beendet – TV Launcher gestartet ✓' : ('Fehler: ' + (d.error || ''));
+    } catch(e) {
+      status.style.color = '#e63946';
+      status.textContent = 'Netzwerkfehler';
+    }
+    setTimeout(() => { status.textContent = ''; }, 4000);
+  }
+
+  async function fullyStart() {
+    const status = document.getElementById('fullyStatus');
+    status.style.color = '#666';
+    status.textContent = 'Starte Fully Kiosk…';
+    try {
+      const r = await fetch('/api/fully-start', { method: 'POST' });
+      const d = await r.json();
+      status.style.color = d.ok ? '#4caf50' : '#e63946';
+      status.textContent = d.ok ? 'Fully Kiosk gestartet ✓' : ('Fehler: ' + (d.error || ''));
+    } catch(e) {
+      status.style.color = '#e63946';
+      status.textContent = 'Netzwerkfehler';
+    }
+    setTimeout(() => { status.textContent = ''; }, 4000);
+  }
+
+  async function restartServer() {
+    const btn   = document.getElementById('restartBtn');
+    const hdBtn = document.getElementById('hdRestartBtn');
+    const status = document.getElementById('restartStatus');
+    if (btn)   btn.disabled   = true;
+    if (hdBtn) hdBtn.disabled = true;
+    if (status) status.textContent = 'Neustart wird angefordert...';
+    try {
+      await fetch('/api/restart', { method: 'POST' });
+      if (status) { status.style.color = '#4caf50'; status.textContent = 'Server startet neu – Seite wird in 4 Sekunden neu geladen.'; }
+      setTimeout(() => location.reload(), 4000);
+    } catch {
+      if (status) { status.style.color = '#e63946'; status.textContent = 'Fehler beim Neustart.'; }
+      if (btn)   btn.disabled   = false;
+      if (hdBtn) hdBtn.disabled = false;
+    }
+  }
   async function saveSettings() {
     const hubTitle = document.getElementById('s-title').value.trim();
     if (!hubTitle) { alert('Bitte einen Titel eingeben.'); return; }
+    const autoReloadMinutes = Math.max(0, parseInt(document.getElementById('s-autoreload').value, 10) || 0);
+    const screensaverEnabled = document.getElementById('s-ss-enabled').checked;
+    const screensaverMinutes = Math.max(1, parseInt(document.getElementById('s-ss-minutes').value, 10) || 2);
     await fetch('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hubTitle })
+      body: JSON.stringify({ hubTitle, autoReloadMinutes, screensaverEnabled, screensaverMinutes })
     });
     showToast('Einstellungen gespeichert ✓');
   }
