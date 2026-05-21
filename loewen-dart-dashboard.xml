@@ -57,6 +57,17 @@
           Required="true"
           Mask="false">/mnt/user/appdata/loewen-dart-dashboard</Config>
 
+  <!-- ADB-Keys (persistent – verhindert erneuten Autorisierungs-Dialog beim Container-Neustart) -->
+  <Config Name="ADB-Keys Pfad"
+          Target="/root/.android"
+          Default="/mnt/user/appdata/loewen-dart-dashboard/adb-keys"
+          Mode="rw"
+          Description="Speicherort für den ADB RSA-Schlüssel. Wird einmal erstellt und dann nie wieder geändert – der Fire TV muss die Verbindung nur einmal bestätigen."
+          Type="Path"
+          Display="always"
+          Required="true"
+          Mask="false">/mnt/user/appdata/loewen-dart-dashboard/adb-keys</Config>
+
   <!-- Umgebungsvariablen -->
   <Config Name="Fire Stick IP"
           Target="FIRESTICK_IP"
