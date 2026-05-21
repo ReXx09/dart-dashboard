@@ -13,3 +13,13 @@ services:
       - PORT=3000
       - FIRESTICK_IP=${FIRESTICK_IP:-192.168.8.177}
       - SERVER_IP=${SERVER_IP:-}
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: dart-dashboard-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 --cleanup dart-dashboard
+    # Prüft alle 5 Minuten ob ein neues Image auf GHCR verfügbar ist.
+    # Sobald GitHub Actions ein neues Image pusht → automatischer Pull + Neustart.
