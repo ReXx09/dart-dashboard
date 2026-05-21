@@ -1,0 +1,6 @@
+# Lokales Build-Override (nur für Entwicklung / erstes Mal bauen)
+# Verwendung: docker-compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  dart-dashboard:
+    build: .
+    image: ghcr.io/rexx09/loewen-dart-dashboard:latest

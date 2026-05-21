@@ -1,14 +1,11 @@
 services:
   dart-dashboard:
-    build: .
+    image: ghcr.io/rexx09/loewen-dart-dashboard:latest
     container_name: dart-dashboard
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
-      # Einstellungen & Kacheln bleiben auch nach Container-Updates erhalten.
-      # Auf Unraid: /mnt/user/appdata/dart-dashboard/data
-      # Lokal (PC/Dev): ./data
       - ${DATA_PATH:-./data}:/app/data
     environment:
       - NODE_ENV=production
