@@ -21,7 +21,7 @@
       text-decoration: none; font-size: 0.84rem; white-space: nowrap;
       transition: background .2s, border-color .2s, color .2s;
     }
-    .back-btn:hover { background: #FB542B; border-color: #FB542B; color: #fff; }
+    .back-btn:hover, .back-btn:focus { background: #FB542B; border-color: #FB542B; color: #fff; outline: 2px solid #FB542B; outline-offset: 2px; }
     .topbar-title { font-size: 1rem; font-weight: 700; color: #f1f1f1; }
     .topbar-status { margin-left: auto; font-size: 0.75rem; color: #444; }
 
@@ -44,9 +44,9 @@
       gap: 8px; padding: 18px 12px 14px;
       background: #151515; border: 1px solid #1e1e1e; border-radius: 12px;
       cursor: pointer; transition: background .2s, border-color .2s, transform .15s;
-      user-select: none;
+      user-select: none; scroll-margin-block: 70px;
     }
-    .media-card:hover  { background: #1b1b1b; border-color: var(--c, #FB542B); transform: translateY(-2px); }
+    .media-card:hover, .media-card:focus  { background: #1b1b1b; border-color: var(--c, #FB542B); transform: translateY(-2px); outline: 3px solid var(--c, #FB542B); outline-offset: 3px; }
     .media-card:active { transform: scale(.96); }
     .media-card .icon  { font-size: 2.2rem; }
     .media-card .label { font-size: 0.85rem; font-weight: 600; color: #e0e0e0; text-align: center; }
@@ -64,9 +64,9 @@
       gap: 6px; padding: 18px 12px 14px;
       background: #0f0f0f; border: 1px dashed #252525; border-radius: 12px;
       cursor: pointer; transition: border-color .2s, color .2s; color: #333;
-      font-size: .82rem; font-weight: 600; user-select: none;
+      font-size: .82rem; font-weight: 600; user-select: none; scroll-margin-block: 70px;
     }
-    .media-card-add:hover { border-color: #FB542B; color: #FB542B; }
+    .media-card-add:hover, .media-card-add:focus { border-color: #FB542B; color: #FB542B; outline: 2px solid #FB542B; outline-offset: 2px; }
 
     /* ── Custom URL row ── */
     .custom-list { display: flex; flex-direction: column; gap: 8px; }
@@ -85,7 +85,7 @@
       padding: 5px 14px; border-radius: 7px; cursor: pointer; font-size: 0.78rem;
       font-family: inherit; transition: background .2s; white-space: nowrap; flex-shrink: 0;
     }
-    .ci-launch-btn:hover { background: #FB542B; color: #fff; border-color: #FB542B; }
+    .ci-launch-btn:hover, .ci-launch-btn:focus { background: #FB542B; color: #fff; border-color: #FB542B; outline: 2px solid #FB542B; outline-offset: 2px; }
     .ci-del-btn {
       background: none; border: none; color: #333; cursor: pointer; font-size: 1rem;
       padding: 4px 6px; border-radius: 6px; transition: color .2s; flex-shrink: 0;
@@ -113,7 +113,7 @@
       font-size: 0.84rem; font-weight: 600; font-family: inherit;
       transition: background .2s; white-space: nowrap;
     }
-    .btn-add:hover { background: #e04020; }
+    .btn-add:hover, .btn-add:focus { background: #e04020; outline: 2px solid #FB542B; outline-offset: 2px; }
 
     /* ── Setup box ── */
     .setup-box {
@@ -198,7 +198,7 @@
       padding: 6px 4px; border-radius: 8px; cursor: pointer; font-size: .78rem;
       font-family: inherit; transition: background .2s, border-color .2s;
     }
-    .firetv-btns button:hover  { background: #252525; border-color: #444; }
+    .firetv-btns button:hover, .firetv-btns button:focus  { background: #252525; border-color: #444; outline: 2px solid #e63946; outline-offset: 2px; }
     .firetv-btns .btn-shot {
       background: #FB542B22; border-color: #FB542B55; color: #FB542B; font-weight: 600;
     }
@@ -396,6 +396,8 @@
         const host = (() => { try { return new URL(e.url).hostname.replace('www.',''); } catch { return ''; } })();
         const card = document.createElement('div');
         card.className = 'media-card';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
         card.style.cssText = `--c:${e.color || '#FB542B'};position:relative`;
         card.innerHTML =
           `<button class="del-tile" onclick="event.stopPropagation();deleteMediaTile('${e.id}')" title="Entfernen">✕</button>` +
@@ -403,16 +405,25 @@
           `<span class="label">${e.title}</span>` +
           `<span class="sub">${host}</span>`;
         card.addEventListener('click', () => launch(e.url, e.title));
+        card.addEventListener('keydown', ev => {
+          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); launch(e.url, e.title); }
+        });
         grid.appendChild(card);
       });
       // "+ Hinzufügen"-Kachel am Ende
       const add = document.createElement('div');
       add.className = 'media-card-add';
+      add.tabIndex = 0;
+      add.setAttribute('role', 'button');
       add.innerHTML = '<span style="font-size:1.6rem">＋</span><span>Hinzuf&uuml;gen</span>';
-      add.onclick = () => {
+      const toggleForm = () => {
         const f = document.getElementById('addMediaForm');
         f.style.display = f.style.display === 'none' ? 'block' : 'none';
       };
+      add.onclick = toggleForm;
+      add.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleForm(); }
+      });
       grid.appendChild(add);
     }
 
@@ -561,6 +572,73 @@
 
     loadMedia();
     loadCustom();
+
+    // ── Fire TV D-Pad Spatial Navigation ──────────────────────────────────────
+    (function () {
+      function focusables() {
+        return Array.from(document.querySelectorAll(
+          'a[href], button:not([disabled]), [tabindex="0"]'
+        )).filter(el => {
+          if (el.closest('[inert]')) return false;
+          // kbCapture (opacity:0) ausschließen
+          if (el.id === 'kbCapture') return false;
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        });
+      }
+
+      document.addEventListener('keydown', function (e) {
+        const DIRS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+        if (!DIRS.includes(e.key)) return;
+        // Nicht eingreifen wenn gerade ein Textfeld fokussiert ist
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
+
+        const all = focusables();
+        if (!all.length) return;
+
+        const active = document.activeElement;
+        if (!active || !all.includes(active)) {
+          all[0].focus();
+          return;
+        }
+
+        const ar = active.getBoundingClientRect();
+        const ax = ar.left + ar.width  / 2;
+        const ay = ar.top  + ar.height / 2;
+        let best = null, bestScore = Infinity;
+
+        all.forEach(el => {
+          if (el === active) return;
+          const r  = el.getBoundingClientRect();
+          const ex = r.left + r.width  / 2;
+          const ey = r.top  + r.height / 2;
+          const dx = ex - ax, dy = ey - ay;
+
+          if (e.key === 'ArrowRight' && dx < 10)  return;
+          if (e.key === 'ArrowLeft'  && dx > -10) return;
+          if (e.key === 'ArrowDown'  && dy < 10)  return;
+          if (e.key === 'ArrowUp'    && dy > -10) return;
+
+          const primary = (e.key === 'ArrowLeft' || e.key === 'ArrowRight') ? Math.abs(dx) : Math.abs(dy);
+          const off     = (e.key === 'ArrowLeft' || e.key === 'ArrowRight') ? Math.abs(dy) : Math.abs(dx);
+          const score   = primary + off * 2.5;
+          if (score < bestScore) { bestScore = score; best = el; }
+        });
+
+        if (best) {
+          best.focus();
+          best.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+      });
+
+      // Erste Kachel nach dem Laden fokussieren
+      fetch('/api/brave-media').then(() => requestAnimationFrame(() => {
+        const first = document.querySelector('.media-card');
+        if (first) first.focus();
+      }));
+    })();
 
     // ── Fire TV Live-Ansicht ──
     let _ftW = 1920, _ftH = 1080;
