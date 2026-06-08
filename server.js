@@ -26,6 +26,7 @@ function getLocalIP() {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PUBLIC_PORT = process.env.PUBLIC_PORT || PORT;
+const FIRE_FEATURES_ENABLED = String(process.env.FIRE_FEATURES_ENABLED || 'false').toLowerCase() === 'true';
 
 const DATA_DIR       = path.join(__dirname, 'data');
 const CUSTOM_FILE    = path.join(DATA_DIR, 'custom-dashboards.json');
@@ -64,8 +65,7 @@ const fixedDefaults = [
   { id: 'grafana',        title: 'Grafana',         icon: '📊', description: 'Metriken, Graphen & Monitoring',               color: '#f46800', route: 'http://localhost:3001',                                                          external: true,  badge: 'Monitoring' },
   { id: 'wm2026',         title: 'WM 2026',          icon: '🌍', description: 'FIFA Weltmeisterschaft 2026 – Spielplan',       color: '#2a9d8f', route: '/panels/wm2026/index.html',                                                      external: false, badge: 'Lokal'      },
   { id: 'privat-dart',    title: 'Privat Dart',      icon: '🎯', description: 'Vereinsinterne Dart-Liga & Turniere',           color: '#e63946', route: '/panels/privat-dart.html',                                                       external: false, badge: 'Lokal'      },
-  { id: 'live-spielstand',title: 'Live-Spielstand',  icon: '⚡', description: 'Aktueller Spielstand in Echtzeit',              color: '#f4a261', route: '/panels/live-spielstand.html',                                                   external: false, badge: 'Live'       },
-  { id: 'brave',          title: 'Browser',          icon: '\uD83E\uDD81', description: 'YouTube & Web-Inhalte \xFCber Brave Browser',        color: '#FB542B', route: '/panels/brave.html',                                                             external: false, badge: 'Brave'      }
+  { id: 'live-spielstand',title: 'Live-Spielstand',  icon: '⚡', description: 'Aktueller Spielstand in Echtzeit',              color: '#f4a261', route: '/panels/live-spielstand.html',                                                   external: false, badge: 'Live'       }
 ];
 
 function readJson(file, fallback) {
@@ -86,6 +86,7 @@ function getSettings() {
     autoReloadMinutes: 5,
     screensaverEnabled: true,
     screensaverMinutes: 2,
+    fireFeaturesEnabled: FIRE_FEATURES_ENABLED,
     adbPath: process.env.ADB_PATH || ADB_DEFAULT,
     firestickIp: process.env.FIRESTICK_IP || '192.168.8.177',
     ...readJson(SETTINGS_FILE, {})
@@ -187,6 +188,21 @@ function getBraveUrls()   { return readJson(BRAVE_URLS_FILE, []); }
 function saveBraveUrls(l) { writeJson(BRAVE_URLS_FILE, l); }
 function getMediaTiles()  { return fs.existsSync(BRAVE_MEDIA_FILE) ? readJson(BRAVE_MEDIA_FILE, DEFAULT_MEDIA) : DEFAULT_MEDIA; }
 function saveMediaTiles(l){ writeJson(BRAVE_MEDIA_FILE, l); }
+
+function requireFireFeatures(req, res, next) {
+  if (!FIRE_FEATURES_ENABLED) {
+    return res.status(410).json({ ok: false, error: 'Fire-TV Features sind in diesem Deployment deaktiviert.' });
+  }
+  next();
+}
+
+app.use('/api/adb', requireFireFeatures);
+app.use('/api/firetv-screenshot', requireFireFeatures);
+app.use('/api/firetv-screen.png', requireFireFeatures);
+app.use('/api/fully-stop', requireFireFeatures);
+app.use('/api/fully-start', requireFireFeatures);
+app.use('/api/kiosk-reload', requireFireFeatures);
+app.use('/api/set-default-browser', requireFireFeatures);
 
 app.post('/api/adb/launch', (req, res) => {
   const { url } = req.body;
@@ -395,7 +411,7 @@ app.get('/api/firetv-screen.png', (req, res) => {
 app.listen(PORT, () => {
   console.log('Dashboard: http://localhost:' + PORT);
   console.log('Admin:     http://localhost:' + PORT + '/admin.html');
-  autoLaunchKiosk();
+  if (FIRE_FEATURES_ENABLED) autoLaunchKiosk();
 });
 
 function autoLaunchKiosk() {
