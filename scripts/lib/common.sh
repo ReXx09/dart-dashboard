@@ -75,6 +75,7 @@ ask_yes_no() {
 }
 
 ui_pause() {
+  stty sane 2>/dev/null || true
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
     whiptail --title "Weiter" --msgbox "Aktion abgeschlossen. Weiter mit OK." 9 60
   else

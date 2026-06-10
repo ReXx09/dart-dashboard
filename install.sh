@@ -22,6 +22,7 @@ run_action() {
     restart) restart_stack ;;
     ps) show_compose_ps ;;
     logs) show_logs ;;
+    logs-follow) show_logs_follow ;;
     status) show_status ;;
     uninstall) uninstall_stack ;;
     reinstall) reinstall_stack ;;
@@ -52,6 +53,7 @@ Actions:
   restart       Container neu starten
   ps            Docker Compose Status anzeigen
   logs          Container-Logs anzeigen
+  logs-follow   Container-Logs live verfolgen (Ctrl+C)
   status        Gesamtstatus anzeigen
   uninstall     Container + Image entfernen (Daten bleiben)
   reinstall     Uninstall + sauberer Neustart
@@ -82,7 +84,7 @@ if [[ $# -eq 0 || "${1:-}" == "menu" ]]; then
 fi
 
 case "${1:-}" in
-  quickstart|check|build-start|start|stop|restart|ps|logs|status|uninstall|reinstall|clone|health|test|help-guide)
+  quickstart|check|build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|help-guide)
     run_action "$1"
     ;;
   -h|--help|help)

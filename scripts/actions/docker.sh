@@ -101,20 +101,47 @@ show_compose_ps() {
 
 show_logs() {
   ensure_docker_ready
-  printf '\nLetzte Logs (dart-dashboard):\n'
-  docker logs --tail 80 dart-dashboard 2>/dev/null || printf '  Keine Logs verfuegbar (Container noch nicht gestartet?).\n'
+  local logs
+  logs="$(docker logs --tail 120 dart-dashboard 2>&1 || true)"
+  if [[ -z "$logs" ]]; then
+    logs='Keine Logs verfuegbar (Container noch nicht gestartet?).'
+  fi
+
+  show_textbox "Docker-Logs (Snapshot)" "$logs"
+}
+
+show_logs_follow() {
+  ensure_docker_ready
+
+  clear || true
+  printf 'Live-Logs fuer dart-dashboard (Ctrl+C zum Beenden)\n\n'
+  docker logs -f --tail 30 dart-dashboard 2>&1 || printf 'Container nicht gefunden oder keine Logs verfuegbar.\n'
+  ui_pause
 }
 
 show_status() {
   ensure_docker_ready
-  printf '\nStatus:\n'
-  $COMPOSE_CMD ps
+  local report compose_ps arduino_ports latest_logs host_ip public_port
 
-  printf '\nArduino Ports:\n'
-  ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null || printf '  Keine ttyACM/ttyUSB Ports gefunden.\n'
+  compose_ps="$($COMPOSE_CMD ps 2>&1 || true)"
+  arduino_ports="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null || true)"
+  latest_logs="$(docker logs --tail 30 dart-dashboard 2>&1 || true)"
+  host_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  public_port="$(get_env_value PUBLIC_PORT 3100)"
 
-  printf '\nLetzte Logs (dart-dashboard):\n'
-  docker logs --tail 30 dart-dashboard 2>/dev/null || printf '  Keine Logs verfuegbar (Container noch nicht gestartet?).\n'
+  [[ -z "$arduino_ports" ]] && arduino_ports='Keine ttyACM/ttyUSB Ports gefunden.'
+  [[ -z "$latest_logs" ]] && latest_logs='Keine Logs verfuegbar (Container noch nicht gestartet?).'
+  [[ -z "$host_ip" ]] && host_ip='<RASPI-IP>'
 
-  show_network_hint
+  report+="Status\n\n"
+  report+="Compose\n"
+  report+="${compose_ps}\n\n"
+  report+="Arduino Ports\n"
+  report+="${arduino_ports}\n\n"
+  report+="Letzte Logs (dart-dashboard)\n"
+  report+="${latest_logs}\n\n"
+  report+="Browser-Aufruf\n"
+  report+="http://${host_ip}:${public_port}\n"
+
+  show_textbox "Gesamtstatus" "$(printf '%b' "$report")"
 }
