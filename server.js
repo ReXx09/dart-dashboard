@@ -964,6 +964,42 @@ app.get('/api/arduino/state', (_req, res) => {
   res.json(arduinoState);
 });
 
+app.post('/api/arduino/connect', (req, res) => {
+  const currentSettings = getSettings();
+  const requestedPort = typeof req.body?.port === 'string' ? req.body.port.trim() : '';
+  const updatedSettings = {
+    ...currentSettings,
+    arduinoMonitorEnabled: true,
+    arduinoPort: requestedPort
+  };
+
+  saveSettings(updatedSettings);
+  restartArduinoMonitor();
+
+  res.json({
+    ok: true,
+    requestedPort: requestedPort || '',
+    state: arduinoState
+  });
+});
+
+app.post('/api/arduino/disconnect', (_req, res) => {
+  const currentSettings = getSettings();
+  const updatedSettings = {
+    ...currentSettings,
+    arduinoMonitorEnabled: false
+  };
+
+  saveSettings(updatedSettings);
+  closeArduinoMonitor();
+  normalizeArduinoStatePatch({
+    enabled: false,
+    error: 'Arduino-Monitor ist in den Einstellungen deaktiviert.'
+  });
+
+  res.json({ ok: true, state: arduinoState });
+});
+
 app.get('/api/arduino/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');

@@ -1,5 +1,148 @@
 #!/usr/bin/env bash
 
+dashboard_api_base() {
+  local public_port=""
+  public_port="$(get_env_value PUBLIC_PORT 3100)"
+  printf 'http://localhost:%s' "$public_port"
+}
+
+json_bool_field() {
+  local json="$1"
+  local field="$2"
+  printf '%s' "$json" | sed -n "s/.*\"${field}\"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p" | head -n 1
+}
+
+json_string_field() {
+  local json="$1"
+  local field="$2"
+  printf '%s' "$json" | sed -n "s/.*\"${field}\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -n 1
+}
+
+json_number_field() {
+  local json="$1"
+  local field="$2"
+  printf '%s' "$json" | sed -n "s/.*\"${field}\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p" | head -n 1
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+get_arduino_state_json() {
+  local api_base=""
+  api_base="$(dashboard_api_base)"
+  curl -fsS --max-time 4 "${api_base}/api/arduino/state" 2>/dev/null || true
+}
+
+prompt_arduino_port() {
+  local current_port="$1"
+  local value=""
+
+  if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
+    value="$(whiptail --title "Arduino-Port" --inputbox "Optional manuellen Serial-Port angeben.\nLeer lassen = automatische Erkennung.\n\nBeispiele: /dev/ttyACM0 oder COM3" 13 78 "$current_port" 3>&1 1>&2 2>&3)" || return 1
+  else
+    printf '\nArduino-Port manuell setzen? Leer lassen fuer automatische Erkennung.\n'
+    read -r -p 'Serial-Port: ' value
+  fi
+
+  printf '%s' "$value"
+}
+
+show_arduino_status() {
+  local state_json=""
+  local report=""
+  local connected enabled port baud error active_count last_line
+
+  if ! command_exists curl; then
+    show_textbox "Arduino-Status" "curl fehlt. Arduino-Status kann lokal nicht abgefragt werden."
+    return 1
+  fi
+
+  state_json="$(get_arduino_state_json)"
+  if [[ -z "$state_json" ]]; then
+    show_textbox "Arduino-Status" "Arduino-Status konnte nicht abgefragt werden.\n\nPruefe, ob der Dienst laeuft und die API erreichbar ist."
+    return 1
+  fi
+
+  connected="$(json_bool_field "$state_json" connected)"
+  enabled="$(json_bool_field "$state_json" enabled)"
+  port="$(json_string_field "$state_json" port)"
+  baud="$(json_number_field "$state_json" baudRate)"
+  error="$(json_string_field "$state_json" error)"
+  active_count="$(json_number_field "$state_json" activeCount)"
+  last_line="$(json_string_field "$state_json" lastLine)"
+
+  [[ -z "$enabled" ]] && enabled='false'
+  [[ -z "$connected" ]] && connected='false'
+  [[ -z "$port" ]] && port='auto / nicht erkannt'
+  [[ -z "$baud" ]] && baud='115200'
+  [[ -z "$active_count" ]] && active_count='0'
+  [[ -z "$last_line" ]] && last_line='keine Daten'
+  [[ -z "$error" ]] && error='kein Fehler gemeldet'
+
+  report+="Arduino-Status\n\n"
+  report+="Monitor aktiv: ${enabled}\n"
+  report+="Verbunden: ${connected}\n"
+  report+="Port: ${port}\n"
+  report+="Baudrate: ${baud}\n"
+  report+="Aktive Kontakte: ${active_count}\n"
+  report+="Letzte Zeile: ${last_line}\n"
+  report+="Fehler: ${error}\n\n"
+  report+="Hinweis:\n"
+  report+="- Verbinden/Neu verbinden startet den Arduino-Monitor neu.\n"
+  report+="- Port leer = automatische Erkennung des ersten passenden Serial-Ports.\n"
+
+  show_textbox "Arduino-Status" "$(printf '%b' "$report")"
+}
+
+connect_arduino_monitor() {
+  local api_base=""
+  local state_json=""
+  local current_port=""
+  local selected_port=""
+  local payload=""
+  local response=""
+
+  if ! command_exists curl; then
+    printf 'curl fehlt. Arduino-Monitor kann nicht ueber die API gesteuert werden.\n'
+    return 1
+  fi
+
+  api_base="$(dashboard_api_base)"
+  state_json="$(get_arduino_state_json)"
+  current_port="$(json_string_field "$state_json" port)"
+
+  if ask_yes_no 'Manuellen Serial-Port setzen? (Nein = automatische Erkennung)' 'n'; then
+    selected_port="$(prompt_arduino_port "$current_port")" || return 1
+  fi
+
+  payload=$(printf '{"port":"%s"}' "$(json_escape "$selected_port")")
+  response="$(curl -fsS --max-time 6 -X POST "${api_base}/api/arduino/connect" -H "Content-Type: application/json" --data "$payload" 2>&1)" || {
+    printf 'Arduino-Monitor konnte nicht gestartet werden.\n%s\n' "$response"
+    return 1
+  }
+
+  show_arduino_status
+}
+
+disconnect_arduino_monitor() {
+  local api_base=""
+  local response=""
+
+  if ! command_exists curl; then
+    printf 'curl fehlt. Arduino-Monitor kann nicht ueber die API gesteuert werden.\n'
+    return 1
+  fi
+
+  api_base="$(dashboard_api_base)"
+  response="$(curl -fsS --max-time 6 -X POST "${api_base}/api/arduino/disconnect" -H "Content-Type: application/json" --data '{}' 2>&1)" || {
+    printf 'Arduino-Monitor konnte nicht gestoppt werden.\n%s\n' "$response"
+    return 1
+  }
+
+  show_arduino_status
+}
+
 run_health_checks() {
   local report=""
   local compose_cmd=""

@@ -28,6 +28,9 @@ run_action() {
     reinstall) reinstall_stack ;;
     health) run_health_checks ;;
     test) run_guided_tests ;;
+    arduino-status) show_arduino_status ;;
+    arduino-connect) connect_arduino_monitor ;;
+    arduino-disconnect) disconnect_arduino_monitor ;;
     clone) clone_repo_elsewhere ;;
     help-guide) show_beginner_help ;;
     *)
@@ -59,6 +62,9 @@ Actions:
   reinstall     Uninstall + sauberer Neustart
   health        Health-Checks (API/Storage/Arduino/Fire-TV)
   test          Gefuehrte Funktionstests (Schritt fuer Schritt)
+  arduino-status Arduino-Status anzeigen
+  arduino-connect Arduino verbinden / neu verbinden
+  arduino-disconnect Arduino-Monitor trennen
   clone         Repo in anderen Ordner klonen
   help-guide    Einsteiger-Hilfe anzeigen
 
@@ -84,7 +90,7 @@ if [[ $# -eq 0 || "${1:-}" == "menu" ]]; then
 fi
 
 case "${1:-}" in
-  quickstart|check|build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|help-guide)
+  quickstart|check|build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|arduino-status|arduino-connect|arduino-disconnect|help-guide)
     run_action "$1"
     ;;
   -h|--help|help)

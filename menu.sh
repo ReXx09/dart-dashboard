@@ -178,6 +178,9 @@ action_label() {
     reinstall) printf 'Reinstall' ;;
     health) printf 'Schnell-Diagnose (Health-Checks)' ;;
     test) printf 'Gefuehrte Funktionstests' ;;
+    arduino-status) printf 'Arduino-Status' ;;
+    arduino-connect) printf 'Arduino verbinden / neu verbinden' ;;
+    arduino-disconnect) printf 'Arduino trennen' ;;
     clone) printf 'Repo klonen' ;;
     help-guide) printf 'Einsteiger-Hilfe' ;;
     *) printf '%s' "$action" ;;
@@ -312,20 +315,26 @@ submenu_monitoring_whiptail() {
     local choice
     local status_line
     status_line="$(monitoring_status_line)"
-    choice="$(whiptail --title "Loewen Dart | Status & Monitoring" --menu "${status_line}\n\n$(menu_subtitle 'Status pruefen, Gesamtansicht oeffnen oder Logs direkt beobachten.')" 22 84 9 \
+    choice="$(whiptail --title "Loewen Dart | Status & Monitoring" --menu "${status_line}\n\n$(menu_subtitle 'Status pruefen, Gesamtansicht oeffnen oder Logs direkt beobachten.')" 24 84 10 \
       "1" "Gesamtstatus  (Compose + Logs + Netz)" \
       "2" "Container Status (ps)" \
       "3" "Schnell-Diagnose (Health-Checks)" \
-      "4" "Docker-Logs Snapshot" \
-      "5" "Docker-Logs Live (Ctrl+C)" \
+      "4" "Arduino-Status" \
+      "5" "Arduino verbinden / neu verbinden" \
+      "6" "Arduino trennen" \
+      "7" "Docker-Logs Snapshot" \
+      "8" "Docker-Logs Live (Ctrl+C)" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
     case "$choice" in
       1) execute_action status 0 0 ;;
       2) execute_action ps ;;
       3) execute_action health 0 0 ;;
-      4) execute_action logs 0 0 ;;
-      5) execute_action logs-follow 0 0 ;;
+      4) execute_action arduino-status 0 0 ;;
+      5) execute_action arduino-connect ;;
+      6) execute_action arduino-disconnect ;;
+      7) execute_action logs 0 0 ;;
+      8) execute_action logs-follow 0 0 ;;
       0|"") return 0 ;;
     esac
   done
@@ -459,16 +468,22 @@ submenu_monitoring_text() {
     printf '1) Gesamtstatus\n'
     printf '2) Container Status (ps)\n'
     printf '3) Schnell-Diagnose (Health-Checks)\n'
-    printf '4) Docker-Logs (Snapshot)\n'
-    printf '5) Docker-Logs (Live)\n'
+    printf '4) Arduino-Status\n'
+    printf '5) Arduino verbinden / neu verbinden\n'
+    printf '6) Arduino trennen\n'
+    printf '7) Docker-Logs (Snapshot)\n'
+    printf '8) Docker-Logs (Live)\n'
     printf '0) Zurueck\n\n'
-    read -r -p 'Option [0-5]: ' c
+    read -r -p 'Option [0-8]: ' c
     case "$c" in
       1) execute_action status 0 0 ;;
       2) execute_action ps ;;
       3) execute_action health 0 0 ;;
-      4) execute_action logs 0 0 ;;
-      5) execute_action logs-follow 0 0 ;;
+      4) execute_action arduino-status 0 0 ;;
+      5) execute_action arduino-connect ;;
+      6) execute_action arduino-disconnect ;;
+      7) execute_action logs 0 0 ;;
+      8) execute_action logs-follow 0 0 ;;
       0|'') return 0 ;;
     esac
   done
