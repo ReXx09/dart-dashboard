@@ -8,10 +8,47 @@ Das Projekt bietet:
 - Optional Fire-TV / ADB Funktionen
 - Live-Anzeige fuer Arduino-Serial (EVT/HB) im Hub
 
+## Verantwortungsgrenze
+
+- `dart-dashboard` verwaltet nur interne Dart-Inhalte unter `/panels/...` (Dart, Live, Rangliste, Spielplan, Spieler, Statistiken).
+- Externe Dashboards (Grafana, externe Webseiten, weitere Services) werden ueber `Fire-Stick/kiosk-dashboard` verwaltet.
+- API-seitig sind im `dart-dashboard` externe Kachel-Routen bewusst blockiert.
+
 ## Voraussetzungen
 
 - Node.js 20+
 - Docker + Docker Compose (empfohlen fuer Betrieb)
+
+## Gefuehrter Setup-Assistent (install.sh)
+
+Fuer unerfahrene Nutzer gibt es einen interaktiven Assistenten:
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+Der Assistent bietet:
+- Systemcheck + Auto-Installation fuer Docker/Pi-Tools
+- Install/Update + Build + Start (empfohlen)
+- Nur Start ohne Build
+- Status + Logs
+- Stoppen
+- Optionales Clone in einen anderen Ordner
+
+Menuepunkte im Assistenten:
+- 0 = Systemcheck + Auto-Installation
+- 1 = Install/Update + Build + Start
+- 2 = Nur Start
+- 3 = Status und Logs
+- 4 = Stoppen
+- 5 = Repo in anderen Ordner klonen
+- 6 = Beenden
+
+Hinweis:
+- Wenn `whiptail` installiert ist, nutzt `install.sh` automatisch ein Dialog-Menue.
+- Ohne `whiptail` nutzt das Skript das normale Textmenue (Fallback).
+- Die Auto-Installation ist fuer Debian/Raspberry Pi OS via apt-get ausgelegt.
 
 ## Schnellstart (Docker Image)
 

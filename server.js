@@ -71,11 +71,28 @@ app.use(express.static(path.join(__dirname, 'public'), {
 app.use(express.json());
 
 const fixedDefaults = [
-  { id: 'grafana',        title: 'Grafana',         icon: '📊', description: 'Metriken, Graphen & Monitoring',               color: '#f46800', route: 'http://localhost:3001',                                                          external: true,  badge: 'Monitoring' },
-  { id: 'wm2026',         title: 'WM 2026',          icon: '🌍', description: 'FIFA Weltmeisterschaft 2026 – Spielplan',       color: '#2a9d8f', route: '/panels/wm2026/index.html',                                                      external: false, badge: 'Lokal'      },
-  { id: 'privat-dart',    title: 'Privat Dart',      icon: '🎯', description: 'Vereinsinterne Dart-Liga & Turniere',           color: '#e63946', route: '/panels/privat-dart.html',                                                       external: false, badge: 'Lokal'      },
-  { id: 'live-spielstand',title: 'Live-Spielstand',  icon: '⚡', description: 'Aktueller Spielstand in Echtzeit',              color: '#f4a261', route: '/panels/live-spielstand.html',                                                   external: false, badge: 'Live'       }
+  { id: 'privat-dart',       title: 'Privat Dart',        icon: '🎯', description: 'Vereinsinterne Dart-Liga & Turniere', color: '#e63946', route: '/panels/privat-dart.html',        external: false, badge: 'Dart'      },
+  { id: 'live-spielstand',   title: 'Live-Spielstand',    icon: '⚡', description: 'Aktueller Spielstand in Echtzeit',    color: '#f4a261', route: '/panels/live-spielstand.html',    external: false, badge: 'Live'      },
+  { id: 'rangliste',         title: 'Rangliste',          icon: '🏆', description: 'Aktuelle Platzierungen und Form',      color: '#2a9d8f', route: '/panels/rangliste.html',          external: false, badge: 'Statistik' },
+  { id: 'spielerstatistiken',title: 'Spielerstatistiken', icon: '📈', description: 'Leistung, Treffer, Trends',            color: '#457b9d', route: '/panels/spielerstatistiken.html', external: false, badge: 'Statistik' },
+  { id: 'spielplan',         title: 'Spielplan',          icon: '🗓️', description: 'Naechste Spiele und Begegnungen',      color: '#264653', route: '/panels/spielplan.html',          external: false, badge: 'Dart'      },
+  { id: 'spieler',           title: 'Spieler',            icon: '👤', description: 'Spielerverwaltung und Uebersicht',      color: '#9b5de5', route: '/panels/spieler.html',            external: false, badge: 'Dart'      }
 ];
+
+function isInternalPanelRoute(route) {
+  return typeof route === 'string'
+    && route.startsWith('/panels/')
+    && !route.includes('..')
+    && !route.startsWith('/panels//');
+}
+
+function sanitizeFixedTile(tile, fallback) {
+  const safeTile = { ...tile, external: false };
+  if (!isInternalPanelRoute(safeTile.route)) {
+    safeTile.route = fallback.route;
+  }
+  return safeTile;
+}
 
 function readJson(file, fallback) {
   try { if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
@@ -86,8 +103,16 @@ function writeJson(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
 }
 
-function getFixed()    { const ov = readJson(OVERRIDES_FILE, {}); return fixedDefaults.map(d => ({ ...d, ...(ov[d.id] || {}) })); }
-function getCustom()   { return readJson(CUSTOM_FILE, []); }
+function getFixed() {
+  const ov = readJson(OVERRIDES_FILE, {});
+  return fixedDefaults.map((d) => sanitizeFixedTile({ ...d, ...(ov[d.id] || {}) }, d));
+}
+function getCustom() {
+  const list = readJson(CUSTOM_FILE, []);
+  return list
+    .filter((entry) => isInternalPanelRoute(entry.route))
+    .map((entry) => ({ ...entry, external: false }));
+}
 function saveCustom(l) { writeJson(CUSTOM_FILE, l); }
 function getSettings() {
   return {
@@ -348,11 +373,14 @@ app.get('/api/dashboards/fixed', (req, res) => res.json(getFixed()));
 app.put('/api/dashboards/fixed/:id', (req, res) => {
   const def = fixedDefaults.find(d => d.id === req.params.id);
   if (!def) return res.status(404).json({ error: 'Nicht gefunden' });
+  if (req.body.route !== undefined && !isInternalPanelRoute(req.body.route)) {
+    return res.status(400).json({ error: 'Nur interne /panels/... Routen sind im dart-dashboard erlaubt.' });
+  }
   const ov = readJson(OVERRIDES_FILE, {});
-  ov[req.params.id] = { ...(ov[req.params.id] || {}), ...req.body };
+  ov[req.params.id] = { ...(ov[req.params.id] || {}), ...req.body, external: false };
   writeJson(OVERRIDES_FILE, ov);
   broadcastReload();
-  res.json({ ...def, ...ov[req.params.id] });
+  res.json(sanitizeFixedTile({ ...def, ...ov[req.params.id] }, def));
 });
 
 // ── Custom tiles ──
@@ -360,8 +388,11 @@ app.get('/api/dashboards/custom', (req, res) => res.json(getCustom()));
 app.post('/api/dashboards/custom', (req, res) => {
   const { title, icon, description, color, route, external, badge } = req.body;
   if (!title || !route) return res.status(400).json({ error: 'title und route erforderlich' });
+  if (!isInternalPanelRoute(route)) {
+    return res.status(400).json({ error: 'Nur interne /panels/... Routen sind im dart-dashboard erlaubt. Externe Dashboards bitte im kiosk-dashboard verwalten.' });
+  }
   const list = getCustom();
-  const entry = { id: 'custom-' + Date.now(), title, icon: icon || '🔗', description: description || '', color: color || '#6c757d', route, external: !!external, badge: badge || 'Custom' };
+  const entry = { id: 'custom-' + Date.now(), title, icon: icon || '🔗', description: description || '', color: color || '#6c757d', route, external: false, badge: badge || 'Custom' };
   list.push(entry);
   saveCustom(list);
   broadcastReload();
@@ -371,7 +402,10 @@ app.put('/api/dashboards/custom/:id', (req, res) => {
   const list = getCustom();
   const i = list.findIndex(d => d.id === req.params.id);
   if (i === -1) return res.status(404).json({ error: 'Nicht gefunden' });
-  list[i] = { ...list[i], ...req.body, id: list[i].id };
+  if (req.body.route !== undefined && !isInternalPanelRoute(req.body.route)) {
+    return res.status(400).json({ error: 'Nur interne /panels/... Routen sind im dart-dashboard erlaubt.' });
+  }
+  list[i] = { ...list[i], ...req.body, external: false, id: list[i].id };
   saveCustom(list);
   broadcastReload();
   res.json(list[i]);
