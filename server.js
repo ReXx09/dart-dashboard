@@ -6,6 +6,15 @@ const http = require('http');
 const https = require('https');
 const { exec, spawn } = require('child_process');
 
+let SerialPortCtor = null;
+let ReadlineParserCtor = null;
+try {
+  ({ SerialPort: SerialPortCtor } = require('serialport'));
+  ({ ReadlineParser: ReadlineParserCtor } = require('@serialport/parser-readline'));
+} catch (_err) {
+  // Optional dependency: dashboard still works without serial monitor feature.
+}
+
 // SSE-Clients – alle offenen Dashboards sofort benachrichtigen
 const sseClients = new Set();
 function broadcastReload() {
@@ -86,6 +95,9 @@ function getSettings() {
     autoReloadMinutes: 5,
     screensaverEnabled: true,
     screensaverMinutes: 2,
+    arduinoMonitorEnabled: true,
+    arduinoPort: '',
+    arduinoBaudRate: 115200,
     fireFeaturesEnabled: FIRE_FEATURES_ENABLED,
     adbPath: process.env.ADB_PATH || ADB_DEFAULT,
     firestickIp: process.env.FIRESTICK_IP || '192.168.8.177',
@@ -93,6 +105,236 @@ function getSettings() {
   };
 }
 function saveSettings(s){ writeJson(SETTINGS_FILE, s); }
+
+const arduinoSseClients = new Set();
+let arduinoPort = null;
+let arduinoParser = null;
+let arduinoReconnectTimer = null;
+const arduinoState = {
+  enabled: true,
+  connected: false,
+  port: null,
+  baudRate: 115200,
+  lastLine: '',
+  lastEvent: null,
+  lastHeartbeat: null,
+  activeCount: null,
+  lastUpdateMs: null,
+  error: null
+};
+
+function broadcastArduinoState() {
+  const payload = JSON.stringify(arduinoState);
+  arduinoSseClients.forEach((res) => {
+    try {
+      res.write(`event: state\ndata: ${payload}\n\n`);
+    } catch (_err) {
+      arduinoSseClients.delete(res);
+    }
+  });
+}
+
+function normalizeArduinoStatePatch(patch) {
+  Object.assign(arduinoState, patch, { lastUpdateMs: Date.now() });
+  broadcastArduinoState();
+}
+
+function parseArduinoLine(line) {
+  const clean = String(line || '').trim();
+  if (!clean) {
+    return;
+  }
+
+  normalizeArduinoStatePatch({ lastLine: clean, error: null });
+
+  const hbMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
+  if (hbMatch) {
+    normalizeArduinoStatePatch({
+      activeCount: Number(hbMatch[2]),
+      lastHeartbeat: {
+        ms: Number(hbMatch[1]),
+        activeCount: Number(hbMatch[2]),
+        line: clean
+      }
+    });
+    return;
+  }
+
+  const evtMatch = clean.match(/^EVT,(\d+),CH(\d{2}),([A-Z]+)$/i);
+  if (evtMatch) {
+    normalizeArduinoStatePatch({
+      lastEvent: {
+        ms: Number(evtMatch[1]),
+        channel: evtMatch[2],
+        state: evtMatch[3].toUpperCase(),
+        line: clean
+      }
+    });
+    return;
+  }
+
+  const legacyEvent = clean.match(/^CH(\d{2}):\s*(ACTIVE|IDLE|idle)$/);
+  if (legacyEvent) {
+    normalizeArduinoStatePatch({
+      lastEvent: {
+        ms: null,
+        channel: legacyEvent[1],
+        state: legacyEvent[2].toUpperCase(),
+        line: clean
+      }
+    });
+    return;
+  }
+
+  const legacyStatus = clean.match(/^STATUS\s+active=(\d+)$/i);
+  if (legacyStatus) {
+    normalizeArduinoStatePatch({ activeCount: Number(legacyStatus[1]) });
+  }
+}
+
+function clearArduinoReconnectTimer() {
+  if (arduinoReconnectTimer) {
+    clearTimeout(arduinoReconnectTimer);
+    arduinoReconnectTimer = null;
+  }
+}
+
+function scheduleArduinoReconnect(delayMs = 4000) {
+  if (arduinoReconnectTimer) {
+    return;
+  }
+  arduinoReconnectTimer = setTimeout(() => {
+    arduinoReconnectTimer = null;
+    startArduinoMonitor();
+  }, delayMs);
+}
+
+async function detectArduinoPort(preferredPort) {
+  if (preferredPort) {
+    return preferredPort;
+  }
+  if (!SerialPortCtor) {
+    return null;
+  }
+  const ports = await SerialPortCtor.list();
+  const firstKnown = ports.find((p) => {
+    const pathValue = (p.path || '').toLowerCase();
+    return pathValue.startsWith('/dev/ttyacm') || pathValue.startsWith('/dev/ttyusb') || pathValue.startsWith('com');
+  });
+  return firstKnown ? firstKnown.path : null;
+}
+
+function closeArduinoMonitor() {
+  clearArduinoReconnectTimer();
+  if (arduinoParser) {
+    arduinoParser.removeAllListeners();
+    arduinoParser = null;
+  }
+  if (arduinoPort) {
+    arduinoPort.removeAllListeners();
+    try {
+      if (arduinoPort.isOpen) {
+        arduinoPort.close();
+      }
+    } catch (_err) {
+      // Ignore close errors here.
+    }
+    arduinoPort = null;
+  }
+  normalizeArduinoStatePatch({ connected: false });
+}
+
+async function startArduinoMonitor() {
+  const settings = getSettings();
+  const baudRate = Number(settings.arduinoBaudRate || 115200) || 115200;
+
+  if (!settings.arduinoMonitorEnabled) {
+    closeArduinoMonitor();
+    normalizeArduinoStatePatch({
+      enabled: false,
+      baudRate,
+      error: 'Arduino-Monitor ist in den Einstellungen deaktiviert.'
+    });
+    return;
+  }
+
+  normalizeArduinoStatePatch({ enabled: true, baudRate });
+
+  if (!SerialPortCtor || !ReadlineParserCtor) {
+    normalizeArduinoStatePatch({
+      connected: false,
+      error: 'serialport Modul fehlt. Bitte npm install ausfuehren.'
+    });
+    return;
+  }
+
+  if (arduinoPort && arduinoPort.isOpen) {
+    return;
+  }
+
+  let serialPath = null;
+  try {
+    serialPath = await detectArduinoPort(settings.arduinoPort || '');
+  } catch (err) {
+    normalizeArduinoStatePatch({
+      connected: false,
+      error: `Portsuche fehlgeschlagen: ${err.message}`
+    });
+    scheduleArduinoReconnect();
+    return;
+  }
+
+  if (!serialPath) {
+    normalizeArduinoStatePatch({
+      connected: false,
+      port: null,
+      error: 'Kein Arduino-Serial-Port gefunden.'
+    });
+    scheduleArduinoReconnect();
+    return;
+  }
+
+  try {
+    const port = new SerialPortCtor({ path: serialPath, baudRate, autoOpen: true });
+    const parser = port.pipe(new ReadlineParserCtor({ delimiter: '\n' }));
+
+    arduinoPort = port;
+    arduinoParser = parser;
+
+    port.on('open', () => {
+      normalizeArduinoStatePatch({
+        connected: true,
+        port: serialPath,
+        error: null
+      });
+    });
+
+    parser.on('data', (line) => {
+      parseArduinoLine(line);
+    });
+
+    port.on('error', (err) => {
+      normalizeArduinoStatePatch({ connected: false, error: `Serial-Fehler: ${err.message}` });
+      scheduleArduinoReconnect();
+    });
+
+    port.on('close', () => {
+      if (arduinoPort === port) {
+        arduinoPort = null;
+      }
+      normalizeArduinoStatePatch({ connected: false, error: 'Arduino-Serial-Port getrennt.' });
+      scheduleArduinoReconnect();
+    });
+  } catch (err) {
+    normalizeArduinoStatePatch({ connected: false, error: `Arduino-Verbindung fehlgeschlagen: ${err.message}` });
+    scheduleArduinoReconnect();
+  }
+}
+
+function restartArduinoMonitor() {
+  closeArduinoMonitor();
+  startArduinoMonitor();
+}
 
 function getPlayers() {
   const defaults = Array.from({ length: 8 }, (_, i) => ({ slot: i + 1, name: '', active: false }));
@@ -166,6 +408,7 @@ app.get('/api/settings', (req, res) => res.json(getSettings()));
 app.put('/api/settings', (req, res) => {
   const s = { ...getSettings(), ...req.body };
   saveSettings(s);
+  restartArduinoMonitor();
   broadcastReload();
   res.json(s);
 });
@@ -181,6 +424,51 @@ app.get('/api/events', (req, res) => {
   // Keepalive alle 25s (verhindert Timeout bei Proxys/Firewalls)
   const ka = setInterval(() => { try { res.write(':ka\n\n'); } catch { clearInterval(ka); sseClients.delete(res); } }, 25000);
   req.on('close', () => { clearInterval(ka); sseClients.delete(res); });
+});
+
+app.get('/api/arduino/state', (_req, res) => {
+  res.json(arduinoState);
+});
+
+app.get('/api/arduino/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  res.write(`event: state\ndata: ${JSON.stringify(arduinoState)}\n\n`);
+  arduinoSseClients.add(res);
+
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(':ka\n\n');
+    } catch (_err) {
+      clearInterval(keepAlive);
+      arduinoSseClients.delete(res);
+    }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    arduinoSseClients.delete(res);
+  });
+});
+
+app.post('/api/arduino/command', (req, res) => {
+  const command = String((req.body && req.body.command) || '').trim();
+  if (!command) {
+    return res.status(400).json({ ok: false, error: 'command fehlt.' });
+  }
+  if (!arduinoPort || !arduinoPort.isOpen) {
+    return res.status(409).json({ ok: false, error: 'Arduino ist aktuell nicht verbunden.' });
+  }
+
+  arduinoPort.write(`${command}\n`, (err) => {
+    if (err) {
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+    res.json({ ok: true });
+  });
 });
 
 // ── ADB / Brave ──
@@ -411,6 +699,7 @@ app.get('/api/firetv-screen.png', (req, res) => {
 app.listen(PORT, () => {
   console.log('Dashboard: http://localhost:' + PORT);
   console.log('Admin:     http://localhost:' + PORT + '/admin.html');
+  startArduinoMonitor();
   if (FIRE_FEATURES_ENABLED) autoLaunchKiosk();
 });
 
