@@ -88,30 +88,264 @@ app.get('/', (_req, res, next) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Loewen Dart - Service</title>
+  <title>Loewen Dart – Service</title>
   <style>
-    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #0e0e0e; color: #f2f2f2; }
-    main { max-width: 900px; margin: 0 auto; padding: 28px; }
-    h1 { margin: 0 0 10px; }
-    .muted { color: #9b9b9b; margin-bottom: 16px; }
-    .row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-    a { display: block; background: #191919; color: #f2f2f2; text-decoration: none; border: 1px solid #2e2e2e; border-radius: 10px; padding: 12px; }
-    a:hover { border-color: #e63946; }
-    code { color: #f4a261; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a;
+      color: #f1f1f1;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #111;
+      border-bottom: 3px solid #e63946;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo { font-size: 2rem; }
+    .header-text h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: .5px; }
+    .header-text p  { font-size: .78rem; color: #666; margin-top: 2px; }
+    main { flex: 1; padding: 28px 32px; max-width: 1100px; width: 100%; margin: 0 auto; }
+
+    .section-hd {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 16px; margin-top: 28px;
+    }
+    .section-hd:first-child { margin-top: 0; }
+    .section-label {
+      font-size: .72rem; text-transform: uppercase; letter-spacing: 3px;
+      color: #555; font-weight: 600; white-space: nowrap;
+    }
+    .section-line { flex: 1; height: 1px; background: #1e1e1e; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      position: relative;
+      background: #161616;
+      border: 2px solid transparent;
+      border-radius: 14px;
+      padding: 20px 18px 16px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: transform .18s, box-shadow .18s, border-color .18s;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--accent, #444);
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 36px rgba(0,0,0,.55);
+      border-color: var(--accent, #444);
+    }
+    .card-icon  { font-size: 2rem; line-height: 1; }
+    .card-title { font-size: 1rem; font-weight: 700; }
+    .card-desc  { font-size: .75rem; color: #888; line-height: 1.45; flex: 1; }
+    .card-foot  { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+    .badge {
+      font-size: .67rem; padding: 3px 9px; border-radius: 20px; font-weight: 700;
+      background: var(--accent-bg, #1e1e1e); color: var(--accent, #888);
+    }
+    .arrow { font-size: .95rem; opacity: .4; transition: opacity .2s, transform .2s; }
+    .card:hover .arrow { opacity: 1; transform: translateX(4px); }
+
+    .status-bar {
+      background: #111;
+      border: 1px solid #1e1e1e;
+      border-radius: 12px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: .8rem;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .dot {
+      width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+      background: #333;
+    }
+    .dot.live { background: #2a9d8f; box-shadow: 0 0 10px rgba(42,157,143,.7); }
+
+    footer {
+      text-align: center;
+      padding: 14px;
+      font-size: .7rem;
+      color: #222;
+      border-top: 1px solid #141414;
+    }
   </style>
 </head>
 <body>
-  <main>
-    <h1>Dart-Dashboard Service</h1>
-    <p class="muted">Dieser Service ist getrennt vom Kiosk-Hub. Einstellungen und Kachel-Verwaltung laufen im Hub.</p>
-    <div class="row">
-      <a href="/panels/live-spielstand.html">Live-Spielstand Panel</a>
-      <a href="/panels/spieler.html">Spieler Panel</a>
-      <a href="/api/live/state">API: Live-State</a>
-      <a href="/api/highscores">API: Highscores</a>
-    </div>
-    <p class="muted" style="margin-top:16px">Optionaler Legacy-Hub-Modus: <code>DART_HUB_ENABLED=true</code></p>
-  </main>
+
+<header>
+  <span class="logo">🎯</span>
+  <div class="header-text">
+    <h1>Loewen Dart &ndash; Service</h1>
+    <p>Dart-Backend-Service &bull; Panels &bull; Daten-APIs</p>
+  </div>
+</header>
+
+<main>
+
+  <div class="status-bar" id="statusBar">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">Pruefe Service...</span>
+  </div>
+
+  <div class="section-hd">
+    <span class="section-label">Panels</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="grid">
+    <a class="card" href="/panels/live-spielstand.html" style="--accent:#e63946;--accent-bg:#1f0b0d">
+      <span class="card-icon">&#9889;</span>
+      <span class="card-title">Live-Spielstand</span>
+      <span class="card-desc">Aktueller Spielstand, Punktevergabe und Highscore-Tabelle.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#e63946;--accent-bg:#1f0b0d">Live</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/panels/spieler.html" style="--accent:#9b5de5;--accent-bg:#160d22">
+      <span class="card-icon">&#128100;</span>
+      <span class="card-title">Spieler</span>
+      <span class="card-desc">Spielerverwaltung &ndash; Slots, Namen und aktive Spieler festlegen.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#9b5de5;--accent-bg:#160d22">Verwaltung</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/panels/rangliste.html" style="--accent:#f4a261;--accent-bg:#1e1208">
+      <span class="card-icon">&#127942;</span>
+      <span class="card-title">Rangliste</span>
+      <span class="card-desc">Vereins-Rangliste und Saisonuebersicht.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#f4a261;--accent-bg:#1e1208">Preview</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/panels/spielplan.html" style="--accent:#264653;--accent-bg:#0d1416">
+      <span class="card-icon">&#128197;</span>
+      <span class="card-title">Spielplan</span>
+      <span class="card-desc">Aktuelle Spieltermine und Ligaplanung.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#457b9d;--accent-bg:#0d1520">Preview</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/panels/spielerstatistiken.html" style="--accent:#457b9d;--accent-bg:#0d1520">
+      <span class="card-icon">&#128202;</span>
+      <span class="card-title">Statistiken</span>
+      <span class="card-desc">Spieler-Statistiken und Auswertungen.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#457b9d;--accent-bg:#0d1520">Preview</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/panels/privat-dart.html" style="--accent:#2a9d8f;--accent-bg:#0b1714">
+      <span class="card-icon">&#127919;</span>
+      <span class="card-title">Privat Dart</span>
+      <span class="card-desc">Private Spielansicht fuer Vereinsmitglieder.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#2a9d8f;--accent-bg:#0b1714">Preview</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="section-hd">
+    <span class="section-label">Daten-APIs</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="grid">
+    <a class="card" href="/api/live/state" style="--accent:#e63946;--accent-bg:#1f0b0d">
+      <span class="card-icon">&#128268;</span>
+      <span class="card-title">Live-State</span>
+      <span class="card-desc">Aktueller Spielzustand als JSON.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#e63946;--accent-bg:#1f0b0d">GET</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/api/highscores" style="--accent:#f4a261;--accent-bg:#1e1208">
+      <span class="card-icon">&#127942;</span>
+      <span class="card-title">Highscores</span>
+      <span class="card-desc">Top-100 Highscores aus der Datenbank.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#f4a261;--accent-bg:#1e1208">GET</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/api/players" style="--accent:#9b5de5;--accent-bg:#160d22">
+      <span class="card-icon">&#128100;</span>
+      <span class="card-title">Spieler-API</span>
+      <span class="card-desc">Spieler-Slots lesen und schreiben.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#9b5de5;--accent-bg:#160d22">GET/PUT</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/api/storage/info" style="--accent:#2a9d8f;--accent-bg:#0b1714">
+      <span class="card-icon">&#128190;</span>
+      <span class="card-title">Storage-Info</span>
+      <span class="card-desc">Aktives Datenbank-Backend und Verbindungsstatus.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#2a9d8f;--accent-bg:#0b1714">GET</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+    <a class="card" href="/api/arduino/state" style="--accent:#457b9d;--accent-bg:#0d1520">
+      <span class="card-icon">&#9881;</span>
+      <span class="card-title">Arduino-Status</span>
+      <span class="card-desc">Verbindungsstatus und letztes Serial-Event.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#457b9d;--accent-bg:#0d1520">GET</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
+  </div>
+
+</main>
+
+<footer>Loewen Dart Club &mdash; Dart-Service &bull; Hub-Verwaltung im Kiosk-Dashboard</footer>
+
+<script>
+  (async () => {
+    const dot  = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    try {
+      const r = await fetch('/api/storage/info', { signal: AbortSignal.timeout(3000) });
+      if (r.ok) {
+        const d = await r.json();
+        dot.classList.add('live');
+        text.textContent = 'Service aktiv \u2014 Storage: ' + (d.client || 'sqlite') + (d.external ? ' (extern)' : ' (lokal)');
+      } else {
+        text.textContent = 'Service antwortet mit Fehler ' + r.status;
+      }
+    } catch (_) {
+      text.textContent = 'Service nicht erreichbar';
+    }
+  })();
+</script>
+
 </body>
 </html>`);
 });
