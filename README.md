@@ -13,6 +13,7 @@ Das Projekt bietet:
 - `dart-dashboard` verwaltet nur interne Dart-Inhalte unter `/panels/...` (Dart, Live, Rangliste, Spielplan, Spieler, Statistiken).
 - Externe Dashboards (Grafana, externe Webseiten, weitere Services) werden ueber `Fire-Stick/kiosk-dashboard` verwaltet.
 - API-seitig sind im `dart-dashboard` externe Kachel-Routen bewusst blockiert.
+- Neu: Dashboard-/Kachel-/Settings-Verwaltung ist standardmaessig im `dart-dashboard` deaktiviert und in den Hub verlagert.
 
 Aktuell enthaltene interne Panel-Dateien im `dart-dashboard`:
 - `/panels/privat-dart.html`
@@ -21,6 +22,10 @@ Aktuell enthaltene interne Panel-Dateien im `dart-dashboard`:
 - `/panels/spielerstatistiken.html`
 - `/panels/spielplan.html`
 - `/panels/spieler.html`
+
+Wichtig:
+- Diese Panelseiten sind aktuell Simulation/Preview und noch keine vollstaendig live-angebundenen Spielpanels.
+- Live-Spielstand und Highscores sind jetzt API- und SQL-basiert persistent.
 
 ## Voraussetzungen
 
@@ -116,6 +121,42 @@ Wichtige Variablen:
 - `DATA_PATH` = Persistente Daten (Settings, Dashboards, etc.)
 - `ADB_KEYS_PATH` = Persistente ADB-Keys
 - `PUBLIC_PORT` = Externer Port (Standard 3100)
+- `DART_HUB_ENABLED` = `false` (empfohlen, klare Trennung), `true` fuer Legacy-Hub/Admin im dart-dashboard
+
+SQL-Storage Variablen:
+- `DB_CLIENT` = `sqlite` (Standard), `postgres` oder `mysql`
+- `DB_SQLITE_FILE` = Pfad zur SQLite-Datei (nur bei `sqlite`)
+- `DB_URL` = Verbindungsstring fuer externe SQL-Datenbank
+- `DB_SSL` = `true/false` fuer TLS bei externer DB
+
+Beispiele fuer externe DB:
+
+```bash
+# PostgreSQL extern
+DB_CLIENT=postgres
+DB_URL=postgres://user:pass@db-host:5432/dart_dashboard
+
+# MySQL extern
+DB_CLIENT=mysql
+DB_URL=mysql://user:pass@db-host:3306/dart_dashboard
+```
+
+Hinweis externe DB:
+- Bei externer DB liegen Spieler, Live-State und Highscores nicht auf dem Raspberry Pi.
+- Der Endpoint `GET /api/storage/info` zeigt aktiv verwendetes Storage-Backend an.
+
+## Getrennter Betriebsmodus (empfohlen)
+
+Standard ist jetzt:
+- `DART_HUB_ENABLED=false`
+
+In diesem Modus gilt:
+- `dart-dashboard` liefert Dart-Panels und Dart-Daten-APIs.
+- Hub-Verwaltung (`/api/dashboards/*`, `/api/settings`, `/api/server-info`) ist im `dart-dashboard` deaktiviert.
+- Zentrale Verwaltung erfolgt ueber `Fire-Stick/kiosk-dashboard`.
+
+Optional (Legacy):
+- `DART_HUB_ENABLED=true` reaktiviert den alten Hub/Admin im `dart-dashboard`.
 
 ## Arduino Live-Monitor
 

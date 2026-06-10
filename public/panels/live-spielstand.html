@@ -7,56 +7,208 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #0d0d0d; color: #f1f1f1; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
-    .topbar { background: #1a1a1a; border-bottom: 2px solid #f4a261; padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+    .topbar { background: #1a1a1a; border-bottom: 2px solid #f4a261; padding: 14px 26px; display: flex; align-items: center; gap: 12px; }
     .topbar a { color: #888; text-decoration: none; font-size: 0.9rem; }
     .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1.3rem; flex: 1; }
-    .live-badge { background: #e63946; color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-    main { padding: 32px; max-width: 800px; margin: 0 auto; }
+    .topbar h2 { font-size: 1.2rem; flex: 1; }
+    .live-badge { background: #e63946; color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; }
+    main { padding: 20px; max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
     .scoreboard {
       background: #1a1a1a;
-      border-radius: 16px;
-      padding: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-around;
-      margin-top: 24px;
+      border-radius: 14px;
+      padding: 18px;
       border: 2px solid #f4a261;
-      text-align: center;
+      display: grid;
+      grid-template-columns: 1fr 72px 1fr;
+      gap: 8px;
+      align-items: center;
     }
-    .player-score .name { font-size: 1.1rem; color: #aaa; margin-bottom: 8px; }
-    .player-score .score { font-size: 5rem; font-weight: 700; color: #f4a261; line-height: 1; }
-    .player-score .legs { font-size: 0.85rem; color: #888; margin-top: 8px; }
-    .vs { font-size: 1.5rem; color: #444; font-weight: 700; }
-    .placeholder { background: #1a1a1a; border-radius: 12px; padding: 40px; text-align: center; border: 2px dashed #f4a261; color: #888; margin-top: 24px; }
-    .placeholder .icon { font-size: 3rem; margin-bottom: 12px; }
+    .player-score { text-align: center; padding: 10px; border-radius: 10px; border: 1px solid #262626; background: #151515; }
+    .player-score .name { font-size: 1rem; color: #d7d7d7; margin-bottom: 4px; }
+    .player-score .score { font-size: 3.8rem; font-weight: 700; color: #f4a261; line-height: 1; font-variant-numeric: tabular-nums; }
+    .player-score .meta { font-size: 0.8rem; color: #888; margin-top: 6px; }
+    .vs { text-align: center; color: #444; font-weight: 700; letter-spacing: 2px; }
+    .controls { background: #171717; border-radius: 12px; border: 1px solid #242424; padding: 14px; }
+    .controls h3 { font-size: 0.95rem; margin-bottom: 10px; color: #ddd; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row + .row { margin-top: 8px; }
+    .btn { background: #262626; border: 1px solid #333; color: #f1f1f1; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 0.85rem; }
+    .btn:hover { background: #333; }
+    .btn.primary { background: #e63946; border-color: #e63946; }
+    .btn.primary:hover { background: #c92f3a; }
+    .input { background: #111; border: 1px solid #303030; color: #f1f1f1; border-radius: 8px; padding: 8px 10px; width: 120px; }
+    .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .panel { background: #171717; border-radius: 12px; border: 1px solid #242424; padding: 12px; }
+    .panel h4 { font-size: 0.85rem; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .mono { font-family: Consolas, monospace; font-size: 0.83rem; color: #ddd; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 6px; border-bottom: 1px solid #242424; font-size: 0.85rem; }
+    th { color: #888; font-size: 0.75rem; text-transform: uppercase; }
+    .muted { color: #777; }
   </style>
 </head>
 <body>
   <div class="topbar">
-    <a href="/">← Zurück</a>
-    <h2>⚡ Live-Spielstand</h2>
-    <span class="live-badge">LIVE</span>
+    <a href="/">Zurueck</a>
+    <h2>Live-Spielstand</h2>
+    <span class="live-badge">LIVE DATA</span>
   </div>
+
   <main>
     <div class="scoreboard">
       <div class="player-score">
-        <div class="name">Spieler 1</div>
-        <div class="score" id="score1">501</div>
-        <div class="legs">Legs: <strong>2</strong></div>
+        <div class="name" id="name0">Spieler 1</div>
+        <div class="score" id="score0">501</div>
+        <div class="meta" id="meta0">Legs: 0 | Turns: 0</div>
       </div>
       <div class="vs">VS</div>
       <div class="player-score">
-        <div class="name">Spieler 2</div>
-        <div class="score" id="score2">501</div>
-        <div class="legs">Legs: <strong>1</strong></div>
+        <div class="name" id="name1">Spieler 2</div>
+        <div class="score" id="score1">501</div>
+        <div class="meta" id="meta1">Legs: 0 | Turns: 0</div>
       </div>
     </div>
-    <div class="placeholder">
-      <div class="icon">⚡</div>
-      <p>Live-Daten werden hier angezeigt, sobald die Spielsteuerung verbunden ist.</p>
+
+    <div class="controls">
+      <h3>Punkte verbuchen</h3>
+      <div class="row">
+        <button class="btn" onclick="applyPreset(0, 60)">P1 -60</button>
+        <button class="btn" onclick="applyPreset(0, 100)">P1 -100</button>
+        <button class="btn" onclick="applyPreset(1, 60)">P2 -60</button>
+        <button class="btn" onclick="applyPreset(1, 100)">P2 -100</button>
+      </div>
+      <div class="row">
+        <input id="manualPoints" class="input" type="number" min="0" max="180" value="45" />
+        <button class="btn" onclick="applyManual(0)">P1 Werfen</button>
+        <button class="btn" onclick="applyManual(1)">P2 Werfen</button>
+        <button class="btn primary" onclick="resetLeg(true)">Neues Leg</button>
+        <button class="btn" onclick="resetLeg(false)">Komplett Reset</button>
+      </div>
+    </div>
+
+    <div class="status-grid">
+      <div class="panel">
+        <h4>Arduino</h4>
+        <div class="mono" id="arduinoState">Warte auf Daten...</div>
+      </div>
+      <div class="panel">
+        <h4>Letzte Aktion</h4>
+        <div class="mono" id="lastAction">Noch keine Aktion</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>Highscores</h4>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Spieler</th><th>Score</th><th>Typ</th><th>Zeit</th></tr>
+        </thead>
+        <tbody id="highscoreBody">
+          <tr><td colspan="5" class="muted">Keine Eintraege</td></tr>
+        </tbody>
+      </table>
     </div>
   </main>
+
+  <script>
+    let liveState = null;
+
+    async function loadAll() {
+      const [stateRes, highscoresRes] = await Promise.all([
+        fetch('/api/live/state'),
+        fetch('/api/highscores')
+      ]);
+      liveState = await stateRes.json();
+      const highscores = await highscoresRes.json();
+      renderState(liveState);
+      renderHighscores(highscores);
+    }
+
+    function renderState(state) {
+      if (!state || !state.players || state.players.length < 2) return;
+
+      const p0 = state.players[0];
+      const p1 = state.players[1];
+      document.getElementById('name0').textContent = p0.name;
+      document.getElementById('name1').textContent = p1.name;
+      document.getElementById('score0').textContent = p0.remaining;
+      document.getElementById('score1').textContent = p1.remaining;
+      document.getElementById('meta0').textContent = 'Legs: ' + p0.legs + ' | Turns: ' + p0.turns + ' | Best: ' + p0.bestTurn;
+      document.getElementById('meta1').textContent = 'Legs: ' + p1.legs + ' | Turns: ' + p1.turns + ' | Best: ' + p1.bestTurn;
+
+      const arduino = state.arduino || {};
+      const arduinoText = arduino.connected
+        ? 'Verbunden | active=' + (arduino.activeCount || 0) + ' | last=' + (arduino.lastEvent ? arduino.lastEvent.line : '-')
+        : 'Nicht verbunden';
+      document.getElementById('arduinoState').textContent = arduinoText;
+
+      const action = state.lastAction;
+      document.getElementById('lastAction').textContent = action
+        ? (action.player + ' -> ' + action.points + (action.bust ? ' (BUST)' : '') + ' | Rest ' + action.remaining)
+        : 'Noch keine Aktion';
+    }
+
+    function renderHighscores(list) {
+      const body = document.getElementById('highscoreBody');
+      if (!Array.isArray(list) || list.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" class="muted">Keine Eintraege</td></tr>';
+        return;
+      }
+      body.innerHTML = list.slice(0, 12).map((e, idx) => {
+        const when = new Date(e.ts || Date.now()).toLocaleString('de-DE');
+        return '<tr>' +
+          '<td>' + (idx + 1) + '</td>' +
+          '<td>' + escapeHtml(e.player || '-') + '</td>' +
+          '<td>' + Number(e.score || 0) + '</td>' +
+          '<td>' + escapeHtml(e.kind || '-') + '</td>' +
+          '<td>' + when + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    async function applyThrow(playerIndex, points) {
+      const res = await fetch('/api/live/throw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerIndex, points })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Fehler' }));
+        alert(err.error || 'Fehler beim Speichern');
+        return;
+      }
+      await loadAll();
+    }
+
+    function applyPreset(playerIndex, points) {
+      applyThrow(playerIndex, points);
+    }
+
+    function applyManual(playerIndex) {
+      const points = Number(document.getElementById('manualPoints').value || 0);
+      applyThrow(playerIndex, points);
+    }
+
+    async function resetLeg(carryLegs) {
+      await fetch('/api/live/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carryLegs })
+      });
+      await loadAll();
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    setInterval(loadAll, 5000);
+    loadAll();
+  </script>
 </body>
 </html>

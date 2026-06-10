@@ -12,7 +12,8 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - PUBLIC_PORT=${PUBLIC_PORT:-3100}
-      - FIRE_FEATURES_ENABLED=false
+      - FIRE_FEATURES_ENABLED=${FIRE_FEATURES_ENABLED:-true}
+      - DART_HUB_ENABLED=${DART_HUB_ENABLED:-false}
       - FIRESTICK_IP=${FIRESTICK_IP:-192.168.8.177}
       - SERVER_IP=${SERVER_IP:-}
 

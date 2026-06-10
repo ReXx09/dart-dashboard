@@ -5,6 +5,7 @@ const os = require('os');
 const http = require('http');
 const https = require('https');
 const { exec, spawn } = require('child_process');
+const { DataStore } = require('./db');
 
 let SerialPortCtor = null;
 let ReadlineParserCtor = null;
@@ -36,6 +37,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const PUBLIC_PORT = process.env.PUBLIC_PORT || PORT;
 const FIRE_FEATURES_ENABLED = String(process.env.FIRE_FEATURES_ENABLED || 'false').toLowerCase() === 'true';
+const DART_HUB_ENABLED = String(process.env.DART_HUB_ENABLED || 'false').toLowerCase() === 'true';
 
 const DATA_DIR       = path.join(__dirname, 'data');
 const CUSTOM_FILE    = path.join(DATA_DIR, 'custom-dashboards.json');
@@ -44,6 +46,10 @@ const SETTINGS_FILE  = path.join(DATA_DIR, 'settings.json');
 const PLAYERS_FILE   = path.join(DATA_DIR, 'players.json');
 const BRAVE_URLS_FILE  = path.join(DATA_DIR, 'brave-urls.json');
 const BRAVE_MEDIA_FILE = path.join(DATA_DIR, 'brave-media.json');
+const LIVE_STATE_FILE = path.join(DATA_DIR, 'live-state.json');
+const HIGHSCORES_FILE = path.join(DATA_DIR, 'highscores.json');
+
+const dataStore = new DataStore();
 
 const DEFAULT_MEDIA = [
   { id: 'm-yt',   title: 'YouTube',     icon: '▶️',  url: 'https://www.youtube.com',   color: '#FF0000' },
@@ -61,6 +67,64 @@ const ADB_DEFAULT = process.env.ADB_PATH || (
 );
 const BRAVE_PKG   = 'com.brave.browser';
 
+function resolveAdbPath(rawValue) {
+  const candidate = String(rawValue || '').trim();
+  const looksLikeWindowsPath = /^[a-zA-Z]:\\/.test(candidate);
+  if (!candidate) {
+    return ADB_DEFAULT;
+  }
+  if (process.platform !== 'win32' && looksLikeWindowsPath) {
+    return 'adb';
+  }
+  return candidate;
+}
+
+app.get('/', (_req, res, next) => {
+  if (DART_HUB_ENABLED) {
+    return next();
+  }
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loewen Dart - Service</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #0e0e0e; color: #f2f2f2; }
+    main { max-width: 900px; margin: 0 auto; padding: 28px; }
+    h1 { margin: 0 0 10px; }
+    .muted { color: #9b9b9b; margin-bottom: 16px; }
+    .row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    a { display: block; background: #191919; color: #f2f2f2; text-decoration: none; border: 1px solid #2e2e2e; border-radius: 10px; padding: 12px; }
+    a:hover { border-color: #e63946; }
+    code { color: #f4a261; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Dart-Dashboard Service</h1>
+    <p class="muted">Dieser Service ist getrennt vom Kiosk-Hub. Einstellungen und Kachel-Verwaltung laufen im Hub.</p>
+    <div class="row">
+      <a href="/panels/live-spielstand.html">Live-Spielstand Panel</a>
+      <a href="/panels/spieler.html">Spieler Panel</a>
+      <a href="/api/live/state">API: Live-State</a>
+      <a href="/api/highscores">API: Highscores</a>
+    </div>
+    <p class="muted" style="margin-top:16px">Optionaler Legacy-Hub-Modus: <code>DART_HUB_ENABLED=true</code></p>
+  </main>
+</body>
+</html>`);
+});
+
+app.get('/admin.html', (req, res, next) => {
+  if (DART_HUB_ENABLED) {
+    return next();
+  }
+  res.status(410).json({
+    error: 'Admin im dart-dashboard ist deaktiviert. Bitte Hub-Admin im kiosk-dashboard nutzen.'
+  });
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders(res, filePath) {
     if (filePath.endsWith('.html')) {
@@ -70,13 +134,22 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 app.use(express.json());
 
+function requireDartHubManagement(_req, res, next) {
+  if (DART_HUB_ENABLED) {
+    return next();
+  }
+  return res.status(410).json({
+    error: 'Dashboard- und Settings-Verwaltung wurde ins kiosk-dashboard verlagert.'
+  });
+}
+
 const fixedDefaults = [
-  { id: 'privat-dart',       title: 'Privat Dart',        icon: '🎯', description: 'Vereinsinterne Dart-Liga & Turniere', color: '#e63946', route: '/panels/privat-dart.html',        external: false, badge: 'Dart'      },
-  { id: 'live-spielstand',   title: 'Live-Spielstand',    icon: '⚡', description: 'Aktueller Spielstand in Echtzeit',    color: '#f4a261', route: '/panels/live-spielstand.html',    external: false, badge: 'Live'      },
-  { id: 'rangliste',         title: 'Rangliste',          icon: '🏆', description: 'Aktuelle Platzierungen und Form',      color: '#2a9d8f', route: '/panels/rangliste.html',          external: false, badge: 'Statistik' },
-  { id: 'spielerstatistiken',title: 'Spielerstatistiken', icon: '📈', description: 'Leistung, Treffer, Trends',            color: '#457b9d', route: '/panels/spielerstatistiken.html', external: false, badge: 'Statistik' },
-  { id: 'spielplan',         title: 'Spielplan',          icon: '🗓️', description: 'Naechste Spiele und Begegnungen',      color: '#264653', route: '/panels/spielplan.html',          external: false, badge: 'Dart'      },
-  { id: 'spieler',           title: 'Spieler',            icon: '👤', description: 'Spielerverwaltung und Uebersicht',      color: '#9b5de5', route: '/panels/spieler.html',            external: false, badge: 'Dart'      }
+  { id: 'privat-dart',       title: 'Privat Dart',        icon: '🎯', description: 'Simulation/Preview fuer Vereins-Ansicht', color: '#e63946', route: '/panels/privat-dart.html',        external: false, badge: 'Preview'   },
+  { id: 'live-spielstand',   title: 'Live-Spielstand',    icon: '⚡', description: 'Simulation/Preview fuer Live-Anzeige',    color: '#f4a261', route: '/panels/live-spielstand.html',    external: false, badge: 'Preview'   },
+  { id: 'rangliste',         title: 'Rangliste',          icon: '🏆', description: 'Simulation/Preview fuer Rangliste',       color: '#2a9d8f', route: '/panels/rangliste.html',          external: false, badge: 'Preview'   },
+  { id: 'spielerstatistiken',title: 'Spielerstatistiken', icon: '📈', description: 'Simulation/Preview fuer Statistiken',     color: '#457b9d', route: '/panels/spielerstatistiken.html', external: false, badge: 'Preview'   },
+  { id: 'spielplan',         title: 'Spielplan',          icon: '🗓️', description: 'Simulation/Preview fuer Spielplan',       color: '#264653', route: '/panels/spielplan.html',          external: false, badge: 'Preview'   },
+  { id: 'spieler',           title: 'Spieler',            icon: '👤', description: 'Simulation/Preview fuer Spielerverwaltung', color: '#9b5de5', route: '/panels/spieler.html',            external: false, badge: 'Preview'   }
 ];
 
 const allowedPanelRoutes = new Set(fixedDefaults.map((tile) => tile.route));
@@ -114,7 +187,7 @@ function getCustom() {
 }
 function saveCustom(l) { writeJson(CUSTOM_FILE, l); }
 function getSettings() {
-  return {
+  const merged = {
     hubTitle: 'Löwen Dart – Kiosk Hub',
     autoReloadMinutes: 5,
     screensaverEnabled: true,
@@ -127,6 +200,8 @@ function getSettings() {
     firestickIp: process.env.FIRESTICK_IP || '192.168.8.177',
     ...readJson(SETTINGS_FILE, {})
   };
+  merged.adbPath = resolveAdbPath(merged.adbPath);
+  return merged;
 }
 function saveSettings(s){ writeJson(SETTINGS_FILE, s); }
 
@@ -360,14 +435,125 @@ function restartArduinoMonitor() {
   startArduinoMonitor();
 }
 
-function getPlayers() {
-  const defaults = Array.from({ length: 8 }, (_, i) => ({ slot: i + 1, name: '', active: false }));
-  const saved = readJson(PLAYERS_FILE, []);
-  return defaults.map(d => { const s = saved.find(p => p.slot === d.slot); return s ? { ...d, ...s } : d; });
+async function getPlayers() {
+  return dataStore.getPlayers();
 }
-function savePlayers(list) { writeJson(PLAYERS_FILE, list); }
+
+async function savePlayers(list) {
+  await dataStore.savePlayers(list);
+}
+
+async function getActivePlayersForLive() {
+  const players = (await getPlayers()).filter((p) => p.active && String(p.name || '').trim());
+  return players.slice(0, 2).map((p, index) => ({
+    slot: p.slot,
+    name: String(p.name).trim(),
+    color: p.color || (index === 0 ? '#e63946' : '#f4a261')
+  }));
+}
+
+async function defaultLiveState() {
+  const active = await getActivePlayersForLive();
+  const p1 = active[0] || { slot: 1, name: 'Spieler 1', color: '#e63946' };
+  const p2 = active[1] || { slot: 2, name: 'Spieler 2', color: '#f4a261' };
+
+  return {
+    game: {
+      mode: '501',
+      status: 'running',
+      startedAt: Date.now(),
+      updatedAt: Date.now()
+    },
+    players: [
+      { ...p1, remaining: 501, legs: 0, turns: 0, totalScored: 0, bestTurn: 0 },
+      { ...p2, remaining: 501, legs: 0, turns: 0, totalScored: 0, bestTurn: 0 }
+    ],
+    lastAction: null,
+    arduino: {
+      connected: false,
+      lastEvent: null,
+      activeCount: 0,
+      heartbeatMs: null
+    }
+  };
+}
+
+function sanitizePlayerState(player, fallback) {
+  const base = fallback || {};
+  const name = String(player && player.name ? player.name : base.name || '').trim() || 'Spieler';
+  const slot = Number.isFinite(Number(player && player.slot)) ? Number(player.slot) : Number(base.slot || 0);
+  const legs = Math.max(0, Number(player && player.legs || base.legs || 0));
+  const turns = Math.max(0, Number(player && player.turns || base.turns || 0));
+  const totalScored = Math.max(0, Number(player && player.totalScored || base.totalScored || 0));
+  const bestTurn = Math.max(0, Number(player && player.bestTurn || base.bestTurn || 0));
+  const remaining = Math.max(0, Number(player && player.remaining || base.remaining || 501));
+  const color = String(player && player.color ? player.color : base.color || '#e63946');
+  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn };
+}
+
+async function getLiveState() {
+  const fallback = await defaultLiveState();
+  const saved = await dataStore.getLiveState(fallback);
+
+  const state = {
+    game: {
+      mode: String(saved.game && saved.game.mode || fallback.game.mode),
+      status: String(saved.game && saved.game.status || fallback.game.status),
+      startedAt: Number(saved.game && saved.game.startedAt || fallback.game.startedAt),
+      updatedAt: Number(saved.game && saved.game.updatedAt || Date.now())
+    },
+    players: [
+      sanitizePlayerState(saved.players && saved.players[0], fallback.players[0]),
+      sanitizePlayerState(saved.players && saved.players[1], fallback.players[1])
+    ],
+    lastAction: saved.lastAction || null,
+    arduino: {
+      connected: !!arduinoState.connected,
+      lastEvent: arduinoState.lastEvent || null,
+      activeCount: Number(arduinoState.activeCount || 0),
+      heartbeatMs: arduinoState.lastHeartbeat ? Number(arduinoState.lastHeartbeat.ms || 0) : null
+    }
+  };
+
+  return state;
+}
+
+async function saveLiveState(state) {
+  const safe = {
+    ...state,
+    game: {
+      ...(state.game || {}),
+      updatedAt: Date.now()
+    }
+  };
+  await dataStore.saveLiveState(safe);
+  return safe;
+}
+
+async function getHighscores() {
+  return dataStore.getHighscores(100);
+}
+
+async function addHighscore(playerName, score, meta = {}) {
+  const safeName = String(playerName || '').trim();
+  const safeScore = Number(score || 0);
+  if (!safeName || !Number.isFinite(safeScore) || safeScore <= 0) {
+    return;
+  }
+  await dataStore.addHighscore({
+    player: safeName,
+    score: safeScore,
+    ts: Date.now(),
+    legWin: !!meta.legWin,
+    ...meta
+  });
+}
 
 // ── Fixed tiles ──
+app.use('/api/dashboards', requireDartHubManagement);
+app.use('/api/settings', requireDartHubManagement);
+app.use('/api/server-info', requireDartHubManagement);
+
 app.get('/api/dashboards/fixed', (req, res) => res.json(getFixed()));
 app.put('/api/dashboards/fixed/:id', (req, res) => {
   const def = fixedDefaults.find(d => d.id === req.params.id);
@@ -420,12 +606,27 @@ app.delete('/api/dashboards/custom/:id', (req, res) => {
 });
 
 // ── Players ──
-app.get('/api/players', (req, res) => res.json(getPlayers()));
-app.put('/api/players', (req, res) => {
+app.get('/api/players', async (_req, res) => {
+  try {
+    res.json(await getPlayers());
+  } catch (err) {
+    res.status(500).json({ error: `Spieler konnten nicht geladen werden: ${err.message}` });
+  }
+});
+
+app.put('/api/players', async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
-  savePlayers(req.body);
-  broadcastReload();
-  res.json({ ok: true });
+  try {
+    await savePlayers(req.body);
+    broadcastReload();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: `Spieler konnten nicht gespeichert werden: ${err.message}` });
+  }
+});
+
+app.get('/api/storage/info', (_req, res) => {
+  res.json(dataStore.getInfo());
 });
 
 // ── Server-Info ──
@@ -502,6 +703,98 @@ app.post('/api/arduino/command', (req, res) => {
     }
     res.json({ ok: true });
   });
+});
+
+app.get('/api/live/state', async (_req, res) => {
+  try {
+    res.json(await getLiveState());
+  } catch (err) {
+    res.status(500).json({ error: `Live-State konnte nicht geladen werden: ${err.message}` });
+  }
+});
+
+app.post('/api/live/reset', async (req, res) => {
+  const carryLegs = !!(req.body && req.body.carryLegs);
+  try {
+    const prev = await getLiveState();
+    const fresh = await defaultLiveState();
+    if (carryLegs) {
+      fresh.players[0].legs = prev.players[0].legs;
+      fresh.players[1].legs = prev.players[1].legs;
+    }
+    const saved = await saveLiveState(fresh);
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ error: `Live-Reset fehlgeschlagen: ${err.message}` });
+  }
+});
+
+app.post('/api/live/throw', async (req, res) => {
+  const playerIndex = Number(req.body && req.body.playerIndex);
+  const points = Number(req.body && req.body.points);
+  if (![0, 1].includes(playerIndex)) {
+    return res.status(400).json({ error: 'playerIndex muss 0 oder 1 sein.' });
+  }
+  if (!Number.isFinite(points) || points < 0 || points > 180) {
+    return res.status(400).json({ error: 'points muss zwischen 0 und 180 liegen.' });
+  }
+
+  try {
+    const state = await getLiveState();
+    const player = state.players[playerIndex];
+    const nextRemaining = player.remaining - points;
+    const bust = nextRemaining < 0;
+
+    player.turns += 1;
+    player.bestTurn = Math.max(player.bestTurn, points);
+    if (!bust) {
+      player.remaining = nextRemaining;
+      player.totalScored += points;
+    }
+
+    state.lastAction = {
+      type: 'throw',
+      playerIndex,
+      player: player.name,
+      points,
+      bust,
+      remaining: player.remaining,
+      ts: Date.now()
+    };
+
+    if (player.remaining === 0) {
+      player.legs += 1;
+      await addHighscore(player.name, points, { kind: 'checkout', legWin: true });
+      state.game.status = 'leg-finished';
+    }
+
+    const saved = await saveLiveState(state);
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ error: `Wurf konnte nicht gespeichert werden: ${err.message}` });
+  }
+});
+
+app.get('/api/highscores', async (_req, res) => {
+  try {
+    res.json(await getHighscores());
+  } catch (err) {
+    res.status(500).json({ error: `Highscores konnten nicht geladen werden: ${err.message}` });
+  }
+});
+
+app.post('/api/highscores', async (req, res) => {
+  const player = String(req.body && req.body.player || '').trim();
+  const score = Number(req.body && req.body.score);
+  if (!player || !Number.isFinite(score) || score <= 0) {
+    return res.status(400).json({ error: 'player und positive score sind erforderlich.' });
+  }
+  try {
+    await addHighscore(player, score, { kind: 'manual' });
+    res.json({ ok: true, highscores: await getHighscores() });
+  } catch (err) {
+    res.status(500).json({ error: `Highscore konnte nicht gespeichert werden: ${err.message}` });
+  }
 });
 
 // ── ADB / Brave ──
@@ -609,6 +902,9 @@ app.delete('/api/brave-media/:id', (req, res) => {
 });
 
 app.post('/api/restart', (_req, res) => {
+  if (!DART_HUB_ENABLED) {
+    return res.status(410).json({ error: 'Server-Neustart aus dem dart-dashboard-Admin ist deaktiviert.' });
+  }
   res.json({ ok: true, message: 'Server wird neu gestartet...' });
   setTimeout(() => process.exit(0), 400);
 });
@@ -729,11 +1025,30 @@ app.get('/api/firetv-screen.png', (req, res) => {
   res.sendFile(f);
 });
 
-app.listen(PORT, () => {
-  console.log('Dashboard: http://localhost:' + PORT);
-  console.log('Admin:     http://localhost:' + PORT + '/admin.html');
-  startArduinoMonitor();
-  if (FIRE_FEATURES_ENABLED) autoLaunchKiosk();
+async function startServer() {
+  await dataStore.init({
+    playersFile: PLAYERS_FILE,
+    liveStateFile: LIVE_STATE_FILE,
+    highscoresFile: HIGHSCORES_FILE
+  });
+
+  const storageInfo = dataStore.getInfo();
+  console.log(`[Storage] client=${storageInfo.client} external=${storageInfo.external}`);
+  if (storageInfo.sqliteFile) {
+    console.log('[Storage] sqlite=' + storageInfo.sqliteFile);
+  }
+
+  app.listen(PORT, () => {
+    console.log('Dashboard: http://localhost:' + PORT);
+    console.log('Admin:     http://localhost:' + PORT + '/admin.html');
+    startArduinoMonitor();
+    if (FIRE_FEATURES_ENABLED) autoLaunchKiosk();
+  });
+}
+
+startServer().catch((err) => {
+  console.error('[Storage] Start fehlgeschlagen:', err.message);
+  process.exit(1);
 });
 
 function autoLaunchKiosk() {
