@@ -615,12 +615,32 @@ async function detectArduinoPort(preferredPort) {
   if (!SerialPortCtor) {
     return null;
   }
-  const ports = await SerialPortCtor.list();
-  const firstKnown = ports.find((p) => {
-    const pathValue = (p.path || '').toLowerCase();
-    return pathValue.startsWith('/dev/ttyacm') || pathValue.startsWith('/dev/ttyusb') || pathValue.startsWith('com');
-  });
-  return firstKnown ? firstKnown.path : null;
+
+  // In minimal container images udevadm may be missing, which can break SerialPort.list().
+  // Fallback: scan /dev directly for common Arduino serial devices.
+  const fallbackDeviceFromDev = () => {
+    try {
+      if (!fs.existsSync('/dev')) {
+        return null;
+      }
+      const entries = fs.readdirSync('/dev');
+      const devName = entries.find((name) => /^tty(ACM|USB)\d+$/i.test(name));
+      return devName ? `/dev/${devName}` : null;
+    } catch (_err) {
+      return null;
+    }
+  };
+
+  try {
+    const ports = await SerialPortCtor.list();
+    const firstKnown = ports.find((p) => {
+      const pathValue = (p.path || '').toLowerCase();
+      return pathValue.startsWith('/dev/ttyacm') || pathValue.startsWith('/dev/ttyusb') || pathValue.startsWith('com');
+    });
+    return firstKnown ? firstKnown.path : fallbackDeviceFromDev();
+  } catch (_err) {
+    return fallbackDeviceFromDev();
+  }
 }
 
 function closeArduinoMonitor() {
