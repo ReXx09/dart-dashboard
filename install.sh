@@ -8,6 +8,22 @@ REPO_URL="https://github.com/ReXx09/dart-dashboard.git"
 USE_WHIPTAIL=0
 COMPOSE_BUILD_ARGS=()
 
+get_env_value() {
+  local key="$1"
+  local default_value="${2:-}"
+
+  if [[ -f .env ]]; then
+    local line
+    line="$(grep -E "^${key}=" .env | tail -n 1 || true)"
+    if [[ -n "$line" ]]; then
+      printf '%s' "${line#*=}"
+      return 0
+    fi
+  fi
+
+  printf '%s' "$default_value"
+}
+
 print_line() {
   printf '%s\n' "------------------------------------------------------------"
 }
@@ -414,76 +430,166 @@ clone_repo_elsewhere() {
   printf 'Fertig. Wechsle dann nach: %s/dart-dashboard\n' "$target_dir"
 }
 
+run_health_checks() {
+  local report=""
+  local compose_cmd=""
+  local public_port=""
+  local fire_enabled=""
+  local fire_ip=""
+
+  public_port="$(get_env_value PUBLIC_PORT 3100)"
+  fire_enabled="$(get_env_value FIRE_FEATURES_ENABLED true | tr '[:upper:]' '[:lower:]')"
+  fire_ip="$(get_env_value FIRESTICK_IP 192.168.8.177)"
+
+  report+="Health-Check Loewen Dart Dashboard\n\n"
+
+  if command_exists docker; then
+    report+="[OK] Docker vorhanden\n"
+  else
+    report+="[FEHLT] Docker nicht gefunden\n"
+  fi
+
+  if compose_cmd="$(detect_compose_cmd)"; then
+    report+="[OK] Docker Compose verfuegbar (${compose_cmd})\n"
+    if compose_output="$($compose_cmd ps 2>&1 || true)"; then
+      if printf '%s' "$compose_output" | grep -q 'dart-dashboard'; then
+        report+="[OK] Containerstatus abgefragt (dart-dashboard gefunden)\n"
+      else
+        report+="[WARN] Compose erreichbar, aber dart-dashboard nicht sichtbar\n"
+      fi
+    else
+      report+="[WARN] Compose-Status konnte nicht abgefragt werden\n"
+    fi
+  else
+    report+="[FEHLT] Docker Compose nicht verfuegbar\n"
+  fi
+
+  if command_exists curl; then
+    local api_base
+    api_base="http://localhost:${public_port}"
+
+    if live_json="$(curl -fsS --max-time 4 "${api_base}/api/live/state" 2>/dev/null || true)"; then
+      if [[ -n "$live_json" ]]; then
+        report+="[OK] API live/state erreichbar (${api_base})\n"
+      else
+        report+="[WARN] API live/state liefert keine Daten (${api_base})\n"
+      fi
+    else
+      report+="[FEHLT] API live/state nicht erreichbar (${api_base})\n"
+    fi
+
+    if storage_json="$(curl -fsS --max-time 4 "${api_base}/api/storage/info" 2>/dev/null || true)"; then
+      if [[ -n "$storage_json" ]]; then
+        if command_exists jq; then
+          local db_client db_external
+          db_client="$(printf '%s' "$storage_json" | jq -r '.client // "unknown"' 2>/dev/null || printf 'unknown')"
+          db_external="$(printf '%s' "$storage_json" | jq -r '.external // false' 2>/dev/null || printf 'false')"
+          report+="[OK] Storage API erreichbar (client=${db_client}, external=${db_external})\n"
+        else
+          report+="[OK] Storage API erreichbar\n"
+        fi
+      else
+        report+="[WARN] Storage API liefert keine Daten\n"
+      fi
+    else
+      report+="[FEHLT] Storage API nicht erreichbar\n"
+    fi
+
+    if arduino_json="$(curl -fsS --max-time 4 "${api_base}/api/arduino/state" 2>/dev/null || true)"; then
+      if [[ -n "$arduino_json" ]]; then
+        if command_exists jq; then
+          local arduino_connected
+          arduino_connected="$(printf '%s' "$arduino_json" | jq -r '.connected // false' 2>/dev/null || printf 'false')"
+          report+="[OK] Arduino API erreichbar (connected=${arduino_connected})\n"
+        else
+          report+="[OK] Arduino API erreichbar\n"
+        fi
+      else
+        report+="[WARN] Arduino API liefert keine Daten\n"
+      fi
+    else
+      report+="[WARN] Arduino API nicht erreichbar\n"
+    fi
+  else
+    report+="[WARN] curl fehlt, API-Checks wurden uebersprungen\n"
+  fi
+
+  if [[ "$fire_enabled" == "true" ]]; then
+    report+="\nFire-TV / ADB Check\n"
+    if command_exists ping; then
+      if ping -c 1 -W 1 "$fire_ip" >/dev/null 2>&1; then
+        report+="[OK] Fire TV per ping erreichbar (${fire_ip})\n"
+      else
+        report+="[WARN] Fire TV per ping nicht erreichbar (${fire_ip})\n"
+      fi
+    else
+      report+="[WARN] ping nicht verfuegbar\n"
+    fi
+
+    if command_exists adb; then
+      if adb connect "${fire_ip}:5555" >/dev/null 2>&1; then
+        report+="[OK] ADB Verbindung moeglich (${fire_ip}:5555)\n"
+      else
+        report+="[WARN] ADB Verbindung fehlgeschlagen (${fire_ip}:5555)\n"
+      fi
+    else
+      report+="[WARN] adb nicht im PATH (hostseitiger Test uebersprungen)\n"
+    fi
+  else
+    report+="\n[HINWEIS] FIRE_FEATURES_ENABLED=false, Fire-TV Checks uebersprungen\n"
+  fi
+
+  show_textbox "Health-Check" "$(printf '%b' "$report")"
+}
+
 run_choice() {
   local choice="$1"
   case "$choice" in
-    0)
-      run_system_check_and_install
-      ;;
-    1)
-      build_and_start
-      ;;
-    2)
-      start_existing
-      ;;
-    3)
-      show_status
-      ;;
-    4)
-      stop_stack
-      ;;
-    5)
-      clone_repo_elsewhere
-      ;;
-    6)
-      printf 'Beendet.\n'
-      exit 0
-      ;;
+    0) run_system_check_and_install ;;
+    1) build_and_start ;;
+    2) start_existing ;;
+    3) show_status ;;
+    4) stop_stack ;;
+    5) clone_repo_elsewhere ;;
+    6) run_health_checks ;;
     *)
       printf 'Ungueltige Auswahl.\n'
+      return 1
       ;;
   esac
 }
 
-main_menu_whiptail() {
-  while true; do
-    local choice
-    choice="$(whiptail --title "Loewen Dart Dashboard - Setup" --menu "Bitte Option waehlen" 20 78 10 \
-      "0" "Systemcheck + Auto-Installation (Docker/Pi-Tools)" \
-      "1" "Install/Update + Build + Start (empfohlen)" \
-      "2" "Nur Start (ohne Build)" \
-      "3" "Status und Logs anzeigen" \
-      "4" "Stoppen" \
-      "5" "Repo in anderen Ordner klonen" \
-      "6" "Beenden" \
-      3>&1 1>&2 2>&3)" || exit 0
+usage() {
+  cat <<'EOF'
+Verwendung:
+  ./install.sh <action>
 
-    run_choice "$choice"
-    ui_pause
-  done
+Actions:
+  menu          Startet das eigenstaendige Menue (menu.sh)
+  check         Systemcheck + Auto-Installation
+  build-start   Install/Update + Build + Start
+  start         Nur Start (ohne Build)
+  status        Status und Logs anzeigen
+  stop          Container stoppen
+  clone         Repo in anderen Ordner klonen
+  health        Health-Checks (API/Storage/Arduino/Fire-TV)
+
+Wenn kein Action-Parameter gesetzt ist, wird automatisch menu.sh gestartet.
+EOF
 }
 
-main_menu() {
-  if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
-    main_menu_whiptail
-    return
-  fi
-
-  while true; do
-    print_header
-    printf 'Aktueller Ordner: %s\n\n' "$SCRIPT_DIR"
-    printf '0) Systemcheck + Auto-Installation (Docker/Pi-Tools)\n'
-    printf '1) Install/Update + Build + Start (empfohlen)\n'
-    printf '2) Nur Start (ohne Build)\n'
-    printf '3) Status und Logs anzeigen\n'
-    printf '4) Stoppen\n'
-    printf '5) Repo in anderen Ordner klonen\n'
-    printf '6) Beenden\n\n'
-
-    read -r -p 'Bitte Option waehlen [0-6]: ' choice
-    run_choice "$choice"
-    ui_pause
-  done
+action_to_choice() {
+  local action="$1"
+  case "$action" in
+    check) echo 0 ;;
+    build-start) echo 1 ;;
+    start) echo 2 ;;
+    status) echo 3 ;;
+    stop) echo 4 ;;
+    clone) echo 5 ;;
+    health) echo 6 ;;
+    *) return 1 ;;
+  esac
 }
 
 if [[ ! -f docker-compose.yml ]]; then
@@ -493,4 +599,27 @@ fi
 
 detect_ui_mode
 
-main_menu
+if [[ $# -eq 0 || "${1:-}" == "menu" ]]; then
+  if [[ -x "$SCRIPT_DIR/menu.sh" ]]; then
+    exec "$SCRIPT_DIR/menu.sh"
+  fi
+
+  printf 'Fehler: menu.sh nicht gefunden oder nicht ausfuehrbar.\n'
+  usage
+  exit 1
+fi
+
+case "${1:-}" in
+  check|build-start|start|status|stop|clone|health)
+    choice="$(action_to_choice "$1")"
+    run_choice "$choice"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    printf 'Unbekannte Action: %s\n\n' "$1"
+    usage
+    exit 1
+    ;;
+esac

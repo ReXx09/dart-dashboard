@@ -41,6 +41,16 @@ chmod +x install.sh
 ./install.sh
 ```
 
+Neu: Das interaktive Menue ist als eigene Datei ausgelagert:
+
+```bash
+chmod +x menu.sh
+./menu.sh
+```
+
+- `menu.sh` ist die eigenstaendige Menue-/Verwaltungsoberflaeche (whiptail oder Textmenue).
+- `install.sh` ist der Ausfuehrer fuer einzelne Aktionen.
+
 Der Assistent bietet:
 - Systemcheck + Auto-Installation fuer Docker/Pi-Tools
 - Install/Update + Build + Start (empfohlen)
@@ -56,7 +66,26 @@ Menuepunkte im Assistenten:
 - 3 = Status und Logs
 - 4 = Stoppen
 - 5 = Repo in anderen Ordner klonen
-- 6 = Beenden
+- 6 = Health-Checks ausfuehren
+- 7 = Beenden
+
+Direkte Aktionen ohne Menue:
+
+```bash
+./install.sh check
+./install.sh build-start
+./install.sh start
+./install.sh status
+./install.sh stop
+./install.sh clone
+./install.sh health
+```
+
+Health-Check umfasst:
+- Docker/Compose Verfuegbarkeit + Containerstatus
+- API-Erreichbarkeit (`/api/live/state`, `/api/storage/info`, `/api/arduino/state`)
+- Storage-Info (z. B. sqlite/postgres/mysql)
+- Optional Fire-TV/ADB Reachability (abh. von `FIRE_FEATURES_ENABLED`)
 
 Hinweis:
 - Wenn `whiptail` installiert ist, nutzt `install.sh` automatisch ein Dialog-Menue.
