@@ -35,25 +35,35 @@ get_env_value_local() {
   printf '%s' "$default_value"
 }
 
+status_badge() {
+  local state="$1"
+  case "$state" in
+    ok) printf '[OK]' ;;
+    warn) printf '[WARN]' ;;
+    off) printf '[OFF]' ;;
+    *) printf '[INFO]' ;;
+  esac
+}
+
 docker_menu_status() {
   if ! command_exists docker; then
-    printf 'Docker: fehlt'
+    printf '%s Docker fehlt' "$(status_badge off)"
     return 0
   fi
 
   local state
   state="$(docker inspect -f '{{.State.Status}}' dart-dashboard 2>/dev/null || printf 'nicht gefunden')"
   case "$state" in
-    running) printf 'Container: running' ;;
-    exited) printf 'Container: exited' ;;
-    restarting) printf 'Container: restarting' ;;
-    *) printf 'Container: %s' "$state" ;;
+    running) printf '%s Container running' "$(status_badge ok)" ;;
+    exited) printf '%s Container exited' "$(status_badge warn)" ;;
+    restarting) printf '%s Container restarting' "$(status_badge warn)" ;;
+    *) printf '%s Container %s' "$(status_badge off)" "$state" ;;
   esac
 }
 
 api_menu_status() {
   if ! command_exists curl; then
-    printf 'API: curl fehlt'
+    printf '%s API curl fehlt' "$(status_badge off)"
     return 0
   fi
 
@@ -62,15 +72,15 @@ api_menu_status() {
   api_base="http://localhost:${port}"
 
   if curl -fsS --max-time 2 "${api_base}/api/live/state" >/dev/null 2>&1; then
-    printf 'API: erreichbar'
+    printf '%s API erreichbar' "$(status_badge ok)"
   else
-    printf 'API: nicht erreichbar'
+    printf '%s API nicht erreichbar' "$(status_badge off)"
   fi
 }
 
 storage_menu_status() {
   if ! command_exists curl; then
-    printf 'DB: unbekannt'
+    printf '%s DB unbekannt' "$(status_badge off)"
     return 0
   fi
 
@@ -79,7 +89,7 @@ storage_menu_status() {
   api_base="http://localhost:${port}"
   payload="$(curl -fsS --max-time 2 "${api_base}/api/storage/info" 2>/dev/null || true)"
   if [[ -z "$payload" ]]; then
-    printf 'DB: offline'
+    printf '%s DB offline' "$(status_badge off)"
     return 0
   fi
 
@@ -87,12 +97,12 @@ storage_menu_status() {
   external="$(printf '%s' "$payload" | sed -n 's/.*"external"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n 1)"
   [[ -z "$client" ]] && client='unknown'
   [[ "$external" == "true" ]] && mode='extern' || mode='lokal'
-  printf 'DB: %s (%s)' "$client" "$mode"
+  printf '%s DB %s (%s)' "$(status_badge ok)" "$client" "$mode"
 }
 
 arduino_menu_status() {
   if ! command_exists curl; then
-    printf 'Arduino: unbekannt'
+    printf '%s Arduino unbekannt' "$(status_badge off)"
     return 0
   fi
 
@@ -101,15 +111,15 @@ arduino_menu_status() {
   api_base="http://localhost:${port}"
   payload="$(curl -fsS --max-time 2 "${api_base}/api/arduino/state" 2>/dev/null || true)"
   if [[ -z "$payload" ]]; then
-    printf 'Arduino: offline'
+    printf '%s Arduino offline' "$(status_badge off)"
     return 0
   fi
 
   connected="$(printf '%s' "$payload" | sed -n 's/.*"connected"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n 1)"
   if [[ "$connected" == "true" ]]; then
-    printf 'Arduino: connected'
+    printf '%s Arduino connected' "$(status_badge ok)"
   else
-    printf 'Arduino: disconnected'
+    printf '%s Arduino disconnected' "$(status_badge warn)"
   fi
 }
 
@@ -128,6 +138,10 @@ docker_status_line() {
 
 diagnostics_status_line() {
   printf '%s | %s | %s' "$(api_menu_status)" "$(storage_menu_status)" "$(arduino_menu_status)"
+}
+
+monitoring_status_line() {
+  printf '%s | %s | %s' "$(docker_menu_status)" "$(api_menu_status)" "$(storage_menu_status)"
 }
 
 print_line() {
@@ -293,6 +307,30 @@ submenu_docker_whiptail() {
   done
 }
 
+submenu_monitoring_whiptail() {
+  while true; do
+    local choice
+    local status_line
+    status_line="$(monitoring_status_line)"
+    choice="$(whiptail --title "Loewen Dart | Status & Monitoring" --menu "${status_line}\n\n$(menu_subtitle 'Status pruefen, Gesamtansicht oeffnen oder Logs direkt beobachten.')" 22 84 9 \
+      "1" "Gesamtstatus  (Compose + Logs + Netz)" \
+      "2" "Container Status (ps)" \
+      "3" "Schnell-Diagnose (Health-Checks)" \
+      "4" "Docker-Logs Snapshot" \
+      "5" "Docker-Logs Live (Ctrl+C)" \
+      "0" "Zurueck" \
+      3>&1 1>&2 2>&3)" || return 0
+    case "$choice" in
+      1) execute_action status 0 0 ;;
+      2) execute_action ps ;;
+      3) execute_action health 0 0 ;;
+      4) execute_action logs 0 0 ;;
+      5) execute_action logs-follow 0 0 ;;
+      0|"") return 0 ;;
+    esac
+  done
+}
+
 submenu_diagnose_advanced_whiptail() {
   while true; do
     local choice
@@ -341,24 +379,26 @@ main_menu_whiptail() {
     local status_line
     status_line="$(menu_status_line)"
 
-    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 21 84 8 \
+    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 22 86 9 \
       "0" "Schnellstart-Assistent  (komplette Einrichtung)" \
       "1" "Einrichtung  >" \
-      "2" "Docker  >" \
-      "3" "Diagnose  >" \
-      "4" "Repo: in anderen Ordner klonen" \
-      "5" "Hilfe fuer Einsteiger" \
-      "6" "Beenden" \
+      "2" "Status & Monitoring  >" \
+      "3" "Docker  >" \
+      "4" "Diagnose  >" \
+      "5" "Repo: in anderen Ordner klonen" \
+      "6" "Hilfe fuer Einsteiger" \
+      "7" "Beenden" \
       3>&1 1>&2 2>&3)" || exit 0
 
     case "$choice" in
       0) execute_action quickstart ;;
       1) submenu_einrichtung_whiptail ;;
-      2) submenu_docker_whiptail ;;
-      3) submenu_diagnose_whiptail ;;
-      4) execute_action clone ;;
-      5) execute_action help-guide ;;
-      6) printf 'Beendet.\n'; exit 0 ;;
+      2) submenu_monitoring_whiptail ;;
+      3) submenu_docker_whiptail ;;
+      4) submenu_diagnose_whiptail ;;
+      5) execute_action clone ;;
+      6) execute_action help-guide ;;
+      7) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
   done
@@ -411,6 +451,29 @@ submenu_docker_text() {
   done
 }
 
+submenu_monitoring_text() {
+  while true; do
+    printf '\n-- Status & Monitoring ------------------------\n'
+    printf '%s\n' "$(monitoring_status_line)"
+    printf 'Status pruefen, Gesamtansicht oeffnen oder Logs direkt beobachten.\n'
+    printf '1) Gesamtstatus\n'
+    printf '2) Container Status (ps)\n'
+    printf '3) Schnell-Diagnose (Health-Checks)\n'
+    printf '4) Docker-Logs (Snapshot)\n'
+    printf '5) Docker-Logs (Live)\n'
+    printf '0) Zurueck\n\n'
+    read -r -p 'Option [0-5]: ' c
+    case "$c" in
+      1) execute_action status 0 0 ;;
+      2) execute_action ps ;;
+      3) execute_action health 0 0 ;;
+      4) execute_action logs 0 0 ;;
+      5) execute_action logs-follow 0 0 ;;
+      0|'') return 0 ;;
+    esac
+  done
+}
+
 submenu_diagnose_advanced_text() {
   while true; do
     printf '\n-- Diagnose (Erweitert) ------------------------\n'
@@ -452,23 +515,26 @@ submenu_diagnose_text() {
 main_menu_text() {
   while true; do
     print_header
+    printf '%s\n\n' "$(menu_status_line)"
     printf 'Aktueller Ordner: %s\n\n' "$SCRIPT_DIR"
     printf '0) Schnellstart-Assistent\n'
     printf '1) Einrichtung >\n'
-    printf '2) Docker >\n'
-    printf '3) Diagnose >\n'
-    printf '4) Repo: klonen\n'
-    printf '5) Hilfe\n'
-    printf '6) Beenden\n\n'
-    read -r -p 'Option [0-6]: ' choice
+    printf '2) Status & Monitoring >\n'
+    printf '3) Docker >\n'
+    printf '4) Diagnose >\n'
+    printf '5) Repo: klonen\n'
+    printf '6) Hilfe\n'
+    printf '7) Beenden\n\n'
+    read -r -p 'Option [0-7]: ' choice
     case "$choice" in
       0) execute_action quickstart ;;
       1) submenu_einrichtung_text ;;
-      2) submenu_docker_text ;;
-      3) submenu_diagnose_text ;;
-      4) execute_action clone ;;
-      5) execute_action help-guide ;;
-      6) printf 'Beendet.\n'; exit 0 ;;
+      2) submenu_monitoring_text ;;
+      3) submenu_docker_text ;;
+      4) submenu_diagnose_text ;;
+      5) execute_action clone ;;
+      6) execute_action help-guide ;;
+      7) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
   done
