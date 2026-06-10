@@ -226,16 +226,51 @@ show_action_error() {
   fi
 }
 
+default_action_pause() {
+  local action="$1"
+  case "$action" in
+    logs|logs-follow|status|health|test|arduino-status)
+      printf '0'
+      ;;
+    *)
+      printf '1'
+      ;;
+  esac
+}
+
+default_action_capture_mode() {
+  local action="$1"
+  case "$action" in
+    logs|logs-follow|status|health|test|arduino-status)
+      # Diese Aktionen haben eigene UI/Streaming-Ausgabe.
+      printf '0'
+      ;;
+    *)
+      # Standard: live anzeigen UND fuer Fehlerdiagnose mitschneiden.
+      printf '2'
+      ;;
+  esac
+}
+
 execute_action() {
   local action="$1"
-  local pause_after="${2:-1}"
-  local capture_output="${3:-1}"
+  local pause_after="${2:-$(default_action_pause "$action")}" 
+  local capture_output="${3:-$(default_action_capture_mode "$action")}" 
 
   if [[ "$capture_output" -eq 0 ]]; then
     if ! run_action "$action"; then
       show_action_error "$action"
       return 1
     fi
+  elif [[ "$capture_output" -eq 2 ]]; then
+    local tmp_output
+    tmp_output="$(mktemp)"
+    if ! run_action "$action" 2>&1 | tee "$tmp_output"; then
+      show_action_error "$action" "$tmp_output"
+      rm -f "$tmp_output"
+      return 1
+    fi
+    rm -f "$tmp_output"
   else
     local tmp_output
     tmp_output="$(mktemp)"
