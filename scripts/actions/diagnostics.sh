@@ -108,19 +108,26 @@ connect_arduino_monitor() {
     return 1
   fi
 
+  printf '[1/3] Vorstatus lesen...\n'
   api_base="$(dashboard_api_base)"
   state_json="$(get_arduino_state_json)"
   current_port="$(json_string_field "$state_json" port)"
 
   if ask_yes_no 'Manuellen Serial-Port setzen? (Nein = automatische Erkennung)' 'n'; then
+    printf '[2/3] Manuellen Port abfragen...\n'
     selected_port="$(prompt_arduino_port "$current_port")" || return 1
+  else
+    printf '[2/3] Auto-Port-Erkennung verwenden...\n'
   fi
 
   payload=$(printf '{"port":"%s"}' "$(json_escape "$selected_port")")
+  printf '[3/3] Arduino-Monitor neu verbinden...\n'
   response="$(curl -fsS --max-time 6 -X POST "${api_base}/api/arduino/connect" -H "Content-Type: application/json" --data "$payload" 2>&1)" || {
     printf 'Arduino-Monitor konnte nicht gestartet werden.\n%s\n' "$response"
     return 1
   }
+
+  printf '[OK] Arduino-Connect ausgelost.\n'
 
   show_arduino_status
 }
@@ -134,11 +141,15 @@ disconnect_arduino_monitor() {
     return 1
   fi
 
+  printf '[1/2] Arduino-Monitor stoppen...\n'
   api_base="$(dashboard_api_base)"
   response="$(curl -fsS --max-time 6 -X POST "${api_base}/api/arduino/disconnect" -H "Content-Type: application/json" --data '{}' 2>&1)" || {
     printf 'Arduino-Monitor konnte nicht gestoppt werden.\n%s\n' "$response"
     return 1
   }
+
+  printf '[2/2] Status neu laden...\n'
+  printf '[OK] Arduino-Disconnect ausgelost.\n'
 
   show_arduino_status
 }

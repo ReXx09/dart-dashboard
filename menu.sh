@@ -256,6 +256,11 @@ execute_action() {
   local action="$1"
   local pause_after="${2:-$(default_action_pause "$action")}" 
   local capture_output="${3:-$(default_action_capture_mode "$action")}" 
+  local label
+  label="$(action_label "$action")"
+
+  printf '\n[RUN] %s\n' "$label"
+  printf '------------------------------------------------------------\n'
 
   if [[ "$capture_output" -eq 0 ]]; then
     if ! run_action "$action"; then
