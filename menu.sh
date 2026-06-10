@@ -117,6 +117,19 @@ menu_status_line() {
   printf '%s | %s | %s | %s' "$(docker_menu_status)" "$(api_menu_status)" "$(storage_menu_status)" "$(arduino_menu_status)"
 }
 
+menu_subtitle() {
+  local heading="$1"
+  printf '%s\n\nENTER = ausfuehren   ESC = zurueck' "$heading"
+}
+
+docker_status_line() {
+  printf '%s | %s' "$(docker_menu_status)" "$(api_menu_status)"
+}
+
+diagnostics_status_line() {
+  printf '%s | %s | %s' "$(api_menu_status)" "$(storage_menu_status)" "$(arduino_menu_status)"
+}
+
 print_line() {
   printf '%s\n' "------------------------------------------------------------"
 }
@@ -162,9 +175,10 @@ show_action_success() {
   local label
   label="$(action_label "$action")"
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
-    whiptail --title "Erfolg" --msgbox "Aktion erfolgreich:\n${label}\n\nWeiter mit OK." 11 68
+    whiptail --title "Erfolg" --msgbox "Aktion erfolgreich:\n${label}\n\nMit OK zur vorherigen Menueebene." 11 72
   else
     printf '\n[OK] Aktion erfolgreich: %s\n' "$label"
+    printf 'Weiter mit Enter zur vorherigen Menueebene...\n'
     ui_pause
   fi
 }
@@ -234,71 +248,89 @@ ui_pause() {
 # ── Untermenus ─────────────────────────────────────────────────────────────
 
 submenu_einrichtung_whiptail() {
-  local choice
-  choice="$(whiptail --title "Einrichtung" --menu "Einrichtung & Installation" 16 72 5 \
-    "1" "Systemcheck + Auto-Installation" \
-    "2" "Install/Update + Build + Start" \
-    "3" "Zurueck" \
-    3>&1 1>&2 2>&3)" || return 0
-  case "$choice" in
-    1) execute_action check ;;
-    2) execute_action build-start ;;
-  esac
+  while true; do
+    local choice
+    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(menu_subtitle 'System vorbereiten oder den Dienst neu bauen und starten.')" 18 78 6 \
+      "1" "Systemcheck + Auto-Installation" \
+      "2" "Install/Update + Build + Start" \
+      "0" "Zurueck" \
+      3>&1 1>&2 2>&3)" || return 0
+    case "$choice" in
+      1) execute_action check ;;
+      2) execute_action build-start ;;
+      0|"") return 0 ;;
+    esac
+  done
 }
 
 submenu_docker_whiptail() {
-  local choice
-  choice="$(whiptail --title "Docker" --menu "Docker-Verwaltung" 20 76 8 \
-    "1" "Start" \
-    "2" "Stop" \
-    "3" "Restart" \
-    "4" "ps  (Status anzeigen)" \
-    "5" "Logs anzeigen  (Snapshot)" \
-    "6" "Logs verfolgen  (Live, Ctrl+C)" \
-    "7" "Uninstall  (Container + Image entfernen)" \
-    "8" "Reinstall  (Uninstall + Neustart)" \
-    "9" "Zurueck" \
-    3>&1 1>&2 2>&3)" || return 0
-  case "$choice" in
-    1) execute_action start ;;
-    2) execute_action stop ;;
-    3) execute_action restart ;;
-    4) execute_action ps ;;
-    5) execute_action logs 0 0 ;;
-    6) execute_action logs-follow 0 0 ;;
-    7) execute_action uninstall ;;
-    8) execute_action reinstall ;;
-  esac
+  while true; do
+    local choice
+    local status_line
+    status_line="$(docker_status_line)"
+    choice="$(whiptail --title "Loewen Dart | Docker" --menu "${status_line}\n\n$(menu_subtitle 'Container steuern, Logs ansehen oder den Dienst sauber neu aufsetzen.')" 22 82 9 \
+      "1" "Start" \
+      "2" "Stop" \
+      "3" "Restart" \
+      "4" "ps  (Status anzeigen)" \
+      "5" "Logs anzeigen  (Snapshot)" \
+      "6" "Logs verfolgen  (Live, Ctrl+C)" \
+      "7" "Uninstall  (Container + Image entfernen)" \
+      "8" "Reinstall  (Uninstall + Neustart)" \
+      "0" "Zurueck" \
+      3>&1 1>&2 2>&3)" || return 0
+    case "$choice" in
+      1) execute_action start ;;
+      2) execute_action stop ;;
+      3) execute_action restart ;;
+      4) execute_action ps ;;
+      5) execute_action logs 0 0 ;;
+      6) execute_action logs-follow 0 0 ;;
+      7) execute_action uninstall ;;
+      8) execute_action reinstall ;;
+      0|"") return 0 ;;
+    esac
+  done
 }
 
 submenu_diagnose_advanced_whiptail() {
-  local choice
-  choice="$(whiptail --title "Diagnose (Erweitert)" --menu "Diagnose & Checks" 20 76 7 \
-    "1" "Gefuehrte Funktionstests  (Schritt fuer Schritt)" \
-    "2" "Gesamtstatus  (Compose + Logs + Netz)" \
-    "3" "Docker-Logs Snapshot" \
-    "4" "Docker-Logs Live (Ctrl+C)" \
-    "5" "Zurueck" \
-    3>&1 1>&2 2>&3)" || return 0
-  case "$choice" in
-    1) execute_action test 0 0 ;;
-    2) execute_action status 0 0 ;;
-    3) execute_action logs 0 0 ;;
-    4) execute_action logs-follow 0 0 ;;
-  esac
+  while true; do
+    local choice
+    local status_line
+    status_line="$(diagnostics_status_line)"
+    choice="$(whiptail --title "Loewen Dart | Diagnose (Erweitert)" --menu "${status_line}\n\n$(menu_subtitle 'Detailansichten fuer Status, Logs und Schritt-fuer-Schritt-Tests.')" 21 82 8 \
+      "1" "Gefuehrte Funktionstests  (Schritt fuer Schritt)" \
+      "2" "Gesamtstatus  (Compose + Logs + Netz)" \
+      "3" "Docker-Logs Snapshot" \
+      "4" "Docker-Logs Live (Ctrl+C)" \
+      "0" "Zurueck" \
+      3>&1 1>&2 2>&3)" || return 0
+    case "$choice" in
+      1) execute_action test 0 0 ;;
+      2) execute_action status 0 0 ;;
+      3) execute_action logs 0 0 ;;
+      4) execute_action logs-follow 0 0 ;;
+      0|"") return 0 ;;
+    esac
+  done
 }
 
 submenu_diagnose_whiptail() {
-  local choice
-  choice="$(whiptail --title "Diagnose" --menu "Diagnose & Checks" 18 76 6 \
-    "1" "Schnell-Diagnose (Health-Checks, empfohlen)" \
-    "2" "Erweiterte Diagnose  >" \
-    "3" "Zurueck" \
-    3>&1 1>&2 2>&3)" || return 0
-  case "$choice" in
-    1) execute_action health 0 0 ;;
-    2) submenu_diagnose_advanced_whiptail ;;
-  esac
+  while true; do
+    local choice
+    local status_line
+    status_line="$(diagnostics_status_line)"
+    choice="$(whiptail --title "Loewen Dart | Diagnose" --menu "${status_line}\n\n$(menu_subtitle 'Erst Schnell-Diagnose, danach bei Bedarf in die Detailansicht wechseln.')" 19 82 6 \
+      "1" "Schnell-Diagnose (Health-Checks, empfohlen)" \
+      "2" "Erweiterte Diagnose  >" \
+      "0" "Zurueck" \
+      3>&1 1>&2 2>&3)" || return 0
+    case "$choice" in
+      1) execute_action health 0 0 ;;
+      2) submenu_diagnose_advanced_whiptail ;;
+      0|"") return 0 ;;
+    esac
+  done
 }
 
 # ── Hauptmenue whiptail ────────────────────────────────────────────────────
@@ -309,7 +341,7 @@ main_menu_whiptail() {
     local status_line
     status_line="$(menu_status_line)"
 
-    choice="$(whiptail --title "Loewen Dart Dashboard" --menu "${status_line}\n\nHauptmenue" 20 78 8 \
+    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 21 84 8 \
       "0" "Schnellstart-Assistent  (komplette Einrichtung)" \
       "1" "Einrichtung  >" \
       "2" "Docker  >" \
@@ -335,67 +367,86 @@ main_menu_whiptail() {
 # ── Hauptmenue Text (Fallback ohne whiptail) ───────────────────────────────
 
 submenu_einrichtung_text() {
-  printf '\n-- Einrichtung --------------------------------\n'
-  printf '1) Systemcheck + Auto-Installation\n'
-  printf '2) Install/Update + Build + Start\n'
-  printf '0) Zurueck\n\n'
-  read -r -p 'Option [0-2]: ' c
-  case "$c" in
-    1) execute_action check ;;
-    2) execute_action build-start ;;
-  esac
+  while true; do
+    printf '\n-- Einrichtung --------------------------------\n'
+    printf 'System vorbereiten oder den Dienst neu bauen und starten.\n'
+    printf '1) Systemcheck + Auto-Installation\n'
+    printf '2) Install/Update + Build + Start\n'
+    printf '0) Zurueck\n\n'
+    read -r -p 'Option [0-2]: ' c
+    case "$c" in
+      1) execute_action check ;;
+      2) execute_action build-start ;;
+      0|'') return 0 ;;
+    esac
+  done
 }
 
 submenu_docker_text() {
-  printf '\n-- Docker -------------------------------------\n'
-  printf '1) Start\n'
-  printf '2) Stop\n'
-  printf '3) Restart\n'
-  printf '4) ps\n'
-  printf '5) Logs (Snapshot)\n'
-  printf '6) Logs (Live)\n'
-  printf '7) Uninstall\n'
-  printf '8) Reinstall\n'
-  printf '0) Zurueck\n\n'
-  read -r -p 'Option [0-8]: ' c
-  case "$c" in
-    1) execute_action start ;;
-    2) execute_action stop ;;
-    3) execute_action restart ;;
-    4) execute_action ps ;;
-    5) execute_action logs 0 0 ;;
-    6) execute_action logs-follow 0 0 ;;
-    7) execute_action uninstall ;;
-    8) execute_action reinstall ;;
-  esac
+  while true; do
+    printf '\n-- Docker -------------------------------------\n'
+    printf '%s\n' "$(docker_status_line)"
+    printf 'Container steuern, Logs ansehen oder den Dienst sauber neu aufsetzen.\n'
+    printf '1) Start\n'
+    printf '2) Stop\n'
+    printf '3) Restart\n'
+    printf '4) ps\n'
+    printf '5) Logs (Snapshot)\n'
+    printf '6) Logs (Live)\n'
+    printf '7) Uninstall\n'
+    printf '8) Reinstall\n'
+    printf '0) Zurueck\n\n'
+    read -r -p 'Option [0-8]: ' c
+    case "$c" in
+      1) execute_action start ;;
+      2) execute_action stop ;;
+      3) execute_action restart ;;
+      4) execute_action ps ;;
+      5) execute_action logs 0 0 ;;
+      6) execute_action logs-follow 0 0 ;;
+      7) execute_action uninstall ;;
+      8) execute_action reinstall ;;
+      0|'') return 0 ;;
+    esac
+  done
 }
 
 submenu_diagnose_advanced_text() {
-  printf '\n-- Diagnose -----------------------------------\n'
-  printf '1) Gefuehrte Funktionstests\n'
-  printf '2) Gesamtstatus\n'
-  printf '3) Docker-Logs (Snapshot)\n'
-  printf '4) Docker-Logs (Live)\n'
-  printf '0) Zurueck\n\n'
-  read -r -p 'Option [0-4]: ' c
-  case "$c" in
-    1) execute_action test 0 0 ;;
-    2) execute_action status 0 0 ;;
-    3) execute_action logs 0 0 ;;
-    4) execute_action logs-follow 0 0 ;;
-  esac
+  while true; do
+    printf '\n-- Diagnose (Erweitert) ------------------------\n'
+    printf '%s\n' "$(diagnostics_status_line)"
+    printf 'Detailansichten fuer Status, Logs und Schritt-fuer-Schritt-Tests.\n'
+    printf '1) Gefuehrte Funktionstests\n'
+    printf '2) Gesamtstatus\n'
+    printf '3) Docker-Logs (Snapshot)\n'
+    printf '4) Docker-Logs (Live)\n'
+    printf '0) Zurueck\n\n'
+    read -r -p 'Option [0-4]: ' c
+    case "$c" in
+      1) execute_action test 0 0 ;;
+      2) execute_action status 0 0 ;;
+      3) execute_action logs 0 0 ;;
+      4) execute_action logs-follow 0 0 ;;
+      0|'') return 0 ;;
+    esac
+  done
 }
 
 submenu_diagnose_text() {
-  printf '\n-- Diagnose -----------------------------------\n'
-  printf '1) Schnell-Diagnose (Health-Checks)\n'
-  printf '2) Erweiterte Diagnose >\n'
-  printf '0) Zurueck\n\n'
-  read -r -p 'Option [0-2]: ' c
-  case "$c" in
-    1) execute_action health 0 0 ;;
-    2) submenu_diagnose_advanced_text ;;
-  esac
+  while true; do
+    printf '\n-- Diagnose -----------------------------------\n'
+    printf '%s\n' "$(diagnostics_status_line)"
+    printf 'Erst Schnell-Diagnose, danach bei Bedarf in die Detailansicht wechseln.\n'
+    printf '1) Schnell-Diagnose (Health-Checks)\n'
+    printf '2) Erweiterte Diagnose >\n'
+    printf '0) Zurueck\n\n'
+    read -r -p 'Option [0-2]: ' c
+    case "$c" in
+      1) execute_action health 0 0 ;;
+      2) submenu_diagnose_advanced_text ;;
+      0|'') return 0 ;;
+    esac
+  done
 }
 
 main_menu_text() {
