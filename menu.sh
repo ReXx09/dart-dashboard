@@ -3,10 +3,22 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_SCRIPT="$SCRIPT_DIR/install.sh"
+COMMON_LIB="$SCRIPT_DIR/scripts/lib/common.sh"
 
 if [[ ! -x "$INSTALL_SCRIPT" ]]; then
   printf 'Fehler: install.sh nicht gefunden oder nicht ausfuehrbar: %s\n' "$INSTALL_SCRIPT"
   exit 1
+fi
+
+if [[ -f "$COMMON_LIB" ]]; then
+  # shellcheck source=/dev/null
+  source "$COMMON_LIB"
+else
+  msg_run() { printf '\n[RUN]  %s\n' "$1"; }
+  msg_ok() { printf '[OK]   %s\n' "$1"; }
+  msg_warn() { printf '[WARN] %s\n' "$1"; }
+  msg_fail() { printf '[FAIL] %s\n' "$1"; }
+  msg_info() { printf '[INFO] %s\n' "$1"; }
 fi
 
 command_exists() {
