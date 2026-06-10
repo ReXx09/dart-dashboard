@@ -44,94 +44,159 @@ ui_pause() {
   fi
 }
 
+# ── Untermenus ─────────────────────────────────────────────────────────────
+
+submenu_einrichtung_whiptail() {
+  local choice
+  choice="$(whiptail --title "Einrichtung" --menu "Einrichtung & Installation" 16 72 5 \
+    "1" "Systemcheck + Auto-Installation" \
+    "2" "Install/Update + Build + Start" \
+    "3" "Zurueck" \
+    3>&1 1>&2 2>&3)" || return 0
+  case "$choice" in
+    1) run_action check ; ui_pause ;;
+    2) run_action build-start ; ui_pause ;;
+  esac
+}
+
+submenu_docker_whiptail() {
+  local choice
+  choice="$(whiptail --title "Docker" --menu "Docker-Verwaltung" 18 72 7 \
+    "1" "Start" \
+    "2" "Stop" \
+    "3" "Restart" \
+    "4" "ps  (Status anzeigen)" \
+    "5" "Logs anzeigen" \
+    "6" "Uninstall  (Container + Image entfernen)" \
+    "7" "Reinstall  (Uninstall + Neustart)" \
+    "8" "Zurueck" \
+    3>&1 1>&2 2>&3)" || return 0
+  case "$choice" in
+    1) run_action start ; ui_pause ;;
+    2) run_action stop ; ui_pause ;;
+    3) run_action restart ; ui_pause ;;
+    4) run_action ps ; ui_pause ;;
+    5) run_action logs ; ui_pause ;;
+    6) run_action uninstall ; ui_pause ;;
+    7) run_action reinstall ; ui_pause ;;
+  esac
+}
+
+submenu_diagnose_whiptail() {
+  local choice
+  choice="$(whiptail --title "Diagnose" --menu "Diagnose & Checks" 16 72 5 \
+    "1" "Health-Checks (API / Storage / Arduino / Fire-TV)" \
+    "2" "Gefuehrte Funktionstests  (Schritt fuer Schritt)" \
+    "3" "Gesamtstatus  (Compose + Logs + Netz)" \
+    "4" "Zurueck" \
+    3>&1 1>&2 2>&3)" || return 0
+  case "$choice" in
+    1) run_action health ; ui_pause ;;
+    2) run_action test ; ui_pause ;;
+    3) run_action status ; ui_pause ;;
+  esac
+}
+
+# ── Hauptmenue whiptail ────────────────────────────────────────────────────
+
 main_menu_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart Dashboard - Menue" --menu "Bitte Bereich waehlen" 24 84 16 \
-      "0" "Schnellstart-Assistent (komplette Einrichtung)" \
-      "1" "Einrichtung: Systemcheck + Auto-Installation" \
-      "2" "Einrichtung: Install/Update + Build + Start" \
-      "3" "Docker: Start" \
-      "4" "Docker: Stop" \
-      "5" "Docker: Restart" \
-      "6" "Docker: ps" \
-      "7" "Docker: Logs" \
-      "8" "Docker: Uninstall (Container + Image entfernen)" \
-      "9" "Docker: Reinstall (Uninstall + Neustart)" \
-      "10" "Diagnose: Health-Checks" \
-      "11" "Diagnose: Gefuehrte Funktionstests" \
-      "12" "Diagnose: Gesamtstatus" \
-      "13" "Repo: in anderen Ordner klonen" \
-      "14" "Hilfe fuer Einsteiger anzeigen" \
-      "15" "Beenden" \
+    choice="$(whiptail --title "Loewen Dart Dashboard" --menu "Hauptmenue" 18 72 8 \
+      "0" "Schnellstart-Assistent  (komplette Einrichtung)" \
+      "1" "Einrichtung  >" \
+      "2" "Docker  >" \
+      "3" "Diagnose  >" \
+      "4" "Repo: in anderen Ordner klonen" \
+      "5" "Hilfe fuer Einsteiger" \
+      "6" "Beenden" \
       3>&1 1>&2 2>&3)" || exit 0
 
     case "$choice" in
-      0) run_action quickstart ;;
-      1) run_action check ;;
-      2) run_action build-start ;;
-      3) run_action start ;;
-      4) run_action stop ;;
-      5) run_action restart ;;
-      6) run_action ps ;;
-      7) run_action logs ;;
-      8) run_action uninstall ;;
-      9) run_action reinstall ;;
-      10) run_action health ;;
-      11) run_action test ;;
-      12) run_action status ;;
-      13) run_action clone ;;
-      14) run_action help-guide ;;
-      15) printf 'Beendet.\n'; exit 0 ;;
+      0) run_action quickstart ; ui_pause ;;
+      1) submenu_einrichtung_whiptail ;;
+      2) submenu_docker_whiptail ;;
+      3) submenu_diagnose_whiptail ;;
+      4) run_action clone ; ui_pause ;;
+      5) run_action help-guide ; ui_pause ;;
+      6) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
-
-    ui_pause
   done
+}
+
+# ── Hauptmenue Text (Fallback ohne whiptail) ───────────────────────────────
+
+submenu_einrichtung_text() {
+  printf '\n-- Einrichtung --------------------------------\n'
+  printf '1) Systemcheck + Auto-Installation\n'
+  printf '2) Install/Update + Build + Start\n'
+  printf '0) Zurueck\n\n'
+  read -r -p 'Option [0-2]: ' c
+  case "$c" in
+    1) run_action check ; ui_pause ;;
+    2) run_action build-start ; ui_pause ;;
+  esac
+}
+
+submenu_docker_text() {
+  printf '\n-- Docker -------------------------------------\n'
+  printf '1) Start\n'
+  printf '2) Stop\n'
+  printf '3) Restart\n'
+  printf '4) ps\n'
+  printf '5) Logs\n'
+  printf '6) Uninstall\n'
+  printf '7) Reinstall\n'
+  printf '0) Zurueck\n\n'
+  read -r -p 'Option [0-7]: ' c
+  case "$c" in
+    1) run_action start ; ui_pause ;;
+    2) run_action stop ; ui_pause ;;
+    3) run_action restart ; ui_pause ;;
+    4) run_action ps ; ui_pause ;;
+    5) run_action logs ; ui_pause ;;
+    6) run_action uninstall ; ui_pause ;;
+    7) run_action reinstall ; ui_pause ;;
+  esac
+}
+
+submenu_diagnose_text() {
+  printf '\n-- Diagnose -----------------------------------\n'
+  printf '1) Health-Checks\n'
+  printf '2) Gefuehrte Funktionstests\n'
+  printf '3) Gesamtstatus\n'
+  printf '0) Zurueck\n\n'
+  read -r -p 'Option [0-3]: ' c
+  case "$c" in
+    1) run_action health ; ui_pause ;;
+    2) run_action test ; ui_pause ;;
+    3) run_action status ; ui_pause ;;
+  esac
 }
 
 main_menu_text() {
   while true; do
     print_header
     printf 'Aktueller Ordner: %s\n\n' "$SCRIPT_DIR"
-    printf '0) Schnellstart-Assistent (komplette Einrichtung)\n'
-    printf '1) Einrichtung: Systemcheck + Auto-Installation\n'
-    printf '2) Einrichtung: Install/Update + Build + Start\n'
-    printf '3) Docker: Start\n'
-    printf '4) Docker: Stop\n'
-    printf '5) Docker: Restart\n'
-    printf '6) Docker: ps\n'
-    printf '7) Docker: Logs\n'
-    printf '8) Docker: Uninstall (Container + Image entfernen)\n'
-    printf '9) Docker: Reinstall (Uninstall + Neustart)\n'
-    printf '10) Diagnose: Health-Checks\n'
-    printf '11) Diagnose: Gefuehrte Funktionstests\n'
-    printf '12) Diagnose: Gesamtstatus\n'
-    printf '13) Repo: in anderen Ordner klonen\n'
-    printf '14) Hilfe fuer Einsteiger anzeigen\n'
-    printf '15) Beenden\n\n'
-
-    read -r -p 'Bitte Option waehlen [0-15]: ' choice
+    printf '0) Schnellstart-Assistent\n'
+    printf '1) Einrichtung >\n'
+    printf '2) Docker >\n'
+    printf '3) Diagnose >\n'
+    printf '4) Repo: klonen\n'
+    printf '5) Hilfe\n'
+    printf '6) Beenden\n\n'
+    read -r -p 'Option [0-6]: ' choice
     case "$choice" in
-      0) run_action quickstart ;;
-      1) run_action check ;;
-      2) run_action build-start ;;
-      3) run_action start ;;
-      4) run_action stop ;;
-      5) run_action restart ;;
-      6) run_action ps ;;
-      7) run_action logs ;;
-      8) run_action uninstall ;;
-      9) run_action reinstall ;;
-      10) run_action health ;;
-      11) run_action test ;;
-      12) run_action status ;;
-      13) run_action clone ;;
-      14) run_action help-guide ;;
-      15) printf 'Beendet.\n'; exit 0 ;;
+      0) run_action quickstart ; ui_pause ;;
+      1) submenu_einrichtung_text ;;
+      2) submenu_docker_text ;;
+      3) submenu_diagnose_text ;;
+      4) run_action clone ; ui_pause ;;
+      5) run_action help-guide ; ui_pause ;;
+      6) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
-    ui_pause
   done
 }
 
