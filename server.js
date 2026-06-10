@@ -163,6 +163,32 @@ app.get('/', (_req, res, next) => {
       font-size: .67rem; padding: 3px 9px; border-radius: 20px; font-weight: 700;
       background: var(--accent-bg, #1e1e1e); color: var(--accent, #888);
     }
+    .health-pill {
+      font-size: .62rem;
+      padding: 3px 8px;
+      border-radius: 20px;
+      border: 1px solid #2b2b2b;
+      color: #909090;
+      background: #141414;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .health-pill.ok {
+      color: #2a9d8f;
+      border-color: #1f4f49;
+      background: #0d1816;
+    }
+    .health-pill.warn {
+      color: #f4a261;
+      border-color: #5b3a1d;
+      background: #1c130b;
+    }
+    .health-pill.err {
+      color: #e63946;
+      border-color: #5f1a21;
+      background: #1c0d10;
+    }
     .arrow { font-size: .95rem; opacity: .4; transition: opacity .2s, transform .2s; }
     .card:hover .arrow { opacity: 1; transform: translateX(4px); }
 
@@ -276,49 +302,49 @@ app.get('/', (_req, res, next) => {
     <div class="section-line"></div>
   </div>
   <div class="grid">
-    <a class="card" href="/api/live/state" style="--accent:#e63946;--accent-bg:#1f0b0d">
+    <a class="card" href="/api/live/state" style="--accent:#e63946;--accent-bg:#1f0b0d" data-health-endpoint="/api/live/state" data-health-id="health-live">
       <span class="card-icon">&#128268;</span>
       <span class="card-title">Live-State</span>
       <span class="card-desc">Aktueller Spielzustand als JSON.</span>
       <div class="card-foot">
         <span class="badge" style="--accent:#e63946;--accent-bg:#1f0b0d">GET</span>
-        <span class="arrow">&#8594;</span>
+        <span class="health-pill" id="health-live">Pruefe...</span>
       </div>
     </a>
-    <a class="card" href="/api/highscores" style="--accent:#f4a261;--accent-bg:#1e1208">
+    <a class="card" href="/api/highscores" style="--accent:#f4a261;--accent-bg:#1e1208" data-health-endpoint="/api/highscores" data-health-id="health-highscores">
       <span class="card-icon">&#127942;</span>
       <span class="card-title">Highscores</span>
       <span class="card-desc">Top-100 Highscores aus der Datenbank.</span>
       <div class="card-foot">
         <span class="badge" style="--accent:#f4a261;--accent-bg:#1e1208">GET</span>
-        <span class="arrow">&#8594;</span>
+        <span class="health-pill" id="health-highscores">Pruefe...</span>
       </div>
     </a>
-    <a class="card" href="/api/players" style="--accent:#9b5de5;--accent-bg:#160d22">
+    <a class="card" href="/api/players" style="--accent:#9b5de5;--accent-bg:#160d22" data-health-endpoint="/api/players" data-health-id="health-players">
       <span class="card-icon">&#128100;</span>
       <span class="card-title">Spieler-API</span>
       <span class="card-desc">Spieler-Slots lesen und schreiben.</span>
       <div class="card-foot">
         <span class="badge" style="--accent:#9b5de5;--accent-bg:#160d22">GET/PUT</span>
-        <span class="arrow">&#8594;</span>
+        <span class="health-pill" id="health-players">Pruefe...</span>
       </div>
     </a>
-    <a class="card" href="/api/storage/info" style="--accent:#2a9d8f;--accent-bg:#0b1714">
+    <a class="card" href="/api/storage/info" style="--accent:#2a9d8f;--accent-bg:#0b1714" data-health-endpoint="/api/storage/info" data-health-id="health-storage">
       <span class="card-icon">&#128190;</span>
       <span class="card-title">Storage-Info</span>
       <span class="card-desc">Aktives Datenbank-Backend und Verbindungsstatus.</span>
       <div class="card-foot">
         <span class="badge" style="--accent:#2a9d8f;--accent-bg:#0b1714">GET</span>
-        <span class="arrow">&#8594;</span>
+        <span class="health-pill" id="health-storage">Pruefe...</span>
       </div>
     </a>
-    <a class="card" href="/api/arduino/state" style="--accent:#457b9d;--accent-bg:#0d1520">
+    <a class="card" href="/api/arduino/state" style="--accent:#457b9d;--accent-bg:#0d1520" data-health-endpoint="/api/arduino/state" data-health-id="health-arduino">
       <span class="card-icon">&#9881;</span>
       <span class="card-title">Arduino-Status</span>
       <span class="card-desc">Verbindungsstatus und letztes Serial-Event.</span>
       <div class="card-foot">
         <span class="badge" style="--accent:#457b9d;--accent-bg:#0d1520">GET</span>
-        <span class="arrow">&#8594;</span>
+        <span class="health-pill" id="health-arduino">Pruefe...</span>
       </div>
     </a>
   </div>
@@ -328,22 +354,62 @@ app.get('/', (_req, res, next) => {
 <footer>Loewen Dart Club &mdash; Dart-Service &bull; Hub-Verwaltung im Kiosk-Dashboard</footer>
 
 <script>
-  (async () => {
-    const dot  = document.getElementById('statusDot');
-    const text = document.getElementById('statusText');
+  function setHealthState(el, state, label) {
+    el.classList.remove('ok', 'warn', 'err');
+    if (state) el.classList.add(state);
+    el.textContent = label;
+  }
+
+  async function probeEndpoint(endpoint) {
     try {
-      const r = await fetch('/api/storage/info', { signal: AbortSignal.timeout(3000) });
-      if (r.ok) {
-        const d = await r.json();
-        dot.classList.add('live');
-        text.textContent = 'Service aktiv \u2014 Storage: ' + (d.client || 'sqlite') + (d.external ? ' (extern)' : ' (lokal)');
-      } else {
-        text.textContent = 'Service antwortet mit Fehler ' + r.status;
+      const r = await fetch(endpoint, { signal: AbortSignal.timeout(3000) });
+      if (!r.ok) {
+        return { ok: false, label: 'HTTP ' + r.status };
       }
-    } catch (_) {
-      text.textContent = 'Service nicht erreichbar';
+      return { ok: true, label: 'OK' };
+    } catch (_e) {
+      return { ok: false, label: 'Offline' };
     }
-  })();
+  }
+
+  async function refreshApiHealth() {
+    const cards = Array.from(document.querySelectorAll('[data-health-endpoint]'));
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+
+    let okCount = 0;
+    for (const card of cards) {
+      const endpoint = card.getAttribute('data-health-endpoint');
+      const targetId = card.getAttribute('data-health-id');
+      const badge = document.getElementById(targetId);
+      if (!badge) continue;
+
+      setHealthState(badge, null, 'Pruefe...');
+      const result = await probeEndpoint(endpoint);
+      if (result.ok) {
+        okCount += 1;
+        setHealthState(badge, 'ok', result.label);
+      } else {
+        setHealthState(badge, 'err', result.label);
+      }
+    }
+
+    if (okCount === cards.length) {
+      dot.classList.add('live');
+      text.textContent = 'API verbunden - alle Endpunkte erreichbar (' + okCount + '/' + cards.length + ')';
+      return;
+    }
+
+    dot.classList.remove('live');
+    if (okCount > 0) {
+      text.textContent = 'API teilweise verbunden (' + okCount + '/' + cards.length + ')';
+    } else {
+      text.textContent = 'API nicht verbunden - keine Endpunkte erreichbar';
+    }
+  }
+
+  refreshApiHealth();
+  setInterval(refreshApiHealth, 10000);
 </script>
 
 </body>
