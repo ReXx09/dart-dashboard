@@ -68,19 +68,17 @@ Der Assistent bietet:
 
 Menuebereiche im Assistenten:
 - 0 = Schnellstart-Assistent (komplette Einrichtung)
-- 1 = Einrichtung: Systemcheck + Auto-Installation
-- 2 = Einrichtung: Install/Update + Build + Start
-- 3 = Docker: Start
-- 4 = Docker: Stop
-- 5 = Docker: Restart
-- 6 = Docker: ps
-- 7 = Docker: Logs
-- 8 = Diagnose: Health-Checks
-- 9 = Diagnose: Gefuehrte Funktionstests
-- 10 = Diagnose: Gesamtstatus
-- 11 = Repo in anderen Ordner klonen
-- 12 = Hilfe fuer Einsteiger
-- 13 = Beenden
+- 1 = Einrichtung
+- 2 = Docker (Start/Stop/Restart/Status/Logs Snapshot/Logs Live/Uninstall/Reinstall)
+- 3 = Diagnose (Schnell-Diagnose + Erweiterte Diagnose)
+- 4 = Repo in anderen Ordner klonen
+- 5 = Hilfe fuer Einsteiger
+- 6 = Beenden
+
+Neu im Menue:
+- Statuszeile im Hauptmenue (Container/API/DB/Arduino)
+- Fehlerdialog mit letzten Meldungen statt stiller Rueckkehr
+- Einheitliche Erfolgsmeldung pro Aktion
 
 Direkte Aktionen ohne Menue:
 
@@ -93,6 +91,7 @@ Direkte Aktionen ohne Menue:
 ./install.sh restart
 ./install.sh ps
 ./install.sh logs
+./install.sh logs-follow
 ./install.sh status
 ./install.sh clone
 ./install.sh health
@@ -258,6 +257,7 @@ Relevante API-Endpunkte:
 - `data/` - persistente Daten
 - `docker-compose.yml` - Standard Deployment
 - `docker-compose.build.yml` - lokales Build-Override
+- `docs/deployment/loewen-dart-dashboard.xml` - Unraid-Container-Template (optional)
 
 ## Hinweise
 
