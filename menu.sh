@@ -273,8 +273,8 @@ submenu_einrichtung_whiptail() {
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
     case "$choice" in
-      1) execute_action check ;;
-      2) execute_action build-start ;;
+      1) execute_action check 1 0 ;;
+      2) execute_action build-start 1 0 ;;
       0|"") return 0 ;;
     esac
   done
@@ -400,12 +400,12 @@ main_menu_whiptail() {
       3>&1 1>&2 2>&3)" || exit 0
 
     case "$choice" in
-      0) execute_action quickstart ;;
+      0) execute_action quickstart 1 0 ;;
       1) submenu_einrichtung_whiptail ;;
       2) submenu_monitoring_whiptail ;;
       3) submenu_docker_whiptail ;;
       4) submenu_diagnose_whiptail ;;
-      5) execute_action clone ;;
+      5) execute_action clone 1 0 ;;
       6) execute_action help-guide ;;
       7) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
@@ -424,8 +424,8 @@ submenu_einrichtung_text() {
     printf '0) Zurueck\n\n'
     read -r -p 'Option [0-2]: ' c
     case "$c" in
-      1) execute_action check ;;
-      2) execute_action build-start ;;
+      1) execute_action check 1 0 ;;
+      2) execute_action build-start 1 0 ;;
       0|'') return 0 ;;
     esac
   done
@@ -542,12 +542,12 @@ main_menu_text() {
     printf '7) Beenden\n\n'
     read -r -p 'Option [0-7]: ' choice
     case "$choice" in
-      0) execute_action quickstart ;;
+      0) execute_action quickstart 1 0 ;;
       1) submenu_einrichtung_text ;;
       2) submenu_monitoring_text ;;
       3) submenu_docker_text ;;
       4) submenu_diagnose_text ;;
-      5) execute_action clone ;;
+      5) execute_action clone 1 0 ;;
       6) execute_action help-guide ;;
       7) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
