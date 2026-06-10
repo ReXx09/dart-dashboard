@@ -12,6 +12,7 @@ RUN npm ci --omit=dev
 
 # Quellcode kopieren
 COPY server.js ./
+COPY db.js ./
 COPY public/ ./public/
 
 # data/ wird als Volume gemountet → Einstellungen bleiben erhalten
