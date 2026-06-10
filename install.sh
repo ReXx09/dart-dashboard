@@ -542,16 +542,128 @@ run_health_checks() {
   show_textbox "Health-Check" "$(printf '%b' "$report")"
 }
 
+show_beginner_help() {
+  local text=""
+  text+="Einsteiger-Anleitung (empfohlene Reihenfolge)\n\n"
+  text+="1) Schnellstart-Assistent ausfuehren\n"
+  text+="   - Menuepunkt: Schnellstart-Assistent\n"
+  text+="   - Dieser fuehrt Systemcheck, Installation und Start zusammen\n\n"
+  text+="2) Health-Checks ausfuehren\n"
+  text+="   - Prueft Docker, Container, APIs und optional Fire-TV\n\n"
+  text+="3) Gefuehrte Funktionstests starten\n"
+  text+="   - Testet die wichtigsten Endpunkte Schritt fuer Schritt\n\n"
+  text+="4) Bei Fire-TV Problemen\n"
+  text+="   - .env pruefen: FIRE_FEATURES_ENABLED=true\n"
+  text+="   - FIRESTICK_IP kontrollieren\n"
+  text+="   - Dann Health-Checks erneut laufen lassen\n\n"
+  text+="Direkte Kommandos:\n"
+  text+="  ./install.sh quickstart\n"
+  text+="  ./install.sh health\n"
+  text+="  ./install.sh test\n"
+  show_textbox "Hilfe" "$(printf '%b' "$text")"
+}
+
+run_guided_tests() {
+  local api_base=""
+  local public_port=""
+  local report=""
+
+  public_port="$(get_env_value PUBLIC_PORT 3100)"
+  api_base="http://localhost:${public_port}"
+
+  report+="Gefuehrte Funktionstests\n\n"
+  report+="Schritt 1: Docker/Compose Verfuegbarkeit\n"
+  if command_exists docker && detect_compose_cmd >/dev/null 2>&1; then
+    report+="[OK] Docker + Compose sind verfuegbar\n"
+  else
+    report+="[FEHLT] Docker oder Compose fehlt\n"
+    report+="       -> Menue: Systemcheck + Auto-Installation\n"
+  fi
+
+  report+="\nSchritt 2: Containerstatus\n"
+  if command_exists docker; then
+    if docker ps --format '{{.Names}}' | grep -q '^dart-dashboard$'; then
+      report+="[OK] Container dart-dashboard laeuft\n"
+    else
+      report+="[WARN] Container laeuft nicht\n"
+      report+="      -> Menue: Install/Update + Build + Start\n"
+    fi
+  else
+    report+="[SKIP] Docker nicht verfuegbar\n"
+  fi
+
+  report+="\nSchritt 3: API-Tests (${api_base})\n"
+  if command_exists curl; then
+    if curl -fsS --max-time 4 "${api_base}/api/live/state" >/dev/null 2>&1; then
+      report+="[OK] /api/live/state\n"
+    else
+      report+="[FEHLT] /api/live/state\n"
+    fi
+
+    if curl -fsS --max-time 4 "${api_base}/api/highscores" >/dev/null 2>&1; then
+      report+="[OK] /api/highscores\n"
+    else
+      report+="[FEHLT] /api/highscores\n"
+    fi
+
+    if curl -fsS --max-time 4 "${api_base}/api/storage/info" >/dev/null 2>&1; then
+      report+="[OK] /api/storage/info\n"
+    else
+      report+="[FEHLT] /api/storage/info\n"
+    fi
+  else
+    report+="[SKIP] curl nicht verfuegbar\n"
+  fi
+
+  report+="\nSchritt 4: Manuelle Browser-Pruefung\n"
+  report+="  - Hub/Dienst im Browser oeffnen: http://<RASPI-IP>:${public_port}\n"
+  report+="  - Live-Spielstand oeffnen und Punkte buchen\n"
+  report+="  - Pruefen, ob Werte nach Reload erhalten bleiben\n"
+
+  report+="\nSchritt 5: Optional Fire-TV\n"
+  report+="  - Menue: Health-Checks ausfuehren\n"
+  report+="  - Auf Warnungen bei Fire-TV/ADB achten\n"
+
+  show_textbox "Gefuehrte Tests" "$(printf '%b' "$report")"
+}
+
+run_quickstart_wizard() {
+  local summary=""
+  summary+="Schnellstart-Assistent\n\n"
+  summary+="Es werden nacheinander ausgefuehrt:\n"
+  summary+="1) Systemcheck + Auto-Installation\n"
+  summary+="2) Install/Update + Build + Start\n"
+  summary+="3) Health-Checks\n"
+  summary+="4) Gefuehrte Funktionstests (Auswertung)\n\n"
+  summary+="Dauer: je nach Internet/Hardware mehrere Minuten."
+
+  show_textbox "Schnellstart" "$(printf '%b' "$summary")"
+  if ! ask_yes_no 'Schnellstart jetzt ausfuehren?' 'y'; then
+    return
+  fi
+
+  run_system_check_and_install
+  build_and_start
+  run_health_checks
+
+  if ask_yes_no 'Zum Abschluss die gefuehrten Funktionstests anzeigen?' 'y'; then
+    run_guided_tests
+  fi
+}
+
 run_choice() {
   local choice="$1"
   case "$choice" in
-    0) run_system_check_and_install ;;
-    1) build_and_start ;;
-    2) start_existing ;;
-    3) show_status ;;
-    4) stop_stack ;;
-    5) clone_repo_elsewhere ;;
-    6) run_health_checks ;;
+    0) run_quickstart_wizard ;;
+    1) run_system_check_and_install ;;
+    2) build_and_start ;;
+    3) start_existing ;;
+    4) run_health_checks ;;
+    5) run_guided_tests ;;
+    6) show_status ;;
+    7) stop_stack ;;
+    8) clone_repo_elsewhere ;;
+    9) show_beginner_help ;;
     *)
       printf 'Ungueltige Auswahl.\n'
       return 1
@@ -566,13 +678,16 @@ Verwendung:
 
 Actions:
   menu          Startet das eigenstaendige Menue (menu.sh)
+  quickstart    Komplettassistent (Pruefen + Einrichten + Start + Tests)
   check         Systemcheck + Auto-Installation
   build-start   Install/Update + Build + Start
   start         Nur Start (ohne Build)
+  health        Health-Checks (API/Storage/Arduino/Fire-TV)
+  test          Gefuehrte Funktionstests (Schritt fuer Schritt)
   status        Status und Logs anzeigen
   stop          Container stoppen
   clone         Repo in anderen Ordner klonen
-  health        Health-Checks (API/Storage/Arduino/Fire-TV)
+  help-guide    Einsteiger-Hilfe anzeigen
 
 Wenn kein Action-Parameter gesetzt ist, wird automatisch menu.sh gestartet.
 EOF
@@ -581,14 +696,32 @@ EOF
 action_to_choice() {
   local action="$1"
   case "$action" in
+    quickstart) echo 0 ;;
     check) echo 0 ;;
-    build-start) echo 1 ;;
-    start) echo 2 ;;
-    status) echo 3 ;;
-    stop) echo 4 ;;
-    clone) echo 5 ;;
-    health) echo 6 ;;
+    build-start) echo 2 ;;
+    start) echo 3 ;;
+    health) echo 4 ;;
+    test) echo 5 ;;
+    status) echo 6 ;;
+    stop) echo 7 ;;
+    clone) echo 8 ;;
+    help-guide) echo 9 ;;
     *) return 1 ;;
+  esac
+}
+
+run_action_by_name() {
+  local action="$1"
+
+  case "$action" in
+    check)
+      run_system_check_and_install
+      ;;
+    *)
+      local choice
+      choice="$(action_to_choice "$action")"
+      run_choice "$choice"
+      ;;
   esac
 }
 
@@ -610,9 +743,8 @@ if [[ $# -eq 0 || "${1:-}" == "menu" ]]; then
 fi
 
 case "${1:-}" in
-  check|build-start|start|status|stop|clone|health)
-    choice="$(action_to_choice "$1")"
-    run_choice "$choice"
+  quickstart|check|build-start|start|status|stop|clone|health|test|help-guide)
+    run_action_by_name "$1"
     ;;
   -h|--help|help)
     usage

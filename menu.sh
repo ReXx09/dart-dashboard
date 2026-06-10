@@ -27,7 +27,7 @@ print_header() {
   print_line
   printf ' Loewen Dart Dashboard - Menue\n'
   print_line
-  printf ' Menue verwaltet die Aktionen, install.sh fuehrt sie aus.\n\n'
+  printf ' Einsteiger-Modus: Pruefen, Einrichten, Aktualisieren, Testen.\n\n'
 }
 
 run_action() {
@@ -48,25 +48,31 @@ main_menu_whiptail() {
   while true; do
     local choice
     choice="$(whiptail --title "Loewen Dart Dashboard - Menue" --menu "Bitte Option waehlen" 20 78 10 \
-      "0" "Systemcheck + Auto-Installation (Docker/Pi-Tools)" \
-      "1" "Install/Update + Build + Start (empfohlen)" \
-      "2" "Nur Start (ohne Build)" \
-      "3" "Status und Logs anzeigen" \
-      "4" "Stoppen" \
-      "5" "Repo in anderen Ordner klonen" \
-      "6" "Health-Checks ausfuehren" \
-      "7" "Beenden" \
+      "0" "Schnellstart-Assistent (empfohlen fuer neue Nutzer)" \
+      "1" "Systemcheck + Auto-Installation" \
+      "2" "Install/Update + Build + Start" \
+      "3" "Nur Start (ohne Build)" \
+      "4" "Health-Checks ausfuehren" \
+      "5" "Gefuehrte Funktionstests (Schritt fuer Schritt)" \
+      "6" "Status und Logs anzeigen" \
+      "7" "Stoppen" \
+      "8" "Repo in anderen Ordner klonen" \
+      "9" "Hilfe fuer Einsteiger anzeigen" \
+      "10" "Beenden" \
       3>&1 1>&2 2>&3)" || exit 0
 
     case "$choice" in
-      0) run_action check ;;
-      1) run_action build-start ;;
-      2) run_action start ;;
-      3) run_action status ;;
-      4) run_action stop ;;
-      5) run_action clone ;;
-      6) run_action health ;;
-      7) printf 'Beendet.\n'; exit 0 ;;
+      0) run_action quickstart ;;
+      1) run_action check ;;
+      2) run_action build-start ;;
+      3) run_action start ;;
+      4) run_action health ;;
+      5) run_action test ;;
+      6) run_action status ;;
+      7) run_action stop ;;
+      8) run_action clone ;;
+      9) run_action help-guide ;;
+      10) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
 
@@ -78,25 +84,31 @@ main_menu_text() {
   while true; do
     print_header
     printf 'Aktueller Ordner: %s\n\n' "$SCRIPT_DIR"
-    printf '0) Systemcheck + Auto-Installation (Docker/Pi-Tools)\n'
-    printf '1) Install/Update + Build + Start (empfohlen)\n'
-    printf '2) Nur Start (ohne Build)\n'
-    printf '3) Status und Logs anzeigen\n'
-    printf '4) Stoppen\n'
-    printf '5) Repo in anderen Ordner klonen\n'
-    printf '6) Health-Checks ausfuehren\n'
-    printf '7) Beenden\n\n'
+    printf '0) Schnellstart-Assistent (empfohlen fuer neue Nutzer)\n'
+    printf '1) Systemcheck + Auto-Installation\n'
+    printf '2) Install/Update + Build + Start\n'
+    printf '3) Nur Start (ohne Build)\n'
+    printf '4) Health-Checks ausfuehren\n'
+    printf '5) Gefuehrte Funktionstests (Schritt fuer Schritt)\n'
+    printf '6) Status und Logs anzeigen\n'
+    printf '7) Stoppen\n'
+    printf '8) Repo in anderen Ordner klonen\n'
+    printf '9) Hilfe fuer Einsteiger anzeigen\n'
+    printf '10) Beenden\n\n'
 
-    read -r -p 'Bitte Option waehlen [0-7]: ' choice
+    read -r -p 'Bitte Option waehlen [0-10]: ' choice
     case "$choice" in
-      0) run_action check ;;
-      1) run_action build-start ;;
-      2) run_action start ;;
-      3) run_action status ;;
-      4) run_action stop ;;
-      5) run_action clone ;;
-      6) run_action health ;;
-      7) printf 'Beendet.\n'; exit 0 ;;
+      0) run_action quickstart ;;
+      1) run_action check ;;
+      2) run_action build-start ;;
+      3) run_action start ;;
+      4) run_action health ;;
+      5) run_action test ;;
+      6) run_action status ;;
+      7) run_action stop ;;
+      8) run_action clone ;;
+      9) run_action help-guide ;;
+      10) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
     ui_pause

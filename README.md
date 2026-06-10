@@ -60,18 +60,22 @@ Der Assistent bietet:
 - Optionales Clone in einen anderen Ordner
 
 Menuepunkte im Assistenten:
-- 0 = Systemcheck + Auto-Installation
-- 1 = Install/Update + Build + Start
-- 2 = Nur Start
-- 3 = Status und Logs
-- 4 = Stoppen
-- 5 = Repo in anderen Ordner klonen
-- 6 = Health-Checks ausfuehren
-- 7 = Beenden
+- 0 = Schnellstart-Assistent (empfohlen)
+- 1 = Systemcheck + Auto-Installation
+- 2 = Install/Update + Build + Start
+- 3 = Nur Start
+- 4 = Health-Checks ausfuehren
+- 5 = Gefuehrte Funktionstests (Schritt fuer Schritt)
+- 6 = Status und Logs
+- 7 = Stoppen
+- 8 = Repo in anderen Ordner klonen
+- 9 = Hilfe fuer Einsteiger
+- 10 = Beenden
 
 Direkte Aktionen ohne Menue:
 
 ```bash
+./install.sh quickstart
 ./install.sh check
 ./install.sh build-start
 ./install.sh start
@@ -79,6 +83,8 @@ Direkte Aktionen ohne Menue:
 ./install.sh stop
 ./install.sh clone
 ./install.sh health
+./install.sh test
+./install.sh help-guide
 ```
 
 Health-Check umfasst:
@@ -86,6 +92,31 @@ Health-Check umfasst:
 - API-Erreichbarkeit (`/api/live/state`, `/api/storage/info`, `/api/arduino/state`)
 - Storage-Info (z. B. sqlite/postgres/mysql)
 - Optional Fire-TV/ADB Reachability (abh. von `FIRE_FEATURES_ENABLED`)
+
+## Ausfuehrbarer Test fuer Einsteiger (Schritt fuer Schritt)
+
+Empfohlener Ablauf direkt im Menue:
+1. `0) Schnellstart-Assistent`
+2. `4) Health-Checks ausfuehren`
+3. `5) Gefuehrte Funktionstests`
+
+Direkt per Kommandozeile:
+
+```bash
+./install.sh quickstart
+./install.sh health
+./install.sh test
+```
+
+Was du sehen solltest:
+- `[OK]` bei Docker/Compose
+- `[OK]` bei `api/live/state` und `api/storage/info`
+- bei Fire-TV optional `[OK]` fuer Ping/ADB
+
+Wenn etwas auf `[FEHLT]` oder `[WARN]` steht:
+1. Zuerst `./install.sh check` laufen lassen
+2. Danach `./install.sh build-start`
+3. Anschliessend `./install.sh health` erneut pruefen
 
 Hinweis:
 - Wenn `whiptail` installiert ist, nutzt `install.sh` automatisch ein Dialog-Menue.
