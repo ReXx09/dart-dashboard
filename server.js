@@ -79,11 +79,10 @@ const fixedDefaults = [
   { id: 'spieler',           title: 'Spieler',            icon: '👤', description: 'Spielerverwaltung und Uebersicht',      color: '#9b5de5', route: '/panels/spieler.html',            external: false, badge: 'Dart'      }
 ];
 
+const allowedPanelRoutes = new Set(fixedDefaults.map((tile) => tile.route));
+
 function isInternalPanelRoute(route) {
-  return typeof route === 'string'
-    && route.startsWith('/panels/')
-    && !route.includes('..')
-    && !route.startsWith('/panels//');
+  return typeof route === 'string' && allowedPanelRoutes.has(route);
 }
 
 function sanitizeFixedTile(tile, fallback) {

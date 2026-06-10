@@ -14,6 +14,14 @@ Das Projekt bietet:
 - Externe Dashboards (Grafana, externe Webseiten, weitere Services) werden ueber `Fire-Stick/kiosk-dashboard` verwaltet.
 - API-seitig sind im `dart-dashboard` externe Kachel-Routen bewusst blockiert.
 
+Aktuell enthaltene interne Panel-Dateien im `dart-dashboard`:
+- `/panels/privat-dart.html`
+- `/panels/live-spielstand.html`
+- `/panels/rangliste.html`
+- `/panels/spielerstatistiken.html`
+- `/panels/spielplan.html`
+- `/panels/spieler.html`
+
 ## Voraussetzungen
 
 - Node.js 20+
