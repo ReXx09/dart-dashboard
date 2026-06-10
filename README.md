@@ -50,6 +50,13 @@ chmod +x menu.sh
 
 - `menu.sh` ist die eigenstaendige Menue-/Verwaltungsoberflaeche (whiptail oder Textmenue).
 - `install.sh` ist der Ausfuehrer fuer einzelne Aktionen.
+- Die Logik ist jetzt sauber in Unterordner getrennt:
+  - `scripts/lib/` fuer gemeinsame Hilfsfunktionen
+  - `scripts/actions/docker.sh` fuer Docker-Kommandos
+  - `scripts/actions/system.sh` fuer Pruefen/Installieren
+  - `scripts/actions/diagnostics.sh` fuer Health-Checks/Tests
+  - `scripts/actions/repo.sh` fuer Repo-Aktionen
+  - `scripts/actions/help.sh` fuer Einsteigerhilfe und Schnellstart
 
 Der Assistent bietet:
 - Systemcheck + Auto-Installation fuer Docker/Pi-Tools
@@ -59,18 +66,21 @@ Der Assistent bietet:
 - Stoppen
 - Optionales Clone in einen anderen Ordner
 
-Menuepunkte im Assistenten:
-- 0 = Schnellstart-Assistent (empfohlen)
-- 1 = Systemcheck + Auto-Installation
-- 2 = Install/Update + Build + Start
-- 3 = Nur Start
-- 4 = Health-Checks ausfuehren
-- 5 = Gefuehrte Funktionstests (Schritt fuer Schritt)
-- 6 = Status und Logs
-- 7 = Stoppen
-- 8 = Repo in anderen Ordner klonen
-- 9 = Hilfe fuer Einsteiger
-- 10 = Beenden
+Menuebereiche im Assistenten:
+- 0 = Schnellstart-Assistent (komplette Einrichtung)
+- 1 = Einrichtung: Systemcheck + Auto-Installation
+- 2 = Einrichtung: Install/Update + Build + Start
+- 3 = Docker: Start
+- 4 = Docker: Stop
+- 5 = Docker: Restart
+- 6 = Docker: ps
+- 7 = Docker: Logs
+- 8 = Diagnose: Health-Checks
+- 9 = Diagnose: Gefuehrte Funktionstests
+- 10 = Diagnose: Gesamtstatus
+- 11 = Repo in anderen Ordner klonen
+- 12 = Hilfe fuer Einsteiger
+- 13 = Beenden
 
 Direkte Aktionen ohne Menue:
 
@@ -79,8 +89,11 @@ Direkte Aktionen ohne Menue:
 ./install.sh check
 ./install.sh build-start
 ./install.sh start
-./install.sh status
 ./install.sh stop
+./install.sh restart
+./install.sh ps
+./install.sh logs
+./install.sh status
 ./install.sh clone
 ./install.sh health
 ./install.sh test

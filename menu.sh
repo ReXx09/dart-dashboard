@@ -27,7 +27,7 @@ print_header() {
   print_line
   printf ' Loewen Dart Dashboard - Menue\n'
   print_line
-  printf ' Einsteiger-Modus: Pruefen, Einrichten, Aktualisieren, Testen.\n\n'
+  printf ' Bereiche: Schnellstart, Einrichtung, Docker, Diagnose, Hilfe.\n\n'
 }
 
 run_action() {
@@ -47,18 +47,23 @@ ui_pause() {
 main_menu_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart Dashboard - Menue" --menu "Bitte Option waehlen" 20 78 10 \
-      "0" "Schnellstart-Assistent (empfohlen fuer neue Nutzer)" \
-      "1" "Systemcheck + Auto-Installation" \
-      "2" "Install/Update + Build + Start" \
-      "3" "Nur Start (ohne Build)" \
-      "4" "Health-Checks ausfuehren" \
-      "5" "Gefuehrte Funktionstests (Schritt fuer Schritt)" \
-      "6" "Status und Logs anzeigen" \
-      "7" "Stoppen" \
-      "8" "Repo in anderen Ordner klonen" \
-      "9" "Hilfe fuer Einsteiger anzeigen" \
-      "10" "Beenden" \
+    choice="$(whiptail --title "Loewen Dart Dashboard - Menue" --menu "Bitte Bereich waehlen" 24 84 16 \
+      "0" "Schnellstart-Assistent (komplette Einrichtung)" \
+      "1" "Einrichtung: Systemcheck + Auto-Installation" \
+      "2" "Einrichtung: Install/Update + Build + Start" \
+      "3" "Docker: Start" \
+      "4" "Docker: Stop" \
+      "5" "Docker: Restart" \
+      "6" "Docker: ps" \
+      "7" "Docker: Logs" \
+      "8" "Docker: Uninstall (Container + Image entfernen)" \
+      "9" "Docker: Reinstall (Uninstall + Neustart)" \
+      "10" "Diagnose: Health-Checks" \
+      "11" "Diagnose: Gefuehrte Funktionstests" \
+      "12" "Diagnose: Gesamtstatus" \
+      "13" "Repo: in anderen Ordner klonen" \
+      "14" "Hilfe fuer Einsteiger anzeigen" \
+      "15" "Beenden" \
       3>&1 1>&2 2>&3)" || exit 0
 
     case "$choice" in
@@ -66,13 +71,18 @@ main_menu_whiptail() {
       1) run_action check ;;
       2) run_action build-start ;;
       3) run_action start ;;
-      4) run_action health ;;
-      5) run_action test ;;
-      6) run_action status ;;
-      7) run_action stop ;;
-      8) run_action clone ;;
-      9) run_action help-guide ;;
-      10) printf 'Beendet.\n'; exit 0 ;;
+      4) run_action stop ;;
+      5) run_action restart ;;
+      6) run_action ps ;;
+      7) run_action logs ;;
+      8) run_action uninstall ;;
+      9) run_action reinstall ;;
+      10) run_action health ;;
+      11) run_action test ;;
+      12) run_action status ;;
+      13) run_action clone ;;
+      14) run_action help-guide ;;
+      15) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
 
@@ -84,31 +94,41 @@ main_menu_text() {
   while true; do
     print_header
     printf 'Aktueller Ordner: %s\n\n' "$SCRIPT_DIR"
-    printf '0) Schnellstart-Assistent (empfohlen fuer neue Nutzer)\n'
-    printf '1) Systemcheck + Auto-Installation\n'
-    printf '2) Install/Update + Build + Start\n'
-    printf '3) Nur Start (ohne Build)\n'
-    printf '4) Health-Checks ausfuehren\n'
-    printf '5) Gefuehrte Funktionstests (Schritt fuer Schritt)\n'
-    printf '6) Status und Logs anzeigen\n'
-    printf '7) Stoppen\n'
-    printf '8) Repo in anderen Ordner klonen\n'
-    printf '9) Hilfe fuer Einsteiger anzeigen\n'
-    printf '10) Beenden\n\n'
+    printf '0) Schnellstart-Assistent (komplette Einrichtung)\n'
+    printf '1) Einrichtung: Systemcheck + Auto-Installation\n'
+    printf '2) Einrichtung: Install/Update + Build + Start\n'
+    printf '3) Docker: Start\n'
+    printf '4) Docker: Stop\n'
+    printf '5) Docker: Restart\n'
+    printf '6) Docker: ps\n'
+    printf '7) Docker: Logs\n'
+    printf '8) Docker: Uninstall (Container + Image entfernen)\n'
+    printf '9) Docker: Reinstall (Uninstall + Neustart)\n'
+    printf '10) Diagnose: Health-Checks\n'
+    printf '11) Diagnose: Gefuehrte Funktionstests\n'
+    printf '12) Diagnose: Gesamtstatus\n'
+    printf '13) Repo: in anderen Ordner klonen\n'
+    printf '14) Hilfe fuer Einsteiger anzeigen\n'
+    printf '15) Beenden\n\n'
 
-    read -r -p 'Bitte Option waehlen [0-10]: ' choice
+    read -r -p 'Bitte Option waehlen [0-15]: ' choice
     case "$choice" in
       0) run_action quickstart ;;
       1) run_action check ;;
       2) run_action build-start ;;
       3) run_action start ;;
-      4) run_action health ;;
-      5) run_action test ;;
-      6) run_action status ;;
-      7) run_action stop ;;
-      8) run_action clone ;;
-      9) run_action help-guide ;;
-      10) printf 'Beendet.\n'; exit 0 ;;
+      4) run_action stop ;;
+      5) run_action restart ;;
+      6) run_action ps ;;
+      7) run_action logs ;;
+      8) run_action uninstall ;;
+      9) run_action reinstall ;;
+      10) run_action health ;;
+      11) run_action test ;;
+      12) run_action status ;;
+      13) run_action clone ;;
+      14) run_action help-guide ;;
+      15) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
     ui_pause
