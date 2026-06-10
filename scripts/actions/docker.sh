@@ -24,6 +24,9 @@ start_existing() {
   ensure_docker_ready
   ensure_env_file
 
+  msg_run 'Ziehe aktuelles Image (falls verfuegbar)...'
+  $COMPOSE_CMD pull dart-dashboard || msg_warn 'Image-Pull fehlgeschlagen, starte mit lokal vorhandenem Image.'
+
   msg_run 'Starte vorhandene Container...'
   $COMPOSE_CMD up -d
   $COMPOSE_CMD ps
@@ -86,6 +89,10 @@ reinstall_stack() {
 restart_stack() {
   ensure_docker_ready
   ensure_env_file
+
+  msg_run 'Ziehe aktuelles Image (falls verfuegbar)...'
+  $COMPOSE_CMD pull dart-dashboard || msg_warn 'Image-Pull fehlgeschlagen, starte mit lokal vorhandenem Image.'
+
   msg_run 'Starte Container neu...'
   $COMPOSE_CMD down
   $COMPOSE_CMD up -d
