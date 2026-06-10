@@ -28,6 +28,70 @@ print_line() {
   printf '%s\n' "------------------------------------------------------------"
 }
 
+# ── Farbausgabe ───────────────────────────────────────────────────────────────
+# Nutzbar in allen action-scripts via: msg_run, msg_ok, msg_warn, msg_fail, msg_step
+# Automatischer Fallback auf farblosen Text wenn kein Terminal vorhanden.
+_color_supported() {
+  [[ -t 1 ]] && command -v tput >/dev/null 2>&1 && [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]
+}
+
+msg_run() {
+  local text="$1"
+  if _color_supported; then
+    printf "\n\033[1;36m[RUN]\033[0m  %s\n" "$text"
+  else
+    printf '\n[RUN]  %s\n' "$text"
+  fi
+  printf '------------------------------------------------------------\n'
+}
+
+msg_ok() {
+  local text="$1"
+  if _color_supported; then
+    printf "\033[1;32m[OK]\033[0m   %s\n" "$text"
+  else
+    printf '[OK]   %s\n' "$text"
+  fi
+}
+
+msg_warn() {
+  local text="$1"
+  if _color_supported; then
+    printf "\033[1;33m[WARN]\033[0m %s\n" "$text"
+  else
+    printf '[WARN] %s\n' "$text"
+  fi
+}
+
+msg_fail() {
+  local text="$1"
+  if _color_supported; then
+    printf "\033[1;31m[FAIL]\033[0m %s\n" "$text"
+  else
+    printf '[FAIL] %s\n' "$text"
+  fi
+}
+
+msg_step() {
+  local step="$1"
+  local total="$2"
+  local text="$3"
+  if _color_supported; then
+    printf "\033[1;34m[%s/%s]\033[0m %s\n" "$step" "$total" "$text"
+  else
+    printf '[%s/%s] %s\n' "$step" "$total" "$text"
+  fi
+}
+
+msg_info() {
+  local text="$1"
+  if _color_supported; then
+    printf "\033[1;37m[INFO]\033[0m %s\n" "$text"
+  else
+    printf '[INFO] %s\n' "$text"
+  fi
+}
+
 print_header() {
   clear || true
   print_line

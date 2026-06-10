@@ -194,7 +194,7 @@ show_action_success() {
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
     whiptail --title "Erfolg" --msgbox "Aktion erfolgreich:\n${label}\n\nMit OK zur vorherigen Menueebene." 11 72
   else
-    printf '\n[OK] Aktion erfolgreich: %s\n' "$label"
+    msg_ok "Aktion erfolgreich: ${label}"
     printf 'Weiter mit Enter zur vorherigen Menueebene...\n'
     ui_pause
   fi
@@ -220,7 +220,7 @@ show_action_error() {
     whiptail --title "Fehler" --scrolltext --textbox "$tmp_file" 24 90
     rm -f "$tmp_file"
   else
-    printf '\n[FEHLER] Aktion fehlgeschlagen: %s\n' "$action"
+    msg_fail "Aktion fehlgeschlagen: ${action}"
     printf 'Letzte Meldungen:\n%s\n' "$details"
     ui_pause
   fi
@@ -259,8 +259,7 @@ execute_action() {
   local label
   label="$(action_label "$action")"
 
-  printf '\n[RUN] %s\n' "$label"
-  printf '------------------------------------------------------------\n'
+  msg_run "$label"
 
   if [[ "$capture_output" -eq 0 ]]; then
     if ! run_action "$action"; then
