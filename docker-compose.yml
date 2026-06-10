@@ -5,8 +5,10 @@ services:
     restart: unless-stopped
     ports:
       - "3100:3000"
+    group_add:
+      - dialout
     devices:
-      - ${ARDUINO_DEVICE:-/dev/ttyACM0}:${ARDUINO_DEVICE:-/dev/ttyACM0}
+      - /dev/ttyACM0:/dev/ttyACM0
     volumes:
       - ${DATA_PATH:-./data}:/app/data
       - ${ADB_KEYS_PATH:-./adb-keys}:/root/.android
