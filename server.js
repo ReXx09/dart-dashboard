@@ -857,40 +857,19 @@ function sanitizePlayerState(player, fallback) {
 async function getLiveState() {
   const fallback = await defaultLiveState();
   const saved = await dataStore.getLiveState(fallback);
-  const savedPlayers = Array.isArray(saved.players) && saved.players.length > 0 ? saved.players : fallback.players;
-  const mergedPlayers = savedPlayers.map((player, index) => sanitizePlayerState(player, fallback.players[index] || fallback.players[0]));
+  const activePlayers = fallback.players;
+  const savedPlayers = Array.isArray(saved.players) && saved.players.length > 0 ? saved.players : activePlayers;
+  const mergedPlayers = savedPlayers.map((player, index) => sanitizePlayerState(player, activePlayers[index] || activePlayers[0]));
 
-  fallback.players.slice(mergedPlayers.length).forEach((player) => mergedPlayers.push(sanitizePlayerState(player, player)));
+  // Alte Live-States mit weniger Spielern werden erweitert.
+  activePlayers.forEach((player) => {
+    if (!mergedPlayers.some((p) => Number(p.slot) === Number(player.slot))) {
+      mergedPlayers.push(sanitizePlayerState(player, player));
+    }
+  });
 
-  // Wenn in der Spieler-Verwaltung aktive Spieler hinzugefügt/entfernt wurden,
-  // muss der Live-State synchron bleiben. Ohne diese Prüfung bleiben alte
-  // Live-States mit nur 2 Spielern bestehen.
-  const activeSlots = fallback.players.map((p) => Number(p.slot));
-  const mergedSlots = mergedPlayers.map((p) => Number(p.slot));
-  const playersChanged = activeSlots.length !== mergedSlots.length || activeSlots.some((slot, idx) => mergedSlots[idx] !== slot);
-  if (playersChanged) {
-    const nextState = {
-      ...saved,
-      game: {
-        ...(saved.game || {}),
-        activePlayer: Math.min(Number(saved.game?.activePlayer || 0), fallback.players.length - 1)
-      },
-      players: fallback.players.map((player) => {
-        const existing = mergedPlayers.find((p) => Number(p.slot) === Number(player.slot));
-        return sanitizePlayerState(existing || player, player);
-      }),
-      lastAction: saved.lastAction || null,
-      arduino: {
-        connected: !!arduinoState.connected,
-        lastEvent: arduinoState.lastEvent || null,
-        activeCount: Number(arduinoState.activeCount || 0),
-        heartbeatMs: arduinoState.lastHeartbeat ? Number(arduinoState.lastHeartbeat.ms || 0) : null,
-        rawHistory: arduinoRawEventHistory.slice(0, 20)
-      }
-    };
-    await dataStore.saveLiveState(nextState);
-    return nextState;
-  }
+  // Sortieren nach Slot, damit die Anzeige stabil bleibt.
+  mergedPlayers.sort((a, b) => Number(a.slot || 0) - Number(b.slot || 0));
 
   const state = {
     game: {
@@ -913,6 +892,7 @@ async function getLiveState() {
     }
   };
 
+  await dataStore.saveLiveState(state);
   return state;
 }
 

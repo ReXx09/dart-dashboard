@@ -1,6 +1,7 @@
 services:
   dart-dashboard:
     image: ghcr.io/rexx09/loewen-dart-dashboard:latest
+    build: .
     container_name: dart-dashboard
     restart: unless-stopped
     ports:
@@ -10,6 +11,9 @@ services:
     devices:
       - /dev/ttyACM0:/dev/ttyACM0
     volumes:
+      # Lokale Code-Änderungen übernehmen, damit nicht versehentlich das alte GHCR-Image läuft.
+      - ./server.js:/app/server.js:ro
+      - ./public:/app/public:ro
       - ${DATA_PATH:-./data}:/app/data
       - ${ADB_KEYS_PATH:-./adb-keys}:/root/.android
     environment:
