@@ -7,735 +7,141 @@
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{background:#0a0a0a;color:#f1f1f1;font-family:"Segoe UI",system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
-
-    /* HEADER */
-    header{background:#111;border-bottom:3px solid #e63946;padding:16px 36px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-    .header-left{display:flex;align-items:center;gap:14px}
-    .logo{font-size:1.8rem}
-    header h1{font-size:1.3rem;font-weight:700}
+    header{background:#111;border-bottom:3px solid #e63946;padding:14px 28px;display:flex;align-items:center;gap:14px;flex-shrink:0}
+    .logo{font-size:1.6rem}
+    header h1{font-size:1.2rem;font-weight:700}
     header .sub{font-size:.75rem;color:#555;margin-top:2px}
-    .back-link{color:#666;text-decoration:none;font-size:.85rem;padding:8px 16px;border:1px solid #252525;border-radius:8px;transition:color .2s,border-color .2s;white-space:nowrap}
+    .back-link{color:#666;text-decoration:none;font-size:.82rem;padding:7px 14px;border:1px solid #252525;border-radius:8px;transition:color .2s,border-color .2s;white-space:nowrap;margin-left:auto}
     .back-link:hover{color:#f1f1f1;border-color:#555}
-    .header-right{display:flex;align-items:center;gap:10px}
-    .btn-restart-hd{background:#180a0b;border:1px solid #2d1213;color:#c0303d;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:.8rem;font-family:inherit;transition:background .2s,border-color .2s,color .2s;white-space:nowrap}
-    .btn-restart-hd:hover{background:#e63946;border-color:#e63946;color:#fff}
-    .btn-restart-hd:disabled{opacity:.45;cursor:not-allowed}
+    main{flex:1;padding:28px;max-width:800px;margin:0 auto;width:100%}
 
-    /* TABS */
-    .tabs{background:#0f0f0f;border-bottom:1px solid #1a1a1a;padding:0 36px;display:flex;gap:2px;flex-shrink:0}
-    .tab-btn{background:none;border:none;color:#444;padding:13px 20px;cursor:pointer;font-size:.88rem;font-family:inherit;border-bottom:2px solid transparent;transition:color .2s,border-color .2s;white-space:nowrap}
-    .tab-btn:hover{color:#aaa}
-    .tab-btn.active{color:#f1f1f1;border-bottom-color:#e63946}
-
-    /* CONTENT */
-    .tab-pane{display:none;flex:1;padding:30px 36px;max-width:1100px;margin:0 auto;width:100%;flex-direction:column;gap:28px}
-    .tab-pane.active{display:flex}
-
-    /* SECTION */
-    .section{display:flex;flex-direction:column;gap:10px}
-    .sec-hd{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+    .section{margin-bottom:28px}
+    .sec-hd{display:flex;align-items:center;gap:12px;margin-bottom:14px}
     .sec-title{font-size:.72rem;text-transform:uppercase;letter-spacing:3px;color:#444;font-weight:600;white-space:nowrap}
     .sec-line{flex:1;height:1px;background:#1a1a1a}
-    .sec-hint{font-size:.7rem;color:#333;white-space:nowrap}
 
-    /* TILE ROWS */
-    .tile-list{display:flex;flex-direction:column;gap:5px}
-    .tile-row{display:flex;align-items:center;gap:10px;background:#141414;border-radius:10px;padding:11px 14px;transition:background .15s;min-height:48px}
-    .tile-row:hover{background:#1a1a1a}
-    .tile-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-    .tile-ic{font-size:1.25rem;width:30px;text-align:center;flex-shrink:0}
-    .tile-name{font-size:.9rem;font-weight:600;min-width:130px;max-width:160px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .tile-url{font-size:.75rem;color:#444;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace}
-    .tile-bdg{font-size:.66rem;padding:3px 8px;border-radius:10px;font-weight:700;white-space:nowrap;flex-shrink:0}
-    .tile-acts{display:flex;gap:5px;flex-shrink:0}
-    .fixed-tag{font-size:.6rem;background:#1a1a1a;color:#333;padding:2px 6px;border-radius:5px;border:1px solid #222;vertical-align:middle;margin-left:4px}
-    .empty-msg{color:#2a2a2a;font-size:.8rem;padding:16px;text-align:center;font-style:italic;background:#0f0f0f;border-radius:8px;border:1px dashed #1a1a1a}
+    fieldset{background:#141414;border:1px solid #1e1e1e;border-radius:12px;padding:18px 20px;margin-bottom:12px}
+    legend{font-size:.78rem;text-transform:uppercase;letter-spacing:1.5px;color:#888;font-weight:600;padding:0 8px}
+    .field-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+    .field-row label{font-size:.82rem;color:#888;min-width:130px}
+    .field-row input,.field-row select{background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 12px;border-radius:8px;font-size:.88rem;font-family:inherit;width:220px}
+    .field-row input:focus,.field-row select:focus{border-color:#e63946;outline:none}
+    .field-row input[type="checkbox"]{width:18px;height:18px;cursor:pointer}
+    .field-hint{font-size:.72rem;color:#444;margin-left:142px;margin-top:-4px;margin-bottom:8px}
 
-    /* BUTTONS */
-    .btn{padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.78rem;font-family:inherit;border:1px solid transparent;transition:background .15s,color .15s,border-color .15s;line-height:1.4}
-    .btn-edit2{background:#1a1a1a;border-color:#252525;color:#888}
-    .btn-edit2:hover{background:#252525;color:#f1f1f1}
-    .btn-del2{background:#180a0b;border-color:#2d1213;color:#c0303d}
-    .btn-del2:hover{background:#e63946;border-color:#e63946;color:#fff}
-    .btn-primary{background:#e63946;border-color:#e63946;color:#fff;font-weight:600;padding:9px 22px;font-size:.88rem}
-    .btn-primary:hover{background:#c0303d;border-color:#c0303d}
-    .btn-secondary{background:#1a1a1a;border-color:#252525;color:#888;padding:9px 20px;font-size:.88rem}
-    .btn-secondary:hover{background:#252525;color:#f1f1f1}
-    .btn-add{background:#0f0f0f;border:1px dashed #222;color:#444;padding:11px 20px;border-radius:9px;cursor:pointer;font-size:.82rem;font-family:inherit;transition:border-color .15s,color .15s;width:100%;text-align:center;margin-top:2px}
-    .btn-add:hover{border-color:#e63946;color:#e63946}
+    .btn-save{background:#e63946;border:none;color:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:background .2s}
+    .btn-save:hover{background:#c1121f}
+    .btn-save:disabled{background:#333;color:#555;cursor:default}
 
-    /* SETTINGS */
-    .settings-card{background:#141414;border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:14px}
-    .settings-card h3{font-size:.72rem;text-transform:uppercase;letter-spacing:2px;color:#444}
-    .field{display:flex;flex-direction:column;gap:5px}
-    .field label{font-size:.75rem;color:#555}
-    .field input,.field textarea{background:#0f0f0f;border:1px solid #222;border-radius:8px;color:#f1f1f1;padding:9px 13px;font-size:.88rem;outline:none;font-family:inherit;width:100%;transition:border-color .2s}
-    .field input:focus,.field textarea:focus{border-color:#e63946}
-    .kiosk-box{background:#0f0f0f;border:1px solid #222;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:.88rem;color:#2a9d8f;word-break:break-all;user-select:all}
-    .info-txt{font-size:.75rem;color:#3a3a3a;line-height:1.65}
-    .save-row{display:flex;justify-content:flex-end}
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e1e1e;border:1px solid #2a9d8f;color:#f1f1f1;padding:10px 24px;border-radius:8px;font-size:.88rem;opacity:0;transition:all .3s;z-index:999}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast.err{border-color:#e63946}
 
-    /* MODAL */
-    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;align-items:flex-start;justify-content:center;padding:36px 16px;overflow-y:auto}
-    .modal-overlay.open{display:flex}
-    .modal{background:#161616;border:1px solid #252525;border-radius:16px;padding:26px 28px;width:min(560px,100%);display:flex;flex-direction:column;gap:16px}
-    .modal-head{display:flex;align-items:center;justify-content:space-between}
-    .modal-head h3{font-size:1rem;font-weight:700}
-    .modal-close{background:none;border:none;color:#444;font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:5px}
-    .modal-close:hover{color:#f1f1f1;background:#252525}
-
-    /* PREVIEW CARD */
-    .prev-wrap{background:#0d0d0d;border-radius:10px;padding:14px 16px}
-    .prev-lbl{font-size:.65rem;text-transform:uppercase;letter-spacing:2px;color:#2a2a2a;margin-bottom:10px}
-    .prev-card{background:#1a1a1a;border-radius:10px;padding:16px 14px 12px;border:2px solid #333;position:relative;overflow:hidden;max-width:210px;transition:border-color .2s}
-    .prev-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--c,#444)}
-    .p-icon{font-size:1.8rem;display:block;margin-bottom:8px}
-    .p-title{font-size:.92rem;font-weight:700;margin-bottom:4px}
-    .p-desc{font-size:.7rem;color:#666;line-height:1.4;margin-bottom:9px}
-    .p-badge{font-size:.63rem;padding:3px 8px;border-radius:10px;font-weight:700}
-
-    /* FIELDS GRID */
-    .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .ff{grid-column:1/-1}
-    .color-row{display:flex;gap:8px;align-items:center}
-    .color-row input[type="color"]{width:40px;height:34px;padding:2px;border-radius:6px;border:1px solid #222;background:#0f0f0f;cursor:pointer;flex-shrink:0}
-    .color-row input[type="text"]{flex:1;background:#0f0f0f;border:1px solid #222;border-radius:8px;color:#f1f1f1;padding:8px 12px;font-size:.85rem;outline:none;font-family:inherit;transition:border-color .2s}
-    .color-row input[type="text"]:focus{border-color:#e63946}
-    .chk-lbl{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#888;cursor:pointer;padding-top:6px}
-    .chk-lbl input[type="checkbox"]{width:15px;height:15px;cursor:pointer;accent-color:#e63946;flex-shrink:0}
-    .modal-acts{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
-
-    /* TOAST */
-    .toast{position:fixed;bottom:22px;right:22px;background:#2a9d8f;color:#fff;padding:10px 18px;border-radius:8px;font-size:.82rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:300;font-weight:600}
-    .toast.show{opacity:1}
-
-    footer{text-align:center;padding:14px;font-size:.7rem;color:#1e1e1e;border-top:1px solid #111;flex-shrink:0}
+    .status-info{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.82rem}
+    .status-info .label{color:#555}
+    .status-info .value{color:#ddd;text-align:right;font-family:monospace}
   </style>
 </head>
 <body>
-
 <header>
-  <div class="header-left">
-    <span class="logo">⚙</span>
-    <div>
-      <h1>Admin-Panel</h1>
-      <div class="sub">Löwen Dart Dashboard</div>
-    </div>
+  <span class="logo">⚙</span>
+  <div>
+    <h1>Live Dashboard – Admin</h1>
+    <div class="sub">Arduino &amp; Server-Konfiguration</div>
   </div>
-  <div class="header-right">
-    <button class="btn-restart-hd" id="hdRestartBtn" onclick="restartServer()">&#9881; Server neu starten</button>
-    <a href="/" class="back-link">&#8592; Zum Hub</a>
-  </div>
+  <a href="/" class="back-link">← Zurück</a>
 </header>
-
-<nav class="tabs">
-  <button class="tab-btn active" data-tab="kacheln">📋 Kacheln</button>
-  <button class="tab-btn" data-tab="einstellungen">⚙ Einstellungen</button>
-</nav>
-
-<!-- ── TAB: KACHELN ── -->
-<div id="tab-kacheln" class="tab-pane active">
-
+<main>
   <div class="section">
-    <div class="sec-hd">
-      <span class="sec-title">Feste Dashboards</span>
-      <div class="sec-line"></div>
-      <span class="sec-hint">URL, Icon und Farbe editierbar</span>
+    <div class="sec-hd"><span class="sec-title">Server-Status</span><div class="sec-line"></div></div>
+    <div class="status-info" id="serverInfo">
+      <span class="label">IP:</span><span class="value" id="si-ip">-</span>
+      <span class="label">Port:</span><span class="value" id="si-port">-</span>
+      <span class="label">Datenbank:</span><span class="value" id="si-db">-</span>
+      <span class="label">Arduino:</span><span class="value" id="si-ard">-</span>
     </div>
-    <div id="fixedList" class="tile-list"></div>
   </div>
 
   <div class="section">
-    <div class="sec-hd">
-      <span class="sec-title">Eigene Kacheln</span>
-      <div class="sec-line"></div>
-    </div>
-    <div id="customList" class="tile-list"></div>
-    <button class="btn-add" onclick="openNew()">＋ Neue Kachel hinzufügen</button>
+    <div class="sec-hd"><span class="sec-title">Arduino-Einstellungen</span><div class="sec-line"></div></div>
+    <fieldset>
+      <div class="field-row">
+        <label>Serial-Überwachung</label>
+        <input type="checkbox" id="ardEnabled" />
+      </div>
+      <div class="field-row">
+        <label>Port</label>
+        <input type="text" id="ardPort" placeholder="Auto (leer lassen)" />
+      </div>
+      <div class="field-hint">Leer lassen = automatische Erkennung (z.B. /dev/ttyACM0, COM3)</div>
+      <div class="field-row">
+        <label>Baudrate</label>
+        <select id="ardBaud">
+          <option value="9600">9600</option>
+          <option value="19200">19200</option>
+          <option value="38400">38400</option>
+          <option value="57600">57600</option>
+          <option value="115200" selected>115200</option>
+          <option value="250000">250000</option>
+        </select>
+      </div>
+      <button class="btn-save" id="saveArdBtn">Speichern</button>
+    </fieldset>
   </div>
-
-</div>
-
-<!-- ── TAB: EINSTELLUNGEN ── -->
-<div id="tab-einstellungen" class="tab-pane">
-
-  <div class="settings-card">
-    <h3>ADB &amp; Fire Stick</h3>
-    <div class="field">
-      <label>ADB-Pfad (nur ändern wenn nicht in Docker)</label>
-      <input type="text" id="s-adbpath" placeholder="adb &nbsp;← Standard im Docker-Container" />
-    </div>
-    <div class="field">
-      <label>Fire Stick IP-Adresse</label>
-      <input type="text" id="s-firestickip" placeholder="192.168.8.177" style="width:200px" />
-    </div>
-    <div class="save-row">
-      <button class="btn btn-primary" onclick="saveAdbSettings()">Speichern</button>
-      <button class="btn" onclick="testAdb()" style="background:#1a1a1a;border:1px solid #333;color:#aaa;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:.85rem;font-family:inherit">&#128279; Verbindung testen</button>
-      <span id="adb-test-status" style="font-size:.78rem;color:#555;margin-left:4px"></span>
-    </div>
-  </div>
-
-  <div class="settings-card">
-    <h3>Hub-Konfiguration</h3>
-    <div class="field">
-      <label>Hub-Titel (wird auf der Hauptseite angezeigt)</label>
-      <input type="text" id="s-title" placeholder="Löwen Dart – Kiosk Hub" />
-    </div>
-    <div class="field">
-      <label>Auto-Reload (Minuten, <code style="color:#f4a261">0</code> = deaktiviert)</label>
-      <input type="number" id="s-autoreload" min="0" max="60" step="1" placeholder="5" style="width:110px" />
-    </div>
-    <div class="field" style="border-top:1px solid #1e1e1e;padding-top:14px;margin-top:2px">
-      <label style="margin-bottom:10px">Bildschirmschoner</label>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#aaa;cursor:pointer">
-          <input type="checkbox" id="s-ss-enabled" style="width:16px;height:16px;cursor:pointer" />
-          Aktiviert
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#aaa">
-          Timeout:
-          <input type="number" id="s-ss-minutes" min="1" max="60" step="1" placeholder="2" style="width:80px" />
-          Minuten
-        </label>
-      </div>
-    </div>
-    <div class="save-row">
-      <button class="btn btn-primary" onclick="saveSettings()">Speichern</button>
-    </div>
-  </div>
-
-  <div class="settings-card">
-    <h3>Kiosk-Gerät (Fire Stick / Fully Kiosk Browser)</h3>
-    <p class="info-txt">Trag diese URL in <strong style="color:#aaa">Fully Kiosk Browser</strong> als <em>Start-URL</em> ein. PC und Fire Stick müssen im selben WLAN sein.</p>
-    <div class="field">
-      <label>Server-IP / Hostname <span id="detectedIpHint" style="color:#444;font-weight:400"></span></label>
-      <input type="text" id="s-serverip" placeholder="wird automatisch erkannt…" oninput="updateKioskUrl()" />
-    </div>
-    <div style="display:flex;gap:8px;align-items:stretch;margin-top:4px">
-      <div class="kiosk-box" id="kioskUrl" style="flex:1;cursor:default">http://…</div>
-      <button class="btn" onclick="copyKioskUrl()" title="URL kopieren" style="padding:0 14px;background:#1a1a1a;border:1px solid #333;border-radius:8px;color:#aaa;font-size:.85rem;cursor:pointer;white-space:nowrap">📋 Kopieren</button>
-    </div>
-    <div class="save-row">
-      <button class="btn btn-primary" onclick="saveKioskIp()">Speichern</button>
-    </div>
-  </div>
-
-  <div class="settings-card">
-    <h3>&#128246; Fire TV – Fernsteuerung</h3>
-    <p class="info-txt">Screenshot vom Fire TV aufnehmen &ndash; dann einfach auf den Button im Bild klicken um ihn zu best&auml;tigen.</p>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
-
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="takeScreenshot()" id="screenshotBtn">&#128247; Screenshot aufnehmen</button>
-        <button class="btn" onclick="adbKey(23)" style="background:#1a1a1a;border:1px solid #333;color:#ccc">&#9654; OK</button>
-        <button class="btn" onclick="adbKey(66)" style="background:#1a1a1a;border:1px solid #333;color:#ccc">&#9166; Enter</button>
-        <button class="btn" onclick="adbKey(4)"  style="background:#1a1a1a;border:1px solid #333;color:#ccc">&#8592; Zur&uuml;ck</button>
-        <span id="screenshotStatus" style="color:#666;font-size:.82rem"></span>
-      </div>
-
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <button class="btn" onclick="fullyStop()" style="background:#c62828;color:#fff">&#9209; Fully beenden</button>
-        <button class="btn" onclick="fullyStart()" style="background:#2e7d32;color:#fff">&#9654; Fully starten</button>
-        <button class="btn" onclick="kioskReload()" style="background:#1565c0;color:#fff" title="Sendet die aktuelle Dashboard-URL an Fully Kiosk">&#128257; URL neu laden</button>
-        <span id="fullyStatus" style="color:#666;font-size:.82rem"></span>
-      </div>
-
-      <!-- Screenshot-Vorschau: Klick → ADB-Tap an exakter Stelle -->
-      <div id="screenshotWrap" style="display:none;position:relative;border:1px solid #333;border-radius:8px;overflow:hidden;cursor:crosshair;max-width:100%">
-        <img id="screenshotImg" src="" alt="Fire TV Screen" style="width:100%;display:block;user-select:none" onclick="onScreenshotClick(event, this)">
-        <div id="tapMarker" style="display:none;position:absolute;width:24px;height:24px;border-radius:50%;border:3px solid #FB542B;transform:translate(-50%,-50%);pointer-events:none"></div>
-        <div style="position:absolute;bottom:6px;right:8px;font-size:.72rem;color:#aaa;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:4px;pointer-events:none">Auf Button klicken zum Tippen</div>
-      </div>
-      <span id="tapStatus" style="color:#666;font-size:.82rem"></span>
-    </div>
-  </div>
-
-  <div class="settings-card">
-    <h3>Server</h3>
-    <p class="info-txt">Startet den Node.js-Server neu (z.&nbsp;B. nach Konfigurations&auml;nderungen). Starte den Server &uuml;ber <code style="color:#aaa;background:#111;padding:1px 6px;border-radius:4px">start.bat</code> damit der Neustart funktioniert.</p>
-    <div class="save-row">
-      <button class="btn" id="restartBtn" onclick="restartServer()" style="background:#1a1a1a;border:1px solid #333;color:#e63946">&#9881; Server neu starten</button>
-      <span id="restartStatus" style="color:#666;font-size:.82rem"></span>
-    </div>
-  </div>
-
-</div>
-
-<!-- ── MODAL ── -->
-<div class="modal-overlay" id="modalOverlay">
-  <div class="modal">
-    <div class="modal-head">
-      <h3 id="modalTitle">Kachel bearbeiten</h3>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-
-    <!-- Vorschau -->
-    <div class="prev-wrap">
-      <div class="prev-lbl">Vorschau</div>
-      <div class="prev-card" id="prevCard">
-        <span class="p-icon" id="pIcon">🔗</span>
-        <div class="p-title" id="pTitle">Titel</div>
-        <div class="p-desc" id="pDesc">Beschreibung</div>
-        <span class="p-badge" id="pBadge">Badge</span>
-      </div>
-    </div>
-
-    <!-- Felder -->
-    <div class="fgrid">
-      <div class="field">
-        <label>Icon (Emoji)</label>
-        <input type="text" id="m-icon" maxlength="4" oninput="livePreview()" />
-      </div>
-      <div class="field">
-        <label>Badge-Text</label>
-        <input type="text" id="m-badge" oninput="livePreview()" />
-      </div>
-      <div class="field ff">
-        <label>Titel *</label>
-        <input type="text" id="m-title" oninput="livePreview()" />
-      </div>
-      <div class="field ff">
-        <label>Beschreibung</label>
-        <textarea id="m-desc" rows="2" oninput="livePreview()"></textarea>
-      </div>
-      <div class="field ff">
-        <label>URL / Route *</label>
-        <input type="text" id="m-route" placeholder="https://... oder /panels/mein-panel.html" />
-      </div>
-      <div class="field ff">
-        <label>Akzentfarbe</label>
-        <div class="color-row">
-          <input type="color" id="m-cpick" value="#6c757d"
-            oninput="document.getElementById('m-color').value=this.value;livePreview()" />
-          <input type="text" id="m-color" value="#6c757d"
-            oninput="syncPicker();livePreview()" placeholder="#6c757d" />
-        </div>
-      </div>
-      <label class="chk-lbl ff">
-        <input type="checkbox" id="m-ext" />
-        Externer Link – öffnet in neuem Tab
-      </label>
-    </div>
-
-    <div class="modal-acts">
-      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
-      <button class="btn btn-primary" onclick="saveModal()">💾 Speichern</button>
-    </div>
-  </div>
-</div>
-
+</main>
 <div class="toast" id="toast"></div>
-
-<footer>Löwen Dart Club – Admin-Panel</footer>
-
 <script>
-  // ── State ──
-  let allFixed  = [];
-  let allCustom = [];
-  let editState = null; // { type: 'new'|'fixed'|'custom', id }
-
-  // ── Boot ──
-  (async () => {
-    await loadAll();
-    await loadSettingsForm();
-    setupTabs();
-  })();
-
-  // ── Data ──
-  async function loadAll() {
-    [allFixed, allCustom] = await Promise.all([
-      fetch('/api/dashboards/fixed').then(r => r.json()),
-      fetch('/api/dashboards/custom').then(r => r.json())
-    ]);
-    renderList('fixedList',  allFixed,  true);
-    renderList('customList', allCustom, false);
+  const toast = document.getElementById('toast');
+  function showToast(msg, isError) {
+    toast.textContent = msg;
+    toast.className = 'toast show' + (isError ? ' err' : '');
+    setTimeout(() => toast.className = 'toast', 2500);
   }
 
-  // ── Render ──
-  function renderList(id, list, isFixed) {
-    const el = document.getElementById(id);
-    el.innerHTML = '';
-    if (!list.length) {
-      el.innerHTML = '<div class="empty-msg">Noch keine eigenen Kacheln angelegt</div>';
-      return;
+  async function load() {
+    try {
+      const [info, settings, storage] = await Promise.all([
+        fetch('/api/server-info').then(r => r.json()),
+        fetch('/api/settings').then(r => r.json()),
+        fetch('/api/storage/info').then(r => r.json())
+      ]);
+      document.getElementById('si-ip').textContent = info.ip;
+      document.getElementById('si-port').textContent = info.port;
+      document.getElementById('si-db').textContent = storage.client + (storage.external ? ' (extern)' : ' (lokal)');
+      document.getElementById('ardEnabled').checked = settings.arduinoMonitorEnabled !== false;
+      document.getElementById('ardPort').value = settings.arduinoPort || '';
+      document.getElementById('ardBaud').value = String(settings.arduinoBaudRate || 115200);
+    } catch(e) {
+      document.getElementById('si-ip').textContent = 'Offline';
     }
-    list.forEach(d => el.appendChild(makeTileRow(d, isFixed)));
+    try {
+      const ard = await fetch('/api/arduino/state').then(r => r.json());
+      document.getElementById('si-ard').textContent = ard.connected ? 'Verbunden (' + (ard.port||'?') + ')' : 'Getrennt';
+    } catch(e) { document.getElementById('si-ard').textContent = '?'; }
   }
 
-  function makeTileRow(d, isFixed) {
-    const row = document.createElement('div');
-    row.className = 'tile-row';
-    row.innerHTML =
-      '<span class="tile-dot" style="background:' + d.color + '"></span>' +
-      '<span class="tile-ic">' + (d.icon || '🔗') + '</span>' +
-      '<span class="tile-name">' + esc(d.title) +
-        (isFixed ? '<span class="fixed-tag">fest</span>' : '') + '</span>' +
-      '<span class="tile-url" title="' + esc(d.route) + '">' + esc(d.route) + '</span>' +
-      '<span class="tile-bdg" style="background:' + d.color + '22;color:' + d.color + '">' + esc(d.badge || '') + '</span>' +
-      '<div class="tile-acts">' +
-        '<button class="btn btn-edit2" onclick="openEdit(\'' + d.id + '\',' + isFixed + ')">✏ Bearbeiten</button>' +
-        (!isFixed ? '<button class="btn btn-del2" onclick="deleteTile(\'' + d.id + '\')">✕ Löschen</button>' : '') +
-      '</div>';
-    return row;
-  }
-
-  function esc(s) {
-    return String(s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // ── Tabs ──
-  function setupTabs() {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = btn.dataset.tab;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('saveArdBtn').addEventListener('click', async function() {
+    this.disabled = true;
+    const settings = {
+      arduinoMonitorEnabled: document.getElementById('ardEnabled').checked,
+      arduinoPort: document.getElementById('ardPort').value.trim(),
+      arduinoBaudRate: parseInt(document.getElementById('ardBaud').value, 10)
+    };
+    try {
+      const r = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(settings)
       });
-    });
-  }
-
-  // ── Modal open ──
-  function openNew() {
-    editState = { type: 'new', id: null };
-    document.getElementById('modalTitle').textContent = 'Neue Kachel erstellen';
-    fillModal({ icon: '', badge: 'Custom', title: '', description: '', route: '', color: '#6c757d', external: false });
-    livePreview();
-    document.getElementById('modalOverlay').classList.add('open');
-  }
-
-  function openEdit(id, isFixed) {
-    const data = isFixed ? allFixed.find(d => d.id === id) : allCustom.find(d => d.id === id);
-    if (!data) return;
-    editState = { type: isFixed ? 'fixed' : 'custom', id };
-    document.getElementById('modalTitle').textContent = 'Bearbeiten: ' + data.title;
-    fillModal(data);
-    livePreview();
-    document.getElementById('modalOverlay').classList.add('open');
-  }
-
-  function fillModal(d) {
-    document.getElementById('m-icon').value  = d.icon        || '';
-    document.getElementById('m-badge').value = d.badge       || '';
-    document.getElementById('m-title').value = d.title       || '';
-    document.getElementById('m-desc').value  = d.description || '';
-    document.getElementById('m-route').value = d.route       || '';
-    const col = d.color || '#6c757d';
-    document.getElementById('m-color').value = col;
-    document.getElementById('m-cpick').value = col;
-    document.getElementById('m-ext').checked = !!d.external;
-  }
-
-  function closeModal() {
-    document.getElementById('modalOverlay').classList.remove('open');
-    editState = null;
-  }
-
-  document.getElementById('modalOverlay').addEventListener('click', e => {
-    if (e.target === e.currentTarget) closeModal();
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      showToast('Einstellungen gespeichert. Arduino-Monitor neu gestartet.');
+    } catch(e) {
+      showToast('Fehler: ' + e.message, true);
+    }
+    this.disabled = false;
   });
 
-  // ── Live preview ──
-  function syncPicker() {
-    const v = document.getElementById('m-color').value;
-    try { document.getElementById('m-cpick').value = v; } catch {}
-  }
-
-  function livePreview() {
-    const icon  = document.getElementById('m-icon').value  || '🔗';
-    const title = document.getElementById('m-title').value || 'Titel';
-    const desc  = document.getElementById('m-desc').value  || 'Beschreibung';
-    const badge = document.getElementById('m-badge').value || 'Badge';
-    const color = document.getElementById('m-color').value || '#6c757d';
-
-    document.getElementById('pIcon').textContent  = icon;
-    document.getElementById('pTitle').textContent = title;
-    document.getElementById('pDesc').textContent  = desc;
-
-    const pb = document.getElementById('pBadge');
-    pb.textContent  = badge;
-    pb.style.background = color + '22';
-    pb.style.color      = color;
-
-    const pc = document.getElementById('prevCard');
-    pc.style.borderColor = color + '55';
-    pc.style.setProperty('--c', color);
-  }
-
-  // ── Save modal ──
-  async function saveModal() {
-    const title = document.getElementById('m-title').value.trim();
-    const route = document.getElementById('m-route').value.trim();
-    if (!title) { alert('Bitte einen Titel eingeben.'); return; }
-    if (!route) { alert('Bitte eine URL oder Route eingeben.'); return; }
-
-    const payload = {
-      title,
-      icon:        document.getElementById('m-icon').value.trim()  || '🔗',
-      description: document.getElementById('m-desc').value.trim(),
-      badge:       document.getElementById('m-badge').value.trim() || 'Custom',
-      color:       document.getElementById('m-color').value.trim() || '#6c757d',
-      route,
-      external:    document.getElementById('m-ext').checked
-    };
-
-    let url, method;
-    if      (editState.type === 'new')    { url = '/api/dashboards/custom';                    method = 'POST'; }
-    else if (editState.type === 'fixed')  { url = '/api/dashboards/fixed/'  + editState.id;   method = 'PUT';  }
-    else                                  { url = '/api/dashboards/custom/' + editState.id;   method = 'PUT';  }
-
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) { alert('Fehler beim Speichern (Status ' + res.status + ').'); return; }
-    closeModal();
-    await loadAll();
-    showToast('Gespeichert ✓');
-  }
-
-  // ── Delete ──
-  async function deleteTile(id) {
-    const d = allCustom.find(x => x.id === id);
-    if (!confirm((d ? '"' + d.title + '"' : 'Diese Kachel') + ' wirklich löschen?')) return;
-    const res = await fetch('/api/dashboards/custom/' + id, { method: 'DELETE' });
-    if (res.ok) { await loadAll(); showToast('Gelöscht'); }
-    else alert('Fehler beim Löschen.');
-  }
-
-  async function saveAdbSettings() {
-    const adbPath     = document.getElementById('s-adbpath').value.trim();
-    const firestickIp = document.getElementById('s-firestickip').value.trim();
-    await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adbPath, firestickIp })
-    });
-    showToast('ADB-Einstellungen gespeichert ✓');
-  }
-
-  async function testAdb() {
-    const el = document.getElementById('adb-test-status');
-    el.textContent = 'Teste…'; el.style.color = '#f4a261';
-    try {
-      const r = await fetch('/api/adb/launch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: 'https://www.google.com' })
-      });
-      const d = await r.json();
-      if (r.ok) { el.textContent = '✓ Verbindung OK'; el.style.color = '#2ec4b6'; }
-      else       { el.textContent = '✗ ' + d.error;     el.style.color = '#e63946'; }
-    } catch { el.textContent = '✗ Server nicht erreichbar'; el.style.color = '#e63946'; }
-  }
-
-  // ── Settings ──
-  async function loadSettingsForm() {
-    const [s, info] = await Promise.all([
-      fetch('/api/settings').then(r => r.json()),
-      fetch('/api/server-info').then(r => r.json())
-    ]);
-    document.getElementById('s-title').value = s.hubTitle || '';
-    document.getElementById('s-autoreload').value = s.autoReloadMinutes !== undefined ? s.autoReloadMinutes : 5;
-    document.getElementById('s-ss-enabled').checked = s.screensaverEnabled !== false;
-    document.getElementById('s-ss-minutes').value = s.screensaverMinutes !== undefined ? s.screensaverMinutes : 2;
-    document.getElementById('s-serverip').value = s.serverIp || info.detectedIp || '';
-    document.getElementById('s-adbpath').value = s.adbPath || '';
-    document.getElementById('s-firestickip').value = s.firestickIp || '';
-    document.getElementById('detectedIpHint').textContent = info.detectedIp ? `(erkannt: ${info.detectedIp})` : '';
-    updateKioskUrl();
-  }
-
-  function updateKioskUrl() {
-    const ip = document.getElementById('s-serverip').value.trim() || '&lt;IP&gt;';
-    document.getElementById('kioskUrl').textContent = `http://${ip}:${window.location.port || 3000}`;
-  }
-
-  async function saveKioskIp() {
-    const serverIp = document.getElementById('s-serverip').value.trim();
-    await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serverIp })
-    });
-    showToast('Server-IP gespeichert ✓');
-  }
-
-  function copyKioskUrl() {
-    const url = document.getElementById('kioskUrl').textContent;
-    navigator.clipboard.writeText(url).then(() => showToast('URL kopiert ✓'));
-  }
-
-  let _screenW = 1920, _screenH = 1080;
-
-  async function takeScreenshot() {
-    const btn    = document.getElementById('screenshotBtn');
-    const status = document.getElementById('screenshotStatus');
-    btn.disabled = true;
-    status.style.color = '#666';
-    status.textContent = 'Screenshot wird aufgenommen…';
-    try {
-      const r = await fetch('/api/firetv-screenshot');
-      const d = await r.json();
-      if (!d.ok) throw new Error(d.error || 'Fehler');
-      _screenW = d.width;
-      _screenH = d.height;
-      const img  = document.getElementById('screenshotImg');
-      const wrap = document.getElementById('screenshotWrap');
-      img.src = '/api/firetv-screen.png?t=' + d.ts;
-      wrap.style.display = 'block';
-      status.style.color = '#4caf50';
-      status.textContent = `${_screenW}×${_screenH} ✓ – auf Button tippen`;
-    } catch(e) {
-      status.style.color = '#e63946';
-      status.textContent = 'Fehler: ' + e.message;
-    }
-    btn.disabled = false;
-  }
-
-  async function onScreenshotClick(e, img) {
-    const rect   = img.getBoundingClientRect();
-    const scaleX = _screenW / rect.width;
-    const scaleY = _screenH / rect.height;
-    const tapX   = Math.round((e.clientX - rect.left) * scaleX);
-    const tapY   = Math.round((e.clientY - rect.top)  * scaleY);
-
-    // Markierung anzeigen
-    const marker = document.getElementById('tapMarker');
-    marker.style.left = (e.clientX - rect.left) + 'px';
-    marker.style.top  = (e.clientY - rect.top)  + 'px';
-    marker.style.display = 'block';
-
-    const status = document.getElementById('tapStatus');
-    status.style.color = '#666';
-    status.textContent = `Tippe auf ${tapX}, ${tapY}…`;
-    try {
-      const r = await fetch('/api/adb-tap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: tapX, y: tapY })
-      });
-      const d = await r.json();
-      status.style.color = d.ok ? '#4caf50' : '#e63946';
-      status.textContent = d.ok ? `Tap ${tapX},${tapY} gesendet ✓` : ('Fehler: ' + (d.error || ''));
-    } catch(e2) {
-      status.style.color = '#e63946';
-      status.textContent = 'Netzwerkfehler';
-    }
-  }
-
-  async function adbKey(keycode) {
-    const status = document.getElementById('screenshotStatus');
-    status.style.color = '#666';
-    status.textContent = 'Sende Taste…';
-    try {
-      const r = await fetch('/api/adb-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keycode })
-      });
-      const d = await r.json();
-      status.style.color = d.ok ? '#4caf50' : '#e63946';
-      status.textContent = d.ok ? 'Taste gesendet ✓' : ('Fehler: ' + (d.error || ''));
-    } catch(e) {
-      status.style.color = '#e63946';
-      status.textContent = 'Netzwerkfehler';
-    }
-    setTimeout(() => { status.textContent = ''; }, 3000);
-  }
-
-  async function kioskReload() {
-    const status = document.getElementById('fullyStatus');
-    status.style.color = '#666';
-    status.textContent = 'Sende URL an Fully Kiosk…';
-    try {
-      const r = await fetch('/api/kiosk-reload', { method: 'POST' });
-      const d = await r.json();
-      status.style.color = d.ok ? '#4caf50' : '#e63946';
-      status.textContent = d.ok ? ('Kiosk lädt: ' + d.url + ' ✓') : ('Fehler: ' + (d.error || ''));
-    } catch(e) {
-      status.style.color = '#e63946';
-      status.textContent = 'Netzwerkfehler';
-    }
-    setTimeout(() => { status.textContent = ''; }, 5000);
-  }
-
-  async function fullyStop() {
-    const status = document.getElementById('fullyStatus');
-    status.style.color = '#666';
-    status.textContent = 'Beende Fully Kiosk…';
-    try {
-      const r = await fetch('/api/fully-stop', { method: 'POST' });
-      const d = await r.json();
-      status.style.color = d.ok ? '#4caf50' : '#e63946';
-      status.textContent = d.ok ? 'Fully beendet – TV Launcher gestartet ✓' : ('Fehler: ' + (d.error || ''));
-    } catch(e) {
-      status.style.color = '#e63946';
-      status.textContent = 'Netzwerkfehler';
-    }
-    setTimeout(() => { status.textContent = ''; }, 4000);
-  }
-
-  async function fullyStart() {
-    const status = document.getElementById('fullyStatus');
-    status.style.color = '#666';
-    status.textContent = 'Starte Fully Kiosk…';
-    try {
-      const r = await fetch('/api/fully-start', { method: 'POST' });
-      const d = await r.json();
-      status.style.color = d.ok ? '#4caf50' : '#e63946';
-      status.textContent = d.ok ? 'Fully Kiosk gestartet ✓' : ('Fehler: ' + (d.error || ''));
-    } catch(e) {
-      status.style.color = '#e63946';
-      status.textContent = 'Netzwerkfehler';
-    }
-    setTimeout(() => { status.textContent = ''; }, 4000);
-  }
-
-  async function restartServer() {
-    const btn   = document.getElementById('restartBtn');
-    const hdBtn = document.getElementById('hdRestartBtn');
-    const status = document.getElementById('restartStatus');
-    if (btn)   btn.disabled   = true;
-    if (hdBtn) hdBtn.disabled = true;
-    if (status) status.textContent = 'Neustart wird angefordert...';
-    try {
-      await fetch('/api/restart', { method: 'POST' });
-      if (status) { status.style.color = '#4caf50'; status.textContent = 'Server startet neu – Seite wird in 4 Sekunden neu geladen.'; }
-      setTimeout(() => location.reload(), 4000);
-    } catch {
-      if (status) { status.style.color = '#e63946'; status.textContent = 'Fehler beim Neustart.'; }
-      if (btn)   btn.disabled   = false;
-      if (hdBtn) hdBtn.disabled = false;
-    }
-  }
-  async function saveSettings() {
-    const hubTitle = document.getElementById('s-title').value.trim();
-    if (!hubTitle) { alert('Bitte einen Titel eingeben.'); return; }
-    const autoReloadMinutes = Math.max(0, parseInt(document.getElementById('s-autoreload').value, 10) || 0);
-    const screensaverEnabled = document.getElementById('s-ss-enabled').checked;
-    const screensaverMinutes = Math.max(1, parseInt(document.getElementById('s-ss-minutes').value, 10) || 2);
-    await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hubTitle, autoReloadMinutes, screensaverEnabled, screensaverMinutes })
-    });
-    showToast('Einstellungen gespeichert ✓');
-  }
-
-  // ── Toast ──
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2600);
-  }
+  load();
 </script>
 </body>
 </html>

@@ -18,36 +18,6 @@
 
     /* MAIN */
     main { flex: 1; padding: 14px 28px 16px; max-width: 1300px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 14px; }
-
-    /* STAT TILES */
-    .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-    .stat-tile { background: #161616; border-radius: 10px; padding: 12px 14px; border-left: 4px solid var(--c, #e63946); }
-    .stat-tile .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1.5px; color: #555; margin-bottom: 5px; }
-    .stat-tile .value { font-size: 1.55rem; font-weight: 800; color: var(--c, #e63946); font-variant-numeric: tabular-nums; }
-    .stat-tile .sub { font-size: 0.72rem; color: #555; margin-top: 3px; }
-
-    /* SECTION */
-    .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-    .section-header h2 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #555; font-weight: 600; white-space: nowrap; }
-    .section-header .line { flex: 1; height: 1px; background: #1e1e1e; }
-
-    /* NAV CARDS (Sub-Panels) */
-    .nav-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-    .nav-card { background: #161616; border-radius: 10px; padding: 12px 14px 10px; text-decoration: none; color: inherit; display: block; border: 2px solid var(--c, #333); position: relative; overflow: hidden; transition: transform .18s, box-shadow .18s; }
-    .nav-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--c, #444); }
-    .nav-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
-    .nav-card .nav-icon { font-size: 1.55rem; margin-bottom: 6px; display: block; }
-    .nav-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 3px; }
-    .nav-card p { font-size: 0.73rem; color: #777; line-height: 1.4; }
-    .nav-card .nav-arrow { position: absolute; bottom: 10px; right: 12px; font-size: 0.9rem; color: var(--c, #444); opacity: .6; transition: opacity .2s, transform .2s; }
-    .nav-card:hover .nav-arrow { opacity: 1; transform: translateX(4px); }
-
-    /* SPLIT LAYOUT */
-    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 780px) { .split { grid-template-columns: 1fr; } }
-
-    /* TABLE */
-    .panel-box { background: #161616; border-radius: 10px; padding: 12px 14px; }
     .panel-box h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 2px; color: #555; margin-bottom: 10px; }
     table { width: 100%; border-collapse: collapse; }
     th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: #444; padding: 5px 10px; text-align: left; border-bottom: 1px solid #1e1e1e; }
@@ -77,7 +47,7 @@
 <body>
 
   <div class="topbar">
-    <a href="/">← Hub</a>
+    <a href="/">← Dashboard</a>
     <span class="sep">›</span>
     <h1>🎯 Privat Dart</h1>
     <span id="clock-mini">--:--:--</span>
@@ -121,33 +91,16 @@
         <div class="line"></div>
       </div>
       <div class="nav-grid">
-        <a class="nav-card" href="/panels/spielerstatistiken.html" style="--c:#e63946">
-          <span class="nav-icon">📊</span>
-          <h3>Spielerstatistiken</h3>
-          <p>Auswertungen, Durchschnitte & Best-of-Werte aller Spieler</p>
-          <span class="nav-arrow">→</span>
-        </a>
         <a class="nav-card" href="/panels/live-spielstand.html" style="--c:#f4a261">
           <span class="nav-icon">⚡</span>
           <h3>Live-Spielstand</h3>
           <p>Aktuelles Spiel in Echtzeit verfolgen</p>
           <span class="nav-arrow">→</span>
         </a>
-        <a class="nav-card" href="/panels/rangliste.html" style="--c:#2a9d8f">
-          <span class="nav-icon">🏆</span>
-          <h3>Rangliste</h3>
-          <p>Aktuelle Saisonwertung & Punktestand</p>
-          <span class="nav-arrow">→</span>
-        </a>
-        <a class="nav-card" href="/panels/spielplan.html" style="--c:#457b9d">
-          <span class="nav-icon">📅</span>
-          <h3>Spielplan & Turnier</h3>
-          <p>Anstehende Spiele, Turnierübersicht & Ergebnisse</p>
-          <span class="nav-arrow">→</span>
-        </a>        <a class="nav-card" href="/panels/spieler.html" style="--c:#9b5de5">
+        <a class="nav-card" href="/panels/spieler.html" style="--c:#9b5de5">
           <span class="nav-icon">👤</span>
           <h3>Spieler-Verwaltung</h3>
-          <p>HB8-Slots benennen &amp; Scores zuordnen</p>
+          <p>Spieler-Slots benennen &amp; verwalten</p>
           <span class="nav-arrow">→</span>
         </a>
         <a class="nav-card" href="/panels/controller.html" style="--c:#457b9d">
@@ -155,6 +108,17 @@
           <h3>Controller</h3>
           <p>Wurfsteuerung, Undo &amp; Next-Player</p>
           <span class="nav-arrow">→</span>
+        </a>
+        <a class="nav-card" href="/api/highscores" style="--c:#f4a261">
+          <span class="nav-icon">🏆</span>
+          <h3>Highscores</h3>
+          <p>Bestleistungen aus der Datenbank</p>
+          <span class="nav-arrow">→</span>
+        </a>
+        <a class="nav-card" href="/admin.html" style="--c:#555">
+          <span class="nav-icon">⚙</span>
+          <h3>Admin</h3>
+          <p>Arduino &amp; Server-Konfiguration</p>
         </a>
     </div>
 

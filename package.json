@@ -1,7 +1,7 @@
 {
   "name": "loewen-dart-dashboard",
   "version": "1.0.0",
-  "description": "Zentrales Dart-Dashboard für den Löwen",
+  "description": "Live Dart Dashboard – Arduino-gesteuerter Spielstand & Highscores",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -1,6 +1,5 @@
 services:
   dart-dashboard:
-    image: ghcr.io/rexx09/loewen-dart-dashboard:latest
     build: .
     container_name: dart-dashboard
     restart: unless-stopped
@@ -11,26 +10,8 @@ services:
     devices:
       - /dev/ttyACM0:/dev/ttyACM0
     volumes:
-      # Lokale Code-Änderungen übernehmen, damit nicht versehentlich das alte GHCR-Image läuft.
-      - ./server.js:/app/server.js:ro
-      - ./public:/app/public:ro
       - ${DATA_PATH:-./data}:/app/data
-      - ${ADB_KEYS_PATH:-./adb-keys}:/root/.android
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - PUBLIC_PORT=${PUBLIC_PORT:-3100}
-      - FIRE_FEATURES_ENABLED=${FIRE_FEATURES_ENABLED:-true}
-      - DART_HUB_ENABLED=${DART_HUB_ENABLED:-false}
-      - FIRESTICK_IP=${FIRESTICK_IP:-192.168.8.177}
       - SERVER_IP=${SERVER_IP:-}
-
-  watchtower:
-    image: containrrr/watchtower
-    container_name: dart-dashboard-watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 --cleanup dart-dashboard
-    # Prüft alle 5 Minuten ob ein neues Image auf GHCR verfügbar ist.
-    # Sobald GitHub Actions ein neues Image pusht → automatischer Pull + Neustart.
