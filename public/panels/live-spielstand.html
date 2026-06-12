@@ -192,6 +192,7 @@
     let liveState = null;
     let manualPoints = document.getElementById('manualPoints');
     (function() { const sse = new EventSource('/api/events'); sse.addEventListener('reload', () => loadAll()); sse.onerror = () => { document.getElementById('sseStatus').textContent = 'getrennt'; }; })();
+    loadAll();
     async function loadAll() {
       const [stateRes, highscoresRes] = await Promise.all([ fetch('/api/live/state'), fetch('/api/highscores') ]);
       liveState = await stateRes.json();

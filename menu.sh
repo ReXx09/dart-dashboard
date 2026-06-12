@@ -59,23 +59,23 @@ status_badge() {
 
 docker_menu_status() {
   if ! command_exists docker; then
-    printf '%s Docker fehlt' "$(status_badge off)"
+    printf '%s Docker nicht gefunden' "$(status_badge off)"
     return 0
   fi
 
   local state
   state="$(docker inspect -f '{{.State.Status}}' dart-dashboard 2>/dev/null || printf 'nicht gefunden')"
   case "$state" in
-    running) printf '%s Container running' "$(status_badge ok)" ;;
-    exited) printf '%s Container exited' "$(status_badge warn)" ;;
-    restarting) printf '%s Container restarting' "$(status_badge warn)" ;;
-    *) printf '%s Container %s' "$(status_badge off)" "$state" ;;
+    running) printf '%s Docker laeuft' "$(status_badge ok)" ;;
+    exited) printf '%s Docker gestoppt' "$(status_badge warn)" ;;
+    restarting) printf '%s Docker startet neu' "$(status_badge warn)" ;;
+    *) printf '%s Docker: %s' "$(status_badge off)" "$state" ;;
   esac
 }
 
 api_menu_status() {
   if ! command_exists curl; then
-    printf '%s API curl fehlt' "$(status_badge off)"
+    printf '%s curl fehlt' "$(status_badge off)"
     return 0
   fi
 
@@ -86,13 +86,13 @@ api_menu_status() {
   if curl -fsS --max-time 2 "${api_base}/api/live/state" >/dev/null 2>&1; then
     printf '%s API erreichbar' "$(status_badge ok)"
   else
-    printf '%s API nicht erreichbar' "$(status_badge off)"
+    printf '%s API offline' "$(status_badge off)"
   fi
 }
 
 storage_menu_status() {
   if ! command_exists curl; then
-    printf '%s DB unbekannt' "$(status_badge off)"
+    printf '%s curl fehlt' "$(status_badge off)"
     return 0
   fi
 
@@ -114,7 +114,7 @@ storage_menu_status() {
 
 arduino_menu_status() {
   if ! command_exists curl; then
-    printf '%s Arduino unbekannt' "$(status_badge off)"
+    printf '%s curl fehlt' "$(status_badge off)"
     return 0
   fi
 
@@ -129,14 +129,22 @@ arduino_menu_status() {
 
   connected="$(printf '%s' "$payload" | sed -n 's/.*"connected"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n 1)"
   if [[ "$connected" == "true" ]]; then
-    printf '%s Arduino connected' "$(status_badge ok)"
+    printf '%s Arduino verbunden' "$(status_badge ok)"
   else
-    printf '%s Arduino disconnected' "$(status_badge warn)"
+    printf '%s Arduino getrennt' "$(status_badge warn)"
   fi
 }
 
+status_pair() {
+  local left="$1"
+  local right="$2"
+  printf '  %-28s   %-28s\n' "$left" "$right"
+}
+
 menu_status_line() {
-  printf '%s | %s | %s | %s' "$(docker_menu_status)" "$(api_menu_status)" "$(storage_menu_status)" "$(arduino_menu_status)"
+  printf '%s%s' \
+    "$(status_pair "$(docker_menu_status)" "$(api_menu_status)")" \
+    "$(status_pair "$(storage_menu_status)" "$(arduino_menu_status)")"
 }
 
 menu_subtitle() {
@@ -145,15 +153,21 @@ menu_subtitle() {
 }
 
 docker_status_line() {
-  printf '%s | %s' "$(docker_menu_status)" "$(api_menu_status)"
+  printf '%s%s' \
+    "$(status_pair "$(docker_menu_status)" "$(api_menu_status)")" \
+    "$(status_pair '' '')"
 }
 
 diagnostics_status_line() {
-  printf '%s | %s | %s' "$(api_menu_status)" "$(storage_menu_status)" "$(arduino_menu_status)"
+  printf '%s%s' \
+    "$(status_pair "$(api_menu_status)" "$(storage_menu_status)")" \
+    "$(status_pair "$(arduino_menu_status)" '')"
 }
 
 monitoring_status_line() {
-  printf '%s | %s | %s' "$(docker_menu_status)" "$(api_menu_status)" "$(storage_menu_status)"
+  printf '%s%s' \
+    "$(status_pair "$(docker_menu_status)" "$(api_menu_status)")" \
+    "$(status_pair "$(storage_menu_status)" '')"
 }
 
 print_line() {
