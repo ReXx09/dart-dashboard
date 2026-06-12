@@ -191,13 +191,69 @@
   <script>
     let liveState = null;
     let manualPoints = document.getElementById('manualPoints');
-    (function() { const sse = new EventSource('/api/events'); sse.addEventListener('reload', () => loadAll()); sse.onerror = () => { document.getElementById('sseStatus').textContent = 'getrennt'; }; })();
+
+    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // ── Arduino-Direktstatus von /api/arduino/state (unabhängig vom Live-State) ──
+    async function refreshArduinoStatus() {
+      try {
+        const r = await fetch('/api/arduino/state', { signal: AbortSignal.timeout(3000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const state = await r.json();
+        const el = document.getElementById('arduinoState');
+        if (state.connected) {
+          el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0);
+        } else {
+          el.innerHTML = '<span class="arduino-dot off"></span>' + (state.error || 'Nicht verbunden');
+        }
+      } catch { /* still zeigen was im live-state steht */ }
+    }
+    // SSE für Arduino-Echtzeit-Updates
+    (function() {
+      const sse = new EventSource('/api/arduino/events');
+      sse.addEventListener('state', function(evt) {
+        try {
+          const state = JSON.parse(evt.data);
+          const el = document.getElementById('arduinoState');
+          if (state.connected) {
+            el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0)
+          } else {
+            el.innerHTML = '<span class="arduino-dot off"></span>' + (state.error || 'Nicht verbunden')
+          }
+        } catch(e) {}
+      });
+    })();
+
+    // ── SSE für Live-Reload ──
+    (function() {
+      const sse = new EventSource('/api/events');
+      sse.addEventListener('reload', () => loadAll());
+      sse.addEventListener('error', () => { document.getElementById('sseStatus').textContent = 'getrennt'; });
+    })();
+
     loadAll();
+    refreshArduinoStatus();
+    setInterval(refreshArduinoStatus, 5000);
+
     async function loadAll() {
-      const [stateRes, highscoresRes] = await Promise.all([ fetch('/api/live/state'), fetch('/api/highscores') ]);
-      liveState = await stateRes.json();
-      const highscores = await highscoresRes.json();
-      renderState(liveState);
+      let state, highscores;
+      try {
+        const stateRes = await fetch('/api/live/state');
+        if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
+        state = await stateRes.json();
+        liveState = state;
+      } catch(e) {
+        document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
+        document.getElementById('sseStatus').textContent = 'Error';
+        return;
+      }
+      try {
+        const hsRes = await fetch('/api/highscores');
+        if (hsRes.ok) highscores = await hsRes.json();
+      } catch { highscores = []; }
+
+      renderState(state);
       renderHighscores(highscores);
       document.getElementById('sseStatus').textContent = 'verbunden';
     }
@@ -290,6 +346,90 @@
       const g = parseInt(clean.slice(2, 4), 16);
       const b = parseInt(clean.slice(4, 6), 16);
       return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
+    // ── Toast ──
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (isError ? ' err' : '');
+      setTimeout(() => t.className = 'toast', 2500);
+    }
+
+    // ── Highscores ──
+    function renderHighscores(list) {
+      const tbody = document.getElementById('highscoreBody');
+      if (!Array.isArray(list) || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="hs-muted">Keine Einträge</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.slice(0, 20).map(function(entry, idx) {
+        var d = entry.ts ? new Date(entry.ts) : null;
+        var timeStr = d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '-';
+        return '<tr><td class="rank">' + (idx + 1) + '</td><td class="name">' + escapeHtml(entry.player) + '</td><td class="score">' + entry.score + '</td><td>' + (entry.kind || '-') + '</td><td class="when">' + timeStr + '</td></tr>';
+      }).join('');
+    }
+
+    // ── Wurf abschicken ──
+    async function applyPreset(slot, points) {
+      try {
+        var r = await fetch('/api/live/throw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerSlot: slot, points: points })
+        });
+        if (!r.ok) { showToast('Fehler: HTTP ' + r.status, true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Wurf: ' + points + ' für P' + slot);
+        loadHighscoresOnly();
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Undo ──
+    async function undoLast() {
+      try {
+        var r = await fetch('/api/live/undo', { method: 'POST' });
+        if (!r.ok) { showToast('Kein Wurf zum Rückgängigmachen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Letzter Wurf rückgängig');
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Next Player ──
+    async function nextPlayer() {
+      try {
+        var r = await fetch('/api/live/next-player', { method: 'POST' });
+        if (!r.ok) { showToast('Fehler', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Nächster Spieler');
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Reset ──
+    async function resetLeg(carryLegs) {
+      try {
+        var r = await fetch('/api/live/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ carryLegs: carryLegs })
+        });
+        if (!r.ok) { showToast('Reset fehlgeschlagen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast(carryLegs ? 'Neues Leg gestartet (Legs erhalten)' : 'Spiel zurückgesetzt');
+        loadHighscoresOnly();
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Highscores separat laden ──
+    async function loadHighscoresOnly() {
+      try {
+        var r = await fetch('/api/highscores');
+        if (r.ok) renderHighscores(await r.json());
+      } catch {}
     }
   </script>
 </body>
