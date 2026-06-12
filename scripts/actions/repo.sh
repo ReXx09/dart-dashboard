@@ -14,7 +14,7 @@ clone_repo_elsewhere() {
 
   local target_dir
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
-    target_dir="$(whiptail --title "Repo klonen" --inputbox "Zielordner fuer den Clone:" 10 78 "$HOME/loewen-dart-dashboard" 3>&1 1>&2 2>&3)" || return
+    target_dir="$(whiptail --title "Repo klonen" --inputbox "Zielordner fuer den Clone:" 10 82 "$HOME/loewen-dart-dashboard" 3>&1 1>&2 2>&3)" || return
   else
     read -r -p 'Zielordner fuer den Clone [~/loewen-dart-dashboard]: ' target_dir
   fi

@@ -119,11 +119,11 @@ ask_yes_no() {
 
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
     if [[ "$default" == "y" ]]; then
-      whiptail --title "Bestaetigung" --yesno "$prompt" 10 72
+      whiptail --title "Bestaetigung" --yesno "$prompt" 10 76
       return $?
     fi
 
-    whiptail --title "Bestaetigung" --defaultno --yesno "$prompt" 10 72
+    whiptail --title "Bestaetigung" --defaultno --yesno "$prompt" 10 76
     return $?
   fi
 
@@ -141,7 +141,7 @@ ask_yes_no() {
 ui_pause() {
   stty sane 2>/dev/null || true
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
-    whiptail --title "Weiter" --msgbox "Aktion abgeschlossen. Weiter mit OK." 9 60
+    whiptail --title "Weiter" --msgbox "Aktion abgeschlossen. Weiter mit OK." 9 64
   else
     printf '\n'
     read -r -p 'Enter druecken fuer Hauptmenue...' _
@@ -156,7 +156,7 @@ show_textbox() {
     local tmp_file
     tmp_file="$(mktemp)"
     printf '%s\n' "$text" > "$tmp_file"
-    whiptail --title "$title" --scrolltext --textbox "$tmp_file" 24 90
+    whiptail --title "$title" --scrolltext --textbox "$tmp_file" 26 94
     rm -f "$tmp_file"
   else
     printf '\n%s\n' "$title"

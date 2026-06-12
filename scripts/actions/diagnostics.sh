@@ -39,7 +39,7 @@ prompt_arduino_port() {
   local value=""
 
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
-    value="$(whiptail --title "Arduino-Port" --inputbox "Optional manuellen Serial-Port angeben.\nLeer lassen = automatische Erkennung.\n\nBeispiele: /dev/ttyACM0 oder COM3" 13 78 "$current_port" 3>&1 1>&2 2>&3)" || return 1
+    value="$(whiptail --title "Arduino-Port" --inputbox "Optional manuellen Serial-Port angeben.\nLeer lassen = automatische Erkennung.\n\nBeispiele: /dev/ttyACM0 oder COM3" 13 82 "$current_port" 3>&1 1>&2 2>&3)" || return 1
   else
     printf '\nArduino-Port manuell setzen? Leer lassen fuer automatische Erkennung.\n'
     read -r -p 'Serial-Port: ' value

@@ -205,7 +205,7 @@ show_action_success() {
   local label
   label="$(action_label "$action")"
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
-    whiptail --title "Erfolg" --msgbox "Aktion erfolgreich:\n${label}\n\nMit OK zur vorherigen Menueebene." 11 72
+    whiptail --title "Erfolg" --msgbox "Aktion erfolgreich:\n${label}\n\nMit OK zur vorherigen Menueebene." 11 76
   else
     msg_ok "Aktion erfolgreich: ${label}"
     printf 'Weiter mit Enter zur vorherigen Menueebene...\n'
@@ -230,7 +230,7 @@ show_action_error() {
       printf 'Aktion fehlgeschlagen: %s\n\n' "$action"
       printf 'Letzte Meldungen:\n%s\n' "$details"
     } > "$tmp_file"
-    whiptail --title "Fehler" --scrolltext --textbox "$tmp_file" 24 90
+    whiptail --title "Fehler" --scrolltext --textbox "$tmp_file" 26 94
     rm -f "$tmp_file"
   else
     msg_fail "Aktion fehlgeschlagen: ${action}"
@@ -307,7 +307,7 @@ execute_action() {
 ui_pause() {
   stty sane 2>/dev/null || true
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
-    whiptail --title "Weiter" --msgbox "Aktion abgeschlossen. Weiter mit OK." 9 60
+    whiptail --title "Weiter" --msgbox "Aktion abgeschlossen. Weiter mit OK." 9 64
   else
     printf '\n'
     read -r -p 'Enter druecken fuer Hauptmenue...' _
@@ -319,7 +319,7 @@ ui_pause() {
 submenu_einrichtung_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(menu_subtitle 'System vorbereiten oder den Dienst neu bauen und starten.')" 18 78 6 \
+    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(menu_subtitle 'System vorbereiten oder den Dienst neu bauen und starten.')" 18 82 6 \
       "1" "Systemcheck + Auto-Installation" \
       "2" "Install/Update + Build + Start" \
       "0" "Zurueck" \
@@ -337,7 +337,7 @@ submenu_docker_whiptail() {
     local choice
     local status_line
     status_line="$(docker_status_line)"
-    choice="$(whiptail --title "Loewen Dart | Docker" --menu "${status_line}\n\n$(menu_subtitle 'Container steuern, Logs ansehen oder den Dienst sauber neu aufsetzen.')" 22 82 9 \
+    choice="$(whiptail --title "Loewen Dart | Docker" --menu "${status_line}\n\n$(menu_subtitle 'Container steuern, Logs ansehen oder den Dienst sauber neu aufsetzen.')" 22 88 9 \
       "1" "Start" \
       "2" "Stop" \
       "3" "Restart" \
@@ -367,7 +367,7 @@ submenu_monitoring_whiptail() {
     local choice
     local status_line
     status_line="$(monitoring_status_line)"
-    choice="$(whiptail --title "Loewen Dart | Status & Monitoring" --menu "${status_line}\n\n$(menu_subtitle 'Status pruefen, Gesamtansicht oeffnen oder Logs direkt beobachten.')" 24 84 10 \
+    choice="$(whiptail --title "Loewen Dart | Status & Monitoring" --menu "${status_line}\n\n$(menu_subtitle 'Status pruefen, Gesamtansicht oeffnen oder Logs direkt beobachten.')" 24 92 10 \
       "1" "Gesamtstatus  (Compose + Logs + Netz)" \
       "2" "Container Status (ps)" \
       "3" "Schnell-Diagnose (Health-Checks)" \
@@ -399,7 +399,7 @@ submenu_diagnose_advanced_whiptail() {
     local choice
     local status_line
     status_line="$(diagnostics_status_line)"
-    choice="$(whiptail --title "Loewen Dart | Diagnose (Erweitert)" --menu "${status_line}\n\n$(menu_subtitle 'Detailansichten fuer Status, Logs und Schritt-fuer-Schritt-Tests.')" 21 82 8 \
+    choice="$(whiptail --title "Loewen Dart | Diagnose (Erweitert)" --menu "${status_line}\n\n$(menu_subtitle 'Detailansichten fuer Status, Logs und Schritt-fuer-Schritt-Tests.')" 21 88 8 \
       "1" "Gefuehrte Funktionstests  (Schritt fuer Schritt)" \
       "2" "Gesamtstatus  (Compose + Logs + Netz)" \
       "3" "Docker-Logs Snapshot" \
@@ -421,7 +421,7 @@ submenu_diagnose_whiptail() {
     local choice
     local status_line
     status_line="$(diagnostics_status_line)"
-    choice="$(whiptail --title "Loewen Dart | Diagnose" --menu "${status_line}\n\n$(menu_subtitle 'Erst Schnell-Diagnose, danach bei Bedarf in die Detailansicht wechseln.')" 19 82 6 \
+    choice="$(whiptail --title "Loewen Dart | Diagnose" --menu "${status_line}\n\n$(menu_subtitle 'Erst Schnell-Diagnose, danach bei Bedarf in die Detailansicht wechseln.')" 19 88 6 \
       "1" "Schnell-Diagnose (Health-Checks, empfohlen)" \
       "2" "Erweiterte Diagnose  >" \
       "0" "Zurueck" \
@@ -442,7 +442,7 @@ main_menu_whiptail() {
     local status_line
     status_line="$(menu_status_line)"
 
-    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 22 86 9 \
+    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 22 92 9 \
       "0" "Schnellstart-Assistent  (komplette Einrichtung)" \
       "1" "Einrichtung  >" \
       "2" "Status & Monitoring  >" \
