@@ -232,7 +232,17 @@
     // ── SSE für Live-Reload ──
     (function() {
       const sse = new EventSource('/api/events');
-      sse.addEventListener('reload', () => loadAll());
+      let reloadQueued = false;
+      sse.addEventListener('reload', () => {
+        if (reloadQueued) return;
+        reloadQueued = true;
+        setTimeout(() => {
+          reloadQueued = false;
+          loadAll().catch(() => {
+            document.getElementById('sseStatus').textContent = 'getrennt';
+          });
+        }, 120);
+      });
       sse.addEventListener('error', () => { document.getElementById('sseStatus').textContent = 'getrennt'; });
     })();
 

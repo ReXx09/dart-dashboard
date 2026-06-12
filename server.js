@@ -104,6 +104,7 @@ let arduinoReconnectTimer = null;
 let pendingArduinoThrow = null;
 let pendingArduinoThrowTimer = null;
 let arduinoThrowLockUntil = 0;
+let arduinoProcessingPromise = Promise.resolve();
 const arduinoRawEventHistory = [];
 const arduinoState = {
   enabled: true,
@@ -146,6 +147,17 @@ function rememberArduinoLine(line) {
 function formatChannel(channel) {
   const key = String(channel || '').replace(/^0+/, '');
   return key ? String(Number(key)).padStart(2, '0') : '';
+}
+
+function roundAverage(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function calculateCurrentRoundAverage(player) {
+  const currentRoundPoints = Array.isArray(player?.currentRoundPoints) ? player.currentRoundPoints : [];
+  if (currentRoundPoints.length === 0) return 0;
+  const sum = currentRoundPoints.reduce((total, points) => total + (Number(points) || 0), 0);
+  return roundAverage(sum / 3);
 }
 
 function dartValueFromChannel(channel) {
@@ -195,7 +207,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     raw: evt.line || null
   });
 
-  player.average = player.turns > 0 ? Math.round((player.totalScored / (player.turns * 3)) * 100) / 100 : 0;
+  player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
 
   state.lastAction = {
@@ -258,7 +270,7 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
     raw: evt.line || null
   });
 
-  player.average = player.turns > 0 ? Math.round((player.totalScored / (player.turns * 3)) * 100) / 100 : 0;
+  player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
 
   state.lastAction = {
@@ -302,7 +314,10 @@ function handleArduinoTrigger(evt) {
     pendingArduinoThrow = null;
     pendingArduinoThrowTimer = null;
     normalizeArduinoStatePatch({ pendingThrow: false });
-    applyArduinoMiss({ line: pending.line || '', ms: pending.triggerMs }, 'timeout')
+
+    arduinoProcessingPromise = arduinoProcessingPromise
+      .catch(() => {})
+      .then(() => applyArduinoMiss({ line: pending.line || '', ms: pending.triggerMs }, 'timeout'))
       .then((result) => normalizeArduinoStatePatch({ lastMiss: result.ok ? result : { ok: false, reason: result.reason } }))
       .catch((err) => normalizeArduinoStatePatch({ lastMiss: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
   }, ARDUINO_THROW_WINDOW_MS);
@@ -319,7 +334,9 @@ function handleArduinoActiveEvent(evt) {
   clearPendingArduinoThrow();
   normalizeArduinoStatePatch({ pendingThrow: false, lastAutoThrowError: null });
 
-  applyArduinoThrowFromChannel(evt.channel, evt)
+  arduinoProcessingPromise = arduinoProcessingPromise
+    .catch(() => {})
+    .then(() => applyArduinoThrowFromChannel(evt.channel, evt))
     .then((result) => {
       if (pending) pending.applied = result.ok;
       normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason });
@@ -507,6 +524,17 @@ async function defaultLiveState() {
   };
 }
 
+function roundAverage(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function calculateCurrentRoundAverage(player) {
+  const currentRoundPoints = Array.isArray(player?.currentRoundPoints) ? player.currentRoundPoints : [];
+  if (currentRoundPoints.length === 0) return 0;
+  const sum = currentRoundPoints.reduce((total, points) => total + (Number(points) || 0), 0);
+  return roundAverage(sum / 3);
+}
+
 function sanitizePlayerState(player, fallback) {
   const base = fallback || {};
   const name = String(player?.name || base.name || '').trim() || 'Spieler';
@@ -519,7 +547,7 @@ function sanitizePlayerState(player, fallback) {
   const color = String(player?.color || base.color || '#e63946');
   const throws = Array.isArray(player?.throws) ? player.throws : [];
   const currentRoundPoints = Array.isArray(player?.currentRoundPoints) ? player.currentRoundPoints : [];
-  const average = turns > 0 ? Math.round((totalScored / (turns * 3)) * 100) / 100 : 0;
+  const average = calculateCurrentRoundAverage({ currentRoundPoints });
   return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average };
 }
 

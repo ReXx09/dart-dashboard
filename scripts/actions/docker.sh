@@ -3,6 +3,14 @@
 build_and_start() {
   ensure_docker_ready
   ensure_env_file
+
+  msg_run 'Aktualisiere lokalen Code aus Git...'
+  if command_exists git && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git pull
+  else
+    msg_warn 'Kein Git-Repository gefunden - nutze lokalen Code ohne git pull.'
+  fi
+
   init_compose_build_args
 
   msg_run 'Baue Container mit aktuellem Code...'
