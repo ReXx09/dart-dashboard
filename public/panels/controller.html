@@ -38,9 +38,13 @@
     .input-row .pts.danger { background: #e6394611; border-color: #e6394644; color: #e63946; }
     .input-row .pts.danger:hover { background: #e6394622; }
     .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    .arduino-status { font-size: .78rem; color: #666; }
-    .arduino-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-    .arduino-dot.on { background: #2a9d8f; }
+    .arduino-status { font-size: .78rem; color: #666; line-height: 1.5; }
+    .arduino-monitor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+    .arduino-monitor-grid div { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 9px 10px; }
+    .arduino-monitor-grid span { display: block; font-size: .66rem; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+    .arduino-monitor-grid strong { display: block; font-size: .82rem; color: #ddd; font-variant-numeric: tabular-nums; }
+    .arduino-last-line { margin-top: 10px; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; padding: 9px 10px; font-family: Consolas, monospace; font-size: .72rem; color: #777; word-break: break-all; }
+    .arduino-dot.on { background: #2a9d8f; box-shadow: 0 0 8px rgba(42,157,143,.5); }
     .arduino-dot.off { background: #555; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -81,9 +85,17 @@
       </div>
     </div>
     <div class="ctrl-section">
-      <h3>Arduino</h3>
+      <h3>Arduino Monitor</h3>
       <div class="arduino-status" id="ctrlArduino"><span class="arduino-dot off"></span>Nicht verbunden</div>
-      <div class="arduino-status" style="margin-top:4px" id="ctrlArduinoEvent">Letztes Event: -</div>
+      <div class="arduino-monitor-grid">
+        <div><span>Letztes Event</span><strong id="ctrlArduinoEvent">-</strong></div>
+        <div><span>Wurf / Zahl</span><strong id="ctrlDartValue">-</strong></div>
+        <div><span>Aktive Kontakte</span><strong id="ctrlActiveContacts">-</strong></div>
+        <div><span>Heartbeat</span><strong id="ctrlHeartbeat">-</strong></div>
+        <div><span>Port</span><strong id="ctrlPort">-</strong></div>
+        <div><span>Baudrate</span><strong id="ctrlBaud">-</strong></div>
+      </div>
+      <div class="arduino-last-line" id="ctrlLastLine">Letzte serielle Zeile: -</div>
     </div>
   </main>
   <div class="toast" id="toast"></div>
@@ -92,17 +104,61 @@
     const ctrlPoints = document.getElementById('ctrlPoints');
     const ctrlThrowBtn = document.getElementById('ctrlThrowBtn');
 
+    function renderArduinoState(state) {
+      const el = document.getElementById('ctrlArduino');
+      el.innerHTML = state.connected
+        ? '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0)
+        : '<span class="arduino-dot off"></span>Nicht verbunden';
+
+      const evt = state.lastEvent || null;
+      document.getElementById('ctrlArduinoEvent').textContent = evt ? 'CH' + evt.channel + ' -> ' + evt.state : '-';
+
+      const value = evt && evt.state === 'ACTIVE' ? dartValueFromChannel(evt.channel) : '-';
+      document.getElementById('ctrlDartValue').textContent = value;
+
+      document.getElementById('ctrlActiveContacts').textContent = (state.activeCount || 0) + ' aktiv';
+      document.getElementById('ctrlHeartbeat').textContent = state.lastHeartbeat ? state.lastHeartbeat.ms + ' ms' : '-';
+      document.getElementById('ctrlPort').textContent = state.port || '-';
+      document.getElementById('ctrlBaud').textContent = state.baudRate || '-';
+      document.getElementById('ctrlLastLine').textContent = 'Letzte serielle Zeile: ' + (state.lastLine || '-');
+    }
+
+    function dartValueFromChannel(channel) {
+      const ch = Number(String(channel || '').replace(/^0+/, '') || 0);
+      const map = {
+        1: '20',
+        2: '1',
+        3: '18',
+        4: '4',
+        5: '13',
+        6: '6',
+        7: '10',
+        8: '15',
+        9: '2',
+        10: '17',
+        11: '3',
+        12: '19',
+        13: '7',
+        14: '16',
+        15: '8',
+        16: '11',
+        17: '14',
+        18: '9',
+        19: '12',
+        20: '5',
+        21: 'BULL',
+        22: 'BULL'
+      };
+      return map[ch] || 'CH' + String(ch).padStart(2, '0');
+    }
+
     (function() {
       const sse = new EventSource('/api/events');
       sse.addEventListener('reload', () => loadAll());
       const arduinoSse = new EventSource('/api/arduino/events');
       arduinoSse.addEventListener('state', (evt) => {
         try {
-          const state = JSON.parse(evt.data);
-          document.getElementById('ctrlArduino').innerHTML = state.connected
-            ? '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0)
-            : '<span class="arduino-dot off"></span>Nicht verbunden';
-          document.getElementById('ctrlArduinoEvent').textContent = 'Letztes Event: ' + (state.lastEvent ? state.lastEvent.channel + ' -> ' + state.lastEvent.state : '-');
+          renderArduinoState(JSON.parse(evt.data));
         } catch(_) {}
       });
     })();
@@ -111,6 +167,8 @@
       const res = await fetch('/api/live/state');
       liveState = await res.json();
       render(liveState);
+      const arduino = await fetch('/api/arduino/state').then(r => r.json()).catch(() => ({}));
+      renderArduinoState(arduino);
     }
 
     function render(state) {
