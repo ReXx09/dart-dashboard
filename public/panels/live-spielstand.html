@@ -6,208 +6,241 @@
   <title>Live-Spielstand</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d0d0d; color: #f1f1f1; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
-    .topbar { background: #1a1a1a; border-bottom: 2px solid #f4a261; padding: 14px 26px; display: flex; align-items: center; gap: 12px; }
-    .topbar a { color: #888; text-decoration: none; font-size: 0.9rem; }
+    body {
+      background: #0a0a0a;
+      color: #f1f1f1;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .topbar {
+      background: #111;
+      border-bottom: 3px solid #e63946;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1.2rem; flex: 1; }
-    .live-badge { background: #e63946; color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; }
-    main { padding: 20px; max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
-    .scoreboard {
+    .topbar h2 { font-size: 1.1rem; flex: 1; font-weight: 700; }
+    .live-badge { background: #e63946; color: #fff; font-size: .65rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
+    .header-status { font-size: .75rem; color: #555; }
+    .header-status span { color: #2a9d8f; }
+    .header-controls { display: flex; gap: 6px; }
+    .btn-icon {
       background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #aaa;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .78rem;
+      font-family: inherit;
+      transition: background .15s, color .15s;
+    }
+    .btn-icon:hover { background: #252525; color: #fff; }
+    .btn-icon.primary { background: #e6394622; border-color: #e63946; color: #e63946; }
+    .btn-icon.primary:hover { background: #e6394633; }
+    .btn-icon.danger { background: #e6394611; border-color: #e6394644; color: #e63946; }
+    .btn-icon.danger:hover { background: #e6394622; }
+    .btn-icon:disabled { opacity: .3; cursor: default; }
+    main { padding: 16px; max-width: 1400px; margin: 0 auto; display: grid; gap: 14px; }
+    .scoreboard { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .score-card {
+      background: #141414;
       border-radius: 14px;
       padding: 18px;
-      border: 2px solid #f4a261;
-      display: grid;
-      grid-template-columns: 1fr 72px 1fr;
-      gap: 8px;
-      align-items: center;
+      border: 2px solid #1e1e1e;
+      position: relative;
+      transition: all .3s ease;
+      overflow: hidden;
     }
-    .player-score { text-align: center; padding: 10px; border-radius: 10px; border: 1px solid #262626; background: #151515; }
-    .player-score .name { font-size: 1rem; color: #d7d7d7; margin-bottom: 4px; }
-    .player-score .score { font-size: 3.8rem; font-weight: 700; color: #f4a261; line-height: 1; font-variant-numeric: tabular-nums; }
-    .player-score .meta { font-size: 0.8rem; color: #888; margin-top: 6px; }
-    .vs { text-align: center; color: #444; font-weight: 700; letter-spacing: 2px; }
-    .controls { background: #171717; border-radius: 12px; border: 1px solid #242424; padding: 14px; }
-    .controls h3 { font-size: 0.95rem; margin-bottom: 10px; color: #ddd; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .row + .row { margin-top: 8px; }
-    .btn { background: #262626; border: 1px solid #333; color: #f1f1f1; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 0.85rem; }
-    .btn:hover { background: #333; }
-    .btn.primary { background: #e63946; border-color: #e63946; }
-    .btn.primary:hover { background: #c92f3a; }
-    .input { background: #111; border: 1px solid #303030; color: #f1f1f1; border-radius: 8px; padding: 8px 10px; width: 120px; }
+    .score-card.active {
+      border-color: var(--pc, #e63946);
+      box-shadow: 0 0 30px rgba(230, 57, 70, .15);
+      background: #191111;
+    }
+    .score-card.active::after {
+      content: 'AKTIV';
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      font-size: .55rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--pc, #e63946);
+      background: rgba(230,57,70,.15);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(230,57,70,.1); }
+      50% { box-shadow: 0 0 40px rgba(230,57,70,.25); }
+    }
+    .score-card.active { animation: pulseGlow 2s ease-in-out infinite; }
+    .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; margin-bottom: 12px; }
+    .sc-name { font-size: .95rem; font-weight: 700; margin-bottom: 4px; }
+    .sc-score { font-size: 4rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--pc, #f4a261); margin-bottom: 6px; }
+    .sc-stats { font-size: .78rem; color: #666; line-height: 1.6; }
+    .sc-stats span { color: #aaa; font-weight: 600; }
+    .sc-last-throws { margin-top: 10px; display: flex; gap: 4px; }
+    .sc-throw-chip { background: #1e1e1e; border-radius: 6px; padding: 4px 8px; font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
+    .sc-throw-chip.empty { color: #333; }
+    .sc-throw-chip.bust { color: #e63946; background: #2a0a0a; }
+    .sc-average { margin-top: 8px; font-size: .7rem; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+    .sc-average strong { color: #f4a261; font-size: .9rem; }
+    .sc-legs { position: absolute; bottom: 10px; right: 14px; font-size: .7rem; color: #444; }
+    .sc-legs strong { color: #888; }
+    .controls { background: #141414; border-radius: 14px; border: 1px solid #1e1e1e; padding: 14px 18px; }
+    .controls h3 { font-size: .85rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+    .controls-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .controls-row + .controls-row { margin-top: 8px; }
+    .ctrl-label { font-size: .78rem; color: #555; font-weight: 600; min-width: 40px; }
+    .btn-pts { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: .85rem; font-family: inherit; font-weight: 600; transition: background .15s; }
+    .btn-pts:hover { background: #2a2a2a; }
+    .btn-pts.active-player { border-color: var(--pc, #e63946); }
+    .points-input { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 8px 10px; border-radius: 8px; width: 80px; font-size: .9rem; font-family: inherit; text-align: center; }
+    .points-input:focus { border-color: #e63946; outline: none; }
     .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .panel { background: #171717; border-radius: 12px; border: 1px solid #242424; padding: 12px; }
-    .panel h4 { font-size: 0.85rem; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-    .mono { font-family: Consolas, monospace; font-size: 0.83rem; color: #ddd; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 6px; border-bottom: 1px solid #242424; font-size: 0.85rem; }
-    th { color: #888; font-size: 0.75rem; text-transform: uppercase; }
-    .muted { color: #777; }
+    .status-panel { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 12px; }
+    .status-panel h4 { font-size: .68rem; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .status-panel .value { font-size: .85rem; color: #ddd; font-family: Consolas, monospace; }
+    .status-panel .value.muted { color: #555; }
+    .arduino-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .arduino-dot.on { background: #2a9d8f; box-shadow: 0 0 10px rgba(42,157,143,.6); }
+    .arduino-dot.off { background: #555; }
+    .hs-panel { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 12px; }
+    .hs-panel h4 { font-size: .68rem; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+    .hs-table { width: 100%; border-collapse: collapse; }
+    .hs-table th { text-align: left; font-size: .65rem; color: #444; text-transform: uppercase; padding: 4px 6px; border-bottom: 1px solid #1e1e1e; }
+    .hs-table td { padding: 4px 6px; font-size: .8rem; border-bottom: 1px solid #1a1a1a; }
+    .hs-table tr:last-child td { border-bottom: none; }
+    .hs-table .rank { color: #555; font-weight: 600; }
+    .hs-table .name { color: #ddd; }
+    .hs-table .score { color: #f4a261; font-weight: 700; text-align: right; }
+    .hs-table .when { color: #444; text-align: right; font-size: .7rem; }
+    .hs-muted { color: #444; font-style: italic; font-size: .78rem; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    @media (max-width: 768px) { .scoreboard { grid-template-columns: 1fr; } .status-grid { grid-template-columns: 1fr; } .sc-score { font-size: 3rem; } }
   </style>
 </head>
 <body>
   <div class="topbar">
-    <a href="/">Zurueck</a>
-    <h2>Live-Spielstand</h2>
-    <span class="live-badge">LIVE DATA</span>
-  </div>
-
-  <main>
-    <div class="scoreboard">
-      <div class="player-score">
-        <div class="name" id="name0">Spieler 1</div>
-        <div class="score" id="score0">501</div>
-        <div class="meta" id="meta0">Legs: 0 | Turns: 0</div>
-      </div>
-      <div class="vs">VS</div>
-      <div class="player-score">
-        <div class="name" id="name1">Spieler 2</div>
-        <div class="score" id="score1">501</div>
-        <div class="meta" id="meta1">Legs: 0 | Turns: 0</div>
-      </div>
+    <a href="/">← Zurück</a>
+    <h2>🎯 Live-Spielstand</h2>
+    <span class="live-badge">LIVE</span>
+    <div class="header-status">SSE: <span id="sseStatus">verbunden</span></div>
+    <div class="header-controls">
+      <button class="btn-icon" onclick="undoLast()" id="undoBtn" title="Letzten Wurf rückgängig">↩ Undo</button>
+      <button class="btn-icon" onclick="nextPlayer()" id="nextBtn" title="Nächster Spieler">⏭ Next</button>
+      <button class="btn-icon primary" onclick="resetLeg(true)">Neues Leg</button>
+      <button class="btn-icon danger" onclick="resetLeg(false)">Reset</button>
     </div>
-
+  </div>
+  <main>
+    <div class="scoreboard" id="scoreboard"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></div>
     <div class="controls">
       <h3>Punkte verbuchen</h3>
-      <div class="row">
-        <button class="btn" onclick="applyPreset(0, 60)">P1 -60</button>
-        <button class="btn" onclick="applyPreset(0, 100)">P1 -100</button>
-        <button class="btn" onclick="applyPreset(1, 60)">P2 -60</button>
-        <button class="btn" onclick="applyPreset(1, 100)">P2 -100</button>
+      <div class="controls-row">
+        <span class="ctrl-label">Punkte</span>
+        <input class="points-input" id="manualPoints" type="number" min="0" max="180" value="60" />
       </div>
-      <div class="row">
-        <input id="manualPoints" class="input" type="number" min="0" max="180" value="45" />
-        <button class="btn" onclick="applyManual(0)">P1 Werfen</button>
-        <button class="btn" onclick="applyManual(1)">P2 Werfen</button>
-        <button class="btn primary" onclick="resetLeg(true)">Neues Leg</button>
-        <button class="btn" onclick="resetLeg(false)">Komplett Reset</button>
-      </div>
+      <div class="controls-row" id="playerButtons"><div class="muted" style="color:#444">Spieler werden geladen...</div></div>
     </div>
-
     <div class="status-grid">
-      <div class="panel">
+      <div class="status-panel">
         <h4>Arduino</h4>
-        <div class="mono" id="arduinoState">Warte auf Daten...</div>
+        <div class="value" id="arduinoState"><span class="arduino-dot off"></span>Nicht verbunden</div>
       </div>
-      <div class="panel">
+      <div class="status-panel">
         <h4>Letzte Aktion</h4>
-        <div class="mono" id="lastAction">Noch keine Aktion</div>
+        <div class="value muted" id="lastAction">Keine Aktion</div>
       </div>
     </div>
-
-    <div class="panel">
-      <h4>Highscores</h4>
-      <table>
-        <thead>
-          <tr><th>#</th><th>Spieler</th><th>Score</th><th>Typ</th><th>Zeit</th></tr>
-        </thead>
-        <tbody id="highscoreBody">
-          <tr><td colspan="5" class="muted">Keine Eintraege</td></tr>
-        </tbody>
+    <div class="hs-panel">
+      <h4>🏆 Highscores</h4>
+      <table class="hs-table">
+        <thead><tr><th>#</th><th>Spieler</th><th>Score</th><th>Typ</th><th>Zeit</th></tr></thead>
+        <tbody id="highscoreBody"><tr><td colspan="5" class="hs-muted">Keine Einträge</td></tr></tbody>
       </table>
     </div>
   </main>
-
+  <div class="toast" id="toast"></div>
   <script>
     let liveState = null;
-
+    let manualPoints = document.getElementById('manualPoints');
+    (function() { const sse = new EventSource('/api/events'); sse.addEventListener('reload', () => loadAll()); sse.onerror = () => { document.getElementById('sseStatus').textContent = 'getrennt'; }; })();
     async function loadAll() {
-      const [stateRes, highscoresRes] = await Promise.all([
-        fetch('/api/live/state'),
-        fetch('/api/highscores')
-      ]);
+      const [stateRes, highscoresRes] = await Promise.all([ fetch('/api/live/state'), fetch('/api/highscores') ]);
       liveState = await stateRes.json();
       const highscores = await highscoresRes.json();
       renderState(liveState);
       renderHighscores(highscores);
+      document.getElementById('sseStatus').textContent = 'verbunden';
     }
-
     function renderState(state) {
-      if (!state || !state.players || state.players.length < 2) return;
-
-      const p0 = state.players[0];
-      const p1 = state.players[1];
-      document.getElementById('name0').textContent = p0.name;
-      document.getElementById('name1').textContent = p1.name;
-      document.getElementById('score0').textContent = p0.remaining;
-      document.getElementById('score1').textContent = p1.remaining;
-      document.getElementById('meta0').textContent = 'Legs: ' + p0.legs + ' | Turns: ' + p0.turns + ' | Best: ' + p0.bestTurn;
-      document.getElementById('meta1').textContent = 'Legs: ' + p1.legs + ' | Turns: ' + p1.turns + ' | Best: ' + p1.bestTurn;
-
+      if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
+      const activePlayer = state.game.activePlayer || 0;
+      const scoreboard = document.getElementById('scoreboard');
+      const playerButtons = document.getElementById('playerButtons');
+      scoreboard.innerHTML = state.players.map((p, idx) => {
+        const isActive = idx === activePlayer;
+        const throws = Array.isArray(p.throws) ? p.throws : [];
+        const lastThrows = throws.slice(-3);
+        const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
+        const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows.map(t => t.points);
+        while (displayThrows.length < 3) displayThrows.push(null);
+        const throwsHtml = displayThrows.map((pt, ti) => {
+          if (pt === null) return '<span class="sc-throw-chip empty">-</span>';
+          const bust = lastThrows[ti] && lastThrows[ti].bust;
+          return '<span class="sc-throw-chip' + (bust ? ' bust' : '') + '">' + pt + '</span>';
+        }).join('');
+        const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
+        return '<div class="score-card' + (isActive ? ' active' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+          '<div class="sc-color-bar"></div>' +
+          '<div class="sc-name">' + escapeHtml(p.name) + '</div>' +
+          '<div class="sc-score">' + p.remaining + '</div>' +
+          '<div class="sc-stats">Turns: <span>' + (p.turns || 0) + '</span> | Best: <span>' + (p.bestTurn || 0) + '</span> | Total: <span>' + (p.totalScored || 0) + '</span></div>' +
+          '<div class="sc-last-throws">' + throwsHtml + '</div>' +
+          '<div class="sc-average">Ø 3-Dart: <strong>' + avgStr + '</strong></div>' +
+          '<div class="sc-legs">Legs: <strong>' + (p.legs || 0) + '</strong></div>' +
+        '</div>';
+      }).join('');
+      playerButtons.innerHTML = state.players.map((p, idx) => {
+        const isActive = idx === activePlayer;
+        return '<button class="btn-pts' + (isActive ? ' active-player' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '" onclick="applyPreset(' + p.slot + ', ' + Number(manualPoints.value || 60) + ')">P' + p.slot + ' ' + escapeHtml(p.name) + '</button>';
+      }).join('');
       const arduino = state.arduino || {};
-      const arduinoText = arduino.connected
-        ? 'Verbunden | active=' + (arduino.activeCount || 0) + ' | last=' + (arduino.lastEvent ? arduino.lastEvent.line : '-')
-        : 'Nicht verbunden';
-      document.getElementById('arduinoState').textContent = arduinoText;
-
+      document.getElementById('arduinoState').innerHTML = arduino.connected
+        ? '<span class="arduino-dot on"></span>Verbunden | active=' + (arduino.activeCount || 0)
+        : '<span class="arduino-dot off"></span>Nicht verbunden';
       const action = state.lastAction;
-      document.getElementById('lastAction').textContent = action
-        ? (action.player + ' -> ' + action.points + (action.bust ? ' (BUST)' : '') + ' | Rest ' + action.remaining)
-        : 'Noch keine Aktion';
+      document.getElementById('lastAction').innerHTML = action
+        ? escapeHtml(action.player) + ' → ' + (action.points || '-') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
+        : 'Keine Aktion';
     }
-
     function renderHighscores(list) {
       const body = document.getElementById('highscoreBody');
-      if (!Array.isArray(list) || list.length === 0) {
-        body.innerHTML = '<tr><td colspan="5" class="muted">Keine Eintraege</td></tr>';
-        return;
-      }
-      body.innerHTML = list.slice(0, 12).map((e, idx) => {
+      if (!Array.isArray(list) || list.length === 0) { body.innerHTML = '<tr><td colspan="5" class="hs-muted">Keine Einträge</td></tr>'; return; }
+      body.innerHTML = list.slice(0, 10).map((e, idx) => {
         const when = new Date(e.ts || Date.now()).toLocaleString('de-DE');
-        return '<tr>' +
-          '<td>' + (idx + 1) + '</td>' +
-          '<td>' + escapeHtml(e.player || '-') + '</td>' +
-          '<td>' + Number(e.score || 0) + '</td>' +
-          '<td>' + escapeHtml(e.kind || '-') + '</td>' +
-          '<td>' + when + '</td>' +
-          '</tr>';
+        return '<tr><td class="rank">#' + (idx + 1) + '</td><td class="name">' + escapeHtml(e.player || '-') + '</td><td class="score">' + Number(e.score || 0) + '</td><td>' + escapeHtml(e.kind || '-') + '</td><td class="when">' + when + '</td></tr>';
       }).join('');
     }
-
-    async function applyThrow(playerIndex, points) {
-      const res = await fetch('/api/live/throw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerIndex, points })
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Fehler' }));
-        alert(err.error || 'Fehler beim Speichern');
-        return;
-      }
-      await loadAll();
+    async function applyThrow(playerSlot, points) {
+      const res = await fetch('/api/live/throw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerSlot, points }) });
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); }
     }
-
-    function applyPreset(playerIndex, points) {
-      applyThrow(playerIndex, points);
-    }
-
-    function applyManual(playerIndex) {
-      const points = Number(document.getElementById('manualPoints').value || 0);
-      applyThrow(playerIndex, points);
-    }
-
-    async function resetLeg(carryLegs) {
-      await fetch('/api/live/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ carryLegs })
-      });
-      await loadAll();
-    }
-
-    function escapeHtml(s) {
-      return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    setInterval(loadAll, 5000);
+    function applyPreset(playerSlot, points) { applyThrow(playerSlot, points); }
+    async function nextPlayer() { const res = await fetch('/api/live/next-player', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }
+    async function undoLast() { const res = await fetch('/api/live/undo', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }
+    async function resetLeg(carryLegs) { await fetch('/api/live/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ carryLegs }) }); }
+    function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); }
+    function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function escapeAttr(s) { return escapeHtml(s).replace(/#/g,'%23'); }
     loadAll();
   </script>
 </body>

@@ -295,6 +295,15 @@ app.get('/', (_req, res, next) => {
         <span class="arrow">&#8594;</span>
       </div>
     </a>
+    <a class="card" href="/panels/controller.html" style="--accent:#457b9d;--accent-bg:#0d1520">
+      <span class="card-icon">&#127918;</span>
+      <span class="card-title">Controller</span>
+      <span class="card-desc">Wurfsteuerung, Undo und Next-Player-Funktionen.</span>
+      <div class="card-foot">
+        <span class="badge" style="--accent:#457b9d;--accent-bg:#0d1520">Steuerung</span>
+        <span class="arrow">&#8594;</span>
+      </div>
+    </a>
   </div>
 
   <div class="section-hd">
@@ -449,7 +458,8 @@ const fixedDefaults = [
   { id: 'rangliste',         title: 'Rangliste',          icon: '🏆', description: 'Simulation/Preview fuer Rangliste',       color: '#2a9d8f', route: '/panels/rangliste.html',          external: false, badge: 'Preview'   },
   { id: 'spielerstatistiken',title: 'Spielerstatistiken', icon: '📈', description: 'Simulation/Preview fuer Statistiken',     color: '#457b9d', route: '/panels/spielerstatistiken.html', external: false, badge: 'Preview'   },
   { id: 'spielplan',         title: 'Spielplan',          icon: '🗓️', description: 'Simulation/Preview fuer Spielplan',       color: '#264653', route: '/panels/spielplan.html',          external: false, badge: 'Preview'   },
-  { id: 'spieler',           title: 'Spieler',            icon: '👤', description: 'Simulation/Preview fuer Spielerverwaltung', color: '#9b5de5', route: '/panels/spieler.html',            external: false, badge: 'Preview'   }
+  { id: 'spieler',           title: 'Spieler',            icon: '👤', description: 'Simulation/Preview fuer Spielerverwaltung', color: '#9b5de5', route: '/panels/spieler.html',            external: false, badge: 'Preview'   },
+  { id: 'controller',        title: 'Controller',         icon: '🎮', description: 'Wurfsteuerung, Undo, Next-Player-Funktionen', color: '#457b9d', route: '/panels/controller.html',         external: false, badge: 'Steuerung' }
 ];
 
 const allowedPanelRoutes = new Set(fixedDefaults.map((tile) => tile.route));
@@ -509,6 +519,7 @@ const arduinoSseClients = new Set();
 let arduinoPort = null;
 let arduinoParser = null;
 let arduinoReconnectTimer = null;
+const arduinoRawEventHistory = [];
 const arduinoState = {
   enabled: true,
   connected: false,
@@ -519,6 +530,7 @@ const arduinoState = {
   lastHeartbeat: null,
   activeCount: null,
   lastUpdateMs: null,
+  rawHistory: [],
   error: null
 };
 
@@ -538,12 +550,24 @@ function normalizeArduinoStatePatch(patch) {
   broadcastArduinoState();
 }
 
+function rememberArduinoLine(line) {
+  const entry = {
+    line: String(line || '').trim(),
+    ts: Date.now()
+  };
+  arduinoRawEventHistory.unshift(entry);
+  while (arduinoRawEventHistory.length > 20) {
+    arduinoRawEventHistory.pop();
+  }
+}
+
 function parseArduinoLine(line) {
   const clean = String(line || '').trim();
   if (!clean) {
     return;
   }
 
+  rememberArduinoLine(clean);
   normalizeArduinoStatePatch({ lastLine: clean, error: null });
 
   const hbMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
@@ -761,33 +785,50 @@ async function getPlayers() {
 
 async function savePlayers(list) {
   await dataStore.savePlayers(list);
+  // Live-State zurücksetzen damit neue Spieler sofort sichtbar werden
+  const fresh = await defaultLiveState();
+  await dataStore.saveLiveState(fresh);
 }
 
 async function getActivePlayersForLive() {
   const players = (await getPlayers()).filter((p) => p.active && String(p.name || '').trim());
-  return players.slice(0, 2).map((p, index) => ({
+  return players.map((p, index) => ({
     slot: p.slot,
     name: String(p.name).trim(),
-    color: p.color || (index === 0 ? '#e63946' : '#f4a261')
+    color: p.color || ['#e63946', '#f4a261', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'][index % 6]
   }));
 }
 
 async function defaultLiveState() {
   const active = await getActivePlayersForLive();
-  const p1 = active[0] || { slot: 1, name: 'Spieler 1', color: '#e63946' };
-  const p2 = active[1] || { slot: 2, name: 'Spieler 2', color: '#f4a261' };
+  const fallbackPlayers = active.length > 0
+    ? active
+    : [
+        { slot: 1, name: 'Spieler 1', color: '#e63946' },
+        { slot: 2, name: 'Spieler 2', color: '#f4a261' }
+      ];
 
   return {
     game: {
       mode: '501',
       status: 'running',
       startedAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      activePlayer: 0,
+      throwRound: 1,
+      currentThrow: 0
     },
-    players: [
-      { ...p1, remaining: 501, legs: 0, turns: 0, totalScored: 0, bestTurn: 0 },
-      { ...p2, remaining: 501, legs: 0, turns: 0, totalScored: 0, bestTurn: 0 }
-    ],
+    players: fallbackPlayers.map((p) => ({
+      ...p,
+      remaining: 501,
+      legs: 0,
+      turns: 0,
+      totalScored: 0,
+      bestTurn: 0,
+      average: 0,
+      throws: [],
+      currentRoundPoints: []
+    })),
     lastAction: null,
     arduino: {
       connected: false,
@@ -808,12 +849,19 @@ function sanitizePlayerState(player, fallback) {
   const bestTurn = Math.max(0, Number(player && player.bestTurn || base.bestTurn || 0));
   const remaining = Math.max(0, Number(player && player.remaining || base.remaining || 501));
   const color = String(player && player.color ? player.color : base.color || '#e63946');
-  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn };
+  const throws = Array.isArray(player && player.throws) ? player.throws : [];
+  const currentRoundPoints = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
+  const average = turns > 0 ? Math.round((totalScored / (turns * 3)) * 100) / 100 : 0;
+  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average };
 }
 
 async function getLiveState() {
   const fallback = await defaultLiveState();
   const saved = await dataStore.getLiveState(fallback);
+  const savedPlayers = Array.isArray(saved.players) && saved.players.length > 0 ? saved.players : fallback.players;
+  const mergedPlayers = savedPlayers.map((player, index) => sanitizePlayerState(player, fallback.players[index] || fallback.players[0]));
+
+  fallback.players.slice(mergedPlayers.length).forEach((player) => mergedPlayers.push(sanitizePlayerState(player, player)));
 
   const state = {
     game: {
@@ -822,16 +870,14 @@ async function getLiveState() {
       startedAt: Number(saved.game && saved.game.startedAt || fallback.game.startedAt),
       updatedAt: Number(saved.game && saved.game.updatedAt || Date.now())
     },
-    players: [
-      sanitizePlayerState(saved.players && saved.players[0], fallback.players[0]),
-      sanitizePlayerState(saved.players && saved.players[1], fallback.players[1])
-    ],
+    players: mergedPlayers,
     lastAction: saved.lastAction || null,
     arduino: {
       connected: !!arduinoState.connected,
       lastEvent: arduinoState.lastEvent || null,
       activeCount: Number(arduinoState.activeCount || 0),
-      heartbeatMs: arduinoState.lastHeartbeat ? Number(arduinoState.lastHeartbeat.ms || 0) : null
+      heartbeatMs: arduinoState.lastHeartbeat ? Number(arduinoState.lastHeartbeat.ms || 0) : null,
+      rawHistory: arduinoRawEventHistory.slice(0, 20)
     }
   };
 
@@ -1061,6 +1107,15 @@ app.post('/api/arduino/command', (req, res) => {
   });
 });
 
+app.get('/api/arduino/raw', (_req, res) => {
+  res.json({
+    connected: !!arduinoState.connected,
+    port: arduinoState.port,
+    history: arduinoRawEventHistory.slice(0, 50),
+    rawHistory: arduinoRawEventHistory.slice(0, 50)
+  });
+});
+
 app.get('/api/live/state', async (_req, res) => {
   try {
     res.json(await getLiveState());
@@ -1075,8 +1130,9 @@ app.post('/api/live/reset', async (req, res) => {
     const prev = await getLiveState();
     const fresh = await defaultLiveState();
     if (carryLegs) {
-      fresh.players[0].legs = prev.players[0].legs;
-      fresh.players[1].legs = prev.players[1].legs;
+      fresh.players.forEach((player, index) => {
+        if (prev.players[index]) player.legs = prev.players[index].legs;
+      });
     }
     const saved = await saveLiveState(fresh);
     res.json(saved);
@@ -1086,10 +1142,20 @@ app.post('/api/live/reset', async (req, res) => {
 });
 
 app.post('/api/live/throw', async (req, res) => {
+  const playerSlot = Number(req.body && req.body.playerSlot);
   const playerIndex = Number(req.body && req.body.playerIndex);
   const points = Number(req.body && req.body.points);
-  if (![0, 1].includes(playerIndex)) {
-    return res.status(400).json({ error: 'playerIndex muss 0 oder 1 sein.' });
+
+  // Unterstuetze sowohl playerSlot als auch playerIndex (legacy)
+  let targetIndex = -1;
+  if (Number.isInteger(playerSlot) && playerSlot > 0) {
+    targetIndex = playerSlot - 1; // Slot ist 1-basiert
+  } else if (Number.isInteger(playerIndex) && playerIndex >= 0) {
+    targetIndex = playerIndex;
+  }
+
+  if (targetIndex < 0) {
+    return res.status(400).json({ error: 'playerSlot oder playerIndex erforderlich.' });
   }
   if (!Number.isFinite(points) || points < 0 || points > 180) {
     return res.status(400).json({ error: 'points muss zwischen 0 und 180 liegen.' });
@@ -1097,7 +1163,11 @@ app.post('/api/live/throw', async (req, res) => {
 
   try {
     const state = await getLiveState();
-    const player = state.players[playerIndex];
+    if (targetIndex >= state.players.length) {
+      return res.status(400).json({ error: 'Spieler nicht gefunden.' });
+    }
+
+    const player = state.players[targetIndex];
     const nextRemaining = player.remaining - points;
     const bust = nextRemaining < 0;
 
@@ -1108,13 +1178,34 @@ app.post('/api/live/throw', async (req, res) => {
       player.totalScored += points;
     }
 
+    // Wurf zur aktuellen Runde hinzufuegen
+    if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
+    player.currentRoundPoints.push(points);
+
+    // Wurf-Historie speichern
+    if (!Array.isArray(player.throws)) player.throws = [];
+    player.throws.push({
+      points,
+      remaining: player.remaining,
+      bust,
+      ts: Date.now()
+    });
+
+    // Average berechnen
+    player.average = player.turns > 0 ? Math.round((player.totalScored / (player.turns * 3)) * 100) / 100 : 0;
+
+    // Wenn 3 Würfe in der Runde -> automatisch naechster Spieler
+    state.game.currentThrow = (state.game.currentThrow || 0) + 1;
+
     state.lastAction = {
       type: 'throw',
-      playerIndex,
+      playerIndex: targetIndex,
+      playerSlot: player.slot,
       player: player.name,
       points,
       bust,
       remaining: player.remaining,
+      roundThrow: state.game.currentThrow,
       ts: Date.now()
     };
 
@@ -1125,9 +1216,104 @@ app.post('/api/live/throw', async (req, res) => {
     }
 
     const saved = await saveLiveState(state);
+    broadcastReload(); // SSE-Update an alle offenen Dashboards
     res.json(saved);
   } catch (err) {
     res.status(500).json({ error: `Wurf konnte nicht gespeichert werden: ${err.message}` });
+  }
+});
+
+// ── Next Player ──
+app.post('/api/live/next-player', async (req, res) => {
+  try {
+    const state = await getLiveState();
+
+    // Runde fuer aktuellen Spieler abschliessen
+    const currentPlayer = state.players[state.game.activePlayer];
+    if (currentPlayer && Array.isArray(currentPlayer.currentRoundPoints)) {
+      // Fueralle fehlenden Wuerfe in dieser Runde 0 einfuegen
+      while (currentPlayer.currentRoundPoints.length < 3) {
+        currentPlayer.currentRoundPoints.push(0);
+        currentPlayer.turns += 1;
+      }
+    }
+
+    // Naechsten Spieler
+    let nextIndex = (state.game.activePlayer + 1) % state.players.length;
+    state.game.activePlayer = nextIndex;
+    state.game.currentThrow = 0;
+    state.game.throwRound = (state.game.throwRound || 1) + 1;
+
+    state.lastAction = {
+      type: 'next-player',
+      player: state.players[nextIndex].name,
+      playerSlot: state.players[nextIndex].slot,
+      ts: Date.now()
+    };
+
+    const saved = await saveLiveState(state);
+    broadcastReload();
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ error: `Next-Player fehlgeschlagen: ${err.message}` });
+  }
+});
+
+// ── Undo (letzten Wurf rueckgaengig) ──
+app.post('/api/live/undo', async (req, res) => {
+  try {
+    const state = await getLiveState();
+
+    // Letzten Wurf finden
+    let lastThrowTime = 0;
+    let lastThrowPlayer = -1;
+    let roundThrow = state.game.currentThrow || 0;
+
+    state.players.forEach((player, idx) => {
+      if (Array.isArray(player.throws) && player.throws.length > 0) {
+        const lastT = player.throws[player.throws.length - 1];
+        if (lastT.ts > lastThrowTime) {
+          lastThrowTime = lastT.ts;
+          lastThrowPlayer = idx;
+        }
+      }
+    });
+
+    if (lastThrowPlayer === -1) {
+      return res.status(400).json({ error: 'Kein Wurf zum Rueckgaengigmachen vorhanden.' });
+    }
+
+    const player = state.players[lastThrowPlayer];
+    const lastThrow = player.throws.pop();
+    const roundIndex = player.currentRoundPoints ? player.currentRoundPoints.length - 1 : -1;
+
+    // Punkte zurueck
+    if (!lastThrow.bust) {
+      player.remaining += lastThrow.points;
+      player.totalScored -= lastThrow.points;
+    }
+    player.turns = Math.max(0, player.turns - 1);
+    player.average = player.turns > 0 ? Math.round((player.totalScored / (player.turns * 3)) * 100) / 100 : 0;
+
+    if (roundIndex >= 0 && player.currentRoundPoints) {
+      player.currentRoundPoints.pop();
+    }
+
+    state.game.currentThrow = Math.max(0, (state.game.currentThrow || 1) - 1);
+    state.game.activePlayer = lastThrowPlayer;
+
+    state.lastAction = {
+      type: 'undo',
+      player: player.name,
+      points: lastThrow.points,
+      ts: Date.now()
+    };
+
+    const saved = await saveLiveState(state);
+    broadcastReload();
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ error: `Undo fehlgeschlagen: ${err.message}` });
   }
 });
 

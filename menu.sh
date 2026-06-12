@@ -191,6 +191,7 @@ action_label() {
     health) printf 'Schnell-Diagnose (Health-Checks)' ;;
     test) printf 'Gefuehrte Funktionstests' ;;
     arduino-status) printf 'Arduino-Status' ;;
+    arduino-monitor) printf 'Arduino-Monitor Live' ;;
     arduino-connect) printf 'Arduino verbinden / neu verbinden' ;;
     arduino-disconnect) printf 'Arduino trennen' ;;
     clone) printf 'Repo klonen' ;;
@@ -241,7 +242,7 @@ show_action_error() {
 default_action_pause() {
   local action="$1"
   case "$action" in
-    logs|logs-follow|status|health|test|arduino-status)
+    logs|logs-follow|status|health|test|arduino-status|arduino-monitor)
       printf '0'
       ;;
     *)
@@ -253,7 +254,7 @@ default_action_pause() {
 default_action_capture_mode() {
   local action="$1"
   case "$action" in
-    logs|logs-follow|status|health|test|arduino-status)
+    logs|logs-follow|status|health|test|arduino-status|arduino-monitor)
       # Diese Aktionen haben eigene UI/Streaming-Ausgabe.
       printf '0'
       ;;
@@ -371,10 +372,11 @@ submenu_monitoring_whiptail() {
       "2" "Container Status (ps)" \
       "3" "Schnell-Diagnose (Health-Checks)" \
       "4" "Arduino-Status" \
-      "5" "Arduino verbinden / neu verbinden" \
-      "6" "Arduino trennen" \
-      "7" "Docker-Logs Snapshot" \
-      "8" "Docker-Logs Live (Ctrl+C)" \
+      "5" "Arduino-Monitor Live (Ctrl+C)" \
+      "6" "Arduino verbinden / neu verbinden" \
+      "7" "Arduino trennen" \
+      "8" "Docker-Logs Snapshot" \
+      "9" "Docker-Logs Live (Ctrl+C)" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
     case "$choice" in
@@ -382,10 +384,11 @@ submenu_monitoring_whiptail() {
       2) execute_action ps ;;
       3) execute_action health 0 0 ;;
       4) execute_action arduino-status 0 0 ;;
-      5) execute_action arduino-connect ;;
-      6) execute_action arduino-disconnect ;;
-      7) execute_action logs 0 0 ;;
-      8) execute_action logs-follow 0 0 ;;
+      5) execute_action arduino-monitor 0 0 ;;
+      6) execute_action arduino-connect ;;
+      7) execute_action arduino-disconnect ;;
+      8) execute_action logs 0 0 ;;
+      9) execute_action logs-follow 0 0 ;;
       0|"") return 0 ;;
     esac
   done
@@ -520,21 +523,23 @@ submenu_monitoring_text() {
     printf '2) Container Status (ps)\n'
     printf '3) Schnell-Diagnose (Health-Checks)\n'
     printf '4) Arduino-Status\n'
-    printf '5) Arduino verbinden / neu verbinden\n'
-    printf '6) Arduino trennen\n'
-    printf '7) Docker-Logs (Snapshot)\n'
-    printf '8) Docker-Logs (Live)\n'
+    printf '5) Arduino-Monitor Live (Ctrl+C)\n'
+    printf '6) Arduino verbinden / neu verbinden\n'
+    printf '7) Arduino trennen\n'
+    printf '8) Docker-Logs (Snapshot)\n'
+    printf '9) Docker-Logs (Live)\n'
     printf '0) Zurueck\n\n'
-    read -r -p 'Option [0-8]: ' c
+    read -r -p 'Option [0-9]: ' c
     case "$c" in
       1) execute_action status 0 0 ;;
       2) execute_action ps ;;
       3) execute_action health 0 0 ;;
       4) execute_action arduino-status 0 0 ;;
-      5) execute_action arduino-connect ;;
-      6) execute_action arduino-disconnect ;;
-      7) execute_action logs 0 0 ;;
-      8) execute_action logs-follow 0 0 ;;
+      5) execute_action arduino-monitor 0 0 ;;
+      6) execute_action arduino-connect ;;
+      7) execute_action arduino-disconnect ;;
+      8) execute_action logs 0 0 ;;
+      9) execute_action logs-follow 0 0 ;;
       0|'') return 0 ;;
     esac
   done

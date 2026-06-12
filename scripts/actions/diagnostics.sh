@@ -156,6 +156,26 @@ disconnect_arduino_monitor() {
   show_arduino_status
 }
 
+run_arduino_monitor() {
+  local api_base=""
+
+  if ! command_exists curl; then
+    msg_fail 'curl fehlt. Arduino-Monitor kann nicht gestartet werden.'
+    return 1
+  fi
+
+  api_base="$(dashboard_api_base)"
+
+  clear || true
+  msg_run 'Arduino-Monitor Live (Ctrl+C zum Beenden)'
+  msg_info "API: ${api_base}/api/arduino/events"
+  printf '\nZeige Arduino-SSE-Ereignisse. Jede state-Aenderung wird unten aktualisiert.\n'
+  printf 'Druecke Ctrl+C zum Beenden.\n\n'
+
+  curl -fsS --max-time 0 "${api_base}/api/arduino/events" 2>&1 || msg_warn 'Monitor beendet oder keine Verbindung mehr verfuegbar.'
+  ui_pause
+}
+
 run_health_checks() {
   local report=""
   local compose_cmd=""
@@ -211,9 +231,14 @@ run_health_checks() {
 
     if arduino_json="$(curl -fsS --max-time 4 "${api_base}/api/arduino/state" 2>/dev/null || true)" && [[ -n "$arduino_json" ]]; then
       if command_exists jq; then
-        local arduino_connected
+        local arduino_connected arduino_last_update arduino_raw_count
         arduino_connected="$(printf '%s' "$arduino_json" | jq -r '.connected // false' 2>/dev/null || printf 'false')"
-        report+="[OK] Arduino API erreichbar (connected=${arduino_connected})\n"
+        arduino_last_update="$(printf '%s' "$arduino_json" | jq -r '.lastUpdateMs // 0' 2>/dev/null || printf '0')"
+        arduino_raw_count="$(printf '%s' "$arduino_json" | jq -r '.rawHistory | length' 2>/dev/null || printf '0')"
+        report+="[OK] Arduino API erreichbar (connected=${arduino_connected}, rawHistory=${arduino_raw_count})\n"
+        if [[ "$arduino_connected" == "true" && "$arduino_last_update" != "0" ]]; then
+          report+="[INFO] Arduino letztes Update: ${arduino_last_update}\n"
+        fi
       else
         report+="[OK] Arduino API erreichbar\n"
       fi

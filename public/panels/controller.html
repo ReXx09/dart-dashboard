@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controller – Live-Spielstand</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #f1f1f1; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; overflow-x: hidden; }
+    .topbar { background: #111; border-bottom: 3px solid #457b9d; padding: 12px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
+    .topbar a:hover { color: #fff; }
+    .topbar h2 { font-size: 1.1rem; flex: 1; font-weight: 700; }
+    .badge-ctrl { background: #457b9d; color: #fff; font-size: .65rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
+    main { padding: 16px; max-width: 800px; margin: 0 auto; display: grid; gap: 14px; }
+    .ctrl-section { background: #141414; border-radius: 14px; border: 1px solid #1e1e1e; padding: 16px; }
+    .ctrl-section h3 { font-size: .85rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
+    .game-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .game-mode .label { font-size: .78rem; color: #555; }
+    .game-mode .value { font-size: 1.2rem; font-weight: 700; color: #f4a261; }
+    .player-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: #0d0d0d; border: 1px solid #1a1a1a; margin-bottom: 6px; transition: all .2s; }
+    .player-row.active { border-color: var(--pc, #e63946); background: #191111; }
+    .player-row .slot { width: 26px; height: 26px; border-radius: 50%; font-size: .7rem; font-weight: 800; display: flex; align-items: center; justify-content: center; background: #222; color: #555; flex-shrink: 0; }
+    .player-row.active .slot { background: var(--pc, #e63946); color: #fff; }
+    .player-row .name { font-size: .94rem; font-weight: 600; flex: 1; min-width: 60px; }
+    .player-row .score { font-size: 1.5rem; font-weight: 800; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 50px; text-align: right; }
+    .player-row .avg { font-size: .72rem; color: #555; min-width: 40px; text-align: right; }
+    .btn-sm { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: background .15s; }
+    .btn-sm:hover { background: #2a2a2a; }
+    .btn-sm.active-player { border-color: var(--pc, #e63946); }
+    .input-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+    .input-row .points-in { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 8px 10px; border-radius: 8px; width: 80px; font-size: .95rem; font-family: inherit; text-align: center; }
+    .input-row .points-in:focus { border-color: #e63946; outline: none; }
+    .input-row .pts { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: .85rem; font-family: inherit; font-weight: 600; }
+    .input-row .pts:hover { background: #2a2a2a; }
+    .input-row .pts.primary { background: #e6394622; border-color: #e63946; color: #e63946; }
+    .input-row .pts.primary:hover { background: #e6394633; }
+    .input-row .pts.danger { background: #e6394611; border-color: #e6394644; color: #e63946; }
+    .input-row .pts.danger:hover { background: #e6394622; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .arduino-status { font-size: .78rem; color: #666; }
+    .arduino-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .arduino-dot.on { background: #2a9d8f; }
+    .arduino-dot.off { background: #555; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="/">← Zurück</a>
+    <h2>🎮 Controller</h2>
+    <span class="badge-ctrl">STEUERUNG</span>
+  </div>
+  <main>
+    <div class="ctrl-section">
+      <h3>Spiel</h3>
+      <div class="game-mode">
+        <span class="label">Modus:</span>
+        <span class="value" id="gameMode">501</span>
+        <span class="label">Runde:</span>
+        <span class="value" id="gameRound">1</span>
+        <button class="btn-sm primary" onclick="resetLeg(true)" style="margin-left:auto">Neues Leg</button>
+        <button class="btn-sm danger" onclick="resetLeg(false)">Reset</button>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <h3>Spieler</h3>
+      <div id="playerListContainer"><div style="color:#444">Lade Spieler...</div></div>
+    </div>
+    <div class="ctrl-section">
+      <h3>Aktionen</h3>
+      <div class="action-row">
+        <button class="btn-sm" onclick="undoLast()">↩ Rückgängig (Undo)</button>
+        <button class="btn-sm" onclick="nextPlayer()">⏭ Nächster Spieler</button>
+      </div>
+      <div class="input-row" style="margin-top:12px">
+        <span style="font-size:.78rem;color:#555">Schnell-Wurf:</span>
+        <input class="points-in" id="ctrlPoints" type="number" min="0" max="180" value="60" />
+        <button class="pts" id="ctrlThrowBtn">Werfen</button>
+      </div>
+    </div>
+    <div class="ctrl-section">
+      <h3>Arduino</h3>
+      <div class="arduino-status" id="ctrlArduino"><span class="arduino-dot off"></span>Nicht verbunden</div>
+      <div class="arduino-status" style="margin-top:4px" id="ctrlArduinoEvent">Letztes Event: -</div>
+    </div>
+  </main>
+  <div class="toast" id="toast"></div>
+  <script>
+    let liveState = null;
+    const ctrlPoints = document.getElementById('ctrlPoints');
+    const ctrlThrowBtn = document.getElementById('ctrlThrowBtn');
+
+    (function() {
+      const sse = new EventSource('/api/events');
+      sse.addEventListener('reload', () => loadAll());
+      const arduinoSse = new EventSource('/api/arduino/events');
+      arduinoSse.addEventListener('state', (evt) => {
+        try {
+          const state = JSON.parse(evt.data);
+          document.getElementById('ctrlArduino').innerHTML = state.connected
+            ? '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0)
+            : '<span class="arduino-dot off"></span>Nicht verbunden';
+          document.getElementById('ctrlArduinoEvent').textContent = 'Letztes Event: ' + (state.lastEvent ? state.lastEvent.channel + ' -> ' + state.lastEvent.state : '-');
+        } catch(_) {}
+      });
+    })();
+
+    async function loadAll() {
+      const res = await fetch('/api/live/state');
+      liveState = await res.json();
+      render(liveState);
+    }
+
+    function render(state) {
+      if (!state || !Array.isArray(state.players)) return;
+      const activeIdx = state.game.activePlayer || 0;
+      document.getElementById('gameMode').textContent = state.game.mode || '501';
+      document.getElementById('gameRound').textContent = state.game.throwRound || 1;
+
+      const container = document.getElementById('playerListContainer');
+      container.innerHTML = state.players.map((p, idx) => {
+        const isActive = idx === activeIdx;
+        const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
+        return '<div class="player-row' + (isActive ? ' active' : '') + '" style="--pc:' + escAttr(p.color || '#f4a261') + '">' +
+          '<div class="slot">' + p.slot + '</div>' +
+          '<div class="name">' + escHtml(p.name) + '</div>' +
+          '<span style="font-size:.72rem;color:#555">Rest:</span>' +
+          '<div class="score">' + p.remaining + '</div>' +
+          '<div class="avg">' + avgStr + '</div>' +
+          '<button class="btn-sm active-player" style="--pc:' + escAttr(p.color || '#f4a261') + '" onclick="quickThrow(' + p.slot + ')">+' + (Number(ctrlPoints.value || 60)) + '</button>' +
+        '</div>';
+      }).join('');
+
+      ctrlThrowBtn.onclick = () => {
+        if (state.players[activeIdx]) {
+          quickThrow(state.players[activeIdx].slot);
+        }
+      };
+    }
+
+    async function quickThrow(slot) {
+      const pts = Number(ctrlPoints.value || 60);
+      const res = await fetch('/api/live/throw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerSlot: slot, points: pts }) });
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); }
+    }
+    async function nextPlayer() { const res = await fetch('/api/live/next-player', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }
+    async function undoLast() { const res = await fetch('/api/live/undo', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }
+    async function resetLeg(carryLegs) { await fetch('/api/live/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ carryLegs }) }); }
+    function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); }
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function escAttr(s) { return escHtml(s).replace(/#/g,'%23'); }
+    loadAll();
+  </script>
+</body>
+</html>
