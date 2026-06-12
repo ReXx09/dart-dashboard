@@ -41,6 +41,34 @@ const PLAYERS_FILE   = path.join(DATA_DIR, 'players.json');
 const LIVE_STATE_FILE = path.join(DATA_DIR, 'live-state.json');
 const HIGHSCORES_FILE = path.join(DATA_DIR, 'highscores.json');
 
+const DART_VALUE_BY_CHANNEL = {
+  '01': 20,
+  '02': 1,
+  '03': 18,
+  '04': 4,
+  '05': 13,
+  '06': 6,
+  '07': 10,
+  '08': 15,
+  '09': 2,
+  '10': 17,
+  '11': 3,
+  '12': 19,
+  '13': 7,
+  '14': 16,
+  '15': 8,
+  '16': 11,
+  '17': 14,
+  '18': 9,
+  '19': 12,
+  '20': 5,
+  '21': 50,
+  '22': 25
+};
+const ARDUINO_AUTO_THROW_ENABLED = process.env.ARDUINO_AUTO_THROW_ENABLED !== 'false';
+const ARDUINO_REQUIRE_THROW_TRIGGER = process.env.ARDUINO_REQUIRE_THROW_TRIGGER !== 'false';
+const ARDUINO_THROW_WINDOW_MS = Number(process.env.ARDUINO_THROW_WINDOW_MS || 1200);
+
 const dataStore = new DataStore();
 
 // ──────────────────────────────────────────────
@@ -73,6 +101,9 @@ const arduinoSseClients = new Set();
 let arduinoPort = null;
 let arduinoParser = null;
 let arduinoReconnectTimer = null;
+let pendingArduinoThrow = null;
+let pendingArduinoThrowTimer = null;
+let arduinoThrowLockUntil = 0;
 const arduinoRawEventHistory = [];
 const arduinoState = {
   enabled: true,
@@ -82,6 +113,11 @@ const arduinoState = {
   lastLine: '',
   lastEvent: null,
   lastHeartbeat: null,
+  lastTrigger: null,
+  pendingThrow: false,
+  lastAutoThrow: null,
+  lastMiss: null,
+  lastAutoThrowError: null,
   activeCount: null,
   lastUpdateMs: null,
   rawHistory: [],
@@ -107,6 +143,193 @@ function rememberArduinoLine(line) {
   while (arduinoRawEventHistory.length > 20) arduinoRawEventHistory.pop();
 }
 
+function formatChannel(channel) {
+  const key = String(channel || '').replace(/^0+/, '');
+  return key ? String(Number(key)).padStart(2, '0') : '';
+}
+
+function dartValueFromChannel(channel) {
+  const key = formatChannel(channel);
+  return Object.prototype.hasOwnProperty.call(DART_VALUE_BY_CHANNEL, key) ? DART_VALUE_BY_CHANNEL[key] : null;
+}
+
+function clearPendingArduinoThrow() {
+  if (pendingArduinoThrowTimer) clearTimeout(pendingArduinoThrowTimer);
+  pendingArduinoThrowTimer = null;
+  pendingArduinoThrow = null;
+}
+
+async function applyArduinoThrowFromChannel(channel, evt = {}) {
+  const value = dartValueFromChannel(channel);
+  if (value == null) return { ok: false, reason: 'unknown-channel', channel: formatChannel(channel) };
+
+  const state = await getLiveState();
+  if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
+  if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
+
+  const targetIndex = Number.isInteger(state.game.activePlayer) ? state.game.activePlayer : 0;
+  const player = state.players[targetIndex];
+  if (!player) return { ok: false, reason: 'no-active-player' };
+
+  const nextRemaining = player.remaining - value;
+  const bust = nextRemaining < 0;
+
+  player.turns = Math.max(0, Number(player.turns || 0)) + 1;
+  player.bestTurn = Math.max(Number(player.bestTurn || 0), value);
+  if (!bust) {
+    player.remaining = nextRemaining;
+    player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+  }
+
+  if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
+  player.currentRoundPoints.push(value);
+
+  if (!Array.isArray(player.throws)) player.throws = [];
+  player.throws.push({
+    points: value,
+    remaining: player.remaining,
+    bust,
+    ts: Date.now(),
+    source: 'arduino',
+    channel: formatChannel(channel),
+    raw: evt.line || null
+  });
+
+  player.average = player.turns > 0 ? Math.round((player.totalScored / (player.turns * 3)) * 100) / 100 : 0;
+  state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
+
+  state.lastAction = {
+    type: 'throw',
+    source: 'arduino',
+    playerIndex: targetIndex,
+    playerSlot: player.slot,
+    player: player.name,
+    points: value,
+    channel: formatChannel(channel),
+    bust,
+    remaining: player.remaining,
+    roundThrow: state.game.currentThrow,
+    ts: Date.now()
+  };
+
+  if (player.remaining === 0) {
+    player.legs = Math.max(0, Number(player.legs || 0)) + 1;
+    await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino' });
+    state.game.status = 'leg-finished';
+    state.lastAction.legWin = true;
+  }
+
+  if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
+    state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
+    state.game.currentThrow = 0;
+    state.game.throwRound = (state.game.throwRound || 1) + 1;
+    state.lastAction.autoAdvanced = true;
+    state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
+    state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
+  }
+
+  const saved = await saveLiveState(state);
+  broadcastReload();
+  return { ok: true, value, player: player.name, playerSlot: player.slot, channel: formatChannel(channel), bust, remaining: player.remaining, state: saved };
+}
+
+async function applyArduinoMiss(evt = {}, reason = 'timeout') {
+  const state = await getLiveState();
+  if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
+  if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
+
+  const targetIndex = Number.isInteger(state.game.activePlayer) ? state.game.activePlayer : 0;
+  const player = state.players[targetIndex];
+  if (!player) return { ok: false, reason: 'no-active-player' };
+
+  player.turns = Math.max(0, Number(player.turns || 0)) + 1;
+  if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
+  player.currentRoundPoints.push(0);
+
+  if (!Array.isArray(player.throws)) player.throws = [];
+  player.throws.push({
+    points: 0,
+    remaining: player.remaining,
+    bust: false,
+    ts: Date.now(),
+    source: 'arduino-miss',
+    reason,
+    channel: evt.channel ? formatChannel(evt.channel) : null,
+    raw: evt.line || null
+  });
+
+  player.average = player.turns > 0 ? Math.round((player.totalScored / (player.turns * 3)) * 100) / 100 : 0;
+  state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
+
+  state.lastAction = {
+    type: 'miss',
+    source: 'arduino',
+    reason,
+    playerIndex: targetIndex,
+    playerSlot: player.slot,
+    player: player.name,
+    points: 0,
+    channel: evt.channel ? formatChannel(evt.channel) : null,
+    remaining: player.remaining,
+    roundThrow: state.game.currentThrow,
+    ts: Date.now()
+  };
+
+  if (state.game.currentThrow >= 3) {
+    state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
+    state.game.currentThrow = 0;
+    state.game.throwRound = (state.game.throwRound || 1) + 1;
+    state.lastAction.autoAdvanced = true;
+    state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
+    state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
+  }
+
+  const saved = await saveLiveState(state);
+  broadcastReload();
+  return { ok: true, reason, player: player.name, playerSlot: player.slot, remaining: player.remaining, state: saved };
+}
+
+function handleArduinoTrigger(evt) {
+  if (!ARDUINO_AUTO_THROW_ENABLED) return;
+  if (pendingArduinoThrow && !pendingArduinoThrow.applied) return;
+  if (Date.now() < arduinoThrowLockUntil) return;
+
+  clearPendingArduinoThrow();
+  pendingArduinoThrow = { triggerMs: Number(evt.ms || 0), line: evt.line || '', startedAt: Date.now(), applied: false, timer: null };
+  pendingArduinoThrow.timer = setTimeout(() => {
+    const pending = pendingArduinoThrow;
+    if (!pending || pending.applied) return;
+    pendingArduinoThrow = null;
+    pendingArduinoThrowTimer = null;
+    normalizeArduinoStatePatch({ pendingThrow: false });
+    applyArduinoMiss({ line: pending.line || '', ms: pending.triggerMs }, 'timeout')
+      .then((result) => normalizeArduinoStatePatch({ lastMiss: result.ok ? result : { ok: false, reason: result.reason } }))
+      .catch((err) => normalizeArduinoStatePatch({ lastMiss: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
+  }, ARDUINO_THROW_WINDOW_MS);
+  pendingArduinoThrowTimer = pendingArduinoThrow.timer;
+  normalizeArduinoStatePatch({ pendingThrow: true, lastAutoThrow: null, lastMiss: null, lastAutoThrowError: null });
+}
+
+function handleArduinoActiveEvent(evt) {
+  if (!ARDUINO_AUTO_THROW_ENABLED) return;
+  if (ARDUINO_REQUIRE_THROW_TRIGGER && (!pendingArduinoThrow || pendingArduinoThrow.applied)) return;
+  if (pendingArduinoThrow && Date.now() - pendingArduinoThrow.startedAt > ARDUINO_THROW_WINDOW_MS) return;
+
+  const pending = pendingArduinoThrow;
+  clearPendingArduinoThrow();
+  normalizeArduinoStatePatch({ pendingThrow: false, lastAutoThrowError: null });
+
+  applyArduinoThrowFromChannel(evt.channel, evt)
+    .then((result) => {
+      if (pending) pending.applied = result.ok;
+      normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason });
+    })
+    .catch((err) => {
+      if (pending) pending.applied = false;
+      normalizeArduinoStatePatch({ lastAutoThrow: { ok: false, reason: err.message }, lastAutoThrowError: err.message });
+    });
+}
+
 function parseArduinoLine(line) {
   const clean = String(line || '').trim();
   if (!clean) return;
@@ -116,9 +339,15 @@ function parseArduinoLine(line) {
 
   const evtMatch = clean.match(/^EVT,(\d+),CH(\d{2}),([A-Z]+)$/i);
   if (evtMatch) {
+    const evt = { ms: Number(evtMatch[1]), channel: evtMatch[2], state: evtMatch[3].toUpperCase(), line: clean };
     normalizeArduinoStatePatch({
-      lastEvent: { ms: Number(evtMatch[1]), channel: evtMatch[2], state: evtMatch[3].toUpperCase(), line: clean }
+      lastEvent: { ...evt },
+      lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
+      pendingThrow: arduinoState.pendingThrow
     });
+
+    if (evt.state === 'ACTIVE') handleArduinoActiveEvent(evt);
+    else if (evt.state === 'IDLE' && clean.match(/,CH(2[12])$/i)) handleArduinoTrigger(evt);
     return;
   }
 
@@ -133,9 +362,14 @@ function parseArduinoLine(line) {
 
   const legacyEvent = clean.match(/^CH(\d{2}):\s*(ACTIVE|IDLE)$/i);
   if (legacyEvent) {
+    const evt = { ms: null, channel: legacyEvent[1], state: legacyEvent[2].toUpperCase(), line: clean };
     normalizeArduinoStatePatch({
-      lastEvent: { ms: null, channel: legacyEvent[1], state: legacyEvent[2].toUpperCase(), line: clean }
+      lastEvent: { ...evt },
+      lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
+      pendingThrow: arduinoState.pendingThrow
     });
+    if (evt.state === 'ACTIVE') handleArduinoActiveEvent(evt);
+    else if (evt.state === 'IDLE' && clean.match(/^CH(2[12]):/i)) handleArduinoTrigger(evt);
     return;
   }
 
@@ -320,7 +554,13 @@ async function getLiveState() {
       lastEvent: arduinoState.lastEvent || null,
       activeCount: Number(arduinoState.activeCount || 0),
       heartbeatMs: arduinoState.lastHeartbeat ? Number(arduinoState.lastHeartbeat.ms || 0) : null,
-      rawHistory: arduinoRawEventHistory.slice(0, 20)
+      rawHistory: arduinoRawEventHistory.slice(0, 20),
+      pendingThrow: !!arduinoState.pendingThrow,
+      lastTrigger: arduinoState.lastTrigger || null,
+      lastAutoThrow: arduinoState.lastAutoThrow || null,
+      lastMiss: arduinoState.lastMiss || null,
+      lastAutoThrowError: arduinoState.lastAutoThrowError || null,
+      dartValueByChannel: DART_VALUE_BY_CHANNEL
     }
   };
 
