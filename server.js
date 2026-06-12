@@ -1215,6 +1215,17 @@ app.post('/api/live/throw', async (req, res) => {
       state.game.status = 'leg-finished';
     }
 
+    // Nach 3 Wuerfen automatisch zum naechsten Spieler wechseln.
+    // Bei Checkout/Rest 0 bleibt das Leg beendet und der aktive Spieler wird nicht weitergeschaltet.
+    if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
+      state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
+      state.game.currentThrow = 0;
+      state.game.throwRound = (state.game.throwRound || 1) + 1;
+      state.lastAction.autoAdvanced = true;
+      state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
+      state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
+    }
+
     const saved = await saveLiveState(state);
     broadcastReload(); // SSE-Update an alle offenen Dashboards
     res.json(saved);

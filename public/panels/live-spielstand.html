@@ -47,7 +47,25 @@
     .btn-icon.danger:hover { background: #e6394622; }
     .btn-icon:disabled { opacity: .3; cursor: default; }
     main { padding: 16px; max-width: 1400px; margin: 0 auto; display: grid; gap: 14px; }
-    .scoreboard { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .focus-player { display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; }
+    .focus-card { background: linear-gradient(135deg, #191111, #141414); border-radius: 18px; padding: 20px; border: 2px solid var(--pc, #e63946); box-shadow: 0 0 45px rgba(230,57,70,.16); position: relative; overflow: hidden; }
+    .focus-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 10%, var(--pc-glow, rgba(230,57,70,.18)), transparent 35%); pointer-events: none; }
+    .focus-card > * { position: relative; }
+    .focus-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
+    .focus-meta { color: #777; font-size: .8rem; margin-bottom: 14px; }
+    .focus-kacheln { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: 16px; min-height: 150px; }
+    .focus-kachel h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+    .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
+    .throw-seg .seg { font-size: 1.55rem; color: var(--pc, #e63946); }
+    .throw-seg .pts { font-size: .78rem; color: #555; margin-top: 4px; }
+    .focus-big-score { font-size: 5rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .focus-summary { margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .focus-summary div { background: #141414; border-radius: 10px; padding: 10px; text-align: center; }
+    .focus-summary span { display: block; color: #666; font-size: .66rem; text-transform: uppercase; letter-spacing: 1px; }
+    .focus-summary strong { display: block; color: #f1f1f1; font-size: 1.05rem; margin-top: 2px; }
+    .compact-players { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
     .score-card {
       background: #141414;
       border-radius: 14px;
@@ -141,9 +159,10 @@
     </div>
   </div>
   <main>
-    <div class="scoreboard" id="scoreboard"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></div>
+    <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
+    <section class="compact-players" id="compactPlayers"></section>
     <div class="controls">
-      <h3>Punkte verbuchen</h3>
+      <h3>Manuelle Punkte nur zum Testen</h3>
       <div class="controls-row">
         <span class="ctrl-label">Punkte</span>
         <input class="points-input" id="manualPoints" type="number" min="0" max="180" value="60" />
@@ -184,31 +203,16 @@
     function renderState(state) {
       if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
       const activePlayer = state.game.activePlayer || 0;
-      const scoreboard = document.getElementById('scoreboard');
+      const active = state.players[activePlayer];
+      const focusPlayer = document.getElementById('focusPlayer');
+      const compactPlayers = document.getElementById('compactPlayers');
       const playerButtons = document.getElementById('playerButtons');
-      scoreboard.innerHTML = state.players.map((p, idx) => {
-        const isActive = idx === activePlayer;
-        const throws = Array.isArray(p.throws) ? p.throws : [];
-        const lastThrows = throws.slice(-3);
-        const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
-        const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows.map(t => t.points);
-        while (displayThrows.length < 3) displayThrows.push(null);
-        const throwsHtml = displayThrows.map((pt, ti) => {
-          if (pt === null) return '<span class="sc-throw-chip empty">-</span>';
-          const bust = lastThrows[ti] && lastThrows[ti].bust;
-          return '<span class="sc-throw-chip' + (bust ? ' bust' : '') + '">' + pt + '</span>';
-        }).join('');
-        const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
-        return '<div class="score-card' + (isActive ? ' active' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
-          '<div class="sc-color-bar"></div>' +
-          '<div class="sc-name">' + escapeHtml(p.name) + '</div>' +
-          '<div class="sc-score">' + p.remaining + '</div>' +
-          '<div class="sc-stats">Turns: <span>' + (p.turns || 0) + '</span> | Best: <span>' + (p.bestTurn || 0) + '</span> | Total: <span>' + (p.totalScored || 0) + '</span></div>' +
-          '<div class="sc-last-throws">' + throwsHtml + '</div>' +
-          '<div class="sc-average">Ø 3-Dart: <strong>' + avgStr + '</strong></div>' +
-          '<div class="sc-legs">Legs: <strong>' + (p.legs || 0) + '</strong></div>' +
-        '</div>';
-      }).join('');
+
+      focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state);
+      compactPlayers.innerHTML = state.players
+        .filter((_p, idx) => idx !== activePlayer)
+        .map((p, idx) => renderCompactPlayer(p, idx, state.players.findIndex(sp => sp.slot === p.slot))).join('');
+
       playerButtons.innerHTML = state.players.map((p, idx) => {
         const isActive = idx === activePlayer;
         return '<button class="btn-pts' + (isActive ? ' active-player' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '" onclick="applyPreset(' + p.slot + ', ' + Number(manualPoints.value || 60) + ')">P' + p.slot + ' ' + escapeHtml(p.name) + '</button>';
@@ -222,26 +226,70 @@
         ? escapeHtml(action.player) + ' → ' + (action.points || '-') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
         : 'Keine Aktion';
     }
-    function renderHighscores(list) {
-      const body = document.getElementById('highscoreBody');
-      if (!Array.isArray(list) || list.length === 0) { body.innerHTML = '<tr><td colspan="5" class="hs-muted">Keine Einträge</td></tr>'; return; }
-      body.innerHTML = list.slice(0, 10).map((e, idx) => {
-        const when = new Date(e.ts || Date.now()).toLocaleString('de-DE');
-        return '<tr><td class="rank">#' + (idx + 1) + '</td><td class="name">' + escapeHtml(e.player || '-') + '</td><td class="score">' + Number(e.score || 0) + '</td><td>' + escapeHtml(e.kind || '-') + '</td><td class="when">' + when + '</td></tr>';
+    function renderFocusPlayer(p, idx, state) {
+      if (!p) return '';
+      const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
+      const throws = Array.isArray(p.throws) ? p.throws : [];
+      const lastThrows = throws.slice(-3);
+      const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows.map(t => t.points);
+      while (displayThrows.length < 3) displayThrows.push(null);
+      const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
+      const totalScored = p.totalScored || 0;
+      const throwsHtml = displayThrows.map((pt, ti) => {
+        const label = pt === null ? '-' : String(pt);
+        const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
+        return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+          '<div class="seg">' + label + '</div>' +
+          '<div class="pts">' + pointsLabel + '</div>' +
+        '</div>';
       }).join('');
+
+      return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+        '<div class="focus-kacheln">' +
+          '<div class="focus-kachel">' +
+            '<h4>Aktuelle Würfe / Zahlen</h4>' +
+            '<div class="throw-segments">' + throwsHtml + '</div>' +
+          '</div>' +
+          '<div class="focus-kachel">' +
+            '<h4>Gesamt / Rest</h4>' +
+            '<div class="focus-big-score">' + p.remaining + '</div>' +
+            '<div style="color:#777;font-size:.82rem">Restpunkte</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="focus-summary">' +
+          '<div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div>' +
+          '<div><span>Gesamt Punkte</span><strong>' + totalScored + '</strong></div>' +
+          '<div><span>Ø 3-Dart</span><strong>' + avgStr + '</strong></div>' +
+        '</div>' +
+      '</div>';
     }
-    async function applyThrow(playerSlot, points) {
-      const res = await fetch('/api/live/throw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerSlot, points }) });
-      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); }
+
+    function renderCompactPlayer(p, displayIdx, stateIdx) {
+      const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
+      const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
+      const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows;
+      while (displayThrows.length < 3) displayThrows.push('-');
+      const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
+
+      return '<div class="score-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+        '<div class="sc-color-bar"></div>' +
+        '<div class="sc-name">P' + p.slot + ' · ' + escapeHtml(p.name) + '</div>' +
+        '<div class="sc-score">' + p.remaining + '</div>' +
+        '<div class="sc-stats">Gesamt: <span>' + (p.totalScored || 0) + '</span> | Ø: <span>' + avgStr + '</span> | Legs: <span>' + (p.legs || 0) + '</span></div>' +
+        '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
+      '</div>';
     }
-    function applyPreset(playerSlot, points) { applyThrow(playerSlot, points); }
-    async function nextPlayer() { const res = await fetch('/api/live/next-player', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }
-    async function undoLast() { const res = await fetch('/api/live/undo', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }
-    async function resetLeg(carryLegs) { await fetch('/api/live/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ carryLegs }) }); }
-    function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); }
-    function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-    function escapeAttr(s) { return escapeHtml(s).replace(/#/g,'%23'); }
-    loadAll();
+
+    function colorToRgba(hex, alpha) {
+      const clean = String(hex || '#e63946').replace('#', '');
+      if (clean.length !== 6) return 'rgba(230,57,70,' + alpha + ')';
+      const r = parseInt(clean.slice(0, 2), 16);
+      const g = parseInt(clean.slice(2, 4), 16);
+      const b = parseInt(clean.slice(4, 6), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
   </script>
 </body>
 </html>
