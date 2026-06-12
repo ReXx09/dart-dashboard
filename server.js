@@ -731,11 +731,12 @@ async function startArduinoMonitor() {
     normalizeArduinoStatePatch({
       connected: false,
       port: null,
-      error: 'Kein Arduino-Serial-Port gefunden.'
+      error: 'Kein Arduino-Serial-Port gefunden. Bitte USB-Kabel, COM-Port und Docker-Gerätezuweisung prüfen.'
     });
-    scheduleArduinoReconnect();
     return;
   }
+
+  normalizeArduinoStatePatch({ port: serialPath, error: null });
 
   try {
     const port = new SerialPortCtor({ path: serialPath, baudRate, autoOpen: true });
@@ -758,7 +759,6 @@ async function startArduinoMonitor() {
 
     port.on('error', (err) => {
       normalizeArduinoStatePatch({ connected: false, error: `Serial-Fehler: ${err.message}` });
-      scheduleArduinoReconnect();
     });
 
     port.on('close', () => {
@@ -766,7 +766,6 @@ async function startArduinoMonitor() {
         arduinoPort = null;
       }
       normalizeArduinoStatePatch({ connected: false, error: 'Arduino-Serial-Port getrennt.' });
-      scheduleArduinoReconnect();
     });
   } catch (err) {
     normalizeArduinoStatePatch({ connected: false, error: `Arduino-Verbindung fehlgeschlagen: ${err.message}` });
@@ -863,12 +862,45 @@ async function getLiveState() {
 
   fallback.players.slice(mergedPlayers.length).forEach((player) => mergedPlayers.push(sanitizePlayerState(player, player)));
 
+  // Wenn in der Spieler-Verwaltung aktive Spieler hinzugefügt/entfernt wurden,
+  // muss der Live-State synchron bleiben. Ohne diese Prüfung bleiben alte
+  // Live-States mit nur 2 Spielern bestehen.
+  const activeSlots = fallback.players.map((p) => Number(p.slot));
+  const mergedSlots = mergedPlayers.map((p) => Number(p.slot));
+  const playersChanged = activeSlots.length !== mergedSlots.length || activeSlots.some((slot, idx) => mergedSlots[idx] !== slot);
+  if (playersChanged) {
+    const nextState = {
+      ...saved,
+      game: {
+        ...(saved.game || {}),
+        activePlayer: Math.min(Number(saved.game?.activePlayer || 0), fallback.players.length - 1)
+      },
+      players: fallback.players.map((player) => {
+        const existing = mergedPlayers.find((p) => Number(p.slot) === Number(player.slot));
+        return sanitizePlayerState(existing || player, player);
+      }),
+      lastAction: saved.lastAction || null,
+      arduino: {
+        connected: !!arduinoState.connected,
+        lastEvent: arduinoState.lastEvent || null,
+        activeCount: Number(arduinoState.activeCount || 0),
+        heartbeatMs: arduinoState.lastHeartbeat ? Number(arduinoState.lastHeartbeat.ms || 0) : null,
+        rawHistory: arduinoRawEventHistory.slice(0, 20)
+      }
+    };
+    await dataStore.saveLiveState(nextState);
+    return nextState;
+  }
+
   const state = {
     game: {
       mode: String(saved.game && saved.game.mode || fallback.game.mode),
       status: String(saved.game && saved.game.status || fallback.game.status),
       startedAt: Number(saved.game && saved.game.startedAt || fallback.game.startedAt),
-      updatedAt: Number(saved.game && saved.game.updatedAt || Date.now())
+      updatedAt: Number(saved.game && saved.game.updatedAt || Date.now()),
+      activePlayer: Math.min(Number(saved.game?.activePlayer || 0), mergedPlayers.length - 1),
+      throwRound: Number(saved.game?.throwRound || 1),
+      currentThrow: Number(saved.game?.currentThrow || 0)
     },
     players: mergedPlayers,
     lastAction: saved.lastAction || null,
