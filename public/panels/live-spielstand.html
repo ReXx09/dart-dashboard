@@ -59,6 +59,7 @@
     .focus-kacheln { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: 16px; min-height: 150px; }
     .focus-kachel h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+    .focus-kachel .subline { color: #555; font-size: .72rem; margin-top: 6px; }
     .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
     .throw-seg .seg { font-size: 1.55rem; color: var(--pc, #e63946); }
@@ -295,6 +296,7 @@
       while (displayThrows.length < 3) displayThrows.push(null);
       const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const totalScored = p.totalScored || 0;
+      const legScore = p.throws.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
       const throwsHtml = displayThrows.map((pt, ti) => {
         const label = pt === null ? '-' : String(pt);
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
@@ -311,6 +313,7 @@
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe / Zahlen</h4>' +
             '<div class="throw-segments">' + throwsHtml + '</div>' +
+            '<div class="subline">Leg-Punkte: <strong>' + legScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<h4>Gesamt / Rest</h4>' +
