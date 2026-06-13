@@ -280,6 +280,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   }
 
   if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
+    player.currentRoundPoints = [];
     state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
     state.game.currentThrow = 0;
     state.game.throwRound = (state.game.throwRound || 1) + 1;
@@ -336,6 +337,7 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
   };
 
   if (state.game.currentThrow >= 3) {
+    player.currentRoundPoints = [];
     state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
     state.game.currentThrow = 0;
     state.game.throwRound = (state.game.throwRound || 1) + 1;
@@ -912,6 +914,7 @@ app.post('/api/live/throw', async (req, res) => {
     }
 
     if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
+      player.currentRoundPoints = [];
       state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
       state.game.currentThrow = 0;
       state.game.throwRound = (state.game.throwRound || 1) + 1;
