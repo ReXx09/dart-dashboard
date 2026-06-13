@@ -31,7 +31,8 @@
     .live-badge { background: #e63946; color: #fff; font-size: .65rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
     .header-status { font-size: .75rem; color: #555; }
     .header-status span { color: #2a9d8f; }
-    .header-controls { display: flex; gap: 6px; }
+    .header-controls { display: flex; gap: 6px; align-items: center; }
+    .header-controls select { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 5px 8px; border-radius: 6px; font-size: .78rem; font-family: inherit; cursor: pointer; }
     .btn-icon {
       background: #1a1a1a;
       border: 1px solid #2a2a2a;
@@ -133,6 +134,14 @@
     .arduino-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
     .arduino-dot.on { background: #2a9d8f; box-shadow: 0 0 10px rgba(42,157,143,.6); }
     .arduino-dot.off { background: #555; }
+    /* Cricket-Grid */
+    .cricket-grid { display: grid; gap: 6px; margin-top: 8px; }
+    .cricket-grid.horizontal { grid-template-columns: repeat(7, 1fr); }
+    .cricket-grid .c-num { text-align: center; background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 8px; padding: 6px; }
+    .cricket-grid .c-num .num { font-size: .85rem; font-weight: 700; color: #f1f1f1; }
+    .cricket-grid .c-num .hits { font-size: .7rem; color: #555; }
+    .cricket-grid .c-num.closed { border-color: #2a9d8f; background: #0d1a1a; }
+    .cricket-grid .c-num.closed .num { color: #2a9d8f; }
     .hs-panel { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 12px; }
     .hs-panel h4 { font-size: .68rem; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
     .hs-table { width: 100%; border-collapse: collapse; }
@@ -156,6 +165,15 @@
     <span class="live-badge">LIVE</span>
     <div class="header-status">SSE: <span id="sseStatus">verbunden</span></div>
     <div class="header-controls">
+      <select id="gameModeSelect" onchange="changeMode(this.value)">
+        <option value="501">501</option>
+        <option value="301">301</option>
+        <option value="701">701</option>
+        <option value="cricket">Cricket</option>
+        <option value="shanghai">Shanghai</option>
+        <option value="atc">Around the Clock</option>
+        <option value="split">Split</option>
+      </select>
       <button class="btn-icon" onclick="undoLast()" id="undoBtn" title="Letzten Wurf rückgängig">↩ Undo</button>
       <button class="btn-icon" onclick="nextPlayer()" id="nextBtn" title="Nächster Spieler">⏭ Next</button>
       <button class="btn-icon primary" onclick="resetLeg(true)">Neues Leg</button>
@@ -274,15 +292,23 @@
     function renderState(state) {
       if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
       const activePlayer = state.game.activePlayer || 0;
+      const mode = state.game.mode || '501';
+      const sel = document.getElementById('gameModeSelect');
+      if (sel.value !== mode) sel.value = mode;
       const active = state.players[activePlayer];
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
       const playerButtons = document.getElementById('playerButtons');
 
-      focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state);
+      const isCricket = mode === 'cricket';
+      if (isCricket) {
+        focusPlayer.innerHTML = renderCricketView(active, state);
+      } else {
+        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state);
+      }
       compactPlayers.innerHTML = state.players
         .filter((_p, idx) => idx !== activePlayer)
-        .map((p, idx) => renderCompactPlayer(p, idx, state.players.findIndex(sp => sp.slot === p.slot))).join('');
+        .map((p, idx) => renderCompactPlayer(p, idx, state.players.findIndex(sp => sp.slot === p.slot), mode)).join('');
 
       playerButtons.innerHTML = state.players.map((p, idx) => {
         const isActive = idx === activePlayer;
@@ -296,6 +322,30 @@
       document.getElementById('lastAction').innerHTML = action
         ? escapeHtml(action.player) + ' → ' + (action.points || '-') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
         : 'Keine Aktion';
+    }
+    function renderCricketView(p, state) {
+      if (!p) return '';
+      const activeIdx = state.game.activePlayer || 0;
+      const throws = Array.isArray(p.throws) ? p.throws : [];
+      const lastThrows = throws.slice(-3);
+      const cricketHits = p.cricketHits || {};
+      const cricketClosed = p.cricketClosed || {};
+      const nums = [15,16,17,18,19,20,25];
+      const gridHtml = nums.map(n => {
+        const hits = cricketHits[n] || 0;
+        const closed = !!cricketClosed[n];
+        return '<div class="c-num' + (closed ? ' closed' : '') + '"><div class="num">' + n + '</div><div class="hits">' + (closed ? '✔' : hits + '/3') + '</div></div>';
+      }).join('');
+
+      return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+        '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr">' +
+          '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div>' +
+          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
+        '</div>' +
+        '<div class="focus-summary"><div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div><div><span>Punkte</span><strong>' + (p.totalScored || 0) + '</strong></div><div><span>Ø 3-Dart</span><strong>' + ((p.average || 0) > 0 ? Number(p.average).toFixed(1) : '-') + '</strong></div></div>' +
+      '</div>';
     }
     function renderFocusPlayer(p, idx, state) {
       if (!p) return '';
@@ -345,18 +395,23 @@
       '</div>';
     }
 
-    function renderCompactPlayer(p, displayIdx, stateIdx) {
+    function renderCompactPlayer(p, displayIdx, stateIdx, mode) {
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
       const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows;
       while (displayThrows.length < 3) displayThrows.push('-');
       const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
 
+      const isCricket = mode === 'cricket';
+      const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
+      const scoreLabel = isCricket ? 'Punkte' : 'Rest';
+      const cricketInfo = isCricket ? ' | Treffer: ' + Object.values(p.cricketHits || {}).reduce((a,b) => a + (b||0), 0) : '';
+
       return '<div class="score-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
         '<div class="sc-color-bar"></div>' +
         '<div class="sc-name">P' + p.slot + ' · ' + escapeHtml(p.name) + '</div>' +
-        '<div class="sc-score">' + p.remaining + '</div>' +
-        '<div class="sc-stats">Gesamt: <span>' + (p.totalScored || 0) + '</span> | Ø: <span>' + avgStr + '</span> | Legs: <span>' + (p.legs || 0) + '</span></div>' +
+        '<div class="sc-score">' + displayScore + '</div>' +
+        '<div class="sc-stats">' + scoreLabel + ': <span>' + displayScore + '</span> | Ø: <span>' + avgStr + '</span> | Legs: <span>' + (p.legs || 0) + '</span>' + cricketInfo + '</div>' +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
     }
@@ -427,6 +482,17 @@
         liveState = await r.json();
         renderState(liveState);
         showToast('Nächster Spieler');
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    async function changeMode(mode) {
+      try {
+        var r = await fetch('/api/game/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+        if (!r.ok) { showToast('Modus-Wechsel fehlgeschlagen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Modus: ' + mode);
+        loadHighscoresOnly();
       } catch(e) { showToast('Netzwerkfehler', true); }
     }
 

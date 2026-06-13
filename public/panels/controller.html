@@ -18,6 +18,7 @@
     .game-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .game-mode .label { font-size: .78rem; color: #555; }
     .game-mode .value { font-size: 1.2rem; font-weight: 700; color: #f4a261; }
+    .game-mode select { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 6px 10px; border-radius: 8px; font-size: .9rem; font-family: inherit; cursor: pointer; }
     .player-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: #0d0d0d; border: 1px solid #1a1a1a; margin-bottom: 6px; transition: all .2s; }
     .player-row.active { border-color: var(--pc, #e63946); background: #191111; }
     .player-row .slot { width: 26px; height: 26px; border-radius: 50%; font-size: .7rem; font-weight: 800; display: flex; align-items: center; justify-content: center; background: #222; color: #555; flex-shrink: 0; }
@@ -61,7 +62,15 @@
       <h3>Spiel</h3>
       <div class="game-mode">
         <span class="label">Modus:</span>
-        <span class="value" id="gameMode">501</span>
+        <select id="gameModeSelect" onchange="changeMode(this.value)">
+          <option value="501">501</option>
+          <option value="301">301</option>
+          <option value="701">701</option>
+          <option value="cricket">Cricket</option>
+          <option value="shanghai">Shanghai</option>
+          <option value="atc">Around the Clock</option>
+          <option value="split">Split</option>
+        </select>
         <span class="label">Runde:</span>
         <span class="value" id="gameRound">1</span>
         <button class="btn-sm primary" onclick="resetLeg(true)" style="margin-left:auto">Neues Leg</button>
@@ -174,7 +183,8 @@
     function render(state) {
       if (!state || !Array.isArray(state.players)) return;
       const activeIdx = state.game.activePlayer || 0;
-      document.getElementById('gameMode').textContent = state.game.mode || '501';
+      const sel = document.getElementById('gameModeSelect');
+      if (sel.value !== state.game.mode) sel.value = state.game.mode;
       document.getElementById('gameRound').textContent = state.game.throwRound || 1;
 
       const container = document.getElementById('playerListContainer');
@@ -201,6 +211,10 @@
     async function quickThrow(slot) {
       const pts = Number(ctrlPoints.value || 60);
       const res = await fetch('/api/live/throw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerSlot: slot, points: pts }) });
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); }
+    }
+    async function changeMode(mode) {
+      const res = await fetch('/api/game/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
       if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); }
     }
     async function nextPlayer() { const res = await fetch('/api/live/next-player', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }

@@ -69,6 +69,37 @@ const ARDUINO_AUTO_THROW_ENABLED = process.env.ARDUINO_AUTO_THROW_ENABLED !== 'f
 const ARDUINO_REQUIRE_THROW_TRIGGER = process.env.ARDUINO_REQUIRE_THROW_TRIGGER !== 'false';
 const ARDUINO_THROW_WINDOW_MS = Number(process.env.ARDUINO_THROW_WINDOW_MS || 1200);
 
+// ── Spielmodi ──────────────────────────────────
+const GAME_MODES = {
+  '501':   { label: '501',   type: 'x01',  startScore: 501,  cricketNumbers: null,   description: '501 Double Out' },
+  '301':   { label: '301',   type: 'x01',  startScore: 301,  cricketNumbers: null,   description: '301 Double Out' },
+  '701':   { label: '701',   type: 'x01',  startScore: 701,  cricketNumbers: null,   description: '701 Double Out' },
+  'cricket': { label: 'Cricket', type: 'cricket', startScore: 0, cricketNumbers: [15,16,17,18,19,20,25], description: 'Cricket – Zahlen schließen' },
+  'shanghai': { label: 'Shanghai', type: 'shanghai', startScore: 0, cricketNumbers: null, description: 'Shanghai – 1-9 S/D/T' },
+  'atc':    { label: 'Around the Clock', type: 'atc', startScore: 0, cricketNumbers: null, description: 'Around the Clock – 1-20 + Bull' },
+  'split':  { label: 'Split', type: 'split', startScore: 0, cricketNumbers: null, description: 'Split Score' }
+};
+
+const DEFAULT_MODE = '501';
+
+function getStartScoreForMode(mode) {
+  const def = GAME_MODES[mode];
+  return def ? def.startScore : 501;
+}
+
+function getCricketNumbersForMode(mode) {
+  const def = GAME_MODES[mode];
+  return def && def.type === 'cricket' ? [...def.cricketNumbers] : null;
+}
+
+function defaultPlayerCricketState(mode) {
+  const nums = getCricketNumbersForMode(mode);
+  if (!nums) return {};
+  const hits = {};
+  nums.forEach(n => { hits[n] = 0; });
+  return { cricketHits: hits, cricketClosed: {} };
+}
+
 const dataStore = new DataStore();
 
 // ──────────────────────────────────────────────
@@ -183,15 +214,31 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const player = state.players[targetIndex];
   if (!player) return { ok: false, reason: 'no-active-player' };
 
-  const nextRemaining = player.remaining - value;
-  const bust = nextRemaining < 0;
+  const mode = state.game.mode || DEFAULT_MODE;
+  const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+  const isCricket = modeDef.type === 'cricket';
+
+  let bust = false;
+  if (isCricket) {
+    player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+    const nums = getCricketNumbersForMode(mode);
+    if (nums && nums.includes(value)) {
+      if (!player.cricketHits) player.cricketHits = {};
+      if (!player.cricketClosed) player.cricketClosed = {};
+      player.cricketHits[value] = Math.min(3, (player.cricketHits[value] || 0) + 1);
+      if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
+    }
+  } else {
+    const nextRemaining = player.remaining - value;
+    bust = nextRemaining < 0;
+    if (!bust) {
+      player.remaining = nextRemaining;
+      player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+    }
+  }
 
   player.turns = Math.max(0, Number(player.turns || 0)) + 1;
   player.bestTurn = Math.max(Number(player.bestTurn || 0), value);
-  if (!bust) {
-    player.remaining = nextRemaining;
-    player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
-  }
 
   if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
   player.currentRoundPoints.push(value);
@@ -221,10 +268,11 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     bust,
     remaining: player.remaining,
     roundThrow: state.game.currentThrow,
-    ts: Date.now()
+    ts: Date.now(),
+    mode
   };
 
-  if (player.remaining === 0) {
+  if (!isCricket && player.remaining === 0) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
     await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino' });
     state.game.status = 'leg-finished';
@@ -498,7 +546,7 @@ async function getPlayers() { return dataStore.getPlayers(); }
 
 async function savePlayers(list) {
   await dataStore.savePlayers(list);
-  const fresh = await defaultLiveState();
+  const fresh = await defaultLiveState(savedLiveMode);
   await dataStore.saveLiveState(fresh);
 }
 
@@ -510,15 +558,17 @@ async function getActivePlayersForLive() {
   }));
 }
 
-async function defaultLiveState() {
+async function defaultLiveState(mode) {
+  const m = mode || DEFAULT_MODE;
   const active = await getActivePlayersForLive();
   const fallbackPlayers = active.length > 0
     ? active
     : [{ slot: 1, name: 'Spieler 1', color: '#e63946' }, { slot: 2, name: 'Spieler 2', color: '#f4a261' }];
+  const startScore = getStartScoreForMode(m);
 
   return {
-    game: { mode: '501', status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0 },
-    players: fallbackPlayers.map(p => ({ ...p, remaining: 501, legs: 0, turns: 0, totalScored: 0, bestTurn: 0, average: 0, throws: [], currentRoundPoints: [] })),
+    game: { mode: m, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0 },
+    players: fallbackPlayers.map(p => ({ ...p, remaining: startScore, legs: 0, turns: 0, totalScored: 0, bestTurn: 0, average: 0, throws: [], currentRoundPoints: [], ...defaultPlayerCricketState(m) })),
     lastAction: null,
     arduino: { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
   };
@@ -548,13 +598,62 @@ function sanitizePlayerState(player, fallback) {
   const throws = Array.isArray(player?.throws) ? player.throws : [];
   const currentRoundPoints = Array.isArray(player?.currentRoundPoints) ? player.currentRoundPoints : [];
   const average = calculateCurrentRoundAverage({ currentRoundPoints });
-  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average };
+  const cricketHits = player?.cricketHits || {};
+  const cricketClosed = player?.cricketClosed || {};
+  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, cricketHits, cricketClosed };
 }
 
+function resetLiveState(carryLegs = false, modeOverride) {
+  const now = Date.now();
+  const basePlayers = savedLiveStateTemplate || [];
+  const mode = modeOverride || savedLiveMode || DEFAULT_MODE;
+  const startScore = getStartScoreForMode(mode);
+  const legsBySlot = carryLegs && Array.isArray(savedLiveStateTemplate)
+    ? new Map(savedLiveStateTemplate.map(p => [Number(p.slot || 0), Number(p.legs || 0)]))
+    : new Map();
+
+  const players = basePlayers.map((p) => ({
+    ...p,
+    remaining: startScore,
+    legs: Number(legsBySlot.get(Number(p.slot || 0)) || 0),
+    turns: 0,
+    totalScored: 0,
+    bestTurn: 0,
+    average: 0,
+    throws: [],
+    currentRoundPoints: [],
+    ...defaultPlayerCricketState(mode)
+  }));
+
+  return {
+    game: {
+      mode,
+      status: 'running',
+      startedAt: now,
+      updatedAt: now,
+      activePlayer: 0,
+      throwRound: 1,
+      currentThrow: 0
+    },
+    players,
+    lastAction: null,
+    arduino: { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
+  };
+}
+
+let savedLiveStateTemplate = [];
+let savedLiveMode = DEFAULT_MODE;
+
 async function getLiveState() {
-  const fallback = await defaultLiveState();
+  const mode = savedLiveMode || DEFAULT_MODE;
+  const fallback = await defaultLiveState(mode);
   const saved = await dataStore.getLiveState(fallback);
   const activePlayers = fallback.players;
+  const savedMode = String(saved.game?.mode || '');
+  if (GAME_MODES[savedMode]) savedLiveMode = savedMode;
+  savedLiveStateTemplate = Array.isArray(saved.players) && saved.players.length > 0
+    ? saved.players.map(p => ({ ...p, throws: Array.isArray(p.throws) ? p.throws : [], currentRoundPoints: Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [] }))
+    : activePlayers;
   const savedPlayers = Array.isArray(saved.players) && saved.players.length > 0 ? saved.players : activePlayers;
   const mergedPlayers = savedPlayers.map((player, index) => sanitizePlayerState(player, activePlayers[index] || activePlayers[0]));
 
@@ -624,6 +723,23 @@ app.use(express.json());
 // ──────────────────────────────────────────────
 // API-Routen
 // ──────────────────────────────────────────────
+
+// ── Spielmodi ──
+app.get('/api/game/modes', (_req, res) => {
+  res.json(GAME_MODES);
+});
+
+app.post('/api/game/mode', async (req, res) => {
+  const mode = String(req.body?.mode || '').trim();
+  if (!GAME_MODES[mode]) return res.status(400).json({ error: `Unbekannter Modus: ${mode}` });
+  try {
+    savedLiveMode = mode;
+    const fresh = resetLiveState(false, mode);
+    const saved = await saveLiveState(fresh);
+    broadcastReload();
+    res.json(saved);
+  } catch (err) { res.status(500).json({ error: 'Modus-Wechsel fehlgeschlagen: ' + err.message }); }
+});
 
 // ── Players ──
 app.get('/api/players', async (_req, res) => {
@@ -725,14 +841,11 @@ app.get('/api/live/state', async (_req, res) => {
 app.post('/api/live/reset', async (req, res) => {
   const carryLegs = !!(req.body && req.body.carryLegs);
   try {
-    const prev = await getLiveState();
-    const fresh = await defaultLiveState();
-    if (carryLegs) {
-      fresh.players.forEach((player, index) => {
-        if (prev.players[index]) player.legs = prev.players[index].legs;
-      });
-    }
-    res.json(await saveLiveState(fresh));
+    const mode = savedLiveMode || DEFAULT_MODE;
+    const fresh = resetLiveState(carryLegs, mode);
+    const saved = await saveLiveState(fresh);
+    broadcastReload();
+    res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Live-Reset fehlgeschlagen: ' + err.message }); }
 });
 
@@ -753,28 +866,38 @@ app.post('/api/live/throw', async (req, res) => {
     if (targetIndex >= state.players.length) return res.status(400).json({ error: 'Spieler nicht gefunden.' });
 
     const player = state.players[targetIndex];
-    const nextRemaining = player.remaining - points;
-    const bust = nextRemaining < 0;
+    const mode = state.game.mode || DEFAULT_MODE;
+    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+    const isCricket = modeDef.type === 'cricket';
+
+    let bust = false;
+    if (isCricket) {
+      player.totalScored += points;
+      player.remaining = 0;
+    } else {
+      const nextRemaining = player.remaining - points;
+      bust = nextRemaining < 0;
+      if (!bust) { player.remaining = nextRemaining; player.totalScored += points; }
+    }
 
     player.turns += 1;
     player.bestTurn = Math.max(player.bestTurn, points);
-    if (!bust) { player.remaining = nextRemaining; player.totalScored += points; }
 
     if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
     player.currentRoundPoints.push(points);
 
     if (!Array.isArray(player.throws)) player.throws = [];
-    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now() });
+    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode });
 
-    player.average = player.turns > 0 ? Math.round((player.totalScored / (player.turns * 3)) * 100) / 100 : 0;
+    player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
 
     state.lastAction = {
       type: 'throw', playerIndex: targetIndex, playerSlot: player.slot, player: player.name,
-      points, bust, remaining: player.remaining, roundThrow: state.game.currentThrow, ts: Date.now()
+      points, bust, remaining: player.remaining, roundThrow: state.game.currentThrow, ts: Date.now(), mode
     };
 
-    if (player.remaining === 0) {
+    if (!isCricket && player.remaining === 0) {
       player.legs += 1;
       await addHighscore(player.name, points, { kind: 'checkout', legWin: true });
       state.game.status = 'leg-finished';
@@ -834,9 +957,17 @@ app.post('/api/live/undo', async (req, res) => {
     const lastThrow = player.throws.pop();
     const roundIndex = player.currentRoundPoints ? player.currentRoundPoints.length - 1 : -1;
 
-    if (!lastThrow.bust) { player.remaining += lastThrow.points; player.totalScored -= lastThrow.points; }
+    const mode = state.game.mode || DEFAULT_MODE;
+    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+    const isCricket = modeDef.type === 'cricket';
+
+    if (isCricket) {
+      player.totalScored = Math.max(0, Number(player.totalScored || 0) - lastThrow.points);
+    } else {
+      if (!lastThrow.bust) { player.remaining += lastThrow.points; player.totalScored -= lastThrow.points; }
+    }
     player.turns = Math.max(0, player.turns - 1);
-    player.average = player.turns > 0 ? Math.round((player.totalScored / (player.turns * 3)) * 100) / 100 : 0;
+    player.average = calculateCurrentRoundAverage(player);
 
     if (roundIndex >= 0 && player.currentRoundPoints) player.currentRoundPoints.pop();
 
