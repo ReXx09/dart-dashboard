@@ -874,6 +874,14 @@ app.post('/api/live/throw', async (req, res) => {
     if (isCricket) {
       player.totalScored += points;
       player.remaining = 0;
+      const dartNumber = Number(req.body?.number || points);
+      const multiplier = Number(req.body?.multiplier || 1);
+      if (!player.cricketHits) player.cricketHits = {};
+      if (!player.cricketClosed) player.cricketClosed = {};
+      if ([15,16,17,18,19,20,25].includes(dartNumber)) {
+        player.cricketHits[dartNumber] = Math.min(3, (player.cricketHits[dartNumber] || 0) + multiplier);
+        if (player.cricketHits[dartNumber] >= 3) player.cricketClosed[dartNumber] = true;
+      }
     } else {
       const nextRemaining = player.remaining - points;
       bust = nextRemaining < 0;
