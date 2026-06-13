@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Highscores – Löwen Dart</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a;
+      color: #f1f1f1;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #111;
+      border-bottom: 3px solid #e63946;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .logo { font-size: 2rem; }
+    .header-text h1 { font-size: 1.35rem; font-weight: 700; }
+    .header-text p { font-size: .78rem; color: #666; margin-top: 2px; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    #clock { font-size: 1.15rem; font-weight: 600; color: #e63946; font-variant-numeric: tabular-nums; text-align: right; }
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 28px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 340px) 1fr auto;
+      gap: 12px;
+      align-items: center;
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-radius: 14px;
+      padding: 14px;
+    }
+    label {
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #777;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: block;
+    }
+    select, input {
+      width: 100%;
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      color: #f1f1f1;
+      border-radius: 9px;
+      padding: 10px 12px;
+      font-size: .95rem;
+      font-family: inherit;
+      outline: none;
+    }
+    select:focus, input:focus { border-color: #e63946; }
+    .btn {
+      background: #1e1e1e;
+      border: 1px solid #2a2a2a;
+      color: #ddd;
+      border-radius: 9px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 700;
+      transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #2a2a2a; border-color: #e63946; }
+    .btn.primary { background: #e63946; border-color: #e63946; color: #fff; }
+    .btn.primary:hover { background: #c1121f; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .summary-card {
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-radius: 14px;
+      padding: 16px;
+      min-height: 92px;
+      position: relative;
+      overflow: hidden;
+    }
+    .summary-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--accent, #457b9d);
+    }
+    .summary-label { font-size: .68rem; text-transform: uppercase; letter-spacing: 1.5px; color: #777; font-weight: 700; }
+    .summary-value { font-size: 2.2rem; line-height: 1.05; color: var(--accent, #457b9d); font-weight: 900; margin-top: 8px; font-variant-numeric: tabular-nums; }
+    .summary-sub { font-size: .72rem; color: #666; margin-top: 6px; }
+    .tables-grid {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .panel {
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .panel-title {
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #777;
+      font-weight: 800;
+    }
+    .panel-subtitle { font-size: .72rem; color: #555; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #1a1a1a; font-size: .86rem; }
+    th {
+      text-align: left;
+      color: #555;
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      background: #101010;
+    }
+    td { color: #ddd; }
+    tr:last-child td { border-bottom: none; }
+    .rank {
+      width: 42px;
+      color: #777;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .score {
+      color: #f4a261;
+      font-weight: 900;
+      font-size: 1rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .player { font-weight: 700; color: #f1f1f1; }
+    .muted { color: #666; font-style: italic; }
+    .time { color: #666; white-space: nowrap; }
+    .empty {
+      padding: 34px 16px;
+      text-align: center;
+      color: #666;
+      font-size: .9rem;
+    }
+    .legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .legend span {
+      border: 1px solid #2a2a2a;
+      background: #101010;
+      color: #888;
+      border-radius: 20px;
+      padding: 4px 8px;
+      font-size: .68rem;
+      font-weight: 700;
+    }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1e1e1e;
+      border: 1px solid #333;
+      color: #f1f1f1;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: .88rem;
+      opacity: 0;
+      transition: all .3s;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    footer { text-align: center; padding: 14px; font-size: .7rem; color: #222; border-top: 1px solid #141414; }
+    @media (max-width: 900px) {
+      .toolbar, .tables-grid, .summary-grid { grid-template-columns: 1fr; }
+      .toolbar { display: flex; flex-direction: column; }
+      th, td { padding: 9px 8px; font-size: .78rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">🏆</span>
+    <div class="header-text">
+      <h1>Highscores</h1>
+      <p>Datenbank-Scores, Best-Off-Liste und Spezialwerte wie 180er, 177er und 174er.</p>
+    </div>
+    <div class="header-right">
+      <div>
+        <div id="clock">--:--:--</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="toolbar">
+      <div>
+        <label for="scoreSelect">Liste</label>
+        <select id="scoreSelect">
+          <option value="all">Best Off – alle Scores</option>
+          <option value="180">180er</option>
+          <option value="177">177er</option>
+          <option value="174">174er</option>
+          <option value="171">171er</option>
+          <option value="167">167er</option>
+          <option value="164">164er</option>
+          <option value="161">161er</option>
+          <option value="160">160er</option>
+          <option value="157">157er</option>
+          <option value="154">154er</option>
+          <option value="151">151er</option>
+          <option value="150">150er</option>
+          <option value="140">140+</option>
+          <option value="100">100+</option>
+          <option value="checkout">Checkouts</option>
+          <option value="manual">Manuelle Scores</option>
+        </select>
+      </div>
+      <div>
+        <label for="playerFilter">Spieler filtern</label>
+        <select id="playerFilter">
+          <option value="">Alle Spieler</option>
+        </select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button class="btn primary" id="refreshBtn">Aktualisieren</button>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card" style="--accent:#f4a261">
+        <div class="summary-label">Einträge gesamt</div>
+        <div class="summary-value" id="totalEntries">0</div>
+        <div class="summary-sub">aus der Datenbank</div>
+      </div>
+      <div class="summary-card" style="--accent:#e63946">
+        <div class="summary-label">Best Score</div>
+        <div class="summary-value" id="bestScore">-</div>
+        <div class="summary-sub" id="bestScoreMeta">-</div>
+      </div>
+      <div class="summary-card" style="--accent:#2a9d8f">
+        <div class="summary-label">Top Spieler</div>
+        <div class="summary-value" id="topPlayer">-</div>
+        <div class="summary-sub" id="topPlayerMeta">-</div>
+      </div>
+      <div class="summary-card" style="--accent:#9b5de5">
+        <div class="summary-label">Aktuelle Liste</div>
+        <div class="summary-value" id="visibleEntries">0</div>
+        <div class="summary-sub" id="visibleMeta">Best Off</div>
+      </div>
+    </div>
+
+    <div class="tables-grid">
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title" id="listTitle">Best Off</div>
+            <div class="panel-subtitle" id="listSubtitle">Alle gespeicherten Scores</div>
+          </div>
+          <div class="legend" id="legend"></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th class="rank">#</th>
+              <th>Spieler</th>
+              <th>Score</th>
+              <th>Typ</th>
+              <th>Zeit</th>
+            </tr>
+          </thead>
+          <tbody id="scoreBody">
+            <tr><td colspan="5" class="empty">Lade Highscores...</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Best Off</div>
+            <div class="panel-subtitle">Beste Einträge pro Spieler</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th class="rank">#</th>
+              <th>Spieler</th>
+              <th>Best</th>
+              <th>Einträge</th>
+            </tr>
+          </thead>
+          <tbody id="bestByPlayerBody">
+            <tr><td colspan="4" class="empty">Lade Best-Off...</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+
+  <footer>Löwen Dart Club – Highscores</footer>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allScores = [];
+    let selectedFilter = 'all';
+
+    const LIST_LABELS = {
+      all: 'Best Off – alle Scores',
+      '180': '180er',
+      '177': '177er',
+      '174': '174er',
+      '171': '171er',
+      '167': '167er',
+      '164': '164er',
+      '161': '161er',
+      '160': '160er',
+      '157': '157er',
+      '154': '154er',
+      '151': '151er',
+      '150': '150er',
+      '140': '140+',
+      '100': '100+',
+      checkout: 'Checkouts',
+      manual: 'Manuelle Scores'
+    };
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    function updateClock() {
+      document.getElementById('clock').textContent = new Date().toLocaleTimeString('de-DE');
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatTime(ts) {
+      if (!ts) return '-';
+      return new Date(ts).toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function normalizeKind(kind) {
+      if (kind == null || kind === '') return 'score';
+      return String(kind);
+    }
+
+    function scoreMatchesFilter(entry, filter) {
+      const kind = normalizeKind(entry.kind);
+      const score = Number(entry.score || 0);
+
+      if (filter === 'all') return true;
+      if (filter === 'checkout') return kind === 'checkout' || !!entry.legWin;
+      if (filter === 'manual') return kind === 'manual';
+      if (filter === '140') return score >= 140 && score <= 180;
+      if (filter === '100') return score >= 100 && score <= 180;
+      if (filter === '180' || filter === '177' || filter === '174' || filter === '171' || filter === '167' || filter === '164' || filter === '161' || filter === '160' || filter === '157' || filter === '154' || filter === '151' || filter === '150') {
+        return score === Number(filter);
+      }
+      return true;
+    }
+
+    function filterScores() {
+      const player = document.getElementById('playerFilter').value;
+      return allScores
+        .filter(entry => scoreMatchesFilter(entry, selectedFilter))
+        .filter(entry => !player || String(entry.player) === player)
+        .sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0));
+    }
+
+    function buildBestByPlayer(list) {
+      const grouped = new Map();
+      list.forEach(entry => {
+        const key = String(entry.player || 'Unbekannt');
+        const current = grouped.get(key) || { player: key, best: 0, count: 0, lastTs: 0 };
+        current.count += 1;
+        current.best = Math.max(current.best, Number(entry.score || 0));
+        current.lastTs = Math.max(current.lastTs, Number(entry.ts || 0));
+        grouped.set(key, current);
+      });
+
+      return Array.from(grouped.values())
+        .filter(item => item.best > 0)
+        .sort((a, b) => b.best - a.best || b.count - a.count || b.lastTs - a.lastTs)
+        .slice(0, 10);
+    }
+
+    function renderPlayerFilter() {
+      const select = document.getElementById('playerFilter');
+      const old = select.value;
+      const names = Array.from(new Set(allScores.map(e => String(e.player || '')).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
+      select.innerHTML = '<option value="">Alle Spieler</option>' + names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+      if (names.includes(old)) select.value = old;
+    }
+
+    function renderSummary(list, bestByPlayer) {
+      document.getElementById('totalEntries').textContent = allScores.length;
+      document.getElementById('visibleEntries').textContent = list.length;
+      document.getElementById('visibleMeta').textContent = LIST_LABELS[selectedFilter] || 'Liste';
+
+      const best = allScores.slice().sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0))[0];
+      document.getElementById('bestScore').textContent = best ? best.score : '-';
+      document.getElementById('bestScoreMeta').textContent = best ? (best.player + ' · ' + formatTime(best.ts)) : '-';
+
+      const top = bestByPlayer[0];
+      document.getElementById('topPlayer').textContent = top ? top.best : '-';
+      document.getElementById('topPlayerMeta').textContent = top ? (top.player + ' · ' + top.count + ' Einträge') : '-';
+    }
+
+    function renderLegend() {
+      const legend = document.getElementById('legend');
+      if (selectedFilter === 'all') {
+        legend.innerHTML = '<span>Best Off</span><span>Checkouts</span><span>180+</span>';
+      } else if (selectedFilter === '140' || selectedFilter === '100') {
+        legend.innerHTML = '<span>Range</span><span>Sortiert nach Score</span>';
+      } else {
+        legend.innerHTML = '<span>Score = ' + selectedFilter + '</span><span>Sortiert nach Zeit</span>';
+      }
+    }
+
+    function renderTable(list) {
+      const body = document.getElementById('scoreBody');
+      if (!list.length) {
+        body.innerHTML = '<tr><td colspan="5" class="empty">Keine Einträge für diese Auswahl.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = list.slice(0, 50).map((entry, idx) => {
+        const kind = normalizeKind(entry.kind);
+        return '<tr>' +
+          '<td class="rank">' + (idx + 1) + '</td>' +
+          '<td class="player">' + escapeHtml(entry.player) + '</td>' +
+          '<td class="score">' + entry.score + '</td>' +
+          '<td>' + escapeHtml(kind) + (entry.legWin ? ' / LegWin' : '') + '</td>' +
+          '<td class="time">' + formatTime(entry.ts) + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function renderBestByPlayer(bestByPlayer) {
+      const body = document.getElementById('bestByPlayerBody');
+      if (!bestByPlayer.length) {
+        body.innerHTML = '<tr><td colspan="4" class="empty">Keine Best-Off-Daten.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = bestByPlayer.map((entry, idx) => {
+        return '<tr>' +
+          '<td class="rank">' + (idx + 1) + '</td>' +
+          '<td class="player">' + escapeHtml(entry.player) + '</td>' +
+          '<td class="score">' + entry.best + '</td>' +
+          '<td>' + entry.count + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function render() {
+      renderPlayerFilter();
+      const list = filterScores();
+      const bestByPlayer = buildBestByPlayer(allScores);
+      renderSummary(list, bestByPlayer);
+      renderLegend();
+      document.getElementById('listTitle').textContent = LIST_LABELS[selectedFilter] || 'Liste';
+      document.getElementById('listSubtitle').textContent = selectedFilter === 'all' ? 'Alle gespeicherten Scores' : 'Gefilterte Datenbank-Einträge';
+      renderTable(list);
+      renderBestByPlayer(bestByPlayer);
+    }
+
+    async function loadScores() {
+      try {
+        const response = await fetch('/api/highscores');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        allScores = await response.json();
+        render();
+      } catch (err) {
+        showToast('Highscores konnten nicht geladen werden.', true);
+        document.getElementById('scoreBody').innerHTML = '<tr><td colspan="5" class="empty">Fehler beim Laden der Highscores.</td></tr>';
+      }
+    }
+
+    function showToast(message, isError) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast show' + (isError ? ' error' : '');
+      setTimeout(() => { toast.className = 'toast'; }, 2500);
+    }
+
+    document.getElementById('scoreSelect').addEventListener('change', event => {
+      selectedFilter = event.target.value;
+      render();
+    });
+
+    document.getElementById('playerFilter').addEventListener('change', render);
+    document.getElementById('refreshBtn').addEventListener('click', () => loadScores());
+
+    loadScores();
+  </script>
+</body>
+</html>
