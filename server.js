@@ -65,9 +65,39 @@ const DART_VALUE_BY_CHANNEL = {
   '21': 50,
   '22': 25
 };
+
+// Vorläufige 4x16-Matrix-Tabelle für passives Sniffing.
+// Mapping: R0..R3 = Rows, C0..C15 = Columns.
+// Werte entsprechen aktuell der Tabelle aus dart_matrix_test.ino und können auf dem Pi angepasst werden.
+const MATRIX_CODE_BY_ROW_COLUMN = {
+  'R0,C0': 212, 'R0,C1': 112, 'R0,C2': 209, 'R0,C3': 109,
+  'R0,C4': 214, 'R0,C5': 114, 'R0,C6': 211, 'R0,C7': 111,
+  'R0,C8': 208, 'R0,C9': 108, 'R0,C10': 0,   'R0,C11': 312,
+  'R0,C12': 309, 'R0,C13': 314, 'R0,C14': 311, 'R0,C15': 308,
+  'R1,C0': 216, 'R1,C1': 116, 'R1,C2': 207, 'R1,C3': 107,
+  'R1,C4': 219, 'R1,C5': 119, 'R1,C6': 203, 'R1,C7': 103,
+  'R1,C8': 217, 'R1,C9': 117, 'R1,C10': 225, 'R1,C11': 316,
+  'R1,C12': 307, 'R1,C13': 319, 'R1,C14': 303, 'R1,C15': 317,
+  'R2,C0': 202, 'R2,C1': 102, 'R2,C2': 215, 'R2,C3': 115,
+  'R2,C4': 210, 'R2,C5': 110, 'R2,C6': 206, 'R2,C7': 106,
+  'R2,C8': 213, 'R2,C9': 113, 'R2,C10': 125, 'R2,C11': 302,
+  'R2,C12': 315, 'R2,C13': 310, 'R2,C14': 306, 'R2,C15': 313,
+  'R3,C0': 204, 'R3,C1': 104, 'R3,C2': 218, 'R3,C3': 118,
+  'R3,C4': 201, 'R3,C5': 101, 'R3,C6': 220, 'R3,C7': 120,
+  'R3,C8': 205, 'R3,C9': 105, 'R3,C10': 0,   'R3,C11': 304,
+  'R3,C12': 318, 'R3,C13': 301, 'R3,C14': 320, 'R3,C15': 305
+};
+const MATRIX_ROW_COLUMN_VALUES = Object.fromEntries(
+  Object.entries(MATRIX_CODE_BY_ROW_COLUMN).map(([key, code]) => [key, { code, points: codeToPoints(code) }])
+);
+
 const ARDUINO_AUTO_THROW_ENABLED = process.env.ARDUINO_AUTO_THROW_ENABLED !== 'false';
+const ARDUINO_AUTO_THROW_MATRIX_ENABLED = process.env.ARDUINO_AUTO_THROW_MATRIX_ENABLED === 'true';
+const ARDUINO_AUTO_THROW_MATRIX_UNMAPPED = process.env.ARDUINO_AUTO_THROW_MATRIX_UNMAPPED === 'true';
 const ARDUINO_REQUIRE_THROW_TRIGGER = process.env.ARDUINO_REQUIRE_THROW_TRIGGER !== 'false';
 const ARDUINO_THROW_WINDOW_MS = Number(process.env.ARDUINO_THROW_WINDOW_MS || 1200);
+const MATRIX_HIT_RELEASE_MS = Number(process.env.MATRIX_HIT_RELEASE_MS || 25);
+const MATRIX_HIT_REFRACTORY_MS = Number(process.env.MATRIX_HIT_REFRACTORY_MS || 350);
 
 // ── Spielmodi ──────────────────────────────────
 const GAME_MODES = {
@@ -137,6 +167,16 @@ let pendingArduinoThrowTimer = null;
 let arduinoThrowLockUntil = 0;
 let arduinoProcessingPromise = Promise.resolve();
 const arduinoRawEventHistory = [];
+const matrixSniffer = {
+  activeRows: {},
+  activeColumns: {},
+  lastMatrixHit: null,
+  matrixHitActive: false,
+  lastMatrixHitMs: 0,
+  lastMatrixHitPairMs: 0,
+  lastMatrixHitRow: null,
+  lastMatrixHitColumn: null
+};
 const arduinoState = {
   enabled: true,
   connected: false,
@@ -150,6 +190,7 @@ const arduinoState = {
   lastAutoThrow: null,
   lastMiss: null,
   lastAutoThrowError: null,
+  matrixSniffer: null,
   activeCount: null,
   lastUpdateMs: null,
   rawHistory: [],
@@ -194,6 +235,22 @@ function calculateCurrentRoundAverage(player) {
 function dartValueFromChannel(channel) {
   const key = formatChannel(channel);
   return Object.prototype.hasOwnProperty.call(DART_VALUE_BY_CHANNEL, key) ? DART_VALUE_BY_CHANNEL[key] : null;
+}
+
+function codeToPoints(code) {
+  if (code <= 0) return 0;
+  if (code == 125) return 25;
+  if (code == 225) return 50;
+
+  const base = code % 100;
+  const multiplier = code / 100;
+
+  if (base == 0) return 0;
+  if (multiplier == 1) return base;
+  if (multiplier == 2) return base * 2;
+  if (multiplier == 3) return base * 3;
+
+  return 0;
 }
 
 function clearPendingArduinoThrow() {
@@ -358,6 +415,163 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
   return { ok: true, reason, player: player.name, playerSlot: player.slot, remaining: player.remaining, state: saved };
 }
 
+function updateMatrixSnifferState(row, column, active, evt = {}) {
+  if (row != null) matrixSniffer.activeRows[row] = !!active;
+  if (column != null) matrixSniffer.activeColumns[column] = !!active;
+
+  Object.keys(matrixSniffer.activeRows).forEach((key) => {
+    if (!matrixSniffer.activeRows[key]) delete matrixSniffer.activeRows[key];
+  });
+  Object.keys(matrixSniffer.activeColumns).forEach((key) => {
+    if (!matrixSniffer.activeColumns[key]) delete matrixSniffer.activeColumns[key];
+  });
+
+  const activeRowKeys = Object.keys(matrixSniffer.activeRows).sort((a, b) => Number(a) - Number(b));
+  const activeColumnKeys = Object.keys(matrixSniffer.activeColumns).sort((a, b) => Number(a) - Number(b));
+  const ms = Number(evt.ms || 0);
+  const now = Date.now();
+
+  if (activeRowKeys.length > 0 && activeColumnKeys.length > 0) {
+    const row = activeRowKeys[0];
+    const column = activeColumnKeys[0];
+    const key = `R${row},C${column}`;
+    const mapped = MATRIX_ROW_COLUMN_VALUES[key];
+    const code = mapped ? mapped.code : null;
+    const points = mapped ? mapped.points : 0;
+
+    if (!matrixSniffer.matrixHitActive || matrixSniffer.lastMatrixHitRow !== row || matrixSniffer.lastMatrixHitColumn !== column) {
+      matrixSniffer.matrixHitActive = true;
+      matrixSniffer.lastMatrixHitRow = row;
+      matrixSniffer.lastMatrixHitColumn = column;
+      matrixSniffer.lastMatrixHitPairMs = ms;
+
+      if (now - matrixSniffer.lastMatrixHitMs >= MATRIX_HIT_REFRACTORY_MS) {
+        matrixSniffer.lastMatrixHitMs = now;
+        const hit = { row: `R${row}`, column: `C${column}`, key, code, points, ms, ts: now, line: evt.line || '', mapped: !!mapped };
+        matrixSniffer.lastMatrixHit = hit;
+        normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: hit } });
+
+        if (ARDUINO_AUTO_THROW_MATRIX_ENABLED && (mapped || ARDUINO_AUTO_THROW_MATRIX_UNMAPPED)) {
+          handleArduinoMatrixHit(hit);
+        }
+      }
+    }
+    return;
+  }
+
+  if (matrixSniffer.matrixHitActive && ms - matrixSniffer.lastMatrixHitPairMs >= MATRIX_HIT_RELEASE_MS) {
+    matrixSniffer.matrixHitActive = false;
+    matrixSniffer.lastMatrixHitRow = null;
+    matrixSniffer.lastMatrixHitColumn = null;
+    normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit } });
+  }
+}
+
+function handleArduinoMatrixHit(hit) {
+  if (pendingArduinoThrow && !pendingArduinoThrow.applied) return;
+  if (Date.now() < arduinoThrowLockUntil) return;
+
+  arduinoProcessingPromise = arduinoProcessingPromise
+    .catch(() => {})
+    .then(() => applyArduinoThrowFromMatrix(hit))
+    .then((result) => normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason }))
+    .catch((err) => normalizeArduinoStatePatch({ lastAutoThrow: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
+}
+
+async function applyArduinoThrowFromMatrix(hit) {
+  const value = Number(hit.points || 0);
+  if (!Number.isFinite(value) || value < 0 || value > 180) return { ok: false, reason: 'invalid-points', hit };
+
+  const state = await getLiveState();
+  if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
+  if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
+
+  const targetIndex = Number.isInteger(state.game.activePlayer) ? state.game.activePlayer : 0;
+  const player = state.players[targetIndex];
+  if (!player) return { ok: false, reason: 'no-active-player' };
+
+  const mode = state.game.mode || DEFAULT_MODE;
+  const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+  const isCricket = modeDef.type === 'cricket';
+
+  let bust = false;
+  if (isCricket) {
+    player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+    const nums = getCricketNumbersForMode(mode);
+    if (nums && nums.includes(value)) {
+      if (!player.cricketHits) player.cricketHits = {};
+      if (!player.cricketClosed) player.cricketClosed = {};
+      player.cricketHits[value] = Math.min(3, (player.cricketHits[value] || 0) + 1);
+      if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
+    }
+  } else {
+    const nextRemaining = player.remaining - value;
+    bust = nextRemaining < 0;
+    if (!bust) {
+      player.remaining = nextRemaining;
+      player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+    }
+  }
+
+  player.turns = Math.max(0, Number(player.turns || 0)) + 1;
+  player.bestTurn = Math.max(Number(player.bestTurn || 0), value);
+
+  if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
+  player.currentRoundPoints.push(value);
+
+  if (!Array.isArray(player.throws)) player.throws = [];
+  player.throws.push({
+    points: value,
+    remaining: player.remaining,
+    bust,
+    ts: Date.now(),
+    source: 'arduino-matrix',
+    row: hit.row,
+    column: hit.column,
+    code: hit.code,
+    channel: hit.key,
+    raw: hit.line || null
+  });
+
+  player.average = calculateCurrentRoundAverage(player);
+  state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
+
+  state.lastAction = {
+    type: 'throw',
+    source: 'arduino-matrix',
+    playerIndex: targetIndex,
+    playerSlot: player.slot,
+    player: player.name,
+    points: value,
+    row: hit.row,
+    column: hit.column,
+    code: hit.code,
+    channel: hit.key,
+    bust,
+    remaining: player.remaining,
+    roundThrow: state.game.currentThrow,
+    ts: Date.now(),
+    mode
+  };
+
+  if (!isCricket && player.remaining === 0) {
+    player.legs = Math.max(0, Number(player.legs || 0)) + 1;
+    await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino-matrix' });
+    state.game.status = 'leg-finished';
+    state.lastAction.legWin = true;
+  }
+
+  if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
+    await advanceAfterThreeThrows(state, player, 'arduino-matrix');
+  }
+
+  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino-matrix');
+
+  const saved = await saveLiveState(state);
+  broadcastReload();
+  return { ok: true, value, player: player.name, playerSlot: player.slot, hit, bust, remaining: player.remaining, state: saved };
+}
+
 function handleArduinoTrigger(evt) {
   if (!ARDUINO_AUTO_THROW_ENABLED) return;
   if (pendingArduinoThrow && !pendingArduinoThrow.applied) return;
@@ -425,11 +639,59 @@ function parseArduinoLine(line) {
     return;
   }
 
-  const hbMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
+  const matrixEvtMatch = clean.match(/^EVT,(\d+),([RC])(\d+),(ACTIVE|IDLE)$/i);
+  if (matrixEvtMatch) {
+    const kind = matrixEvtMatch[2].toUpperCase();
+    const index = Number(matrixEvtMatch[3]);
+    const active = matrixEvtMatch[4].toUpperCase() === 'ACTIVE';
+    const evt = { ms: Number(matrixEvtMatch[1]), kind, index, state: matrixEvtMatch[4].toUpperCase(), line: clean };
+    normalizeArduinoStatePatch({
+      lastEvent: { ...evt },
+      lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
+      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
+    });
+
+    updateMatrixSnifferState(kind === 'R' ? index : null, kind === 'C' ? index : null, active, evt);
+    return;
+  }
+
+  const hitMatch = clean.match(/^HIT,(\d+),R(\d+),C(\d+),(-?\d+),(-?\d+)$/i);
+  if (hitMatch) {
+    const hit = {
+      ms: Number(hitMatch[1]),
+      row: `R${Number(hitMatch[2])}`,
+      column: `C${Number(hitMatch[3])}`,
+      key: `R${Number(hitMatch[2])},C${Number(hitMatch[3])}`,
+      code: Number(hitMatch[4]),
+      points: Number(hitMatch[5]),
+      ts: Date.now(),
+      line: clean,
+      mapped: true
+    };
+    matrixSniffer.lastMatrixHit = hit;
+    matrixSniffer.lastMatrixHitMs = Date.now();
+    normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: hit } });
+    if (ARDUINO_AUTO_THROW_MATRIX_ENABLED) handleArduinoMatrixHit(hit);
+    return;
+  }
+
+  const hbMatch = clean.match(/^HB,(\d+),rows=(\d+),columns=(\d+),rows=(\d+),columns=(\d+),active=(\d+)$/i);
   if (hbMatch) {
     normalizeArduinoStatePatch({
-      activeCount: Number(hbMatch[2]),
-      lastHeartbeat: { ms: Number(hbMatch[1]), activeCount: Number(hbMatch[2]), line: clean }
+      activeCount: Number(hbMatch[4]),
+      lastHeartbeat: { ms: Number(hbMatch[1]), rows: Number(hbMatch[2]), columns: Number(hbMatch[3]), activeCount: Number(hbMatch[4]), line: clean },
+      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
+    });
+    return;
+  }
+
+  const hbLegacyMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
+  if (hbLegacyMatch) {
+  if (hbLegacyMatch) {
+    normalizeArduinoStatePatch({
+      activeCount: Number(hbLegacyMatch[2]),
+      lastHeartbeat: { ms: Number(hbLegacyMatch[1]), activeCount: Number(hbLegacyMatch[2]), line: clean },
+      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
     });
     return;
   }
@@ -725,7 +987,9 @@ async function getLiveState() {
       lastAutoThrow: arduinoState.lastAutoThrow || null,
       lastMiss: arduinoState.lastMiss || null,
       lastAutoThrowError: arduinoState.lastAutoThrowError || null,
-      dartValueByChannel: DART_VALUE_BY_CHANNEL
+      matrixSniffer: matrixSniffer.lastMatrixHit || null,
+      dartValueByChannel: DART_VALUE_BY_CHANNEL,
+      matrixCodeByRowColumn: MATRIX_CODE_BY_ROW_COLUMN
     }
   };
 
