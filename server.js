@@ -675,7 +675,7 @@ function parseArduinoLine(line) {
     return;
   }
 
-  const hbMatch = clean.match(/^HB,(\d+),rows=(\d+),columns=(\d+),rows=(\d+),columns=(\d+),active=(\d+)$/i);
+  const hbMatch = clean.match(/^HB,(\d+),rows=(\d+),columns=(\d+),active=(\d+)$/i);
   if (hbMatch) {
     normalizeArduinoStatePatch({
       activeCount: Number(hbMatch[4]),
@@ -686,7 +686,6 @@ function parseArduinoLine(line) {
   }
 
   const hbLegacyMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
-  if (hbLegacyMatch) {
   if (hbLegacyMatch) {
     normalizeArduinoStatePatch({
       activeCount: Number(hbLegacyMatch[2]),
