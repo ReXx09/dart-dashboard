@@ -301,13 +301,16 @@
       const playerButtons = document.getElementById('playerButtons');
 
       const isCricket = mode === 'cricket';
+      const compactOrder = [...state.players]
+        .filter((_p, idx) => idx !== activePlayer)
+        .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
+
       if (isCricket) {
         focusPlayer.innerHTML = renderCricketView(active, state);
       } else {
         focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state);
       }
-      compactPlayers.innerHTML = state.players
-        .filter((_p, idx) => idx !== activePlayer)
+      compactPlayers.innerHTML = compactOrder
         .map((p, idx) => renderCompactPlayer(p, idx, state.players.findIndex(sp => sp.slot === p.slot), mode)).join('');
 
       playerButtons.innerHTML = state.players.map((p, idx) => {

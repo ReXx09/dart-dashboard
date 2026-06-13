@@ -202,6 +202,21 @@ function clearPendingArduinoThrow() {
   pendingArduinoThrow = null;
 }
 
+async function advanceAfterThreeThrows(state, player, source) {
+  if (state.game.status === 'leg-finished' || state.game.currentThrow < 3) return;
+
+  player.currentRoundPoints = [];
+  state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
+  state.game.currentThrow = 0;
+  if (state.game.activePlayer === 0) {
+    state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
+  }
+  state.lastAction.autoAdvanced = true;
+  state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
+  state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
+  state.lastAction.nextSource = source;
+}
+
 async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const value = dartValueFromChannel(channel);
   if (value == null) return { ok: false, reason: 'unknown-channel', channel: formatChannel(channel) };
@@ -280,14 +295,10 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   }
 
   if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
-    player.currentRoundPoints = [];
-    state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
-    state.game.currentThrow = 0;
-    state.game.throwRound = (state.game.throwRound || 1) + 1;
-    state.lastAction.autoAdvanced = true;
-    state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
-    state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
+    await advanceAfterThreeThrows(state, player, 'arduino');
   }
+
+  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino');
 
   const saved = await saveLiveState(state);
   broadcastReload();
@@ -337,14 +348,10 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
   };
 
   if (state.game.currentThrow >= 3) {
-    player.currentRoundPoints = [];
-    state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
-    state.game.currentThrow = 0;
-    state.game.throwRound = (state.game.throwRound || 1) + 1;
-    state.lastAction.autoAdvanced = true;
-    state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
-    state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
+    await advanceAfterThreeThrows(state, player, 'arduino-miss');
   }
+
+  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino-miss');
 
   const saved = await saveLiveState(state);
   broadcastReload();
@@ -585,6 +592,35 @@ function calculateCurrentRoundAverage(player) {
   if (currentRoundPoints.length === 0) return 0;
   const sum = currentRoundPoints.reduce((total, points) => total + (Number(points) || 0), 0);
   return roundAverage(sum / 3);
+}
+
+function getTurnScoreHighscoreKind(score) {
+  if (score === 180) return '180er';
+  if (score === 177) return '177er';
+  if (score === 174) return '174er';
+  if (score === 171) return '171er';
+  if (score === 167) return '167er';
+  if (score === 164) return '164er';
+  if (score === 161) return '161er';
+  if (score === 160) return '160er';
+  if (score === 157) return '157er';
+  if (score === 154) return '154er';
+  if (score === 151) return '151er';
+  if (score === 150) return '150er';
+  if (score >= 140) return '140+';
+  if (score >= 100) return '100+';
+  return null;
+}
+
+async function addTurnScoreHighscoreIfNeeded(player, state, source = 'live') {
+  if (state.game.mode === 'cricket') return;
+  if (!Array.isArray(player.currentRoundPoints) || player.currentRoundPoints.length !== 3 || player.turnScoreRecorded) return;
+  const turnScore = player.currentRoundPoints.reduce((sum, points) => sum + (Number(points) || 0), 0);
+  const kind = getTurnScoreHighscoreKind(turnScore);
+  if (!kind) return;
+
+  await addHighscore(player.name, turnScore, { kind, source });
+  player.turnScoreRecorded = true;
 }
 
 function sanitizePlayerState(player, fallback) {
@@ -914,14 +950,10 @@ app.post('/api/live/throw', async (req, res) => {
     }
 
     if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
-      player.currentRoundPoints = [];
-      state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
-      state.game.currentThrow = 0;
-      state.game.throwRound = (state.game.throwRound || 1) + 1;
-      state.lastAction.autoAdvanced = true;
-      state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
-      state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
+      await advanceAfterThreeThrows(state, player, 'manual');
     }
+
+    await addTurnScoreHighscoreIfNeeded(player, state, 'manual');
 
     const saved = await saveLiveState(state);
     broadcastReload();
