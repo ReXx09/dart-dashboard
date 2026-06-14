@@ -194,7 +194,8 @@ const arduinoState = {
   activeCount: null,
   lastUpdateMs: null,
   rawHistory: [],
-  error: null
+  error: null,
+  channelAutoDetect: null
 };
 
 function broadcastArduinoState() {
@@ -625,20 +626,40 @@ function parseArduinoLine(line) {
   rememberArduinoLine(clean);
   normalizeArduinoStatePatch({ lastLine: clean, error: null });
 
-  const evtMatch = clean.match(/^EVT,(\d+),CH(\d{2}),([A-Z]+)$/i);
+  // DIAG-Parsing
+  const diagMatch = clean.match(/^DIAG,(\d+),ch=(CH\d+),edges=(\d+)$/i);
+  if (diagMatch) {
+    normalizeArduinoStatePatch({
+      lastDiag: { ms: Number(diagMatch[1]), channel: diagMatch[2], edges: Number(diagMatch[3]), line: clean }
+    });
+    return;
+  }
+
+  // EVT,<ms>,CH00..CH19,ACTIVE|IDLE  (neuer 20CH-Sniffer)
+  // Auch CH01..CH22 (alter Sniffer) wird hier erkannt.
+  const evtMatch = clean.match(/^EVT,(\d+),CH(\d+),([A-Z]+)$/i);
   if (evtMatch) {
-    const evt = { ms: Number(evtMatch[1]), channel: evtMatch[2], state: evtMatch[3].toUpperCase(), line: clean };
+    const ch = Number(evtMatch[2]);
+    const chStr = String(ch).padStart(2, '0');
+    const state = evtMatch[3].toUpperCase();
+    const evt = { ms: Number(evtMatch[1]), channel: chStr, state, line: clean };
     normalizeArduinoStatePatch({
       lastEvent: { ...evt },
       lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
       pendingThrow: arduinoState.pendingThrow
     });
 
-    if (evt.state === 'ACTIVE') handleArduinoActiveEvent(evt);
-    else if (evt.state === 'IDLE' && clean.match(/,CH(2[12])$/i)) handleArduinoTrigger(evt);
+    // Bei ACTIVE: Auto-Detect zählt mit + führt ggf. Throw aus
+    if (evt.state === 'ACTIVE') {
+      handleChannelActiveEvent(evt);
+    } else if (evt.state === 'IDLE' && (ch === 21 || ch === 22)) {
+      // CH21/CH22 IDLE = Bull-Trigger (alte Logik)
+      handleArduinoTrigger(evt);
+    }
     return;
   }
 
+  // EVT,<ms>,R#,ACTIVE|IDLE (alter R/C-Sniffer, falls noch verwendet)
   const matrixEvtMatch = clean.match(/^EVT,(\d+),([RC])(\d+),(ACTIVE|IDLE)$/i);
   if (matrixEvtMatch) {
     const kind = matrixEvtMatch[2].toUpperCase();
@@ -650,11 +671,11 @@ function parseArduinoLine(line) {
       lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
       matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
     });
-
     updateMatrixSnifferState(kind === 'R' ? index : null, kind === 'C' ? index : null, active, evt);
     return;
   }
 
+  // HIT,<ms>,R#,C#,CODE,POINTS (alter Sniffer, falls Arduino doch sendet)
   const hitMatch = clean.match(/^HIT,(\d+),R(\d+),C(\d+),(-?\d+),(-?\d+)$/i);
   if (hitMatch) {
     const hit = {
@@ -675,39 +696,49 @@ function parseArduinoLine(line) {
     return;
   }
 
-  const hbMatch = clean.match(/^HB,(\d+),rows=(\d+),columns=(\d+),active=(\d+)$/i);
+  // HB,<ms>,active=<n>  (neuer 20CH-Sniffer + alter einfacher HB)
+  const hbMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
   if (hbMatch) {
     normalizeArduinoStatePatch({
-      activeCount: Number(hbMatch[4]),
-      lastHeartbeat: { ms: Number(hbMatch[1]), rows: Number(hbMatch[2]), columns: Number(hbMatch[3]), activeCount: Number(hbMatch[4]), line: clean },
+      activeCount: Number(hbMatch[2]),
+      lastHeartbeat: { ms: Number(hbMatch[1]), activeCount: Number(hbMatch[2]), line: clean },
       matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
     });
+    // Auto-Detect nach Heartbeat ausführen
+    channelAutoDetect.heartbeatCount++;
+    runChannelAutoDetect();
     return;
   }
 
-  const hbLegacyMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
-  if (hbLegacyMatch) {
+  // HB,<ms>,rows=...,columns=...,active=... (alter R/C-Sniffer)
+  const hbRcMatch = clean.match(/^HB,(\d+),rows=(\d+),columns=(\d+),active=(\d+)$/i);
+  if (hbRcMatch) {
     normalizeArduinoStatePatch({
-      activeCount: Number(hbLegacyMatch[2]),
-      lastHeartbeat: { ms: Number(hbLegacyMatch[1]), activeCount: Number(hbLegacyMatch[2]), line: clean },
+      activeCount: Number(hbRcMatch[4]),
+      lastHeartbeat: { ms: Number(hbRcMatch[1]), rows: Number(hbRcMatch[2]), columns: Number(hbRcMatch[3]), activeCount: Number(hbRcMatch[4]), line: clean },
       matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
     });
     return;
   }
 
+  // Legacy: CHxx: ACTIVE|IDLE (alter Test-Sketch)
   const legacyEvent = clean.match(/^CH(\d{2}):\s*(ACTIVE|IDLE)$/i);
   if (legacyEvent) {
-    const evt = { ms: null, channel: legacyEvent[1], state: legacyEvent[2].toUpperCase(), line: clean };
+    const ch = Number(legacyEvent[1]);
+    const chStr = String(ch).padStart(2, '0');
+    const state = legacyEvent[2].toUpperCase();
+    const evt = { ms: null, channel: chStr, state, line: clean };
     normalizeArduinoStatePatch({
       lastEvent: { ...evt },
       lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
       pendingThrow: arduinoState.pendingThrow
     });
-    if (evt.state === 'ACTIVE') handleArduinoActiveEvent(evt);
-    else if (evt.state === 'IDLE' && clean.match(/^CH(2[12]):/i)) handleArduinoTrigger(evt);
+    if (evt.state === 'ACTIVE') handleChannelActiveEvent(evt);
+    else if (evt.state === 'IDLE' && (ch === 21 || ch === 22)) handleArduinoTrigger(evt);
     return;
   }
 
+  // Legacy: STATUS active=...
   const legacyStatus = clean.match(/^STATUS\s+active=(\d+)$/i);
   if (legacyStatus) normalizeArduinoStatePatch({ activeCount: Number(legacyStatus[1]) });
 }
@@ -987,6 +1018,7 @@ async function getLiveState() {
       lastMiss: arduinoState.lastMiss || null,
       lastAutoThrowError: arduinoState.lastAutoThrowError || null,
       matrixSniffer: matrixSniffer.lastMatrixHit || null,
+      channelAutoDetect: arduinoState.channelAutoDetect || null,
       dartValueByChannel: DART_VALUE_BY_CHANNEL,
       matrixCodeByRowColumn: MATRIX_CODE_BY_ROW_COLUMN
     }
