@@ -177,6 +177,16 @@ const matrixSniffer = {
   lastMatrixHitRow: null,
   lastMatrixHitColumn: null
 };
+const channelAutoDetect = {
+  startedAtMs: null,
+  lastHeartbeatMs: null,
+  heartbeatCount: 0,
+  edgeCounts: {},
+  rows: [],
+  columns: [],
+  status: 'waiting',
+  lastUpdatedMs: null
+};
 const arduinoState = {
   enabled: true,
   connected: false,
@@ -706,6 +716,7 @@ function parseArduinoLine(line) {
     });
     // Auto-Detect nach Heartbeat ausführen
     channelAutoDetect.heartbeatCount++;
+    channelAutoDetect.lastHeartbeatMs = Date.now();
     runChannelAutoDetect();
     return;
   }
@@ -825,7 +836,10 @@ async function startArduinoMonitor() {
     arduinoPort = port;
     arduinoParser = parser;
 
-    port.on('open', () => normalizeArduinoStatePatch({ connected: true, port: serialPath, error: null }));
+    port.on('open', () => {
+      resetChannelAutoDetect();
+      normalizeArduinoStatePatch({ connected: true, port: serialPath, error: null });
+    });
     parser.on('data', (line) => parseArduinoLine(line));
     port.on('error', (err) => normalizeArduinoStatePatch({ connected: false, error: `Serial-Fehler: ${err.message}` }));
     port.on('close', () => {
