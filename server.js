@@ -489,6 +489,43 @@ function handleArduinoMatrixHit(hit) {
     .catch((err) => normalizeArduinoStatePatch({ lastAutoThrow: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
 }
 
+function resetChannelAutoDetect() {
+  channelAutoDetect.startedAtMs = Date.now();
+  channelAutoDetect.lastHeartbeatMs = null;
+  channelAutoDetect.heartbeatCount = 0;
+  channelAutoDetect.edgeCounts = {};
+  channelAutoDetect.rows = [];
+  channelAutoDetect.columns = [];
+  channelAutoDetect.status = 'waiting';
+  channelAutoDetect.lastUpdatedMs = null;
+  normalizeArduinoStatePatch({ channelAutoDetect: { ...channelAutoDetect } });
+}
+
+function runChannelAutoDetect() {
+  if (!channelAutoDetect.startedAtMs) return;
+  if (!channelAutoDetect.heartbeatCount) return;
+
+  const elapsedMs = Date.now() - channelAutoDetect.startedAtMs;
+  const sorted = Object.entries(channelAutoDetect.edgeCounts)
+    .map(([channel, edges]) => ({ channel, edges: Number(edges) || 0 }))
+    .sort((a, b) => b.edges - a.edges || a.channel.localeCompare(b.channel));
+
+  channelAutoDetect.rows = sorted.slice(0, 4).map((item) => item.channel);
+  channelAutoDetect.columns = sorted.slice(4).map((item) => item.channel);
+  channelAutoDetect.status = elapsedMs >= 5000 ? 'ready' : 'collecting';
+  channelAutoDetect.lastUpdatedMs = Date.now();
+
+  normalizeArduinoStatePatch({ channelAutoDetect: { ...channelAutoDetect } });
+}
+
+function handleChannelActiveEvent(evt) {
+  if (!channelAutoDetect.startedAtMs) resetChannelAutoDetect();
+  if (!channelAutoDetect.edgeCounts[evt.channel]) channelAutoDetect.edgeCounts[evt.channel] = 0;
+  channelAutoDetect.edgeCounts[evt.channel]++;
+  channelAutoDetect.lastUpdatedMs = Date.now();
+  runChannelAutoDetect();
+}
+
 async function applyArduinoThrowFromMatrix(hit) {
   const value = Number(hit.points || 0);
   if (!Number.isFinite(value) || value < 0 || value > 180) return { ok: false, reason: 'invalid-points', hit };
@@ -661,7 +698,7 @@ function parseArduinoLine(line) {
 
     // Bei ACTIVE: Auto-Detect zählt mit + führt ggf. Throw aus
     if (evt.state === 'ACTIVE') {
-      handleChannelActiveEvent(evt);
+      if (typeof handleChannelActiveEvent === 'function') handleChannelActiveEvent(evt);
     } else if (evt.state === 'IDLE' && (ch === 21 || ch === 22)) {
       // CH21/CH22 IDLE = Bull-Trigger (alte Logik)
       handleArduinoTrigger(evt);
@@ -717,7 +754,7 @@ function parseArduinoLine(line) {
     // Auto-Detect nach Heartbeat ausführen
     channelAutoDetect.heartbeatCount++;
     channelAutoDetect.lastHeartbeatMs = Date.now();
-    runChannelAutoDetect();
+    if (typeof runChannelAutoDetect === 'function') runChannelAutoDetect();
     return;
   }
 
@@ -744,7 +781,9 @@ function parseArduinoLine(line) {
       lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
       pendingThrow: arduinoState.pendingThrow
     });
-    if (evt.state === 'ACTIVE') handleChannelActiveEvent(evt);
+    if (evt.state === 'ACTIVE') {
+      if (typeof handleChannelActiveEvent === 'function') handleChannelActiveEvent(evt);
+    }
     else if (evt.state === 'IDLE' && (ch === 21 || ch === 22)) handleArduinoTrigger(evt);
     return;
   }
