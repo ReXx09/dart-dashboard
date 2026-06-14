@@ -837,7 +837,7 @@ async function startArduinoMonitor() {
     arduinoParser = parser;
 
     port.on('open', () => {
-      resetChannelAutoDetect();
+      if (typeof resetChannelAutoDetect === 'function') resetChannelAutoDetect();
       normalizeArduinoStatePatch({ connected: true, port: serialPath, error: null });
     });
     parser.on('data', (line) => parseArduinoLine(line));
