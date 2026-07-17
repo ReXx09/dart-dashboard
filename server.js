@@ -380,7 +380,7 @@ function codeToPoints(code) {
   if (code == 225) return 50;
 
   const base = code % 100;
-  const multiplier = code / 100;
+  const multiplier = Math.floor(code / 100);
 
   if (base == 0) return 0;
   if (multiplier == 1) return base;
