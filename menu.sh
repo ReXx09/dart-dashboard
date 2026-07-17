@@ -78,7 +78,7 @@ arduino_menu_status() {
   port="$(get_env_value_local PUBLIC_PORT 3100)"; api_base="http://localhost:${port}"
   payload="$(curl -fsS --max-time 2 "${api_base}/api/arduino/state" 2>/dev/null || true)"
   if [[ -z "$payload" ]]; then printf '%s Arduino offline' "$(status_badge off)"; return 0; fi
-  connected="$(printf '%s' "$payload" | sed -n 's/.*"connected"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n 1)"
+  connected="$(node -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(String(!!(data.connection ? data.connection.connected : data.connected)));' <<<"$payload" 2>/dev/null)"
   if [[ "$connected" == "true" ]]; then printf '%s Arduino connected' "$(status_badge ok)"
   else printf '%s Arduino disconnected' "$(status_badge warn)"; fi
 }

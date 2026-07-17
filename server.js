@@ -289,15 +289,62 @@ function buildArduinoStateView() {
     ? Number(normalizedHit.code)
     : null;
 
-  return {
-    ...arduinoState,
-    matrixSniffer: matrixSnifferView,
-    lastHit: normalizedHit,
-    matrixHit: normalizedHit,
-    matrixHitLabel: normalizedHit ? normalizedHit.label : null,
-    matrixHitCode: normalizedHitCode,
-    matrixHitPoints: normalizedHitPoints
+  const connection = {
+    connected: !!arduinoState.connected,
+    enabled: !!arduinoState.enabled,
+    port: arduinoState.port || null,
+    baudRate: Number(arduinoState.baudRate || 115200),
+    error: arduinoState.error || null
   };
+
+  const latest = {
+    event: arduinoState.lastEvent ? { ...arduinoState.lastEvent } : null,
+    heartbeat: arduinoState.lastHeartbeat ? { ...arduinoState.lastHeartbeat } : null,
+    trigger: arduinoState.lastTrigger ? { ...arduinoState.lastTrigger } : null,
+    line: arduinoState.lastLine || '',
+    hit: normalizedHit
+  };
+
+  const matrix = {
+    sniffer: matrixSnifferView,
+    hit: normalizedHit,
+    label: normalizedHit ? normalizedHit.label : null,
+    code: normalizedHitCode,
+    points: normalizedHitPoints
+  };
+
+  const automation = {
+    pendingThrow: !!arduinoState.pendingThrow,
+    lastAutoThrow: arduinoState.lastAutoThrow || null,
+    lastMiss: arduinoState.lastMiss || null,
+    lastAutoThrowError: arduinoState.lastAutoThrowError || null,
+    channelAutoDetect: arduinoState.channelAutoDetect || null
+  };
+
+  const telemetry = {
+    activeCount: Number(arduinoState.activeCount || 0),
+    activeStateMode: arduinoState.activeStateMode,
+    activeStateResolved: arduinoState.activeStateResolved,
+    rawHistory: arduinoRawEventHistory.slice(0, 20),
+    lastUpdateMs: Number(arduinoState.lastUpdateMs || 0) || null
+  };
+
+  const lookups = {
+    dartValueByChannel: DART_VALUE_BY_CHANNEL,
+    matrixCodeByRowColumn: MATRIX_CODE_BY_ROW_COLUMN
+  };
+
+  const api = {
+    apiVersion: 2,
+    connection,
+    latest,
+    matrix,
+    automation,
+    telemetry,
+    lookups
+  };
+
+  return api;
 }
 
 function rememberArduinoLine(line) {
@@ -1154,30 +1201,9 @@ async function getLiveState() {
     },
     players: mergedPlayers,
     lastAction: saved.lastAction || null,
-    arduino: {
-      connected: !!arduinoView.connected,
-      lastEvent: arduinoView.lastEvent || null,
-      activeCount: Number(arduinoView.activeCount || 0),
-      heartbeatMs: arduinoView.lastHeartbeat ? Number(arduinoView.lastHeartbeat.ms || 0) : null,
-      rawHistory: arduinoRawEventHistory.slice(0, 20),
-      pendingThrow: !!arduinoView.pendingThrow,
-      lastTrigger: arduinoView.lastTrigger || null,
-      lastAutoThrow: arduinoView.lastAutoThrow || null,
-      lastMiss: arduinoView.lastMiss || null,
-      lastAutoThrowError: arduinoView.lastAutoThrowError || null,
-      matrixSniffer: arduinoView.matrixSniffer || null,
-      lastHit: arduinoView.lastHit || null,
-      matrixHit: arduinoView.matrixHit || null,
-      matrixHitLabel: arduinoView.matrixHitLabel || null,
-      matrixHitCode: arduinoView.matrixHitCode || null,
-      matrixHitPoints: arduinoView.matrixHitPoints || null,
-      channelAutoDetect: arduinoView.channelAutoDetect || null,
-      dartValueByChannel: DART_VALUE_BY_CHANNEL,
-      matrixCodeByRowColumn: MATRIX_CODE_BY_ROW_COLUMN
-    }
+    arduino: arduinoView
   };
 
-  await dataStore.saveLiveState(state);
   return state;
 }
 

@@ -116,7 +116,8 @@
     }
     try {
       const ard = await fetch('/api/arduino/state').then(r => r.json());
-      document.getElementById('si-ard').textContent = ard.connected ? 'Verbunden (' + (ard.port||'?') + ')' : 'Getrennt';
+      const connection = ard.connection || ard;
+      document.getElementById('si-ard').textContent = connection.connected ? 'Verbunden (' + (connection.port||'?') + ')' : 'Getrennt';
     } catch(e) { document.getElementById('si-ard').textContent = '?'; }
   }
 

@@ -185,28 +185,31 @@
 
   function renderSerial(state) {
     if (!state) return;
-    const connected = !!state.connected;
+    const connection = state.connection || state;
+    const matrix = state.matrix || {};
+    const telemetry = state.telemetry || state;
+    const connected = !!connection.connected;
     document.getElementById('serialConnection').innerHTML = '<span class="live-dot ' + (connected ? 'ok' : 'off') + '"></span>' +
-      (connected ? 'Verbunden (' + (state.port || '?') + ')' : (state.error || 'Getrennt'));
+      (connected ? 'Verbunden (' + (connection.port || '?') + ')' : (connection.error || 'Getrennt'));
 
-    const hitLabel = state.matrixHitLabel || (state.lastHit && state.lastHit.label) || '-';
+    const hitLabel = matrix.label || (matrix.hit && matrix.hit.label) || '-';
 
     const evtEl = document.getElementById('serialLastEvent');
-    if (state.lastEvent && state.lastEvent.channel) {
+    if (state.latest && state.latest.event && state.latest.event.channel) {
       evtEl.className = 'serial-value';
-      evtEl.textContent = 'CH' + state.lastEvent.channel + ' → ' + state.lastEvent.state;
+      evtEl.textContent = 'CH' + state.latest.event.channel + ' → ' + state.latest.event.state;
     } else {
       evtEl.className = 'serial-value muted';
       evtEl.textContent = '-';
     }
 
     const actEl = document.getElementById('serialActive');
-    if (state.lastHeartbeat) {
+    if (state.latest && state.latest.heartbeat) {
       actEl.className = 'serial-value';
-      actEl.textContent = state.lastHeartbeat.activeCount + ' aktiv | ' + state.lastHeartbeat.ms + 'ms | Hit ' + hitLabel;
-    } else if (state.activeCount !== null) {
+      actEl.textContent = telemetry.activeCount + ' aktiv | ' + state.latest.heartbeat.ms + 'ms | Hit ' + hitLabel;
+    } else if (telemetry.activeCount !== null) {
       actEl.className = 'serial-value';
-      actEl.textContent = state.activeCount + ' aktiv | Hit ' + hitLabel;
+      actEl.textContent = telemetry.activeCount + ' aktiv | Hit ' + hitLabel;
     } else {
       actEl.className = 'serial-value muted';
       actEl.textContent = '-';

@@ -21,6 +21,22 @@ json_number_field() {
   printf '%s' "$json" | sed -n "s/.*\"${field}\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p" | head -n 1
 }
 
+json_path_field() {
+  local json="$1" path="$2"
+  node -e '
+    const data = JSON.parse(process.argv[1]);
+    const path = process.argv[2].split(".");
+    let value = data;
+    for (const key of path) {
+      if (value == null || !Object.prototype.hasOwnProperty.call(value, key)) { value = undefined; break; }
+      value = value[key];
+    }
+    if (value === undefined || value === null) process.exit(0);
+    if (typeof value === "object") process.stdout.write(JSON.stringify(value));
+    else process.stdout.write(String(value));
+  ' "$json" "$path" 2>/dev/null
+}
+
 prompt_arduino_port() {
   local current_port="$1" value=""
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
@@ -46,13 +62,13 @@ show_arduino_status() {
     return 1
   fi
 
-  connected="$(json_bool_field "$state_json" connected)"
-  enabled="$(json_bool_field "$state_json" enabled)"
-  port="$(json_string_field "$state_json" port)"
-  baud="$(json_number_field "$state_json" baudRate)"
-  error="$(json_string_field "$state_json" error)"
-  active_count="$(json_number_field "$state_json" activeCount)"
-  last_line="$(json_string_field "$state_json" lastLine)"
+  connected="$(json_path_field "$state_json" connection.connected)"
+  enabled="$(json_path_field "$state_json" connection.enabled)"
+  port="$(json_path_field "$state_json" connection.port)"
+  baud="$(json_path_field "$state_json" connection.baudRate)"
+  error="$(json_path_field "$state_json" connection.error)"
+  active_count="$(json_path_field "$state_json" telemetry.activeCount)"
+  last_line="$(json_path_field "$state_json" latest.line)"
 
   [[ -z "$enabled" ]] && enabled='false'
   [[ -z "$connected" ]] && connected='false'
@@ -144,7 +160,7 @@ run_health_checks() {
   local arduino_info
   arduino_info="$(curl -fsS --max-time 3 "${api_base}/api/arduino/state" 2>/dev/null || true)"
   if [[ -n "$arduino_info" ]]; then
-    local connected; connected="$(json_bool_field "$arduino_info" connected)"
+    local connected; connected="$(json_path_field "$arduino_info" connection.connected)"
     if [[ "$connected" == "true" ]]; then
       report+="[OK] Arduino verbunden\n"
     else

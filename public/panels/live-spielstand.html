@@ -227,7 +227,7 @@
     function describeMatrixHit(hit) {
       if (!hit) return '-';
       const parts = [hit.row || '-', hit.column || '-'];
-      if (typeof hit.points === 'number') parts.push(String(hit.points) + ' P');
+      if (typeof hit.points === 'number') parts.push('Wert ' + String(hit.points));
       if (typeof hit.code === 'number' && hit.code > 0) parts.push('Code ' + hit.code);
       if (hit.label) parts.push(hit.label);
       return parts.join(' | ');
@@ -250,11 +250,14 @@
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const state = await r.json();
         const el = document.getElementById('arduinoState');
-        const hitLabel = state.matrixHitLabel || (state.lastHit && state.lastHit.label) || '-';
-        if (state.connected) {
-          el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0) + ' | Hit ' + hitLabel;
+        const connection = state.connection || state;
+        const matrix = state.matrix || {};
+        const telemetry = state.telemetry || state;
+        const hitLabel = matrix.label || (matrix.hit && matrix.hit.label) || '-';
+        if (connection.connected) {
+          el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (telemetry.activeCount || 0) + ' | Hit ' + hitLabel;
         } else {
-          el.innerHTML = '<span class="arduino-dot off"></span>' + (state.error || 'Nicht verbunden');
+          el.innerHTML = '<span class="arduino-dot off"></span>' + (connection.error || 'Nicht verbunden');
         }
       } catch { /* still zeigen was im live-state steht */ }
     }
@@ -265,11 +268,14 @@
         try {
           const state = JSON.parse(evt.data);
           const el = document.getElementById('arduinoState');
-          const hitLabel = state.matrixHitLabel || (state.lastHit && state.lastHit.label) || '-';
-          if (state.connected) {
-            el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0) + ' | Hit ' + hitLabel
+          const connection = state.connection || state;
+          const matrix = state.matrix || {};
+          const telemetry = state.telemetry || state;
+          const hitLabel = matrix.label || (matrix.hit && matrix.hit.label) || '-';
+          if (connection.connected) {
+            el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (telemetry.activeCount || 0) + ' | Hit ' + hitLabel
           } else {
-            el.innerHTML = '<span class="arduino-dot off"></span>' + (state.error || 'Nicht verbunden')
+            el.innerHTML = '<span class="arduino-dot off"></span>' + (connection.error || 'Nicht verbunden')
           }
         } catch(e) {}
       });
@@ -346,15 +352,18 @@
         return '<button class="btn-pts' + (isActive ? ' active-player' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '" onclick="applyPreset(' + p.slot + ', ' + Number(manualPoints.value || 60) + ')">P' + p.slot + ' ' + escapeHtml(p.name) + '</button>';
       }).join('');
       const arduino = state.arduino || {};
-      document.getElementById('arduinoState').innerHTML = arduino.connected
-        ? '<span class="arduino-dot on"></span>Verbunden | active=' + (arduino.activeCount || 0)
+      const connection = arduino.connection || arduino;
+      const matrix = arduino.matrix || {};
+      const telemetry = arduino.telemetry || arduino;
+      const automation = arduino.automation || arduino;
+      document.getElementById('arduinoState').innerHTML = connection.connected
+        ? '<span class="arduino-dot on"></span>Verbunden | active=' + (telemetry.activeCount || 0)
         : '<span class="arduino-dot off"></span>Nicht verbunden';
-      const matrixHit = arduino.matrixSniffer || null;
-      document.getElementById('matrixHitState').textContent = describeMatrixHit(matrixHit);
-      document.getElementById('autoThrowState').textContent = describeAutoThrow(arduino.lastAutoThrow || null);
+      document.getElementById('matrixHitState').textContent = describeMatrixHit(matrix.hit || matrix.sniffer || null);
+      document.getElementById('autoThrowState').textContent = describeAutoThrow(automation.lastAutoThrow || null);
       const action = state.lastAction;
       document.getElementById('lastAction').innerHTML = action
-        ? escapeHtml(action.player || '-') + ' → ' + (action.points || '-') + (action.source ? ' [' + action.source + ']' : '') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
+        ? escapeHtml(action.player || '-') + ' → ' + (action.points ?? '-') + (action.source ? ' [' + action.source + ']' : '') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
         : 'Keine Aktion';
     }
     function renderCricketView(p, state) {

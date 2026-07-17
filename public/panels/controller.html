@@ -119,7 +119,7 @@
     function describeMatrixHit(hit) {
       if (!hit) return '-';
       const parts = [hit.row || '-', hit.column || '-'];
-      if (typeof hit.points === 'number') parts.push(String(hit.points) + ' P');
+      if (typeof hit.points === 'number') parts.push('Wert ' + String(hit.points));
       if (typeof hit.code === 'number' && hit.code > 0) parts.push('Code ' + hit.code);
       return parts.join(' | ');
     }
@@ -135,12 +135,18 @@
     }
 
     function renderArduinoState(state) {
+      const connection = state.connection || state;
+      const latest = state.latest || {};
+      const matrix = state.matrix || {};
+      const telemetry = state.telemetry || state;
+      const automation = state.automation || state;
+
       const el = document.getElementById('ctrlArduino');
-      el.innerHTML = state.connected
-        ? '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0)
+      el.innerHTML = connection.connected
+        ? '<span class="arduino-dot on"></span>Verbunden | active=' + (telemetry.activeCount || 0)
         : '<span class="arduino-dot off"></span>Nicht verbunden';
 
-      const evt = state.lastEvent || null;
+      const evt = latest.event || null;
       if (evt && evt.kind) {
         document.getElementById('ctrlArduinoEvent').textContent = evt.kind + evt.index + ' -> ' + evt.state;
       } else if (evt && evt.channel) {
@@ -152,14 +158,14 @@
       const value = evt && evt.channel && evt.state === 'ACTIVE' ? dartValueFromChannel(evt.channel) : '-';
       document.getElementById('ctrlDartValue').textContent = value;
 
-      document.getElementById('ctrlActiveContacts').textContent = (state.activeCount || 0) + ' aktiv';
-      document.getElementById('ctrlHeartbeat').textContent = state.lastHeartbeat ? state.lastHeartbeat.ms + ' ms' : '-';
-      document.getElementById('ctrlPort').textContent = state.port || '-';
-      document.getElementById('ctrlBaud').textContent = state.baudRate || '-';
-      document.getElementById('ctrlMatrixHit').textContent = describeMatrixHit(state.lastHit || state.matrixHit || (state.matrixSniffer && state.matrixSniffer.lastMatrixHit ? state.matrixSniffer.lastMatrixHit : null));
-      document.getElementById('ctrlAutoThrow').textContent = describeAutoThrow(state.lastAutoThrow || null);
-      document.getElementById('ctrlActiveStateMode').textContent = (state.activeStateMode || '-') + ' / ' + (state.activeStateResolved || '-');
-      document.getElementById('ctrlLastLine').textContent = 'Letzte serielle Zeile: ' + (state.lastLine || '-');
+      document.getElementById('ctrlActiveContacts').textContent = (telemetry.activeCount || 0) + ' aktiv';
+      document.getElementById('ctrlHeartbeat').textContent = latest.heartbeat ? latest.heartbeat.ms + ' ms' : '-';
+      document.getElementById('ctrlPort').textContent = connection.port || '-';
+      document.getElementById('ctrlBaud').textContent = connection.baudRate || '-';
+      document.getElementById('ctrlMatrixHit').textContent = describeMatrixHit(matrix.hit || state.lastHit || null);
+      document.getElementById('ctrlAutoThrow').textContent = describeAutoThrow(automation.lastAutoThrow || null);
+      document.getElementById('ctrlActiveStateMode').textContent = (telemetry.activeStateMode || '-') + ' / ' + (telemetry.activeStateResolved || '-');
+      document.getElementById('ctrlLastLine').textContent = 'Letzte serielle Zeile: ' + (latest.line || state.lastLine || '-');
     }
 
     function dartValueFromChannel(channel) {
