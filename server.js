@@ -282,6 +282,12 @@ function buildArduinoStateView() {
   const matrixHit = summarizeMatrixHit(matrixSniffer.lastMatrixHit);
   const autoThrowHit = summarizeMatrixHit(arduinoState.lastAutoThrow && arduinoState.lastAutoThrow.hit ? arduinoState.lastAutoThrow.hit : null);
   const normalizedHit = autoThrowHit || matrixHit;
+  const normalizedHitPoints = normalizedHit && Number.isFinite(Number(normalizedHit.points))
+    ? Number(normalizedHit.points)
+    : null;
+  const normalizedHitCode = normalizedHit && Number.isFinite(Number(normalizedHit.code))
+    ? Number(normalizedHit.code)
+    : null;
 
   return {
     ...arduinoState,
@@ -289,8 +295,8 @@ function buildArduinoStateView() {
     lastHit: normalizedHit,
     matrixHit: normalizedHit,
     matrixHitLabel: normalizedHit ? normalizedHit.label : null,
-    matrixHitCode: normalizedHit ? normalizedHit.code : null,
-    matrixHitPoints: normalizedHit ? normalizedHit.points : null
+    matrixHitCode: normalizedHitCode,
+    matrixHitPoints: normalizedHitPoints
   };
 }
 
