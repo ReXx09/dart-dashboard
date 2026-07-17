@@ -155,7 +155,10 @@
         document.getElementById('ctrlArduinoEvent').textContent = '-';
       }
 
-      const value = evt && evt.channel && evt.state === 'ACTIVE' ? dartValueFromChannel(evt.channel) : '-';
+      const matrixHit = matrix.hit || null;
+      const matrixValue = matrixHit && typeof matrixHit.points === 'number' ? matrixHit.points : null;
+      const channelValue = evt && evt.channel && evt.state === 'ACTIVE' ? dartValueFromChannel(evt.channel) : null;
+      const value = matrixValue != null ? String(matrixValue) : (channelValue != null ? channelValue : '-');
       document.getElementById('ctrlDartValue').textContent = value;
 
       document.getElementById('ctrlActiveContacts').textContent = (telemetry.activeCount || 0) + ' aktiv';

@@ -16,3 +16,4 @@ services:
       - PORT=3000
       - SERVER_IP=${SERVER_IP:-}
       - ARDUINO_REQUIRE_THROW_TRIGGER=false
+      - ARDUINO_AUTO_THROW_MATRIX_ENABLED=true
