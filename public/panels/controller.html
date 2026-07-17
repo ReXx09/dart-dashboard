@@ -40,7 +40,7 @@
     .input-row .pts.danger:hover { background: #e6394622; }
     .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
     .arduino-status { font-size: .78rem; color: #666; line-height: 1.5; }
-    .arduino-monitor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+    .arduino-monitor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
     .arduino-monitor-grid div { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 9px 10px; }
     .arduino-monitor-grid span { display: block; font-size: .66rem; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
     .arduino-monitor-grid strong { display: block; font-size: .82rem; color: #ddd; font-variant-numeric: tabular-nums; }
@@ -103,6 +103,9 @@
         <div><span>Heartbeat</span><strong id="ctrlHeartbeat">-</strong></div>
         <div><span>Port</span><strong id="ctrlPort">-</strong></div>
         <div><span>Baudrate</span><strong id="ctrlBaud">-</strong></div>
+        <div><span>Matrix-Hit</span><strong id="ctrlMatrixHit">-</strong></div>
+        <div><span>Auto-Wurf</span><strong id="ctrlAutoThrow">-</strong></div>
+        <div><span>Aktiv-Logik</span><strong id="ctrlActiveStateMode">-</strong></div>
       </div>
       <div class="arduino-last-line" id="ctrlLastLine">Letzte serielle Zeile: -</div>
     </div>
@@ -113,6 +116,24 @@
     const ctrlPoints = document.getElementById('ctrlPoints');
     const ctrlThrowBtn = document.getElementById('ctrlThrowBtn');
 
+    function describeMatrixHit(hit) {
+      if (!hit) return '-';
+      const parts = [hit.row || '-', hit.column || '-'];
+      if (typeof hit.points === 'number') parts.push(String(hit.points) + ' P');
+      if (typeof hit.code === 'number' && hit.code > 0) parts.push('Code ' + hit.code);
+      return parts.join(' | ');
+    }
+
+    function describeAutoThrow(result) {
+      if (!result) return '-';
+      if (result.ok === false) return 'Fehler: ' + (result.reason || 'unbekannt');
+      const parts = [];
+      if (typeof result.value === 'number') parts.push(result.value + ' P');
+      if (result.player) parts.push(result.player);
+      if (result.hit && result.hit.row && result.hit.column) parts.push(result.hit.row + '/' + result.hit.column);
+      return parts.join(' | ') || '-';
+    }
+
     function renderArduinoState(state) {
       const el = document.getElementById('ctrlArduino');
       el.innerHTML = state.connected
@@ -120,15 +141,24 @@
         : '<span class="arduino-dot off"></span>Nicht verbunden';
 
       const evt = state.lastEvent || null;
-      document.getElementById('ctrlArduinoEvent').textContent = evt ? 'CH' + evt.channel + ' -> ' + evt.state : '-';
+      if (evt && evt.kind) {
+        document.getElementById('ctrlArduinoEvent').textContent = evt.kind + evt.index + ' -> ' + evt.state;
+      } else if (evt && evt.channel) {
+        document.getElementById('ctrlArduinoEvent').textContent = 'CH' + evt.channel + ' -> ' + evt.state;
+      } else {
+        document.getElementById('ctrlArduinoEvent').textContent = '-';
+      }
 
-      const value = evt && evt.state === 'ACTIVE' ? dartValueFromChannel(evt.channel) : '-';
+      const value = evt && evt.channel && evt.state === 'ACTIVE' ? dartValueFromChannel(evt.channel) : '-';
       document.getElementById('ctrlDartValue').textContent = value;
 
       document.getElementById('ctrlActiveContacts').textContent = (state.activeCount || 0) + ' aktiv';
       document.getElementById('ctrlHeartbeat').textContent = state.lastHeartbeat ? state.lastHeartbeat.ms + ' ms' : '-';
       document.getElementById('ctrlPort').textContent = state.port || '-';
       document.getElementById('ctrlBaud').textContent = state.baudRate || '-';
+      document.getElementById('ctrlMatrixHit').textContent = describeMatrixHit(state.lastHit || state.matrixHit || (state.matrixSniffer && state.matrixSniffer.lastMatrixHit ? state.matrixSniffer.lastMatrixHit : null));
+      document.getElementById('ctrlAutoThrow').textContent = describeAutoThrow(state.lastAutoThrow || null);
+      document.getElementById('ctrlActiveStateMode').textContent = (state.activeStateMode || '-') + ' / ' + (state.activeStateResolved || '-');
       document.getElementById('ctrlLastLine').textContent = 'Letzte serielle Zeile: ' + (state.lastLine || '-');
     }
 

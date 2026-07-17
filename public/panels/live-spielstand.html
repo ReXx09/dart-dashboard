@@ -126,7 +126,7 @@
     .btn-pts.active-player { border-color: var(--pc, #e63946); }
     .points-input { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 8px 10px; border-radius: 8px; width: 80px; font-size: .9rem; font-family: inherit; text-align: center; }
     .points-input:focus { border-color: #e63946; outline: none; }
-    .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .status-panel { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 12px; }
     .status-panel h4 { font-size: .68rem; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
     .status-panel .value { font-size: .85rem; color: #ddd; font-family: Consolas, monospace; }
@@ -197,6 +197,14 @@
         <div class="value" id="arduinoState"><span class="arduino-dot off"></span>Nicht verbunden</div>
       </div>
       <div class="status-panel">
+        <h4>Matrix-Hit</h4>
+        <div class="value muted" id="matrixHitState">-</div>
+      </div>
+      <div class="status-panel">
+        <h4>Auto-Wurf</h4>
+        <div class="value muted" id="autoThrowState">-</div>
+      </div>
+      <div class="status-panel">
         <h4>Letzte Aktion</h4>
         <div class="value muted" id="lastAction">Keine Aktion</div>
       </div>
@@ -216,6 +224,24 @@
 
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function describeMatrixHit(hit) {
+      if (!hit) return '-';
+      const parts = [hit.row || '-', hit.column || '-'];
+      if (typeof hit.points === 'number') parts.push(String(hit.points) + ' P');
+      if (typeof hit.code === 'number' && hit.code > 0) parts.push('Code ' + hit.code);
+      if (hit.label) parts.push(hit.label);
+      return parts.join(' | ');
+    }
+    function describeAutoThrow(result) {
+      if (!result) return '-';
+      if (result.ok === false) return 'Fehler: ' + (result.reason || 'unbekannt');
+      const pieces = [];
+      if (typeof result.value === 'number') pieces.push(result.value + ' P');
+      if (result.player) pieces.push(result.player);
+      if (result.hit && result.hit.row && result.hit.column) pieces.push(result.hit.row + '/' + result.hit.column);
+      if (result.channel) pieces.push('CH' + result.channel);
+      return pieces.join(' | ') || '-';
+    }
 
     // ── Arduino-Direktstatus von /api/arduino/state (unabhängig vom Live-State) ──
     async function refreshArduinoStatus() {
@@ -224,8 +250,9 @@
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const state = await r.json();
         const el = document.getElementById('arduinoState');
+        const hitLabel = state.matrixHitLabel || (state.lastHit && state.lastHit.label) || '-';
         if (state.connected) {
-          el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0);
+          el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0) + ' | Hit ' + hitLabel;
         } else {
           el.innerHTML = '<span class="arduino-dot off"></span>' + (state.error || 'Nicht verbunden');
         }
@@ -238,8 +265,9 @@
         try {
           const state = JSON.parse(evt.data);
           const el = document.getElementById('arduinoState');
+          const hitLabel = state.matrixHitLabel || (state.lastHit && state.lastHit.label) || '-';
           if (state.connected) {
-            el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0)
+            el.innerHTML = '<span class="arduino-dot on"></span>Verbunden | active=' + (state.activeCount || 0) + ' | Hit ' + hitLabel
           } else {
             el.innerHTML = '<span class="arduino-dot off"></span>' + (state.error || 'Nicht verbunden')
           }
@@ -321,9 +349,12 @@
       document.getElementById('arduinoState').innerHTML = arduino.connected
         ? '<span class="arduino-dot on"></span>Verbunden | active=' + (arduino.activeCount || 0)
         : '<span class="arduino-dot off"></span>Nicht verbunden';
+      const matrixHit = arduino.matrixSniffer || null;
+      document.getElementById('matrixHitState').textContent = describeMatrixHit(matrixHit);
+      document.getElementById('autoThrowState').textContent = describeAutoThrow(arduino.lastAutoThrow || null);
       const action = state.lastAction;
       document.getElementById('lastAction').innerHTML = action
-        ? escapeHtml(action.player) + ' → ' + (action.points || '-') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
+        ? escapeHtml(action.player || '-') + ' → ' + (action.points || '-') + (action.source ? ' [' + action.source + ']' : '') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
         : 'Keine Aktion';
     }
     function renderCricketView(p, state) {

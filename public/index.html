@@ -189,6 +189,8 @@
     document.getElementById('serialConnection').innerHTML = '<span class="live-dot ' + (connected ? 'ok' : 'off') + '"></span>' +
       (connected ? 'Verbunden (' + (state.port || '?') + ')' : (state.error || 'Getrennt'));
 
+    const hitLabel = state.matrixHitLabel || (state.lastHit && state.lastHit.label) || '-';
+
     const evtEl = document.getElementById('serialLastEvent');
     if (state.lastEvent && state.lastEvent.channel) {
       evtEl.className = 'serial-value';
@@ -201,10 +203,10 @@
     const actEl = document.getElementById('serialActive');
     if (state.lastHeartbeat) {
       actEl.className = 'serial-value';
-      actEl.textContent = state.lastHeartbeat.activeCount + ' aktiv | ' + state.lastHeartbeat.ms + 'ms';
+      actEl.textContent = state.lastHeartbeat.activeCount + ' aktiv | ' + state.lastHeartbeat.ms + 'ms | Hit ' + hitLabel;
     } else if (state.activeCount !== null) {
       actEl.className = 'serial-value';
-      actEl.textContent = state.activeCount + ' aktiv';
+      actEl.textContent = state.activeCount + ' aktiv | Hit ' + hitLabel;
     } else {
       actEl.className = 'serial-value muted';
       actEl.textContent = '-';

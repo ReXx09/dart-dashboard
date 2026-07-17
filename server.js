@@ -95,6 +95,10 @@ const ARDUINO_AUTO_THROW_ENABLED = process.env.ARDUINO_AUTO_THROW_ENABLED !== 'f
 const ARDUINO_AUTO_THROW_MATRIX_ENABLED = process.env.ARDUINO_AUTO_THROW_MATRIX_ENABLED === 'true';
 const ARDUINO_AUTO_THROW_MATRIX_UNMAPPED = process.env.ARDUINO_AUTO_THROW_MATRIX_UNMAPPED === 'true';
 const ARDUINO_REQUIRE_THROW_TRIGGER = process.env.ARDUINO_REQUIRE_THROW_TRIGGER !== 'false';
+const ARDUINO_EVENT_ACTIVE_STATE_MODE_RAW = String(process.env.ARDUINO_EVENT_ACTIVE_STATE || 'AUTO').trim().toUpperCase();
+const ARDUINO_EVENT_ACTIVE_STATE_MODE = ['ACTIVE', 'IDLE', 'AUTO'].includes(ARDUINO_EVENT_ACTIVE_STATE_MODE_RAW)
+  ? ARDUINO_EVENT_ACTIVE_STATE_MODE_RAW
+  : 'AUTO';
 const ARDUINO_THROW_WINDOW_MS = Number(process.env.ARDUINO_THROW_WINDOW_MS || 1200);
 const MATRIX_HIT_RELEASE_MS = Number(process.env.MATRIX_HIT_RELEASE_MS || 25);
 const MATRIX_HIT_REFRACTORY_MS = Number(process.env.MATRIX_HIT_REFRACTORY_MS || 350);
@@ -162,6 +166,7 @@ const arduinoSseClients = new Set();
 let arduinoPort = null;
 let arduinoParser = null;
 let arduinoReconnectTimer = null;
+let arduinoResolvedActiveState = ARDUINO_EVENT_ACTIVE_STATE_MODE === 'AUTO' ? 'ACTIVE' : ARDUINO_EVENT_ACTIVE_STATE_MODE;
 let pendingArduinoThrow = null;
 let pendingArduinoThrowTimer = null;
 let arduinoThrowLockUntil = 0;
@@ -205,11 +210,36 @@ const arduinoState = {
   lastUpdateMs: null,
   rawHistory: [],
   error: null,
-  channelAutoDetect: null
+  channelAutoDetect: null,
+  activeStateMode: ARDUINO_EVENT_ACTIVE_STATE_MODE,
+  activeStateResolved: arduinoResolvedActiveState
 };
 
+function isArduinoActiveState(state) {
+  const normalized = String(state || '').trim().toUpperCase();
+  return normalized === arduinoResolvedActiveState;
+}
+
+function maybeInferArduinoActiveState(activeCount, totalSignals = 20) {
+  if (ARDUINO_EVENT_ACTIVE_STATE_MODE !== 'AUTO') return;
+  const active = Number(activeCount);
+  const total = Number(totalSignals);
+  if (!Number.isFinite(active) || !Number.isFinite(total) || total <= 0) return;
+
+  // Wenn im Heartbeat die Mehrheit als ACTIVE gemeldet wird, ist das meist der Ruhepegel.
+  // Dann ist fuer Treffer-Impulse die Gegenphase (IDLE) die interessantere Aktivphase.
+  const inferred = active > (total / 2) ? 'IDLE' : 'ACTIVE';
+  if (inferred === arduinoResolvedActiveState) return;
+
+  arduinoResolvedActiveState = inferred;
+  normalizeArduinoStatePatch({
+    activeStateMode: ARDUINO_EVENT_ACTIVE_STATE_MODE,
+    activeStateResolved: arduinoResolvedActiveState
+  });
+}
+
 function broadcastArduinoState() {
-  const payload = JSON.stringify(arduinoState);
+  const payload = JSON.stringify(buildArduinoStateView());
   arduinoSseClients.forEach((res) => {
     try { res.write(`event: state\ndata: ${payload}\n\n`); }
     catch { arduinoSseClients.delete(res); }
@@ -219,6 +249,49 @@ function broadcastArduinoState() {
 function normalizeArduinoStatePatch(patch) {
   Object.assign(arduinoState, patch, { lastUpdateMs: Date.now() });
   broadcastArduinoState();
+}
+
+function summarizeMatrixHit(hit) {
+  if (!hit) return null;
+
+  const row = hit.row != null ? String(hit.row) : null;
+  const column = hit.column != null ? String(hit.column) : null;
+  const key = hit.key || (row && column ? `${row},${column}` : null);
+  const code = Number(hit.code);
+  const points = Number(hit.points);
+  const ms = Number(hit.ms);
+  const ts = Number(hit.ts);
+
+  return {
+    row,
+    column,
+    key,
+    code: Number.isFinite(code) ? code : null,
+    points: Number.isFinite(points) ? points : null,
+    mapped: !!hit.mapped,
+    ms: Number.isFinite(ms) ? ms : null,
+    ts: Number.isFinite(ts) ? ts : null,
+    line: String(hit.line || ''),
+    source: String(hit.source || 'arduino-matrix'),
+    label: row && column ? `${row}/${column}` : row || column || '-'
+  };
+}
+
+function buildArduinoStateView() {
+  const matrixSnifferView = arduinoState.matrixSniffer ? { ...arduinoState.matrixSniffer } : null;
+  const matrixHit = summarizeMatrixHit(matrixSniffer.lastMatrixHit);
+  const autoThrowHit = summarizeMatrixHit(arduinoState.lastAutoThrow && arduinoState.lastAutoThrow.hit ? arduinoState.lastAutoThrow.hit : null);
+  const normalizedHit = autoThrowHit || matrixHit;
+
+  return {
+    ...arduinoState,
+    matrixSniffer: matrixSnifferView,
+    lastHit: normalizedHit,
+    matrixHit: normalizedHit,
+    matrixHitLabel: normalizedHit ? normalizedHit.label : null,
+    matrixHitCode: normalizedHit ? normalizedHit.code : null,
+    matrixHitPoints: normalizedHit ? normalizedHit.points : null
+  };
 }
 
 function rememberArduinoLine(line) {
@@ -690,17 +763,19 @@ function parseArduinoLine(line) {
     const chStr = String(ch).padStart(2, '0');
     const state = evtMatch[3].toUpperCase();
     const evt = { ms: Number(evtMatch[1]), channel: chStr, state, line: clean };
+    const isActiveEvent = isArduinoActiveState(evt.state);
     normalizeArduinoStatePatch({
       lastEvent: { ...evt },
-      lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
+      lastTrigger: isActiveEvent ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
       pendingThrow: arduinoState.pendingThrow
     });
 
-    // Bei ACTIVE: Auto-Detect zählt mit + führt ggf. Throw aus
-    if (evt.state === 'ACTIVE') {
+    // Bei aktiver Phase: Auto-Detect zählt mit + fuehrt ggf. Throw aus.
+    if (isActiveEvent) {
       if (typeof handleChannelActiveEvent === 'function') handleChannelActiveEvent(evt);
-    } else if (evt.state === 'IDLE' && (ch === 21 || ch === 22)) {
-      // CH21/CH22 IDLE = Bull-Trigger (alte Logik)
+      handleArduinoActiveEvent(evt);
+    } else if (ch === 21 || ch === 22) {
+      // CH21/CH22 in Gegenphase = Trigger (alte Bull-Logik, aber polaritaetsrobust)
       handleArduinoTrigger(evt);
     }
     return;
@@ -711,19 +786,20 @@ function parseArduinoLine(line) {
   if (matrixEvtMatch) {
     const kind = matrixEvtMatch[2].toUpperCase();
     const index = Number(matrixEvtMatch[3]);
-    const active = matrixEvtMatch[4].toUpperCase() === 'ACTIVE';
+    const state = matrixEvtMatch[4].toUpperCase();
+    const active = isArduinoActiveState(state);
     const evt = { ms: Number(matrixEvtMatch[1]), kind, index, state: matrixEvtMatch[4].toUpperCase(), line: clean };
     normalizeArduinoStatePatch({
       lastEvent: { ...evt },
-      lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
+      lastTrigger: active ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
       matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
     });
     updateMatrixSnifferState(kind === 'R' ? index : null, kind === 'C' ? index : null, active, evt);
     return;
   }
 
-  // HIT,<ms>,R#,C#,CODE,POINTS (alter Sniffer, falls Arduino doch sendet)
-  const hitMatch = clean.match(/^HIT,(\d+),R(\d+),C(\d+),(-?\d+),(-?\d+)$/i);
+  // HIT/MATRIX,<ms>,R#,C#,CODE,POINTS (passiver Matrix-Sniffer)
+  const hitMatch = clean.match(/^(?:HIT|MATRIX),(\d+),R(\d+),C(\d+),(-?\d+),(-?\d+)$/i);
   if (hitMatch) {
     const hit = {
       ms: Number(hitMatch[1]),
@@ -746,10 +822,14 @@ function parseArduinoLine(line) {
   // HB,<ms>,active=<n>  (neuer 20CH-Sniffer + alter einfacher HB)
   const hbMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
   if (hbMatch) {
+    const activeCount = Number(hbMatch[2]);
+    maybeInferArduinoActiveState(activeCount, 20);
     normalizeArduinoStatePatch({
-      activeCount: Number(hbMatch[2]),
-      lastHeartbeat: { ms: Number(hbMatch[1]), activeCount: Number(hbMatch[2]), line: clean },
-      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
+      activeCount,
+      lastHeartbeat: { ms: Number(hbMatch[1]), activeCount, line: clean },
+      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit },
+      activeStateMode: ARDUINO_EVENT_ACTIVE_STATE_MODE,
+      activeStateResolved: arduinoResolvedActiveState
     });
     // Auto-Detect nach Heartbeat ausführen
     channelAutoDetect.heartbeatCount++;
@@ -761,10 +841,16 @@ function parseArduinoLine(line) {
   // HB,<ms>,rows=...,columns=...,active=... (alter R/C-Sniffer)
   const hbRcMatch = clean.match(/^HB,(\d+),rows=(\d+),columns=(\d+),active=(\d+)$/i);
   if (hbRcMatch) {
+    const rows = Number(hbRcMatch[2]);
+    const columns = Number(hbRcMatch[3]);
+    const activeCount = Number(hbRcMatch[4]);
+    maybeInferArduinoActiveState(activeCount, Math.max(1, rows + columns));
     normalizeArduinoStatePatch({
-      activeCount: Number(hbRcMatch[4]),
-      lastHeartbeat: { ms: Number(hbRcMatch[1]), rows: Number(hbRcMatch[2]), columns: Number(hbRcMatch[3]), activeCount: Number(hbRcMatch[4]), line: clean },
-      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
+      activeCount,
+      lastHeartbeat: { ms: Number(hbRcMatch[1]), rows, columns, activeCount, line: clean },
+      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit },
+      activeStateMode: ARDUINO_EVENT_ACTIVE_STATE_MODE,
+      activeStateResolved: arduinoResolvedActiveState
     });
     return;
   }
@@ -776,15 +862,17 @@ function parseArduinoLine(line) {
     const chStr = String(ch).padStart(2, '0');
     const state = legacyEvent[2].toUpperCase();
     const evt = { ms: null, channel: chStr, state, line: clean };
+    const isActiveEvent = isArduinoActiveState(evt.state);
     normalizeArduinoStatePatch({
       lastEvent: { ...evt },
-      lastTrigger: evt.state === 'ACTIVE' ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
+      lastTrigger: isActiveEvent ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
       pendingThrow: arduinoState.pendingThrow
     });
-    if (evt.state === 'ACTIVE') {
+    if (isActiveEvent) {
       if (typeof handleChannelActiveEvent === 'function') handleChannelActiveEvent(evt);
+      handleArduinoActiveEvent(evt);
     }
-    else if (evt.state === 'IDLE' && (ch === 21 || ch === 22)) handleArduinoTrigger(evt);
+    else if (ch === 21 || ch === 22) handleArduinoTrigger(evt);
     return;
   }
 
@@ -1031,6 +1119,7 @@ async function getLiveState() {
   const mode = savedLiveMode || DEFAULT_MODE;
   const fallback = await defaultLiveState(mode);
   const saved = await dataStore.getLiveState(fallback);
+  const arduinoView = buildArduinoStateView();
   const activePlayers = fallback.players;
   const savedMode = String(saved.game?.mode || '');
   if (GAME_MODES[savedMode]) savedLiveMode = savedMode;
@@ -1060,18 +1149,23 @@ async function getLiveState() {
     players: mergedPlayers,
     lastAction: saved.lastAction || null,
     arduino: {
-      connected: !!arduinoState.connected,
-      lastEvent: arduinoState.lastEvent || null,
-      activeCount: Number(arduinoState.activeCount || 0),
-      heartbeatMs: arduinoState.lastHeartbeat ? Number(arduinoState.lastHeartbeat.ms || 0) : null,
+      connected: !!arduinoView.connected,
+      lastEvent: arduinoView.lastEvent || null,
+      activeCount: Number(arduinoView.activeCount || 0),
+      heartbeatMs: arduinoView.lastHeartbeat ? Number(arduinoView.lastHeartbeat.ms || 0) : null,
       rawHistory: arduinoRawEventHistory.slice(0, 20),
-      pendingThrow: !!arduinoState.pendingThrow,
-      lastTrigger: arduinoState.lastTrigger || null,
-      lastAutoThrow: arduinoState.lastAutoThrow || null,
-      lastMiss: arduinoState.lastMiss || null,
-      lastAutoThrowError: arduinoState.lastAutoThrowError || null,
-      matrixSniffer: matrixSniffer.lastMatrixHit || null,
-      channelAutoDetect: arduinoState.channelAutoDetect || null,
+      pendingThrow: !!arduinoView.pendingThrow,
+      lastTrigger: arduinoView.lastTrigger || null,
+      lastAutoThrow: arduinoView.lastAutoThrow || null,
+      lastMiss: arduinoView.lastMiss || null,
+      lastAutoThrowError: arduinoView.lastAutoThrowError || null,
+      matrixSniffer: arduinoView.matrixSniffer || null,
+      lastHit: arduinoView.lastHit || null,
+      matrixHit: arduinoView.matrixHit || null,
+      matrixHitLabel: arduinoView.matrixHitLabel || null,
+      matrixHitCode: arduinoView.matrixHitCode || null,
+      matrixHitPoints: arduinoView.matrixHitPoints || null,
+      channelAutoDetect: arduinoView.channelAutoDetect || null,
       dartValueByChannel: DART_VALUE_BY_CHANNEL,
       matrixCodeByRowColumn: MATRIX_CODE_BY_ROW_COLUMN
     }
@@ -1175,14 +1269,14 @@ app.get('/api/events', (req, res) => {
 });
 
 // ── Arduino ──
-app.get('/api/arduino/state', (_req, res) => { res.json(arduinoState); });
+app.get('/api/arduino/state', (_req, res) => { res.json(buildArduinoStateView()); });
 
 app.post('/api/arduino/connect', (req, res) => {
   const currentSettings = getSettings();
   const requestedPort = typeof req.body?.port === 'string' ? req.body.port.trim() : '';
   saveSettings({ ...currentSettings, arduinoMonitorEnabled: true, arduinoPort: requestedPort });
   restartArduinoMonitor();
-  res.json({ ok: true, requestedPort: requestedPort || '', state: arduinoState });
+  res.json({ ok: true, requestedPort: requestedPort || '', state: buildArduinoStateView() });
 });
 
 app.post('/api/arduino/disconnect', (_req, res) => {
@@ -1190,7 +1284,7 @@ app.post('/api/arduino/disconnect', (_req, res) => {
   saveSettings({ ...currentSettings, arduinoMonitorEnabled: false });
   closeArduinoMonitor();
   normalizeArduinoStatePatch({ enabled: false, error: 'Arduino-Monitor deaktiviert.' });
-  res.json({ ok: true, state: arduinoState });
+  res.json({ ok: true, state: buildArduinoStateView() });
 });
 
 app.get('/api/arduino/events', (req, res) => {
@@ -1198,7 +1292,7 @@ app.get('/api/arduino/events', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
-  res.write('event: state\ndata: ' + JSON.stringify(arduinoState) + '\n\n');
+  res.write('event: state\ndata: ' + JSON.stringify(buildArduinoStateView()) + '\n\n');
   arduinoSseClients.add(res);
   const ka = setInterval(() => { try { res.write(':ka\n\n'); } catch { clearInterval(ka); arduinoSseClients.delete(res); } }, 25000);
   req.on('close', () => { clearInterval(ka); arduinoSseClients.delete(res); });
