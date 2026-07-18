@@ -118,6 +118,7 @@
       <h3>Feld-Testmodus</h3>
       <div class="action-row">
         <button class="btn-sm primary" id="fieldTestToggle" onclick="toggleFieldTestMode()">Testmodus starten</button>
+        <button class="btn-sm" id="fieldTestOpenWindow" onclick="openFieldTestWindow()">Testfenster oeffnen</button>
         <button class="btn-sm" onclick="clearFieldTestLog()">Log leeren</button>
       </div>
       <div class="arduino-status" id="fieldTestStatus" style="margin-top:8px">Inaktiv - starte den Testmodus für fortlaufende Wurferfassung.</div>
@@ -142,6 +143,7 @@
     let fieldTestStartedAt = 0;
     let fieldTestLastFingerprint = '';
     let fieldTestEntries = [];
+    let fieldTestWindow = null;
 
     function describeMatrixHit(hit) {
       if (!hit) return '-';
@@ -226,6 +228,138 @@
       updateFieldTestUi();
     }
 
+    function isFieldTestWindowOpen() {
+      return !!(fieldTestWindow && !fieldTestWindow.closed);
+    }
+
+    function openFieldTestWindow() {
+      if (isFieldTestWindowOpen()) {
+        fieldTestWindow.focus();
+        updateFieldTestWindow();
+        return;
+      }
+
+      fieldTestWindow = window.open('', 'fieldTestWindow', 'width=1100,height=760,resizable=yes,scrollbars=yes');
+      if (!fieldTestWindow) {
+        showToast('Popup blockiert: bitte Popups fuer diese Seite erlauben.');
+        return;
+      }
+
+      fieldTestWindow.document.open();
+      fieldTestWindow.document.write(`<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feld-Testmodus</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #f1f1f1; font-family: 'Segoe UI', system-ui, sans-serif; padding: 16px; }
+    .header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .header h1 { font-size: 1rem; font-weight: 700; }
+    .badge { background: #457b9d; color: #fff; font-size: .65rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
+    .btn { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: .8rem; margin-left: auto; }
+    .btn:hover { background: #2a2a2a; }
+    .status { font-size: .82rem; color: #777; margin-bottom: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+    .grid div { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 9px 10px; }
+    .grid span { display: block; font-size: .66rem; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+    .grid strong { display: block; font-size: .82rem; color: #ddd; font-variant-numeric: tabular-nums; }
+    .summary { margin-bottom: 10px; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; padding: 9px 10px; font-family: Consolas, monospace; font-size: .74rem; color: #bbb; }
+    .log { max-height: calc(100vh - 220px); overflow: auto; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: .74rem; }
+    th, td { padding: 6px 8px; border-bottom: 1px solid #141414; text-align: left; white-space: nowrap; }
+    th { color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; position: sticky; top: 0; background: #0a0a0a; }
+    td { color: #bbb; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Feld-Testmodus</h1>
+    <span class="badge">LIVE</span>
+    <button class="btn" onclick="window.opener.clearFieldTestLog()">Log leeren</button>
+  </div>
+  <div class="status" id="ftStatus">-</div>
+  <div class="grid">
+    <div><span>Erfasste Wuerfe</span><strong id="ftCount">0</strong></div>
+    <div><span>Letzter Wert</span><strong id="ftLastValue">-</strong></div>
+    <div><span>Letzter Code</span><strong id="ftLastCode">-</strong></div>
+    <div><span>Letzter Kanal</span><strong id="ftLastChannel">-</strong></div>
+    <div><span>Letzte Zeit</span><strong id="ftLastTs">-</strong></div>
+    <div><span>Quelle</span><strong id="ftLastSource">-</strong></div>
+  </div>
+  <div class="summary" id="ftSummary">Wert-Haeufigkeit: -</div>
+  <div class="log" id="ftLog"></div>
+</body>
+</html>`);
+      fieldTestWindow.document.close();
+      fieldTestWindow.focus();
+      updateFieldTestUi();
+    }
+
+    function updateFieldTestWindow() {
+      if (!isFieldTestWindowOpen()) return;
+
+      const doc = fieldTestWindow.document;
+      const statusEl = doc.getElementById('ftStatus');
+      const countEl = doc.getElementById('ftCount');
+      const lastValueEl = doc.getElementById('ftLastValue');
+      const lastCodeEl = doc.getElementById('ftLastCode');
+      const lastChannelEl = doc.getElementById('ftLastChannel');
+      const lastTsEl = doc.getElementById('ftLastTs');
+      const lastSourceEl = doc.getElementById('ftLastSource');
+      const summaryEl = doc.getElementById('ftSummary');
+      const logEl = doc.getElementById('ftLog');
+      if (!statusEl || !countEl || !lastValueEl || !lastCodeEl || !lastChannelEl || !lastTsEl || !lastSourceEl || !summaryEl || !logEl) return;
+
+      statusEl.textContent = fieldTestMode
+        ? 'Aktiv - jeder neue Matrix-Hit wird fortlaufend erfasst.'
+        : 'Inaktiv - starte den Testmodus fuer fortlaufende Wurferfassung.';
+
+      countEl.textContent = String(fieldTestEntries.length);
+
+      const latest = fieldTestEntries[0] || null;
+      lastValueEl.textContent = latest && latest.value != null ? String(latest.value) : '-';
+      lastCodeEl.textContent = latest && latest.code != null ? String(latest.code) : '-';
+      lastChannelEl.textContent = latest ? latest.channel : '-';
+      lastTsEl.textContent = latest ? new Date(latest.ts).toLocaleTimeString('de-DE') : '-';
+      lastSourceEl.textContent = latest ? latest.source : '-';
+
+      const valueCounts = {};
+      for (const entry of fieldTestEntries) {
+        const key = entry.value != null ? String(entry.value) : 'na';
+        valueCounts[key] = (valueCounts[key] || 0) + 1;
+      }
+      const summary = Object.entries(valueCounts)
+        .sort((a, b) => b[1] - a[1] || Number(b[0]) - Number(a[0]))
+        .slice(0, 20)
+        .map(([value, count]) => value === 'na' ? `?=${count}` : `${value}=${count}`)
+        .join(' | ');
+      summaryEl.textContent = 'Wert-Haeufigkeit: ' + (summary || '-');
+
+      if (fieldTestEntries.length === 0) {
+        logEl.innerHTML = '<div style="padding:10px;color:#777">Keine Testwuerfe erfasst.</div>';
+        return;
+      }
+
+      const rows = fieldTestEntries.map((entry) => {
+        const time = new Date(entry.ts).toLocaleTimeString('de-DE');
+        return '<tr>' +
+          '<td>' + entry.index + '</td>' +
+          '<td>' + escHtml(time) + '</td>' +
+          '<td>' + escHtml(entry.value != null ? String(entry.value) : '-') + '</td>' +
+          '<td>' + escHtml(entry.code != null ? String(entry.code) : '-') + '</td>' +
+          '<td>' + escHtml(entry.channel) + '</td>' +
+          '<td>' + escHtml(entry.source) + '</td>' +
+          '</tr>';
+      }).join('');
+
+      logEl.innerHTML = '<table>' +
+        '<thead><tr><th>#</th><th>Zeit</th><th>Wert</th><th>Code</th><th>Kanal</th><th>Quelle</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+        '</table>';
+    }
+
     function captureFieldTestHit(hit) {
       if (!fieldTestMode || !hit) return;
 
@@ -254,6 +388,7 @@
 
     function updateFieldTestUi() {
       const statusEl = document.getElementById('fieldTestStatus');
+      const openBtnEl = document.getElementById('fieldTestOpenWindow');
       const countEl = document.getElementById('fieldTestCount');
       const lastValueEl = document.getElementById('fieldTestLastValue');
       const lastCodeEl = document.getElementById('fieldTestLastCode');
@@ -266,6 +401,10 @@
       statusEl.textContent = fieldTestMode
         ? 'Aktiv - jeder neue Matrix-Hit wird fortlaufend erfasst.'
         : 'Inaktiv - starte den Testmodus für fortlaufende Wurferfassung.';
+
+      if (openBtnEl) {
+        openBtnEl.textContent = isFieldTestWindowOpen() ? 'Testfenster fokusieren' : 'Testfenster oeffnen';
+      }
 
       countEl.textContent = String(fieldTestEntries.length);
 
@@ -292,10 +431,11 @@
 
       if (fieldTestEntries.length === 0) {
         logEl.innerHTML = '<div class="arduino-last-line" style="margin:0;border:0;border-radius:0">Keine Testwuerfe erfasst.</div>';
+        updateFieldTestWindow();
         return;
       }
 
-      const rows = fieldTestEntries.slice(0, 80).map((entry) => {
+      const rows = fieldTestEntries.slice(0, 12).map((entry) => {
         const time = new Date(entry.ts).toLocaleTimeString('de-DE');
         return '<tr>' +
           '<td>' + entry.index + '</td>' +
@@ -311,6 +451,8 @@
         '<thead><tr><th>#</th><th>Zeit</th><th>Wert</th><th>Code</th><th>Kanal</th><th>Quelle</th></tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
         '</table>';
+
+      updateFieldTestWindow();
     }
 
     function dartValueFromChannel(channel) {

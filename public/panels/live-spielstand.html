@@ -57,10 +57,14 @@
     .focus-card > * { position: relative; }
     .focus-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
     .focus-meta { color: #777; font-size: .8rem; margin-bottom: 14px; }
-    .focus-kacheln { display: grid; grid-template-columns: 1.35fr 1.15fr 1.15fr; gap: 12px; }
+    .focus-kacheln { display: grid; grid-template-columns: 1.35fr 1.15fr 1.15fr 1fr; gap: 12px; }
     .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: 16px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     .focus-kachel h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
     .focus-kachel .subline { color: #555; font-size: .72rem; margin-top: 6px; }
+    .leg-list { width: 100%; display: grid; gap: 6px; max-height: 110px; overflow: auto; }
+    .leg-item { display: flex; justify-content: space-between; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 6px 8px; font-size: .74rem; }
+    .leg-item .idx { color: #777; }
+    .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; }
     .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
     .throw-seg .seg { font-size: 1.55rem; color: var(--pc, #e63946); }
@@ -70,7 +74,7 @@
     .focus-summary div { background: #141414; border-radius: 10px; padding: 10px; text-align: center; }
     .focus-summary span { display: block; color: #666; font-size: .66rem; text-transform: uppercase; letter-spacing: 1px; }
     .focus-summary strong { display: block; color: #f1f1f1; font-size: 1.05rem; margin-top: 2px; }
-    .compact-players { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .compact-players { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
     .score-card {
       background: #141414;
       border-radius: 14px;
@@ -105,7 +109,7 @@
     .score-card.active { animation: pulseGlow 2s ease-in-out infinite; }
     .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; margin-bottom: 12px; }
     .sc-name { font-size: .95rem; font-weight: 700; margin-bottom: 4px; }
-    .sc-score { font-size: 4rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--pc, #f4a261); margin-bottom: 6px; }
+    .sc-score { font-size: 3.6rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--pc, #f4a261); margin-bottom: 6px; }
     .sc-stats { font-size: .78rem; color: #666; line-height: 1.6; }
     .sc-stats span { color: #aaa; font-weight: 600; }
     .sc-last-throws { margin-top: 10px; display: flex; gap: 4px; }
@@ -116,16 +120,6 @@
     .sc-average strong { color: #f4a261; font-size: .9rem; }
     .sc-legs { position: absolute; bottom: 10px; right: 14px; font-size: .7rem; color: #444; }
     .sc-legs strong { color: #888; }
-    .controls { background: #141414; border-radius: 14px; border: 1px solid #1e1e1e; padding: 14px 18px; }
-    .controls h3 { font-size: .85rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
-    .controls-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .controls-row + .controls-row { margin-top: 8px; }
-    .ctrl-label { font-size: .78rem; color: #555; font-weight: 600; min-width: 40px; }
-    .btn-pts { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: .85rem; font-family: inherit; font-weight: 600; transition: background .15s; }
-    .btn-pts:hover { background: #2a2a2a; }
-    .btn-pts.active-player { border-color: var(--pc, #e63946); }
-    .points-input { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 8px 10px; border-radius: 8px; width: 80px; font-size: .9rem; font-family: inherit; text-align: center; }
-    .points-input:focus { border-color: #e63946; outline: none; }
     .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .status-panel { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 12px; }
     .status-panel h4 { font-size: .68rem; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
@@ -155,7 +149,66 @@
     .hs-muted { color: #444; font-style: italic; font-size: .78rem; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    @media (max-width: 768px) { .scoreboard { grid-template-columns: 1fr; } .status-grid { grid-template-columns: 1fr; } .sc-score { font-size: 3rem; } }
+    @media (max-width: 768px) {
+      .scoreboard { grid-template-columns: 1fr; }
+      .status-grid { grid-template-columns: 1fr; }
+      .sc-score { font-size: 3rem; }
+    }
+
+    @media (max-height: 900px) and (min-width: 900px) {
+      .topbar { padding: 8px 14px; gap: 8px; }
+      .topbar h2 { font-size: 1rem; }
+      .header-status { font-size: .68rem; }
+      .header-controls select { padding: 4px 7px; font-size: .72rem; }
+      .btn-icon { padding: 5px 9px; font-size: .72rem; }
+
+      main { padding: 10px; gap: 8px; }
+      .focus-player { gap: 8px; }
+      .focus-card { padding: 14px; border-radius: 14px; }
+      .focus-name { font-size: 1.15rem; }
+      .focus-meta { font-size: .72rem; margin-bottom: 10px; }
+      .focus-kacheln { gap: 8px; grid-template-columns: 1.1fr 1fr 1fr .9fr; }
+      .focus-kachel { min-height: 116px; padding: 10px; border-radius: 12px; }
+      .throw-seg { min-height: 58px; }
+      .throw-seg .seg { font-size: 1.2rem; }
+      .focus-big-score { font-size: 3.35rem; }
+      .focus-summary { margin-top: 8px; }
+      .focus-summary strong { font-size: .95rem; }
+      .leg-list { max-height: 84px; }
+
+      .compact-players { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+      .score-card { padding: 12px; border-radius: 11px; }
+      .sc-name { font-size: .86rem; }
+      .sc-score { font-size: 2.45rem; }
+      .sc-stats { font-size: .7rem; line-height: 1.45; }
+      .sc-last-throws { margin-top: 6px; }
+      .sc-throw-chip { padding: 3px 6px; font-size: .72rem; }
+
+      .status-grid { gap: 6px; }
+      .status-panel { padding: 8px; }
+      .status-panel .value { font-size: .76rem; }
+      .hs-panel { padding: 8px; }
+      .hs-panel h4 { margin-bottom: 6px; }
+      .hs-table th { padding: 3px 4px; }
+      .hs-table td { padding: 3px 4px; }
+    }
+
+    @media (max-height: 780px) and (min-width: 900px) {
+      main {
+        max-height: calc(100vh - 58px);
+        overflow-y: auto;
+        padding-right: 6px;
+      }
+
+      .focus-kacheln { grid-template-columns: 1fr 1fr 1fr; }
+      .focus-kacheln .focus-kachel:last-child { grid-column: 1 / -1; min-height: 84px; }
+      .leg-list { max-height: 56px; }
+      .focus-big-score { font-size: 2.9rem; }
+
+      .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+      .sc-score { font-size: 2rem; }
+      .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
   </style>
 </head>
 <body>
@@ -183,14 +236,6 @@
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
     <section class="compact-players" id="compactPlayers"></section>
-    <div class="controls">
-      <h3>Manuelle Punkte nur zum Testen</h3>
-      <div class="controls-row">
-        <span class="ctrl-label">Punkte</span>
-        <input class="points-input" id="manualPoints" type="number" min="0" max="180" value="60" />
-      </div>
-      <div class="controls-row" id="playerButtons"><div class="muted" style="color:#444">Spieler werden geladen...</div></div>
-    </div>
     <div class="status-grid">
       <div class="status-panel">
         <h4>Arduino</h4>
@@ -220,7 +265,6 @@
   <div class="toast" id="toast"></div>
   <script>
     let liveState = null;
-    let manualPoints = document.getElementById('manualPoints');
 
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -332,7 +376,6 @@
       const active = state.players[activePlayer];
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
-      const playerButtons = document.getElementById('playerButtons');
 
       const isCricket = mode === 'cricket';
       const compactOrder = [...state.players]
@@ -347,10 +390,6 @@
       compactPlayers.innerHTML = compactOrder
         .map((p, idx) => renderCompactPlayer(p, idx, state.players.findIndex(sp => sp.slot === p.slot), mode)).join('');
 
-      playerButtons.innerHTML = state.players.map((p, idx) => {
-        const isActive = idx === activePlayer;
-        return '<button class="btn-pts' + (isActive ? ' active-player' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '" onclick="applyPreset(' + p.slot + ', ' + Number(manualPoints.value || 60) + ')">P' + p.slot + ' ' + escapeHtml(p.name) + '</button>';
-      }).join('');
       const arduino = state.arduino || {};
       const connection = arduino.connection || arduino;
       const matrix = arduino.matrix || {};
@@ -399,8 +438,22 @@
       while (displayThrows.length < 3) displayThrows.push(null);
       const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const totalScored = p.totalScored || 0;
-      const currentRoundScore = currentRound.reduce((sum, pt) => sum + (Number(pt) || 0), 0);
+      const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const legScore = p.throws.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
+      const turnScores = [];
+      for (let i = 0; i < throws.length; i += 3) {
+        const chunk = throws.slice(i, i + 3);
+        const score = chunk.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
+        turnScores.push(score);
+      }
+
+      const legListHtml = turnScores.length
+        ? turnScores.slice(-12).reverse().map((score, orderIdx) => {
+            const legIdx = turnScores.length - orderIdx;
+            return '<div class="leg-item"><span class="idx">Leg ' + legIdx + '</span><span class="score">' + score + '</span></div>';
+          }).join('')
+        : '<div class="subline">Noch keine Legs erfasst</div>';
+
       const throwsHtml = displayThrows.map((pt, ti) => {
         const label = pt === null ? '-' : String(pt);
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
@@ -417,17 +470,21 @@
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe / Zahlen</h4>' +
             '<div class="throw-segments">' + throwsHtml + '</div>' +
-            '<div class="subline">Leg-Punkte: <strong>' + legScore + '</strong></div>' +
+            '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<h4>Geworfene Punkte / Leg</h4>' +
-            '<div class="focus-big-score" style="font-size:4.2rem">' + currentRoundScore + '</div>' +
-            '<div style="color:#777;font-size:.82rem">Summe aktueller 3 Würfe</div>' +
+            '<div class="focus-big-score" style="font-size:4.2rem">' + legScore + '</div>' +
+            '<div style="color:#777;font-size:.82rem">Fortlaufend im Leg</div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<h4>Gesamt / Rest</h4>' +
             '<div class="focus-big-score">' + p.remaining + '</div>' +
             '<div style="color:#777;font-size:.82rem">Restpunkte</div>' +
+          '</div>' +
+          '<div class="focus-kachel">' +
+            '<h4>Leg-Liste</h4>' +
+            '<div class="leg-list">' + legListHtml + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="focus-summary">' +
@@ -488,22 +545,6 @@
         var timeStr = d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '-';
         return '<tr><td class="rank">' + (idx + 1) + '</td><td class="name">' + escapeHtml(entry.player) + '</td><td class="score">' + entry.score + '</td><td>' + (entry.kind || '-') + '</td><td class="when">' + timeStr + '</td></tr>';
       }).join('');
-    }
-
-    // ── Wurf abschicken ──
-    async function applyPreset(slot, points) {
-      try {
-        var r = await fetch('/api/live/throw', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerSlot: slot, points: points })
-        });
-        if (!r.ok) { showToast('Fehler: HTTP ' + r.status, true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Wurf: ' + points + ' für P' + slot);
-        loadHighscoresOnly();
-      } catch(e) { showToast('Netzwerkfehler', true); }
     }
 
     // ── Undo ──
