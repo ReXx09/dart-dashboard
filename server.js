@@ -102,11 +102,12 @@ const ARDUINO_EVENT_ACTIVE_STATE_MODE = ['ACTIVE', 'IDLE', 'AUTO'].includes(ARDU
   : 'AUTO';
 const ARDUINO_THROW_WINDOW_MS = Number(process.env.ARDUINO_THROW_WINDOW_MS || 1200);
 const MATRIX_HIT_RELEASE_MS = Number(process.env.MATRIX_HIT_RELEASE_MS || 25);
-const MATRIX_HIT_REFRACTORY_MS = Number(process.env.MATRIX_HIT_REFRACTORY_MS || 350);
-const MATRIX_HIT_SUPPRESS_MS = Number(process.env.MATRIX_HIT_SUPPRESS_MS || 140);
-const MATRIX_HIT_CLUSTER_WINDOW_MS = Number(process.env.MATRIX_HIT_CLUSTER_WINDOW_MS || 90);
-const MATRIX_EVT_PAIR_MAX_SKEW_MS = Number(process.env.MATRIX_EVT_PAIR_MAX_SKEW_MS || 110);
-const ARDUINO_MATRIX_THROW_LOCK_MS = Number(process.env.ARDUINO_MATRIX_THROW_LOCK_MS || 500);
+const MATRIX_HIT_REFRACTORY_MS = Number(process.env.MATRIX_HIT_REFRACTORY_MS || 260);
+const MATRIX_HIT_SUPPRESS_MS = Number(process.env.MATRIX_HIT_SUPPRESS_MS || 90);
+const MATRIX_HIT_CLUSTER_WINDOW_MS = Number(process.env.MATRIX_HIT_CLUSTER_WINDOW_MS || 70);
+const MATRIX_EVT_PAIR_MAX_SKEW_MS = Number(process.env.MATRIX_EVT_PAIR_MAX_SKEW_MS || 220);
+const MATRIX_SAME_KEY_GUARD_MS = Number(process.env.MATRIX_SAME_KEY_GUARD_MS || 130);
+const ARDUINO_MATRIX_THROW_LOCK_MS = Number(process.env.ARDUINO_MATRIX_THROW_LOCK_MS || 220);
 
 // ── Spielmodi ──────────────────────────────────
 const GAME_MODES = {
@@ -305,7 +306,7 @@ function normalizeArduinoStatePatch(patch) {
 
 function shouldQueueMatrixHit(key, nowMs) {
   const now = Number(nowMs || Date.now());
-  if (key && key === matrixLastAcceptedKey && (now - matrixLastAcceptedHitAt) < MATRIX_HIT_REFRACTORY_MS) {
+  if (key && key === matrixLastAcceptedKey && (now - matrixLastAcceptedHitAt) < MATRIX_SAME_KEY_GUARD_MS) {
     return false;
   }
 

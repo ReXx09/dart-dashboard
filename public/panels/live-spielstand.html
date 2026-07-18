@@ -447,6 +447,20 @@
         '<div class="focus-summary"><div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div><div><span>Punkte</span><strong>' + (p.totalScored || 0) + '</strong></div><div><span>Ø 3-Dart</span><strong>' + ((p.average || 0) > 0 ? Number(p.average).toFixed(1) : '-') + '</strong></div></div>' +
       '</div>';
     }
+
+    function getLegPointsForPlayer(player, state) {
+      const mode = String((state && state.game && state.game.mode) || '');
+      const numericMode = Number(mode);
+      const startScore = Number.isFinite(numericMode) && numericMode > 0 ? numericMode : 0;
+
+      if (startScore > 0) {
+        const remaining = Math.max(0, Number(player && player.remaining || startScore));
+        return Math.max(0, startScore - remaining);
+      }
+
+      return Math.max(0, Number(player && player.totalScored || 0));
+    }
+
     function renderFocusPlayer(p, idx, state) {
       if (!p) return '';
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
@@ -457,7 +471,7 @@
       const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const totalScored = p.totalScored || 0;
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
-      const legScore = p.throws.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
+      const legScore = getLegPointsForPlayer(p, state);
       const throwsHtml = displayThrows.map((pt, ti) => {
         const label = pt === null ? '-' : String(pt);
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
