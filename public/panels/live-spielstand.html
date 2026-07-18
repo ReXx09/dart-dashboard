@@ -55,9 +55,13 @@
     .focus-card { background: linear-gradient(135deg, #191111, #141414); border-radius: 18px; padding: 20px; border: 2px solid var(--pc, #e63946); box-shadow: 0 0 45px rgba(230,57,70,.16); position: relative; overflow: hidden; }
     .focus-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 10%, var(--pc-glow, rgba(230,57,70,.18)), transparent 35%); pointer-events: none; }
     .focus-card > * { position: relative; }
+    .focus-head { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 10px; align-items: start; margin-bottom: 12px; }
+    .focus-title { min-width: 0; }
     .focus-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
     .focus-meta { color: #777; font-size: .8rem; margin-bottom: 14px; }
-    .focus-kacheln { display: grid; grid-template-columns: 1.35fr 1.15fr 1.15fr 1fr; gap: 12px; }
+    .focus-leg-tile { background: #101010; border: 1px solid #272727; border-radius: 12px; padding: 10px; min-height: 96px; display: flex; flex-direction: column; }
+    .focus-leg-tile h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
+    .focus-kacheln { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; }
     .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: 16px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     .focus-kachel h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
     .focus-kachel .subline { color: #555; font-size: .72rem; margin-top: 6px; }
@@ -165,9 +169,11 @@
       main { padding: 10px; gap: 8px; }
       .focus-player { gap: 8px; }
       .focus-card { padding: 14px; border-radius: 14px; }
+      .focus-head { grid-template-columns: minmax(0, 1fr) 210px; gap: 8px; margin-bottom: 8px; }
       .focus-name { font-size: 1.15rem; }
-      .focus-meta { font-size: .72rem; margin-bottom: 10px; }
-      .focus-kacheln { gap: 8px; grid-template-columns: 1.1fr 1fr 1fr .9fr; }
+      .focus-meta { font-size: .72rem; margin-bottom: 0; }
+      .focus-leg-tile { min-height: 82px; padding: 8px; border-radius: 10px; }
+      .focus-kacheln { gap: 8px; grid-template-columns: 1.1fr 1fr 1fr; }
       .focus-kachel { min-height: 116px; padding: 10px; border-radius: 12px; }
       .throw-seg { min-height: 58px; }
       .throw-seg .seg { font-size: 1.2rem; }
@@ -201,8 +207,9 @@
       }
 
       .focus-kacheln { grid-template-columns: 1fr 1fr 1fr; }
-      .focus-kacheln .focus-kachel:last-child { grid-column: 1 / -1; min-height: 84px; }
-      .leg-list { max-height: 56px; }
+      .focus-head { grid-template-columns: 1fr; }
+      .focus-leg-tile { min-height: 64px; }
+      .leg-list { max-height: 42px; }
       .focus-big-score { font-size: 2.9rem; }
 
       .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
@@ -464,8 +471,16 @@
       }).join('');
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
-        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+        '<div class="focus-head">' +
+          '<div class="focus-title">' +
+            '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
+            '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+          '</div>' +
+          '<div class="focus-leg-tile">' +
+            '<h4>Leg-Liste</h4>' +
+            '<div class="leg-list">' + legListHtml + '</div>' +
+          '</div>' +
+        '</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe / Zahlen</h4>' +
@@ -481,10 +496,6 @@
             '<h4>Gesamt / Rest</h4>' +
             '<div class="focus-big-score">' + p.remaining + '</div>' +
             '<div style="color:#777;font-size:.82rem">Restpunkte</div>' +
-          '</div>' +
-          '<div class="focus-kachel">' +
-            '<h4>Leg-Liste</h4>' +
-            '<div class="leg-list">' + legListHtml + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="focus-summary">' +
