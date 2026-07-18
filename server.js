@@ -111,7 +111,8 @@ const MATRIX_EVT_PAIR_MAX_SKEW_MS = Number(process.env.MATRIX_EVT_PAIR_MAX_SKEW_
 const MATRIX_SAME_KEY_GUARD_MS = Number(process.env.MATRIX_SAME_KEY_GUARD_MS || 130);
 const ARDUINO_MATRIX_THROW_LOCK_MS = Number(process.env.ARDUINO_MATRIX_THROW_LOCK_MS || 220);
 const THROW_MIN_INTERVAL_MS = Number(process.env.THROW_MIN_INTERVAL_MS || 120);
-const PLAYER_SWITCH_DELAY_MS = Number(process.env.PLAYER_SWITCH_DELAY_MS || 0);
+const PLAYER_SWITCH_DELAY_MS = Number(process.env.PLAYER_SWITCH_DELAY_MS || 20000);
+const SINGLE_PLAYER_SWITCH_DELAY_MS = Number(process.env.SINGLE_PLAYER_SWITCH_DELAY_MS || 3000);
 
 let runtimeTuning = {
   arduinoMatrixRawEnabled: ARDUINO_MATRIX_RAW_ENABLED,
@@ -124,7 +125,8 @@ let runtimeTuning = {
   matrixSameKeyGuardMs: MATRIX_SAME_KEY_GUARD_MS,
   arduinoMatrixThrowLockMs: ARDUINO_MATRIX_THROW_LOCK_MS,
   throwMinIntervalMs: THROW_MIN_INTERVAL_MS,
-  playerSwitchDelayMs: PLAYER_SWITCH_DELAY_MS
+  playerSwitchDelayMs: PLAYER_SWITCH_DELAY_MS,
+  singlePlayerSwitchDelayMs: SINGLE_PLAYER_SWITCH_DELAY_MS
 };
 
 // ── Spielmodi ──────────────────────────────────
@@ -229,6 +231,7 @@ function getSettings() {
     arduinoMatrixThrowLockMs: runtimeTuning.arduinoMatrixThrowLockMs,
     throwMinIntervalMs: runtimeTuning.throwMinIntervalMs,
     playerSwitchDelayMs: runtimeTuning.playerSwitchDelayMs,
+    singlePlayerSwitchDelayMs: runtimeTuning.singlePlayerSwitchDelayMs,
     ...readJson(SETTINGS_FILE, {})
   };
   return merged;
@@ -256,7 +259,8 @@ function refreshRuntimeTuning(settings = getSettings()) {
     matrixSameKeyGuardMs: clampNumber(settings.matrixSameKeyGuardMs, MATRIX_SAME_KEY_GUARD_MS, 20, 800),
     arduinoMatrixThrowLockMs: clampNumber(settings.arduinoMatrixThrowLockMs, ARDUINO_MATRIX_THROW_LOCK_MS, 50, 1500),
     throwMinIntervalMs: clampNumber(settings.throwMinIntervalMs, THROW_MIN_INTERVAL_MS, 0, 1200),
-    playerSwitchDelayMs: clampNumber(settings.playerSwitchDelayMs, PLAYER_SWITCH_DELAY_MS, 0, 5000)
+    playerSwitchDelayMs: clampNumber(settings.playerSwitchDelayMs, PLAYER_SWITCH_DELAY_MS, 0, 120000),
+    singlePlayerSwitchDelayMs: clampNumber(settings.singlePlayerSwitchDelayMs, SINGLE_PLAYER_SWITCH_DELAY_MS, 0, 120000)
   };
 }
 
@@ -624,9 +628,14 @@ function clearPendingArduinoThrow() {
 
 async function advanceAfterThreeThrows(state, player, source) {
   if (state.game.status === 'leg-finished' || state.game.currentThrow < 3) return;
+  const playersInLeg = Array.isArray(state.players) ? state.players.length : 0;
+  const isSinglePlayerLeg = playersInLeg <= 1;
+  const delayMs = isSinglePlayerLeg
+    ? Math.max(0, Number(runtimeTuning.singlePlayerSwitchDelayMs || 0))
+    : Math.max(0, Number(runtimeTuning.playerSwitchDelayMs || 0));
 
-  if (runtimeTuning.playerSwitchDelayMs > 0) {
-    await new Promise((resolve) => setTimeout(resolve, runtimeTuning.playerSwitchDelayMs));
+  if (delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
   player.currentRoundPoints = [];
@@ -636,6 +645,8 @@ async function advanceAfterThreeThrows(state, player, source) {
     state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
   }
   state.lastAction.autoAdvanced = true;
+  state.lastAction.autoAdvanceDelayMs = delayMs;
+  state.lastAction.autoAdvanceSinglePlayer = isSinglePlayerLeg;
   state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
   state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
   state.lastAction.nextSource = source;

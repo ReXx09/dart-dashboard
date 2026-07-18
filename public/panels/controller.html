@@ -318,7 +318,8 @@
         <div class="cell"><label>Throw Lock ms</label><input id="tuningThrowLock" type="number" min="50" max="1500" step="10" value="220" /></div>
         <div class="cell"><label>Wurfrhythmus Min ms</label><input id="tuningThrowMin" type="number" min="0" max="1200" step="10" value="120" /></div>
         <div class="cell"><label>Pfeilaufnahme Timer ms</label><input id="tuningThrowWindow" type="number" min="100" max="4000" step="50" value="1200" /></div>
-        <div class="cell"><label>Playerwechsel Delay ms</label><input id="tuningPlayerSwitchDelay" type="number" min="0" max="5000" step="50" value="0" /></div>
+        <div class="cell"><label>Playerwechsel Delay ms (2+ Spieler)</label><input id="tuningPlayerSwitchDelay" type="number" min="0" max="120000" step="100" value="20000" /></div>
+        <div class="cell"><label>Auto-Weiter Delay ms (1 Spieler)</label><input id="tuningSinglePlayerSwitchDelay" type="number" min="0" max="120000" step="100" value="3000" /></div>
       </div>
       <div class="tuning-row">
         <button class="btn-sm primary" id="saveTuningBtn" onclick="saveTuningSettings()">Tuning speichern</button>
@@ -329,7 +330,8 @@
           <li><strong>Doppelzaehlung:</strong> zuerst Suppress ms, Same Key Guard ms und Throw Lock ms leicht erhoehen.</li>
           <li><strong>Treffer fehlen:</strong> Refractory ms, Suppress ms und Wurfrhythmus Min ms leicht senken.</li>
           <li><strong>Falsches Segment:</strong> Pair Skew ms und Cluster Window ms in kleinen Schritten nachstellen.</li>
-          <li><strong>Fehltrigger beim Pfeile ziehen:</strong> Playerwechsel Delay ms leicht erhoehen.</li>
+          <li><strong>Fehltrigger beim Pfeile ziehen:</strong> Playerwechsel Delay ms (2+ Spieler) leicht erhoehen.</li>
+          <li><strong>1-Spieler-Training:</strong> Auto-Weiter Delay (1 Spieler) klein halten, damit die neue Runde schnell startet.</li>
           <li><strong>Arbeitsweise:</strong> nur 1-2 Werte pro Durchlauf aendern, dann 10-20 Testwuerfe pruefen.</li>
         </ul>
       </div>
@@ -363,7 +365,8 @@
         arduinoMatrixThrowLockMs: 300,
         throwMinIntervalMs: 160,
         arduinoThrowWindowMs: 1400,
-        playerSwitchDelayMs: 120
+        playerSwitchDelayMs: 20000,
+        singlePlayerSwitchDelayMs: 3000
       },
       balanced: {
         arduinoMatrixRawEnabled: true,
@@ -376,7 +379,8 @@
         arduinoMatrixThrowLockMs: 220,
         throwMinIntervalMs: 120,
         arduinoThrowWindowMs: 1200,
-        playerSwitchDelayMs: 0
+        playerSwitchDelayMs: 20000,
+        singlePlayerSwitchDelayMs: 2000
       },
       fast: {
         arduinoMatrixRawEnabled: true,
@@ -389,7 +393,8 @@
         arduinoMatrixThrowLockMs: 170,
         throwMinIntervalMs: 80,
         arduinoThrowWindowMs: 950,
-        playerSwitchDelayMs: 0
+        playerSwitchDelayMs: 12000,
+        singlePlayerSwitchDelayMs: 1500
       }
     };
 
@@ -441,6 +446,7 @@
       document.getElementById('tuningThrowMin').value = t.throwMinIntervalMs;
       document.getElementById('tuningThrowWindow').value = t.arduinoThrowWindowMs;
       document.getElementById('tuningPlayerSwitchDelay').value = t.playerSwitchDelayMs;
+      document.getElementById('tuningSinglePlayerSwitchDelay').value = t.singlePlayerSwitchDelayMs != null ? t.singlePlayerSwitchDelayMs : 3000;
     }
 
     function collectTuningFromInputs() {
@@ -455,7 +461,8 @@
         arduinoMatrixThrowLockMs: clampInt(document.getElementById('tuningThrowLock').value, 220, 50, 1500),
         throwMinIntervalMs: clampInt(document.getElementById('tuningThrowMin').value, 120, 0, 1200),
         arduinoThrowWindowMs: clampInt(document.getElementById('tuningThrowWindow').value, 1200, 100, 4000),
-        playerSwitchDelayMs: clampInt(document.getElementById('tuningPlayerSwitchDelay').value, 0, 0, 5000)
+        playerSwitchDelayMs: clampInt(document.getElementById('tuningPlayerSwitchDelay').value, 20000, 0, 120000),
+        singlePlayerSwitchDelayMs: clampInt(document.getElementById('tuningSinglePlayerSwitchDelay').value, 3000, 0, 120000)
       };
     }
 

@@ -287,6 +287,13 @@
       .focus-kachel:first-child { grid-column: 1 / -1; }
     }
 
+    @media (width: 1024px) and (height: 860px) {
+      .focus-kacheln { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .focus-kachel { min-height: 124px; }
+      .focus-kachel:first-child { grid-column: auto; }
+      .focus-big-score { font-size: 3.35rem; }
+    }
+
     @media (max-width: 860px) {
       .focus-kacheln { grid-template-columns: 1fr; }
       .focus-kachel:first-child { grid-column: auto; }
