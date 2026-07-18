@@ -45,6 +45,11 @@
     .arduino-monitor-grid span { display: block; font-size: .66rem; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
     .arduino-monitor-grid strong { display: block; font-size: .82rem; color: #ddd; font-variant-numeric: tabular-nums; }
     .arduino-last-line { margin-top: 10px; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; padding: 9px 10px; font-family: Consolas, monospace; font-size: .72rem; color: #777; word-break: break-all; }
+    .field-test-log { margin-top: 10px; max-height: 220px; overflow: auto; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; }
+    .field-test-log table { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: .72rem; }
+    .field-test-log th, .field-test-log td { padding: 6px 8px; border-bottom: 1px solid #141414; text-align: left; white-space: nowrap; }
+    .field-test-log th { color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; position: sticky; top: 0; background: #0a0a0a; }
+    .field-test-log td { color: #bbb; }
     .arduino-dot.on { background: #2a9d8f; box-shadow: 0 0 8px rgba(42,157,143,.5); }
     .arduino-dot.off { background: #555; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
@@ -109,12 +114,34 @@
       </div>
       <div class="arduino-last-line" id="ctrlLastLine">Letzte serielle Zeile: -</div>
     </div>
+    <div class="ctrl-section">
+      <h3>Feld-Testmodus</h3>
+      <div class="action-row">
+        <button class="btn-sm primary" id="fieldTestToggle" onclick="toggleFieldTestMode()">Testmodus starten</button>
+        <button class="btn-sm" onclick="clearFieldTestLog()">Log leeren</button>
+      </div>
+      <div class="arduino-status" id="fieldTestStatus" style="margin-top:8px">Inaktiv - starte den Testmodus für fortlaufende Wurferfassung.</div>
+      <div class="arduino-monitor-grid" style="margin-top:10px">
+        <div><span>Erfasste Würfe</span><strong id="fieldTestCount">0</strong></div>
+        <div><span>Letzter Wert</span><strong id="fieldTestLastValue">-</strong></div>
+        <div><span>Letzter Code</span><strong id="fieldTestLastCode">-</strong></div>
+        <div><span>Letzter Kanal</span><strong id="fieldTestLastChannel">-</strong></div>
+        <div><span>Letzte Zeit</span><strong id="fieldTestLastTs">-</strong></div>
+        <div><span>Quelle</span><strong id="fieldTestLastSource">-</strong></div>
+      </div>
+      <div class="arduino-last-line" id="fieldTestSummary">Wert-Haeufigkeit: -</div>
+      <div class="field-test-log" id="fieldTestLog"></div>
+    </div>
   </main>
   <div class="toast" id="toast"></div>
   <script>
     let liveState = null;
     const ctrlPoints = document.getElementById('ctrlPoints');
     const ctrlThrowBtn = document.getElementById('ctrlThrowBtn');
+    let fieldTestMode = false;
+    let fieldTestStartedAt = 0;
+    let fieldTestLastFingerprint = '';
+    let fieldTestEntries = [];
 
     function describeMatrixHit(hit) {
       if (!hit) return '-';
@@ -155,7 +182,7 @@
         document.getElementById('ctrlArduinoEvent').textContent = '-';
       }
 
-      const matrixHit = matrix.hit || null;
+      const matrixHit = matrix.hit || latest.hit || null;
       const matrixValue = matrixHit && typeof matrixHit.points === 'number' ? matrixHit.points : null;
       const channelValue = evt && evt.channel && evt.state === 'ACTIVE' ? dartValueFromChannel(evt.channel) : null;
       const value = matrixValue != null ? String(matrixValue) : (channelValue != null ? channelValue : '-');
@@ -169,6 +196,121 @@
       document.getElementById('ctrlAutoThrow').textContent = describeAutoThrow(automation.lastAutoThrow || null);
       document.getElementById('ctrlActiveStateMode').textContent = (telemetry.activeStateMode || '-') + ' / ' + (telemetry.activeStateResolved || '-');
       document.getElementById('ctrlLastLine').textContent = 'Letzte serielle Zeile: ' + (latest.line || state.lastLine || '-');
+
+      captureFieldTestHit(matrixHit);
+    }
+
+    function toFieldTestFingerprint(hit) {
+      if (!hit) return '';
+      return [hit.ts ?? '', hit.ms ?? '', hit.key ?? '', hit.code ?? '', hit.points ?? ''].join('|');
+    }
+
+    function toggleFieldTestMode() {
+      fieldTestMode = !fieldTestMode;
+      const btn = document.getElementById('fieldTestToggle');
+      if (fieldTestMode) {
+        fieldTestStartedAt = Date.now();
+        fieldTestLastFingerprint = '';
+        btn.textContent = 'Testmodus stoppen';
+        showToast('Testmodus aktiv: Matrix-Hits werden fortlaufend geloggt.');
+      } else {
+        btn.textContent = 'Testmodus starten';
+        showToast('Testmodus gestoppt.');
+      }
+      updateFieldTestUi();
+    }
+
+    function clearFieldTestLog() {
+      fieldTestEntries = [];
+      fieldTestLastFingerprint = '';
+      updateFieldTestUi();
+    }
+
+    function captureFieldTestHit(hit) {
+      if (!fieldTestMode || !hit) return;
+
+      const ts = Number(hit.ts || 0);
+      if (ts && ts < fieldTestStartedAt) return;
+
+      const fingerprint = toFieldTestFingerprint(hit);
+      if (!fingerprint || fingerprint === fieldTestLastFingerprint) return;
+      fieldTestLastFingerprint = fingerprint;
+
+      const entry = {
+        index: fieldTestEntries.length + 1,
+        ts: ts || Date.now(),
+        value: typeof hit.points === 'number' ? hit.points : null,
+        code: typeof hit.code === 'number' ? hit.code : null,
+        channel: hit.key || (hit.row && hit.column ? `${hit.row}/${hit.column}` : '-'),
+        row: hit.row || '-',
+        column: hit.column || '-',
+        source: hit.source || 'matrix'
+      };
+
+      fieldTestEntries.unshift(entry);
+      if (fieldTestEntries.length > 250) fieldTestEntries.pop();
+      updateFieldTestUi();
+    }
+
+    function updateFieldTestUi() {
+      const statusEl = document.getElementById('fieldTestStatus');
+      const countEl = document.getElementById('fieldTestCount');
+      const lastValueEl = document.getElementById('fieldTestLastValue');
+      const lastCodeEl = document.getElementById('fieldTestLastCode');
+      const lastChannelEl = document.getElementById('fieldTestLastChannel');
+      const lastTsEl = document.getElementById('fieldTestLastTs');
+      const lastSourceEl = document.getElementById('fieldTestLastSource');
+      const summaryEl = document.getElementById('fieldTestSummary');
+      const logEl = document.getElementById('fieldTestLog');
+
+      statusEl.textContent = fieldTestMode
+        ? 'Aktiv - jeder neue Matrix-Hit wird fortlaufend erfasst.'
+        : 'Inaktiv - starte den Testmodus für fortlaufende Wurferfassung.';
+
+      countEl.textContent = String(fieldTestEntries.length);
+
+      const latest = fieldTestEntries[0] || null;
+      lastValueEl.textContent = latest && latest.value != null ? String(latest.value) : '-';
+      lastCodeEl.textContent = latest && latest.code != null ? String(latest.code) : '-';
+      lastChannelEl.textContent = latest ? latest.channel : '-';
+      lastTsEl.textContent = latest ? new Date(latest.ts).toLocaleTimeString('de-DE') : '-';
+      lastSourceEl.textContent = latest ? latest.source : '-';
+
+      const valueCounts = {};
+      for (const entry of fieldTestEntries) {
+        const key = entry.value != null ? String(entry.value) : 'na';
+        valueCounts[key] = (valueCounts[key] || 0) + 1;
+      }
+
+      const summary = Object.entries(valueCounts)
+        .sort((a, b) => b[1] - a[1] || Number(b[0]) - Number(a[0]))
+        .slice(0, 12)
+        .map(([value, count]) => value === 'na' ? `?=${count}` : `${value}=${count}`)
+        .join(' | ');
+
+      summaryEl.textContent = 'Wert-Haeufigkeit: ' + (summary || '-');
+
+      if (fieldTestEntries.length === 0) {
+        logEl.innerHTML = '<div class="arduino-last-line" style="margin:0;border:0;border-radius:0">Keine Testwuerfe erfasst.</div>';
+        return;
+      }
+
+      const rows = fieldTestEntries.slice(0, 80).map((entry) => {
+        const time = new Date(entry.ts).toLocaleTimeString('de-DE');
+        return '<tr>' +
+          '<td>' + entry.index + '</td>' +
+          '<td>' + escHtml(time) + '</td>' +
+          '<td>' + escHtml(entry.value != null ? String(entry.value) : '-') + '</td>' +
+          '<td>' + escHtml(entry.code != null ? String(entry.code) : '-') + '</td>' +
+          '<td>' + escHtml(entry.channel) + '</td>' +
+          '<td>' + escHtml(entry.source) + '</td>' +
+          '</tr>';
+      }).join('');
+
+      logEl.innerHTML = '<table>' +
+        '<thead><tr><th>#</th><th>Zeit</th><th>Wert</th><th>Code</th><th>Kanal</th><th>Quelle</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+        '</table>';
     }
 
     function dartValueFromChannel(channel) {
@@ -217,6 +359,7 @@
       render(liveState);
       const arduino = await fetch('/api/arduino/state').then(r => r.json()).catch(() => ({}));
       renderArduinoState(arduino);
+      updateFieldTestUi();
     }
 
     function render(state) {
