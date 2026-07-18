@@ -94,6 +94,7 @@ let MATRIX_ROW_COLUMN_VALUES = buildMatrixValueMap(MATRIX_CODE_BY_ROW_COLUMN);
 const ARDUINO_AUTO_THROW_ENABLED = process.env.ARDUINO_AUTO_THROW_ENABLED !== 'false';
 const ARDUINO_AUTO_THROW_MATRIX_ENABLED = process.env.ARDUINO_AUTO_THROW_MATRIX_ENABLED === 'true';
 const ARDUINO_AUTO_THROW_MATRIX_UNMAPPED = process.env.ARDUINO_AUTO_THROW_MATRIX_UNMAPPED === 'true';
+const ARDUINO_MATRIX_RAW_ENABLED = process.env.ARDUINO_MATRIX_RAW_ENABLED !== 'false';
 const ARDUINO_REQUIRE_THROW_TRIGGER = process.env.ARDUINO_REQUIRE_THROW_TRIGGER !== 'false';
 const ARDUINO_EVENT_ACTIVE_STATE_MODE_RAW = String(process.env.ARDUINO_EVENT_ACTIVE_STATE || 'AUTO').trim().toUpperCase();
 const ARDUINO_EVENT_ACTIVE_STATE_MODE = ['ACTIVE', 'IDLE', 'AUTO'].includes(ARDUINO_EVENT_ACTIVE_STATE_MODE_RAW)
@@ -102,6 +103,10 @@ const ARDUINO_EVENT_ACTIVE_STATE_MODE = ['ACTIVE', 'IDLE', 'AUTO'].includes(ARDU
 const ARDUINO_THROW_WINDOW_MS = Number(process.env.ARDUINO_THROW_WINDOW_MS || 1200);
 const MATRIX_HIT_RELEASE_MS = Number(process.env.MATRIX_HIT_RELEASE_MS || 25);
 const MATRIX_HIT_REFRACTORY_MS = Number(process.env.MATRIX_HIT_REFRACTORY_MS || 350);
+const MATRIX_HIT_SUPPRESS_MS = Number(process.env.MATRIX_HIT_SUPPRESS_MS || 140);
+const MATRIX_HIT_CLUSTER_WINDOW_MS = Number(process.env.MATRIX_HIT_CLUSTER_WINDOW_MS || 90);
+const MATRIX_EVT_PAIR_MAX_SKEW_MS = Number(process.env.MATRIX_EVT_PAIR_MAX_SKEW_MS || 110);
+const ARDUINO_MATRIX_THROW_LOCK_MS = Number(process.env.ARDUINO_MATRIX_THROW_LOCK_MS || 500);
 
 // ── Spielmodi ──────────────────────────────────
 const GAME_MODES = {
@@ -212,6 +217,11 @@ let pendingArduinoThrow = null;
 let pendingArduinoThrowTimer = null;
 let arduinoThrowLockUntil = 0;
 let arduinoProcessingPromise = Promise.resolve();
+let matrixHitSuppressUntil = 0;
+let matrixLastAcceptedHitAt = 0;
+let matrixLastAcceptedKey = '';
+let matrixHitClusterTimer = null;
+let matrixHitClusterHits = [];
 const arduinoRawEventHistory = [];
 const matrixSniffer = {
   activeRows: {},
@@ -291,6 +301,118 @@ function broadcastArduinoState() {
 function normalizeArduinoStatePatch(patch) {
   Object.assign(arduinoState, patch, { lastUpdateMs: Date.now() });
   broadcastArduinoState();
+}
+
+function shouldQueueMatrixHit(key, nowMs) {
+  const now = Number(nowMs || Date.now());
+  if (key && key === matrixLastAcceptedKey && (now - matrixLastAcceptedHitAt) < MATRIX_HIT_REFRACTORY_MS) {
+    return false;
+  }
+
+  // Blocke nur direkte Nachzuegler auf dasselbe Segment im Suppress-Fenster.
+  if (key && key === matrixLastAcceptedKey && now < matrixHitSuppressUntil) {
+    return false;
+  }
+
+  return true;
+}
+
+function scoreMatrixHitCandidate(hit, count) {
+  let score = 0;
+  if (hit && hit.mapped) score += 4;
+  if (hit && Number(hit.points) > 0) score += 3;
+  if (hit && Number(hit.code) > 0) score += 1;
+  if (hit && String(hit.source || '').includes('evt')) score += 2;
+  score += Number(count || 0) * 10;
+  return score;
+}
+
+function pickFreshestActiveSignal(activeMap) {
+  const entries = Object.entries(activeMap || {})
+    .map(([index, ts]) => ({ index: Number(index), ts: Number(ts || 0) }))
+    .filter((entry) => Number.isFinite(entry.index) && Number.isFinite(entry.ts));
+
+  if (entries.length === 0) return null;
+  entries.sort((a, b) => b.ts - a.ts || a.index - b.index);
+  return entries[0];
+}
+
+function flushMatrixHitCluster() {
+  if (matrixHitClusterTimer) {
+    clearTimeout(matrixHitClusterTimer);
+    matrixHitClusterTimer = null;
+  }
+
+  if (!Array.isArray(matrixHitClusterHits) || matrixHitClusterHits.length === 0) {
+    matrixHitClusterHits = [];
+    return;
+  }
+
+  const grouped = new Map();
+  for (const entry of matrixHitClusterHits) {
+    const hit = entry.hit || {};
+    const key = String(hit.key || '').trim();
+    if (!key) continue;
+
+    let group = grouped.get(key);
+    if (!group) {
+      group = { key, count: 0, firstAt: entry.at, bestHit: hit, bestScore: -Infinity };
+      grouped.set(key, group);
+    }
+
+    group.count += 1;
+    if (entry.at < group.firstAt) group.firstAt = entry.at;
+
+    const candidateScore = scoreMatrixHitCandidate(hit, group.count);
+    if (candidateScore > group.bestScore) {
+      group.bestScore = candidateScore;
+      group.bestHit = hit;
+    }
+  }
+
+  matrixHitClusterHits = [];
+  const ranked = [...grouped.values()].sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
+    return a.firstAt - b.firstAt;
+  });
+
+  const winner = ranked[0];
+  if (!winner || !winner.bestHit) return;
+
+  const now = Date.now();
+  const acceptedHit = {
+    ...winner.bestHit,
+    ts: now,
+    clusterSize: ranked.reduce((sum, g) => sum + g.count, 0),
+    clusterCount: winner.count
+  };
+
+  matrixLastAcceptedHitAt = now;
+  matrixLastAcceptedKey = acceptedHit.key || '';
+  matrixHitSuppressUntil = now + MATRIX_HIT_SUPPRESS_MS;
+
+  matrixSniffer.lastMatrixHit = acceptedHit;
+  matrixSniffer.lastMatrixHitMs = now;
+  normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: acceptedHit } });
+
+  if (ARDUINO_AUTO_THROW_MATRIX_ENABLED && (acceptedHit.mapped || ARDUINO_AUTO_THROW_MATRIX_UNMAPPED)) {
+    handleArduinoMatrixHit(acceptedHit);
+  }
+}
+
+function queueMatrixHitCandidate(hit, nowMs) {
+  const now = Number(nowMs || Date.now());
+  const key = String((hit && hit.key) || '').trim();
+  if (!key) return false;
+  if (!shouldQueueMatrixHit(key, now)) return false;
+
+  matrixHitClusterHits.push({ hit, at: now });
+  if (!matrixHitClusterTimer) {
+    matrixHitClusterTimer = setTimeout(flushMatrixHitCluster, MATRIX_HIT_CLUSTER_WINDOW_MS);
+  }
+
+  return true;
 }
 
 function summarizeMatrixHit(hit) {
@@ -595,24 +717,28 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
 }
 
 function updateMatrixSnifferState(row, column, active, evt = {}) {
-  if (row != null) matrixSniffer.activeRows[row] = !!active;
-  if (column != null) matrixSniffer.activeColumns[column] = !!active;
-
-  Object.keys(matrixSniffer.activeRows).forEach((key) => {
-    if (!matrixSniffer.activeRows[key]) delete matrixSniffer.activeRows[key];
-  });
-  Object.keys(matrixSniffer.activeColumns).forEach((key) => {
-    if (!matrixSniffer.activeColumns[key]) delete matrixSniffer.activeColumns[key];
-  });
-
-  const activeRowKeys = Object.keys(matrixSniffer.activeRows).sort((a, b) => Number(a) - Number(b));
-  const activeColumnKeys = Object.keys(matrixSniffer.activeColumns).sort((a, b) => Number(a) - Number(b));
   const ms = Number(evt.ms || 0);
+  const edgeMs = Number.isFinite(ms) && ms > 0 ? ms : Date.now();
+
+  if (row != null) {
+    if (active) matrixSniffer.activeRows[row] = edgeMs;
+    else delete matrixSniffer.activeRows[row];
+  }
+  if (column != null) {
+    if (active) matrixSniffer.activeColumns[column] = edgeMs;
+    else delete matrixSniffer.activeColumns[column];
+  }
+
+  const freshestRow = pickFreshestActiveSignal(matrixSniffer.activeRows);
+  const freshestColumn = pickFreshestActiveSignal(matrixSniffer.activeColumns);
   const now = Date.now();
 
-  if (activeRowKeys.length > 0 && activeColumnKeys.length > 0) {
-    const row = activeRowKeys[0];
-    const column = activeColumnKeys[0];
+  if (freshestRow && freshestColumn) {
+    const row = freshestRow.index;
+    const column = freshestColumn.index;
+    const pairSkew = Math.abs(Number(freshestRow.ts || 0) - Number(freshestColumn.ts || 0));
+    if (pairSkew > MATRIX_EVT_PAIR_MAX_SKEW_MS) return;
+
     const key = `R${row},C${column}`;
     const mapped = MATRIX_ROW_COLUMN_VALUES[key];
     const code = mapped ? mapped.code : null;
@@ -622,17 +748,22 @@ function updateMatrixSnifferState(row, column, active, evt = {}) {
       matrixSniffer.matrixHitActive = true;
       matrixSniffer.lastMatrixHitRow = row;
       matrixSniffer.lastMatrixHitColumn = column;
-      matrixSniffer.lastMatrixHitPairMs = ms;
+      matrixSniffer.lastMatrixHitPairMs = Number.isFinite(ms) && ms > 0 ? ms : edgeMs;
 
       if (now - matrixSniffer.lastMatrixHitMs >= MATRIX_HIT_REFRACTORY_MS) {
-        matrixSniffer.lastMatrixHitMs = now;
-        const hit = { row: `R${row}`, column: `C${column}`, key, code, points, ms, ts: now, line: evt.line || '', mapped: !!mapped };
-        matrixSniffer.lastMatrixHit = hit;
-        normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: hit } });
-
-        if (ARDUINO_AUTO_THROW_MATRIX_ENABLED && (mapped || ARDUINO_AUTO_THROW_MATRIX_UNMAPPED)) {
-          handleArduinoMatrixHit(hit);
-        }
+        const hit = {
+          row: `R${row}`,
+          column: `C${column}`,
+          key,
+          code,
+          points,
+          ms,
+          ts: now,
+          line: evt.line || '',
+          mapped: !!mapped,
+          source: 'arduino-matrix-evt'
+        };
+        queueMatrixHitCandidate(hit, now);
       }
     }
     return;
@@ -653,7 +784,12 @@ function handleArduinoMatrixHit(hit) {
   arduinoProcessingPromise = arduinoProcessingPromise
     .catch(() => {})
     .then(() => applyArduinoThrowFromMatrix(hit))
-    .then((result) => normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason }))
+    .then((result) => {
+      if (result && result.ok) {
+        arduinoThrowLockUntil = Date.now() + Math.max(0, ARDUINO_MATRIX_THROW_LOCK_MS);
+      }
+      normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason });
+    })
     .catch((err) => normalizeArduinoStatePatch({ lastAutoThrow: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
 }
 
@@ -896,6 +1032,7 @@ function parseArduinoLine(line) {
   // HIT/MATRIX,<ms>,R#,C#[,CODE,POINTS] (passiver Matrix-Sniffer)
   const hitMatch = clean.match(/^(?:HIT|MATRIX),(\d+),R(\d+),C(\d+)(?:,(-?\d+),(-?\d+))?$/i);
   if (hitMatch) {
+    if (!ARDUINO_MATRIX_RAW_ENABLED) return;
     const row = `R${Number(hitMatch[2])}`;
     const column = `C${Number(hitMatch[3])}`;
     const key = `${row},${column}`;
@@ -911,12 +1048,11 @@ function parseArduinoLine(line) {
       points: Number.isFinite(rawPoints) ? rawPoints : (mapped ? mapped.points : 0),
       ts: Date.now(),
       line: clean,
-      mapped: !!mapped
+      mapped: !!mapped,
+      source: 'arduino-matrix-raw'
     };
-    matrixSniffer.lastMatrixHit = hit;
-    matrixSniffer.lastMatrixHitMs = Date.now();
-    normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: hit } });
-    if (ARDUINO_AUTO_THROW_MATRIX_ENABLED && (mapped || ARDUINO_AUTO_THROW_MATRIX_UNMAPPED)) handleArduinoMatrixHit(hit);
+    const hitNow = Date.now();
+    queueMatrixHitCandidate(hit, hitNow);
     return;
   }
 
