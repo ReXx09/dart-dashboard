@@ -12,7 +12,35 @@
     .topbar a:hover { color: #fff; }
     .topbar h2 { font-size: 1.1rem; flex: 1; font-weight: 700; }
     .badge-ctrl { background: #457b9d; color: #fff; font-size: .65rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
+    .section-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(10, 10, 10, .92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #1b1b1b;
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .section-nav a {
+      flex: 0 0 auto;
+      color: #c9c9c9;
+      text-decoration: none;
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .03em;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid #242424;
+      background: #111;
+      transition: all .15s ease;
+    }
+    .section-nav a:hover { color: #fff; border-color: #3a3a3a; background: #171717; }
     main { padding: 16px; max-width: 800px; margin: 0 auto; display: grid; gap: 14px; }
+    .ctrl-section { scroll-margin-top: 70px; }
     .ctrl-section { background: #141414; border-radius: 14px; border: 1px solid #1e1e1e; padding: 16px; }
     .ctrl-section h3 { font-size: .85rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
     .game-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -74,8 +102,16 @@
     <h2>🎮 Controller</h2>
     <span class="badge-ctrl">STEUERUNG</span>
   </div>
+  <div class="section-nav" aria-label="Controller Navigation">
+    <a href="#spiel">Spiel</a>
+    <a href="#spieler">Spieler</a>
+    <a href="#aktionen">Aktionen</a>
+    <a href="#arduino">Arduino</a>
+    <a href="#scanner">Scanner</a>
+    <a href="#tuning">Tuning</a>
+  </div>
   <main>
-    <div class="ctrl-section">
+    <div class="ctrl-section" id="spiel">
       <h3>Spiel</h3>
       <div class="game-mode">
         <span class="label">Modus:</span>
@@ -94,11 +130,11 @@
         <button class="btn-sm danger" onclick="resetLeg(false)">Reset</button>
       </div>
     </div>
-    <div class="ctrl-section">
+    <div class="ctrl-section" id="spieler">
       <h3>Spieler</h3>
       <div id="playerListContainer"><div style="color:#444">Lade Spieler...</div></div>
     </div>
-    <div class="ctrl-section">
+    <div class="ctrl-section" id="aktionen">
       <h3>Aktionen</h3>
       <div class="action-row">
         <button class="btn-sm" onclick="undoLast()">↩ Rückgängig (Undo)</button>
@@ -110,7 +146,7 @@
         <button class="pts" id="ctrlThrowBtn">Werfen</button>
       </div>
     </div>
-    <div class="ctrl-section">
+    <div class="ctrl-section" id="arduino">
       <h3>Arduino Monitor</h3>
       <div class="arduino-status" id="ctrlArduino"><span class="arduino-dot off"></span>Nicht verbunden</div>
       <div class="arduino-monitor-grid">
@@ -126,7 +162,7 @@
       </div>
       <div class="arduino-last-line" id="ctrlLastLine">Letzte serielle Zeile: -</div>
     </div>
-    <div class="ctrl-section">
+    <div class="ctrl-section" id="scanner">
       <h3>Matrix-Scanner (Rohwerte)</h3>
       <div class="action-row">
         <button class="btn-sm primary" id="fieldTestToggle" onclick="toggleFieldTestMode()">Scanner starten</button>
@@ -150,7 +186,7 @@
       <div class="arduino-last-line" id="fieldTestSummary">Wert-Haeufigkeit: -</div>
       <div class="field-test-log" id="fieldTestLog"></div>
     </div>
-    <div class="ctrl-section">
+    <div class="ctrl-section" id="tuning">
       <h3>Treffer-Tuning (Lokal)</h3>
       <div class="tuning-row">
         <button class="btn-sm" onclick="openTuningInfoWindow()">Info-Fenster</button>

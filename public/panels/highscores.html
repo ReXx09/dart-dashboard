@@ -213,8 +213,35 @@
     body.tv-mode footer {
       display: none !important;
     }
+    body.tv-mode .logo { font-size: 1.5rem; }
+    body.tv-mode .header-text h1 { font-size: 1.08rem; }
+    body.tv-mode .header-text p { display: none; }
+    body.tv-mode #clock { font-size: 1rem; }
     body.tv-mode .tables-grid { grid-template-columns: 1fr; }
-    body.tv-mode .panel:first-child { min-height: calc(100vh - 170px); }
+    body.tv-mode .panel:first-child { min-height: calc(100vh - 128px); }
+    body.tv-mode .panel-header { padding: 10px 12px; }
+    body.tv-mode .panel-title { font-size: .62rem; letter-spacing: 1.2px; }
+    body.tv-mode .panel-subtitle { font-size: .66rem; }
+    body.tv-mode th,
+    body.tv-mode td {
+      padding: 8px 9px;
+      font-size: .78rem;
+    }
+    body.tv-mode th { font-size: .6rem; }
+    body.tv-mode .rank { width: 34px; }
+    body.tv-mode .score { font-size: .92rem; }
+
+    @media (max-width: 1100px) and (max-height: 900px) {
+      body.tv-mode header { padding: 10px 14px; }
+      body.tv-mode main { padding: 10px 14px 12px; }
+      body.tv-mode .panel:first-child { min-height: calc(100vh - 112px); }
+      body.tv-mode th,
+      body.tv-mode td {
+        padding: 7px 8px;
+        font-size: .74rem;
+      }
+      body.tv-mode .score { font-size: .86rem; }
+    }
     @media (max-width: 900px) {
       .toolbar, .tables-grid, .summary-grid { grid-template-columns: 1fr; }
       .toolbar { display: flex; flex-direction: column; }

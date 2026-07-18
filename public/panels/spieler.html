@@ -83,10 +83,39 @@
     }
     body.tv-mode main { max-width: none; padding: 14px 18px 16px; }
     body.tv-mode .page-header { justify-content: flex-start; }
-    body.tv-mode .slots-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    body.tv-mode .slot-card { padding: 12px 14px; }
-    body.tv-mode .slot-name-input { font-size: 1rem; padding: 8px 10px; }
-    body.tv-mode .slot-info { min-height: 18px; }
+    body.tv-mode .page-header-left p,
+    body.tv-mode .slot-colors,
+    body.tv-mode .toggle,
+    body.tv-mode .slot-info,
+    body.tv-mode #clock-mini,
+    body.tv-mode .section-header {
+      display: none !important;
+    }
+    body.tv-mode .summary-row { gap: 8px; }
+    body.tv-mode .player-chip {
+      background: #111;
+      border-color: #252525;
+      font-size: .88rem;
+      padding: 6px 12px 6px 9px;
+    }
+    body.tv-mode .slots-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    body.tv-mode .slot-card { padding: 10px 12px; min-height: 82px; justify-content: center; }
+    body.tv-mode .slot-card:not(.active) { display: none; }
+    body.tv-mode .slot-head { margin-bottom: 6px; }
+    body.tv-mode .slot-label { font-size: .62rem; }
+    body.tv-mode .slot-name-input {
+      font-size: 1rem;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    body.tv-mode .slot-name-input::placeholder { color: #555; }
+
+    @media (max-width: 1000px) {
+      body.tv-mode .slots-grid { grid-template-columns: 1fr; }
+    }
 
     /* Section header */
     .section-header { display: flex; align-items: center; gap: 12px; }

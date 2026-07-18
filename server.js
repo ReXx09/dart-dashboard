@@ -2,6 +2,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const http = require('http');
 const { DataStore } = require('./db');
 
 let SerialPortCtor = null;
@@ -33,7 +34,8 @@ function getLocalIP() {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const BROWSER_PORT = Number(process.env.BROWSER_PORT || process.env.PORT || 3100);
+const FIRETV_PORT = Number(process.env.FIRETV_PORT || 3200);
 
 const DATA_DIR       = path.join(__dirname, 'data');
 const SETTINGS_FILE  = path.join(DATA_DIR, 'settings.json');
@@ -244,6 +246,7 @@ function clampNumber(value, fallback, min, max) {
 function refreshRuntimeTuning(settings = getSettings()) {
   runtimeTuning = {
     arduinoMatrixRawEnabled: settings.arduinoMatrixRawEnabled !== false,
+    matrixAutoThrowEnabled: settings.matrixAutoThrowEnabled !== false,
     arduinoThrowWindowMs: clampNumber(settings.arduinoThrowWindowMs, ARDUINO_THROW_WINDOW_MS, 100, 4000),
     matrixHitReleaseMs: clampNumber(settings.matrixHitReleaseMs, MATRIX_HIT_RELEASE_MS, 5, 300),
     matrixHitRefractoryMs: clampNumber(settings.matrixHitRefractoryMs, MATRIX_HIT_REFRACTORY_MS, 80, 1200),
@@ -844,6 +847,13 @@ function handleArduinoMatrixHit(hit) {
   if (pendingArduinoThrow && !pendingArduinoThrow.applied) return;
   if (Date.now() < arduinoThrowLockUntil) return;
   if (runtimeTuning.throwMinIntervalMs > 0 && (Date.now() - lastAppliedThrowAt) < runtimeTuning.throwMinIntervalMs) return;
+  if (!runtimeTuning.matrixAutoThrowEnabled) {
+    normalizeArduinoStatePatch({
+      lastAutoThrow: { ok: false, reason: 'matrix-auto-throw-disabled', hit: summarizeMatrixHit(hit) },
+      lastAutoThrowError: 'matrix-auto-throw-disabled'
+    });
+    return;
+  }
 
   arduinoProcessingPromise = arduinoProcessingPromise
     .catch(() => {})
@@ -1561,7 +1571,16 @@ app.put('/api/matrix-mapping', (req, res) => {
 
 // ── Server-Info ──
 app.get('/api/server-info', (_req, res) => {
-  res.json({ ip: getLocalIP(), port: PORT, url: 'http://' + getLocalIP() + ':' + PORT });
+  const ip = getLocalIP();
+  res.json({
+    ip,
+    port: BROWSER_PORT,
+    browserPort: BROWSER_PORT,
+    fireTvPort: FIRETV_PORT,
+    url: 'http://' + ip + ':' + BROWSER_PORT,
+    browserUrl: 'http://' + ip + ':' + BROWSER_PORT,
+    fireTvUrl: 'http://' + ip + ':' + FIRETV_PORT
+  });
 });
 
 // ── SSE – Live-Push ──
@@ -1804,9 +1823,86 @@ async function startServer() {
   console.log('[Storage] client=' + storageInfo.client + ' external=' + storageInfo.external);
   if (storageInfo.sqliteFile) console.log('[Storage] sqlite=' + storageInfo.sqliteFile);
 
-  app.listen(PORT, () => {
-    console.log('Dashboard: http://localhost:' + PORT);
+  app.listen(BROWSER_PORT, () => {
+    console.log('Dashboard (Browser): http://localhost:' + BROWSER_PORT);
+    startFireTvServer();
     startArduinoMonitor();
+  });
+}
+
+function createFireTvServer() {
+  const fireTvApp = express();
+  fireTvApp.disable('x-powered-by');
+
+  const panelsDir = path.join(__dirname, 'public', 'panels');
+  const allowedPanels = new Set([
+    'firetv-dashboard.html',
+    'live-spielstand.html',
+    'spieler.html',
+    'highscores.html'
+  ]);
+
+  function proxyToBrowser(req, res) {
+    const proxyReq = http.request({
+      protocol: 'http:',
+      hostname: '127.0.0.1',
+      port: BROWSER_PORT,
+      method: req.method,
+      path: req.originalUrl,
+      headers: {
+        ...req.headers,
+        host: '127.0.0.1:' + BROWSER_PORT
+      }
+    }, (proxyRes) => {
+      res.status(proxyRes.statusCode || 502);
+      Object.entries(proxyRes.headers || {}).forEach(([key, value]) => {
+        if (value !== undefined) res.setHeader(key, value);
+      });
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Fire-TV-Proxy Fehler: ' + err.message });
+      } else {
+        res.end();
+      }
+    });
+
+    req.pipe(proxyReq);
+  }
+
+  fireTvApp.get('/', (_req, res) => {
+    res.redirect('/panels/firetv-dashboard.html');
+  });
+
+  fireTvApp.get('/panels/:name', (req, res) => {
+    const panel = String(req.params.name || '').trim();
+    if (!allowedPanels.has(panel)) {
+      res.status(404).send('Diese Seite ist am Fire-TV-Port nicht freigegeben.');
+      return;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.sendFile(path.join(panelsDir, panel));
+  });
+
+  fireTvApp.use('/api', proxyToBrowser);
+
+  fireTvApp.use((_req, res) => {
+    res.status(404).send('Fire-TV-Port: Nur /panels/firetv-dashboard.html und TV-Panels sind verfuegbar.');
+  });
+
+  return fireTvApp;
+}
+
+function startFireTvServer() {
+  if (FIRETV_PORT === BROWSER_PORT) {
+    console.log('[FireTV] deaktiviert: FIRETV_PORT ist gleich BROWSER_PORT (' + BROWSER_PORT + ').');
+    return;
+  }
+  const fireTvApp = createFireTvServer();
+  fireTvApp.listen(FIRETV_PORT, () => {
+    console.log('Dashboard (Fire TV): http://localhost:' + FIRETV_PORT + '/panels/firetv-dashboard.html');
   });
 }
 

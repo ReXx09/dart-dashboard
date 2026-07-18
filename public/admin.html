@@ -129,6 +129,18 @@
     </fieldset>
   </div>
 
+  <div class="section">
+    <div class="sec-hd"><span class="sec-title">Matrix-Übernahme</span><div class="sec-line"></div></div>
+    <fieldset>
+      <div class="field-row">
+        <label>Matrix-Hits ins Live-Spiel</label>
+        <input type="checkbox" id="matrixAutoThrowEnabled" />
+      </div>
+      <div class="field-hint">Aktiviert die Übernahme der akzeptierten Scanner-Cluster als echte Würfe im Live-Dashboard.</div>
+      <button class="btn-save" id="saveMatrixAutoThrowBtn">Matrix-Übernahme speichern</button>
+    </fieldset>
+  </div>
+
 </main>
 <div class="toast" id="toast"></div>
 <script>
@@ -155,6 +167,7 @@
       document.getElementById('firetvTileOrder').value = settings.firetvTileOrder || 'live,spieler,highscores';
       document.getElementById('firetvUiScale').value = String(settings.firetvUiScale || 100);
       document.getElementById('firetvShowClock').checked = settings.firetvShowClock !== false;
+      document.getElementById('matrixAutoThrowEnabled').checked = settings.matrixAutoThrowEnabled !== false;
     } catch(e) {
       document.getElementById('si-ip').textContent = 'Offline';
     }
@@ -226,6 +239,25 @@
       });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       showToast('Fire-TV-Einstellungen gespeichert.');
+    } catch(e) {
+      showToast('Fehler: ' + e.message, true);
+    }
+    this.disabled = false;
+  });
+
+  document.getElementById('saveMatrixAutoThrowBtn').addEventListener('click', async function() {
+    this.disabled = true;
+    const settings = {
+      matrixAutoThrowEnabled: document.getElementById('matrixAutoThrowEnabled').checked
+    };
+    try {
+      const r = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(settings)
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      showToast('Matrix-Übernahme gespeichert.');
     } catch(e) {
       showToast('Fehler: ' + e.message, true);
     }

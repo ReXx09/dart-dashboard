@@ -170,12 +170,47 @@
     body.tv-mode .footer {
       display: none !important;
     }
-    body.tv-mode .topbar { padding: 10px 16px; }
-    body.tv-mode main { max-width: none; padding: 12px; }
-    body.tv-mode .focus-player { grid-template-columns: 1.45fr .75fr; }
+    body.tv-mode .topbar { padding: 8px 14px; }
+    body.tv-mode .topbar h2 { font-size: .98rem; }
+    body.tv-mode .live-badge { font-size: .58rem; padding: 3px 8px; }
+    body.tv-mode main { max-width: none; padding: 10px; gap: 8px; }
+    body.tv-mode .focus-player { grid-template-columns: 1.35fr .65fr; gap: 8px; }
+    body.tv-mode .focus-card { padding: 12px; border-radius: 14px; }
+    body.tv-mode .focus-name { font-size: 1.06rem; margin-bottom: 2px; }
+    body.tv-mode .focus-meta { font-size: .68rem; margin-bottom: 8px; }
+    body.tv-mode .focus-kacheln { gap: 7px; }
+    body.tv-mode .focus-kachel { min-height: 108px; padding: 8px; border-radius: 11px; }
+    body.tv-mode .focus-kachel h4 { font-size: .6rem; margin-bottom: 7px; }
+    body.tv-mode .focus-kachel .subline { font-size: .62rem; }
+    body.tv-mode .throw-segments { gap: 6px; }
+    body.tv-mode .throw-seg { min-height: 48px; border-radius: 10px; }
+    body.tv-mode .throw-seg .seg { font-size: 1rem; }
+    body.tv-mode .throw-seg .pts { font-size: .66rem; margin-top: 2px; }
     body.tv-mode .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-    body.tv-mode .focus-big-score { font-size: 4.6rem; }
-    body.tv-mode .focus-kachel { min-height: 138px; }
+    body.tv-mode .focus-big-score { font-size: 3.05rem; }
+    body.tv-mode .focus-summary { margin-top: 7px; gap: 6px; }
+    body.tv-mode .focus-summary div { padding: 7px; }
+    body.tv-mode .focus-summary span { font-size: .58rem; }
+    body.tv-mode .focus-summary strong { font-size: .86rem; }
+    body.tv-mode .focus-leg-card { padding: 10px; border-radius: 14px; }
+    body.tv-mode .focus-leg-card h4 { font-size: .62rem; }
+    body.tv-mode .focus-leg-card .leg-list { max-height: 250px; }
+    body.tv-mode .leg-item { padding: 5px 7px; font-size: .68rem; }
+    body.tv-mode .score-card { padding: 10px; border-radius: 10px; }
+    body.tv-mode .sc-name { font-size: .78rem; }
+    body.tv-mode .sc-score { font-size: 1.95rem; margin-bottom: 3px; }
+    body.tv-mode .sc-stats { font-size: .66rem; line-height: 1.35; }
+    body.tv-mode .sc-last-throws { margin-top: 5px; gap: 3px; }
+    body.tv-mode .sc-throw-chip { font-size: .66rem; padding: 2px 5px; min-width: 24px; }
+    body.tv-mode .sc-average { margin-top: 5px; font-size: .6rem; }
+    body.tv-mode .sc-average strong { font-size: .75rem; }
+    body.tv-mode .sc-legs { right: 8px; bottom: 7px; font-size: .58rem; }
+
+    @media (max-width: 1100px) and (max-height: 900px) {
+      body.tv-mode .focus-player { grid-template-columns: 1fr; }
+      body.tv-mode .focus-leg-card .leg-list { max-height: 120px; }
+      body.tv-mode .compact-players { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
+    }
     @media (max-width: 768px) {
       .scoreboard { grid-template-columns: 1fr; }
       .status-grid { grid-template-columns: 1fr; }
