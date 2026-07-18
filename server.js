@@ -108,6 +108,22 @@ const MATRIX_HIT_CLUSTER_WINDOW_MS = Number(process.env.MATRIX_HIT_CLUSTER_WINDO
 const MATRIX_EVT_PAIR_MAX_SKEW_MS = Number(process.env.MATRIX_EVT_PAIR_MAX_SKEW_MS || 220);
 const MATRIX_SAME_KEY_GUARD_MS = Number(process.env.MATRIX_SAME_KEY_GUARD_MS || 130);
 const ARDUINO_MATRIX_THROW_LOCK_MS = Number(process.env.ARDUINO_MATRIX_THROW_LOCK_MS || 220);
+const THROW_MIN_INTERVAL_MS = Number(process.env.THROW_MIN_INTERVAL_MS || 120);
+const PLAYER_SWITCH_DELAY_MS = Number(process.env.PLAYER_SWITCH_DELAY_MS || 0);
+
+let runtimeTuning = {
+  arduinoMatrixRawEnabled: ARDUINO_MATRIX_RAW_ENABLED,
+  arduinoThrowWindowMs: ARDUINO_THROW_WINDOW_MS,
+  matrixHitReleaseMs: MATRIX_HIT_RELEASE_MS,
+  matrixHitRefractoryMs: MATRIX_HIT_REFRACTORY_MS,
+  matrixHitSuppressMs: MATRIX_HIT_SUPPRESS_MS,
+  matrixHitClusterWindowMs: MATRIX_HIT_CLUSTER_WINDOW_MS,
+  matrixEvtPairMaxSkewMs: MATRIX_EVT_PAIR_MAX_SKEW_MS,
+  matrixSameKeyGuardMs: MATRIX_SAME_KEY_GUARD_MS,
+  arduinoMatrixThrowLockMs: ARDUINO_MATRIX_THROW_LOCK_MS,
+  throwMinIntervalMs: THROW_MIN_INTERVAL_MS,
+  playerSwitchDelayMs: PLAYER_SWITCH_DELAY_MS
+};
 
 // ── Spielmodi ──────────────────────────────────
 const GAME_MODES = {
@@ -200,11 +216,48 @@ function getSettings() {
     arduinoMonitorEnabled: true,
     arduinoPort: '',
     arduinoBaudRate: 115200,
+    arduinoMatrixRawEnabled: runtimeTuning.arduinoMatrixRawEnabled,
+    arduinoThrowWindowMs: runtimeTuning.arduinoThrowWindowMs,
+    matrixHitReleaseMs: runtimeTuning.matrixHitReleaseMs,
+    matrixHitRefractoryMs: runtimeTuning.matrixHitRefractoryMs,
+    matrixHitSuppressMs: runtimeTuning.matrixHitSuppressMs,
+    matrixHitClusterWindowMs: runtimeTuning.matrixHitClusterWindowMs,
+    matrixEvtPairMaxSkewMs: runtimeTuning.matrixEvtPairMaxSkewMs,
+    matrixSameKeyGuardMs: runtimeTuning.matrixSameKeyGuardMs,
+    arduinoMatrixThrowLockMs: runtimeTuning.arduinoMatrixThrowLockMs,
+    throwMinIntervalMs: runtimeTuning.throwMinIntervalMs,
+    playerSwitchDelayMs: runtimeTuning.playerSwitchDelayMs,
     ...readJson(SETTINGS_FILE, {})
   };
   return merged;
 }
 function saveSettings(s) { writeJson(SETTINGS_FILE, s); }
+
+function clampNumber(value, fallback, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  if (Number.isFinite(min) && n < min) return min;
+  if (Number.isFinite(max) && n > max) return max;
+  return n;
+}
+
+function refreshRuntimeTuning(settings = getSettings()) {
+  runtimeTuning = {
+    arduinoMatrixRawEnabled: settings.arduinoMatrixRawEnabled !== false,
+    arduinoThrowWindowMs: clampNumber(settings.arduinoThrowWindowMs, ARDUINO_THROW_WINDOW_MS, 100, 4000),
+    matrixHitReleaseMs: clampNumber(settings.matrixHitReleaseMs, MATRIX_HIT_RELEASE_MS, 5, 300),
+    matrixHitRefractoryMs: clampNumber(settings.matrixHitRefractoryMs, MATRIX_HIT_REFRACTORY_MS, 80, 1200),
+    matrixHitSuppressMs: clampNumber(settings.matrixHitSuppressMs, MATRIX_HIT_SUPPRESS_MS, 20, 800),
+    matrixHitClusterWindowMs: clampNumber(settings.matrixHitClusterWindowMs, MATRIX_HIT_CLUSTER_WINDOW_MS, 20, 300),
+    matrixEvtPairMaxSkewMs: clampNumber(settings.matrixEvtPairMaxSkewMs, MATRIX_EVT_PAIR_MAX_SKEW_MS, 20, 600),
+    matrixSameKeyGuardMs: clampNumber(settings.matrixSameKeyGuardMs, MATRIX_SAME_KEY_GUARD_MS, 20, 800),
+    arduinoMatrixThrowLockMs: clampNumber(settings.arduinoMatrixThrowLockMs, ARDUINO_MATRIX_THROW_LOCK_MS, 50, 1500),
+    throwMinIntervalMs: clampNumber(settings.throwMinIntervalMs, THROW_MIN_INTERVAL_MS, 0, 1200),
+    playerSwitchDelayMs: clampNumber(settings.playerSwitchDelayMs, PLAYER_SWITCH_DELAY_MS, 0, 5000)
+  };
+}
+
+refreshRuntimeTuning();
 
 // ──────────────────────────────────────────────
 // Arduino Serial Monitor
@@ -223,6 +276,7 @@ let matrixLastAcceptedHitAt = 0;
 let matrixLastAcceptedKey = '';
 let matrixHitClusterTimer = null;
 let matrixHitClusterHits = [];
+let lastAppliedThrowAt = 0;
 const arduinoRawEventHistory = [];
 const matrixSniffer = {
   activeRows: {},
@@ -306,7 +360,7 @@ function normalizeArduinoStatePatch(patch) {
 
 function shouldQueueMatrixHit(key, nowMs) {
   const now = Number(nowMs || Date.now());
-  if (key && key === matrixLastAcceptedKey && (now - matrixLastAcceptedHitAt) < MATRIX_SAME_KEY_GUARD_MS) {
+  if (key && key === matrixLastAcceptedKey && (now - matrixLastAcceptedHitAt) < runtimeTuning.matrixSameKeyGuardMs) {
     return false;
   }
 
@@ -391,7 +445,7 @@ function flushMatrixHitCluster() {
 
   matrixLastAcceptedHitAt = now;
   matrixLastAcceptedKey = acceptedHit.key || '';
-  matrixHitSuppressUntil = now + MATRIX_HIT_SUPPRESS_MS;
+  matrixHitSuppressUntil = now + runtimeTuning.matrixHitSuppressMs;
 
   matrixSniffer.lastMatrixHit = acceptedHit;
   matrixSniffer.lastMatrixHitMs = now;
@@ -410,7 +464,7 @@ function queueMatrixHitCandidate(hit, nowMs) {
 
   matrixHitClusterHits.push({ hit, at: now });
   if (!matrixHitClusterTimer) {
-    matrixHitClusterTimer = setTimeout(flushMatrixHitCluster, MATRIX_HIT_CLUSTER_WINDOW_MS);
+    matrixHitClusterTimer = setTimeout(flushMatrixHitCluster, runtimeTuning.matrixHitClusterWindowMs);
   }
 
   return true;
@@ -563,6 +617,10 @@ function clearPendingArduinoThrow() {
 
 async function advanceAfterThreeThrows(state, player, source) {
   if (state.game.status === 'leg-finished' || state.game.currentThrow < 3) return;
+
+  if (runtimeTuning.playerSwitchDelayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, runtimeTuning.playerSwitchDelayMs));
+  }
 
   player.currentRoundPoints = [];
   state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
@@ -738,7 +796,7 @@ function updateMatrixSnifferState(row, column, active, evt = {}) {
     const row = freshestRow.index;
     const column = freshestColumn.index;
     const pairSkew = Math.abs(Number(freshestRow.ts || 0) - Number(freshestColumn.ts || 0));
-    if (pairSkew > MATRIX_EVT_PAIR_MAX_SKEW_MS) return;
+    if (pairSkew > runtimeTuning.matrixEvtPairMaxSkewMs) return;
 
     const key = `R${row},C${column}`;
     const mapped = MATRIX_ROW_COLUMN_VALUES[key];
@@ -751,7 +809,7 @@ function updateMatrixSnifferState(row, column, active, evt = {}) {
       matrixSniffer.lastMatrixHitColumn = column;
       matrixSniffer.lastMatrixHitPairMs = Number.isFinite(ms) && ms > 0 ? ms : edgeMs;
 
-      if (now - matrixSniffer.lastMatrixHitMs >= MATRIX_HIT_REFRACTORY_MS) {
+      if (now - matrixSniffer.lastMatrixHitMs >= runtimeTuning.matrixHitRefractoryMs) {
         const hit = {
           row: `R${row}`,
           column: `C${column}`,
@@ -770,7 +828,7 @@ function updateMatrixSnifferState(row, column, active, evt = {}) {
     return;
   }
 
-  if (matrixSniffer.matrixHitActive && ms - matrixSniffer.lastMatrixHitPairMs >= MATRIX_HIT_RELEASE_MS) {
+  if (matrixSniffer.matrixHitActive && ms - matrixSniffer.lastMatrixHitPairMs >= runtimeTuning.matrixHitReleaseMs) {
     matrixSniffer.matrixHitActive = false;
     matrixSniffer.lastMatrixHitRow = null;
     matrixSniffer.lastMatrixHitColumn = null;
@@ -781,13 +839,16 @@ function updateMatrixSnifferState(row, column, active, evt = {}) {
 function handleArduinoMatrixHit(hit) {
   if (pendingArduinoThrow && !pendingArduinoThrow.applied) return;
   if (Date.now() < arduinoThrowLockUntil) return;
+  if (runtimeTuning.throwMinIntervalMs > 0 && (Date.now() - lastAppliedThrowAt) < runtimeTuning.throwMinIntervalMs) return;
 
   arduinoProcessingPromise = arduinoProcessingPromise
     .catch(() => {})
     .then(() => applyArduinoThrowFromMatrix(hit))
     .then((result) => {
       if (result && result.ok) {
-        arduinoThrowLockUntil = Date.now() + Math.max(0, ARDUINO_MATRIX_THROW_LOCK_MS);
+        const now = Date.now();
+        lastAppliedThrowAt = now;
+        arduinoThrowLockUntil = now + Math.max(0, runtimeTuning.arduinoMatrixThrowLockMs);
       }
       normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason });
     })
@@ -944,7 +1005,7 @@ function handleArduinoTrigger(evt) {
       .then(() => applyArduinoMiss({ line: pending.line || '', ms: pending.triggerMs }, 'timeout'))
       .then((result) => normalizeArduinoStatePatch({ lastMiss: result.ok ? result : { ok: false, reason: result.reason } }))
       .catch((err) => normalizeArduinoStatePatch({ lastMiss: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
-  }, ARDUINO_THROW_WINDOW_MS);
+  }, runtimeTuning.arduinoThrowWindowMs);
   pendingArduinoThrowTimer = pendingArduinoThrow.timer;
   normalizeArduinoStatePatch({ pendingThrow: true, lastAutoThrow: null, lastMiss: null, lastAutoThrowError: null });
 }
@@ -952,7 +1013,7 @@ function handleArduinoTrigger(evt) {
 function handleArduinoActiveEvent(evt) {
   if (!ARDUINO_AUTO_THROW_ENABLED) return;
   if (ARDUINO_REQUIRE_THROW_TRIGGER && (!pendingArduinoThrow || pendingArduinoThrow.applied)) return;
-  if (pendingArduinoThrow && Date.now() - pendingArduinoThrow.startedAt > ARDUINO_THROW_WINDOW_MS) return;
+  if (pendingArduinoThrow && Date.now() - pendingArduinoThrow.startedAt > runtimeTuning.arduinoThrowWindowMs) return;
 
   const pending = pendingArduinoThrow;
   clearPendingArduinoThrow();
@@ -1033,7 +1094,7 @@ function parseArduinoLine(line) {
   // HIT/MATRIX,<ms>,R#,C#[,CODE,POINTS] (passiver Matrix-Sniffer)
   const hitMatch = clean.match(/^(?:HIT|MATRIX),(\d+),R(\d+),C(\d+)(?:,(-?\d+),(-?\d+))?$/i);
   if (hitMatch) {
-    if (!ARDUINO_MATRIX_RAW_ENABLED) return;
+    if (!runtimeTuning.arduinoMatrixRawEnabled) return;
     const row = `R${Number(hitMatch[2])}`;
     const column = `C${Number(hitMatch[3])}`;
     const key = `${row},${column}`;
@@ -1463,6 +1524,7 @@ app.get('/api/settings', (_req, res) => res.json(getSettings()));
 app.put('/api/settings', (req, res) => {
   const s = { ...getSettings(), ...req.body };
   saveSettings(s);
+  refreshRuntimeTuning(s);
   restartArduinoMonitor();
   broadcastReload();
   res.json(s);
