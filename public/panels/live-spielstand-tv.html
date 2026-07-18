@@ -44,6 +44,16 @@
       min-height: 0;
     }
     .focus-player.single { grid-template-columns: 1fr; }
+    .focus-player.has-others { flex: 0 0 auto; max-height: 62%; }
+    .compact-players {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      min-height: 0;
+      align-content: start;
+    }
+    .compact-players:empty { display: none; }
     .focus-card {
       background: linear-gradient(135deg, #191111, #141414);
       border-radius: 14px;
@@ -119,10 +129,32 @@
     .leg-item .idx { color: #777; }
     .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+    .score-card {
+      background: #141414;
+      border-radius: 12px;
+      padding: 12px;
+      border: 2px solid #1e1e1e;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; }
+    .score-card .sc-name { font-size: .86rem; font-weight: 700; }
+    .score-card .sc-score { font-size: 2.2rem; font-weight: 800; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .score-card .sc-stats { font-size: .68rem; color: #666; line-height: 1.5; }
+    .score-card .sc-stats span { color: #aaa; font-weight: 600; }
+    .score-card .sc-last-throws { display: flex; gap: 3px; }
+    .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 2px 6px; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 24px; text-align: center; }
+    .score-card .sc-throw-chip.empty { color: #333; }
+
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .focus-kachel { min-height: 124px; }
       .focus-big-score { font-size: 3.35rem; }
+      .focus-player.has-others { max-height: 56%; }
+      .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; }
     }
   </style>
 </head>
@@ -133,6 +165,7 @@
   </div>
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
+    <section class="compact-players" id="compactPlayers"></section>
   </main>
   <script>
     let liveState = null;
@@ -254,19 +287,53 @@
       return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
     }
 
+    function renderCompactPlayer(p, mode) {
+      const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
+      const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
+      const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows;
+      while (displayThrows.length < 3) displayThrows.push('-');
+      const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
+      const isCricket = mode === 'cricket';
+      const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
+      const scoreLabel = isCricket ? 'Punkte' : 'Rest';
+
+      return '<div class="score-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+        '<div class="sc-color-bar"></div>' +
+        '<div class="sc-name">P' + p.slot + ' \u00b7 ' + escapeHtml(p.name) + '</div>' +
+        '<div class="sc-score">' + displayScore + '</div>' +
+        '<div class="sc-stats">' + scoreLabel + ': <span>' + displayScore + '</span> | \u00d8: <span>' + avgStr + '</span> | Legs: <span>' + (p.legs || 0) + '</span></div>' +
+        '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
+      '</div>';
+    }
+
     function renderState(state) {
       if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
       const activePlayer = state.game.activePlayer || 0;
       const mode = state.game.mode || '501';
       const active = state.players[activePlayer];
       const focusPlayer = document.getElementById('focusPlayer');
+      const compactPlayers = document.getElementById('compactPlayers');
       const isCricket = mode === 'cricket';
+
+      const hasOthers = state.players.length > 1;
+      focusPlayer.classList.toggle('has-others', hasOthers);
+
       if (isCricket) {
         focusPlayer.classList.add('single');
         focusPlayer.innerHTML = renderCricketView(active, state);
       } else {
         focusPlayer.classList.remove('single');
         focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
+      }
+
+      if (hasOthers) {
+        const compactOrder = [...state.players]
+          .filter((_p, idx) => idx !== activePlayer)
+          .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
+        compactPlayers.innerHTML = compactOrder
+          .map((p) => renderCompactPlayer(p, mode)).join('');
+      } else {
+        compactPlayers.innerHTML = '';
       }
     }
 
