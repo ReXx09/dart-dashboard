@@ -1848,6 +1848,7 @@ function createFireTvServer() {
   const panelsDir = path.join(__dirname, 'public', 'panels');
   const allowedPanels = new Set([
     'firetv-dashboard.html',
+    'live-spielstand-tv.html',
     'live-spielstand.html',
     'spieler.html',
     'highscores.html'
