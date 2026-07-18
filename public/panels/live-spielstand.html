@@ -215,7 +215,7 @@
         padding-right: 6px;
       }
 
-      .focus-player { grid-template-columns: 1fr; }
+      .focus-player { grid-template-columns: minmax(0, 1fr) 320px; }
       .focus-kacheln { grid-template-columns: 1fr 1fr 1fr; }
       .focus-leg-card { min-height: 64px; padding: 10px; }
       .leg-list { max-height: 120px; }
@@ -224,6 +224,10 @@
       .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
       .sc-score { font-size: 2rem; }
       .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-height: 780px) and (max-width: 1150px) {
+      .focus-player { grid-template-columns: 1fr; }
     }
   </style>
 </head>
