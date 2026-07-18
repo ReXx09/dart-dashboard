@@ -143,6 +143,7 @@
     <div class="ctrl-section">
       <h3>Treffer-Tuning (Lokal)</h3>
       <div class="tuning-row">
+        <button class="btn-sm" onclick="openTuningInfoWindow()">Info-Fenster</button>
         <button class="btn-sm" onclick="applyTuningPreset('safe')">Empfehlung Stabil</button>
         <button class="btn-sm" onclick="applyTuningPreset('balanced')">Empfehlung Balance</button>
         <button class="btn-sm" onclick="applyTuningPreset('fast')">Empfehlung Schnell</button>
@@ -177,6 +178,7 @@
     let fieldTestLastFingerprint = '';
     let fieldTestEntries = [];
     let fieldTestWindow = null;
+    let tuningInfoWindow = null;
     let tuningLoadedOnce = false;
 
     const TUNING_PRESETS = {
@@ -276,6 +278,148 @@
       if (!preset) return;
       applyTuningToInputs(preset);
       showToast('Preset gesetzt: ' + name);
+    }
+
+    function isTuningInfoWindowOpen() {
+      return !!(tuningInfoWindow && !tuningInfoWindow.closed);
+    }
+
+    function openTuningInfoWindow() {
+      if (isTuningInfoWindowOpen()) {
+        tuningInfoWindow.focus();
+        return;
+      }
+
+      tuningInfoWindow = window.open('', 'tuningInfoWindow', 'width=980,height=800,resizable=yes,scrollbars=yes');
+      if (!tuningInfoWindow) {
+        showToast('Popup blockiert: bitte Popups fuer diese Seite erlauben.');
+        return;
+      }
+
+      tuningInfoWindow.document.open();
+      tuningInfoWindow.document.write(`<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Treffer-Tuning Hilfe</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #f1f1f1; font-family: 'Segoe UI', system-ui, sans-serif; padding: 18px; }
+    .header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .header h1 { font-size: 1rem; font-weight: 700; }
+    .badge { background: #457b9d; color: #fff; font-size: .65rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
+    .lead { color: #b8b8b8; font-size: .84rem; line-height: 1.45; margin-bottom: 12px; }
+    .card { background: #111; border: 1px solid #212121; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+    .card h2 { font-size: .88rem; color: #f4a261; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .7px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kv { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; padding: 10px; }
+    .kv strong { display: block; font-size: .8rem; color: #fff; margin-bottom: 6px; }
+    .kv p { font-size: .78rem; color: #bdbdbd; line-height: 1.45; margin-bottom: 5px; }
+    .kv p:last-child { margin-bottom: 0; }
+    .mono { font-family: Consolas, monospace; color: #9ec8e2; }
+    .tip { color: #7ac29a; }
+    .warn { color: #f0b47a; }
+    ul { margin-left: 18px; }
+    li { font-size: .8rem; color: #cecece; margin-bottom: 5px; line-height: 1.4; }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Treffer-Tuning Hilfe</h1>
+    <span class="badge">LIVE</span>
+  </div>
+  <div class="lead">
+    Ziel: echte Treffer sicher erkennen, ohne Doppelzaehlung oder verschluckte Wuerfe.
+    Aendere immer nur 1-2 Werte in kleinen Schritten und teste danach 10-20 Wuerfe auf dasselbe Segment.
+  </div>
+
+  <div class="card">
+    <h2>Schnellstart</h2>
+    <ul>
+      <li><span class="mono">Stabil</span>: wenn zu viele Doppel-/Fehltreffer auftreten.</li>
+      <li><span class="mono">Balance</span>: Standard fuer den Alltag.</li>
+      <li><span class="mono">Schnell</span>: wenn gueltige schnelle Wuerfe sonst zu oft unterdrueckt werden.</li>
+      <li>Nach jedem Preset nur einzelne Werte fein nachziehen.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Parameter Erklaerung</h2>
+    <div class="grid">
+      <div class="kv">
+        <strong>Matrix Raw Enabled</strong>
+        <p>Schaltet die Matrix-Rohauswertung ein oder aus (<span class="mono">1</span> / <span class="mono">0</span>).</p>
+        <p class="tip">Auf 1 lassen, wenn der Arduino als passiver Sniffer arbeitet.</p>
+      </div>
+      <div class="kv">
+        <strong>Pair Skew ms</strong>
+        <p>Maximaler Zeitversatz zwischen zusammengehoerigen Row/Column-Events.</p>
+        <p class="warn">Hoeher: toleranter bei asynchronen Signalen. Niedriger: weniger falsche Paarungen.</p>
+      </div>
+      <div class="kv">
+        <strong>Cluster Window ms</strong>
+        <p>Fenster, in dem mehrere Roh-Impulse zu einem Treffer gebuendelt werden.</p>
+        <p class="warn">Hoeher: reduziert Mehrfachtreffer. Zu hoch kann echte schnelle Treffer verschlucken.</p>
+      </div>
+      <div class="kv">
+        <strong>Suppress ms</strong>
+        <p>Unterdrueckt direkt folgende aehnliche Treffer fuer kurze Zeit.</p>
+        <p class="warn">Hoeher gegen Doppelzaehlung, niedriger fuer schnellere erneute Erkennung.</p>
+      </div>
+      <div class="kv">
+        <strong>Same Key Guard ms</strong>
+        <p>Sperre nur fuer denselben Matrix-Key (gleiches Feld) kurz nach einem Treffer.</p>
+        <p class="warn">Wenn ein Feld doppelt zaehlt: leicht erhoehen.</p>
+      </div>
+      <div class="kv">
+        <strong>Refractory ms</strong>
+        <p>Globale Ruhezeit nach einem Treffer, bevor ein neuer akzeptiert wird.</p>
+        <p class="warn">Zu niedrig: Rauschen kommt durch. Zu hoch: schnelle Folgewuerfe fehlen.</p>
+      </div>
+      <div class="kv">
+        <strong>Release ms</strong>
+        <p>Wie lange ein Kontakt als "losgelassen" gelten muss, bevor neu gezaehlt wird.</p>
+        <p class="warn">Etwas erhoehen bei prellenden Kontakten, sonst eher klein halten.</p>
+      </div>
+      <div class="kv">
+        <strong>Throw Lock ms</strong>
+        <p>Kurze Sperre direkt nach Auto-Wurf-Entscheidung.</p>
+        <p class="warn">Hilft gegen Doppelverbuchung aus derselben Beruehrung.</p>
+      </div>
+      <div class="kv">
+        <strong>Wurfrhythmus Min ms</strong>
+        <p>Minimaler Abstand zwischen zwei gezaehlten Wuerfen.</p>
+        <p class="warn">Wenn schnelle Spieler werfen, nicht zu hoch einstellen.</p>
+      </div>
+      <div class="kv">
+        <strong>Pfeilaufnahme Timer ms</strong>
+        <p>Fenster, in dem Treffer zu einem Dart-Entscheid zusammengezogen werden.</p>
+        <p class="warn">Zu kurz kann Segmente falsch aufteilen, zu lang fuehlt sich traege an.</p>
+      </div>
+      <div class="kv">
+        <strong>Playerwechsel Delay ms</strong>
+        <p>Wartezeit vor automatischem Spielerwechsel nach dem 3. Dart.</p>
+        <p class="tip">Erhoehen, wenn beim Herausziehen der Pfeile noch Fehltrigger entstehen.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Praxisregel</h2>
+    <ul>
+      <li>Doppelzaehlung: zuerst <span class="mono">Suppress</span>, <span class="mono">Same Key Guard</span>, <span class="mono">Throw Lock</span> leicht erhoehen.</li>
+      <li>Zu wenig Treffer: <span class="mono">Refractory</span>, <span class="mono">Suppress</span> und <span class="mono">Wurfrhythmus Min</span> leicht senken.</li>
+      <li>Unklare Feldzuordnung: <span class="mono">Pair Skew</span> und <span class="mono">Cluster Window</span> fein nachstellen.</li>
+    </ul>
+  </div>
+</body>
+</html>`);
+      tuningInfoWindow.document.close();
+      tuningInfoWindow.focus();
     }
 
     async function saveTuningSettings() {
