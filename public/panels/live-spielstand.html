@@ -728,8 +728,6 @@
         if (r.ok) renderHighscores(await r.json());
       } catch {}
     }
-    const tvMode = new URLSearchParams(location.search).get('tv') === '1';
-    if (tvMode) document.body.classList.add('tv-mode');
   </script>
 </body>
 </html>
