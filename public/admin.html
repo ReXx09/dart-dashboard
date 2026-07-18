@@ -28,6 +28,9 @@
     .field-row input:focus,.field-row select:focus{border-color:#e63946;outline:none}
     .field-row input[type="checkbox"]{width:18px;height:18px;cursor:pointer}
     .field-hint{font-size:.72rem;color:#444;margin-left:142px;margin-top:-4px;margin-bottom:8px}
+    textarea.mapping-json{width:100%;min-height:280px;resize:vertical;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:12px;border-radius:8px;font-size:.82rem;font-family:Consolas,monospace;line-height:1.45}
+    textarea.mapping-json:focus{border-color:#e63946;outline:none}
+    .mapping-hint{font-size:.72rem;color:#444;margin-top:8px;line-height:1.45}
 
     .btn-save{background:#e63946;border:none;color:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:background .2s}
     .btn-save:hover{background:#c1121f}
@@ -88,6 +91,19 @@
       <button class="btn-save" id="saveArdBtn">Speichern</button>
     </fieldset>
   </div>
+
+  <div class="section">
+    <div class="sec-hd"><span class="sec-title">Matrix-Mapping</span><div class="sec-line"></div></div>
+    <fieldset>
+      <div class="field-row" style="align-items:flex-start">
+        <label style="padding-top:10px">Zuordnung</label>
+        <textarea class="mapping-json" id="matrixMappingJson" spellcheck="false"></textarea>
+      </div>
+      <div class="field-hint" style="margin-left:142px">JSON mit R/C-Schluesseln und Codewerten. Aenderungen wirken sofort im Dashboard und ersetzen den Arduino-Neu-Flash.</div>
+      <div class="mapping-hint" style="margin-left:142px">Beispiel: {"R3,C1":104,"R0,C5":114,...}</div>
+      <button class="btn-save" id="saveMappingBtn">Mapping speichern</button>
+    </fieldset>
+  </div>
 </main>
 <div class="toast" id="toast"></div>
 <script>
@@ -119,6 +135,13 @@
       const connection = ard.connection || ard;
       document.getElementById('si-ard').textContent = connection.connected ? 'Verbunden (' + (connection.port||'?') + ')' : 'Getrennt';
     } catch(e) { document.getElementById('si-ard').textContent = '?'; }
+
+    try {
+      const mapping = await fetch('/api/matrix-mapping').then(r => r.json());
+      document.getElementById('matrixMappingJson').value = JSON.stringify(mapping.mapping || {}, null, 2);
+    } catch(e) {
+      document.getElementById('matrixMappingJson').value = '{\n  "R3,C1": 104\n}';
+    }
   }
 
   document.getElementById('saveArdBtn').addEventListener('click', async function() {
@@ -136,6 +159,24 @@
       });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       showToast('Einstellungen gespeichert. Arduino-Monitor neu gestartet.');
+    } catch(e) {
+      showToast('Fehler: ' + e.message, true);
+    }
+    this.disabled = false;
+  });
+
+  document.getElementById('saveMappingBtn').addEventListener('click', async function() {
+    this.disabled = true;
+    try {
+      const raw = document.getElementById('matrixMappingJson').value;
+      const parsed = JSON.parse(raw);
+      const r = await fetch('/api/matrix-mapping', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(parsed)
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      showToast('Matrix-Mapping gespeichert.');
     } catch(e) {
       showToast('Fehler: ' + e.message, true);
     }

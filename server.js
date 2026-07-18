@@ -40,6 +40,7 @@ const SETTINGS_FILE  = path.join(DATA_DIR, 'settings.json');
 const PLAYERS_FILE   = path.join(DATA_DIR, 'players.json');
 const LIVE_STATE_FILE = path.join(DATA_DIR, 'live-state.json');
 const HIGHSCORES_FILE = path.join(DATA_DIR, 'highscores.json');
+const MATRIX_MAPPING_FILE = path.join(DATA_DIR, 'matrix-mapping.json');
 
 const DART_VALUE_BY_CHANNEL = {
   '01': 20,
@@ -68,8 +69,8 @@ const DART_VALUE_BY_CHANNEL = {
 
 // Vorläufige 4x16-Matrix-Tabelle für passives Sniffing.
 // Mapping: R0..R3 = Rows, C0..C15 = Columns.
-// Werte entsprechen aktuell der Tabelle aus dart_matrix_test.ino und können auf dem Pi angepasst werden.
-const MATRIX_CODE_BY_ROW_COLUMN = {
+// Werte können auf dem Raspi per JSON-Datei angepasst werden, ohne den Arduino neu zu flashen.
+const DEFAULT_MATRIX_CODE_BY_ROW_COLUMN = {
   'R0,C0': 212, 'R0,C1': 112, 'R0,C2': 209, 'R0,C3': 109,
   'R0,C4': 214, 'R0,C5': 114, 'R0,C6': 211, 'R0,C7': 111,
   'R0,C8': 208, 'R0,C9': 108, 'R0,C10': 0,   'R0,C11': 312,
@@ -87,9 +88,8 @@ const MATRIX_CODE_BY_ROW_COLUMN = {
   'R3,C8': 205, 'R3,C9': 105, 'R3,C10': 0,   'R3,C11': 304,
   'R3,C12': 318, 'R3,C13': 301, 'R3,C14': 320, 'R3,C15': 305
 };
-const MATRIX_ROW_COLUMN_VALUES = Object.fromEntries(
-  Object.entries(MATRIX_CODE_BY_ROW_COLUMN).map(([key, code]) => [key, { code, points: codeToPoints(code) }])
-);
+let MATRIX_CODE_BY_ROW_COLUMN = loadMatrixMapping();
+let MATRIX_ROW_COLUMN_VALUES = buildMatrixValueMap(MATRIX_CODE_BY_ROW_COLUMN);
 
 const ARDUINO_AUTO_THROW_ENABLED = process.env.ARDUINO_AUTO_THROW_ENABLED !== 'false';
 const ARDUINO_AUTO_THROW_MATRIX_ENABLED = process.env.ARDUINO_AUTO_THROW_MATRIX_ENABLED === 'true';
@@ -146,6 +146,47 @@ function readJson(file, fallback) {
 function writeJson(file, data) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+}
+
+function cloneDefaultMatrixMapping() {
+  return { ...DEFAULT_MATRIX_CODE_BY_ROW_COLUMN };
+}
+
+function normalizeMatrixMapping(rawMapping) {
+  const source = rawMapping && typeof rawMapping === 'object' ? rawMapping : {};
+  const normalized = {};
+
+  for (const [key, value] of Object.entries(source)) {
+    const code = Number(value);
+    if (!Number.isFinite(code)) continue;
+    normalized[key] = code;
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : cloneDefaultMatrixMapping();
+}
+
+function loadMatrixMapping() {
+  if (!fs.existsSync(MATRIX_MAPPING_FILE)) return cloneDefaultMatrixMapping();
+  try {
+    return normalizeMatrixMapping(JSON.parse(fs.readFileSync(MATRIX_MAPPING_FILE, 'utf8')));
+  } catch {
+    return cloneDefaultMatrixMapping();
+  }
+}
+
+function buildMatrixValueMap(mapping) {
+  return Object.fromEntries(
+    Object.entries(mapping).map(([key, code]) => [key, { code, points: codeToPoints(code) }])
+  );
+}
+
+function saveMatrixMapping(mapping) {
+  const normalized = normalizeMatrixMapping(mapping);
+  writeJson(MATRIX_MAPPING_FILE, normalized);
+  MATRIX_CODE_BY_ROW_COLUMN = normalized;
+  MATRIX_ROW_COLUMN_VALUES = buildMatrixValueMap(normalized);
+  normalizeArduinoStatePatch({ matrixMappingUpdatedAt: Date.now() });
+  return normalized;
 }
 
 function getSettings() {
@@ -212,7 +253,8 @@ const arduinoState = {
   error: null,
   channelAutoDetect: null,
   activeStateMode: ARDUINO_EVENT_ACTIVE_STATE_MODE,
-  activeStateResolved: arduinoResolvedActiveState
+  activeStateResolved: arduinoResolvedActiveState,
+  matrixMappingUpdatedAt: null
 };
 
 function isArduinoActiveState(state) {
@@ -851,24 +893,30 @@ function parseArduinoLine(line) {
     return;
   }
 
-  // HIT/MATRIX,<ms>,R#,C#,CODE,POINTS (passiver Matrix-Sniffer)
-  const hitMatch = clean.match(/^(?:HIT|MATRIX),(\d+),R(\d+),C(\d+),(-?\d+),(-?\d+)$/i);
+  // HIT/MATRIX,<ms>,R#,C#[,CODE,POINTS] (passiver Matrix-Sniffer)
+  const hitMatch = clean.match(/^(?:HIT|MATRIX),(\d+),R(\d+),C(\d+)(?:,(-?\d+),(-?\d+))?$/i);
   if (hitMatch) {
+    const row = `R${Number(hitMatch[2])}`;
+    const column = `C${Number(hitMatch[3])}`;
+    const key = `${row},${column}`;
+    const mapped = MATRIX_ROW_COLUMN_VALUES[key];
+    const rawCode = hitMatch[4] != null ? Number(hitMatch[4]) : null;
+    const rawPoints = hitMatch[5] != null ? Number(hitMatch[5]) : null;
     const hit = {
       ms: Number(hitMatch[1]),
-      row: `R${Number(hitMatch[2])}`,
-      column: `C${Number(hitMatch[3])}`,
-      key: `R${Number(hitMatch[2])},C${Number(hitMatch[3])}`,
-      code: Number(hitMatch[4]),
-      points: Number(hitMatch[5]),
+      row,
+      column,
+      key,
+      code: Number.isFinite(rawCode) ? rawCode : (mapped ? mapped.code : null),
+      points: Number.isFinite(rawPoints) ? rawPoints : (mapped ? mapped.points : 0),
       ts: Date.now(),
       line: clean,
-      mapped: true
+      mapped: !!mapped
     };
     matrixSniffer.lastMatrixHit = hit;
     matrixSniffer.lastMatrixHitMs = Date.now();
     normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: hit } });
-    if (ARDUINO_AUTO_THROW_MATRIX_ENABLED) handleArduinoMatrixHit(hit);
+    if (ARDUINO_AUTO_THROW_MATRIX_ENABLED && (mapped || ARDUINO_AUTO_THROW_MATRIX_UNMAPPED)) handleArduinoMatrixHit(hit);
     return;
   }
 
@@ -1281,6 +1329,19 @@ app.put('/api/settings', (req, res) => {
   restartArduinoMonitor();
   broadcastReload();
   res.json(s);
+});
+
+app.get('/api/matrix-mapping', (_req, res) => {
+  res.json({ updatedAt: arduinoState.matrixMappingUpdatedAt || null, mapping: MATRIX_CODE_BY_ROW_COLUMN });
+});
+
+app.put('/api/matrix-mapping', (req, res) => {
+  const payload = req.body && typeof req.body === 'object' && !Array.isArray(req.body) && req.body.mapping
+    ? req.body.mapping
+    : req.body;
+  const mapping = saveMatrixMapping(payload);
+  broadcastReload();
+  res.json({ ok: true, updatedAt: arduinoState.matrixMappingUpdatedAt || Date.now(), mapping });
 });
 
 // ── Server-Info ──
