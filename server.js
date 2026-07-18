@@ -1522,10 +1522,17 @@ app.get('/api/storage/info', (_req, res) => { res.json(dataStore.getInfo()); });
 // ── Settings ──
 app.get('/api/settings', (_req, res) => res.json(getSettings()));
 app.put('/api/settings', (req, res) => {
-  const s = { ...getSettings(), ...req.body };
+  const current = getSettings();
+  const next = req.body && typeof req.body === 'object' ? req.body : {};
+  const s = { ...current, ...next };
   saveSettings(s);
   refreshRuntimeTuning(s);
-  restartArduinoMonitor();
+  const shouldRestartArduinoMonitor = [
+    'arduinoMonitorEnabled',
+    'arduinoPort',
+    'arduinoBaudRate'
+  ].some((key) => current[key] !== s[key]);
+  if (shouldRestartArduinoMonitor) restartArduinoMonitor();
   broadcastReload();
   res.json(s);
 });

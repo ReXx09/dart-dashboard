@@ -51,6 +51,11 @@
     .tuning-grid input { width: 100%; background: #070707; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 6px 8px; border-radius: 7px; font-size: .86rem; font-family: inherit; }
     .tuning-grid input:focus { outline: none; border-color: #457b9d; }
     .tuning-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .tuning-quickhelp { margin-top: 10px; border: 1px solid #1f2b34; background: #0b1217; border-radius: 10px; padding: 10px; }
+    .tuning-quickhelp h4 { font-size: .74rem; color: #9ec8e2; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px; }
+    .tuning-quickhelp ul { margin: 0; padding-left: 16px; display: grid; gap: 5px; }
+    .tuning-quickhelp li { font-size: .74rem; color: #b7c2c9; line-height: 1.35; }
+    .tuning-quickhelp strong { color: #e2edf4; }
     .tuning-hint { margin-top: 8px; font-size: .72rem; color: #555; line-height: 1.4; }
     .field-test-log { margin-top: 10px; max-height: 220px; overflow: auto; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; }
     .field-test-log table { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: .72rem; }
@@ -165,6 +170,16 @@
       <div class="tuning-row">
         <button class="btn-sm primary" id="saveTuningBtn" onclick="saveTuningSettings()">Tuning speichern</button>
       </div>
+      <div class="tuning-quickhelp">
+        <h4>Kurz-Hilfe: Wann welchen Wert aendern?</h4>
+        <ul>
+          <li><strong>Doppelzaehlung:</strong> zuerst Suppress ms, Same Key Guard ms und Throw Lock ms leicht erhoehen.</li>
+          <li><strong>Treffer fehlen:</strong> Refractory ms, Suppress ms und Wurfrhythmus Min ms leicht senken.</li>
+          <li><strong>Falsches Segment:</strong> Pair Skew ms und Cluster Window ms in kleinen Schritten nachstellen.</li>
+          <li><strong>Fehltrigger beim Pfeile ziehen:</strong> Playerwechsel Delay ms leicht erhoehen.</li>
+          <li><strong>Arbeitsweise:</strong> nur 1-2 Werte pro Durchlauf aendern, dann 10-20 Testwuerfe pruefen.</li>
+        </ul>
+      </div>
       <div class="tuning-hint">Hinweis: Werte in kleinen Schritten aendern (10-30 ms) und danach 10-20 Testwuerfe je Feld pruefen.</div>
     </div>
   </main>
@@ -180,6 +195,7 @@
     let fieldTestWindow = null;
     let tuningInfoWindow = null;
     let tuningLoadedOnce = false;
+    let latestObservedMatrixHit = null;
 
     const TUNING_PRESETS = {
       safe: {
@@ -486,6 +502,7 @@
       }
 
       const matrixHit = matrix.hit || latest.hit || null;
+      latestObservedMatrixHit = matrixHit;
       const matrixValue = matrixHit && typeof matrixHit.points === 'number' ? matrixHit.points : null;
       const channelValue = evt && evt.channel && evt.state === 'ACTIVE' ? dartValueFromChannel(evt.channel) : null;
       const value = matrixValue != null ? String(matrixValue) : (channelValue != null ? channelValue : '-');
@@ -513,7 +530,7 @@
       const btn = document.getElementById('fieldTestToggle');
       if (fieldTestMode) {
         fieldTestStartedAt = Date.now();
-        fieldTestLastFingerprint = '';
+        fieldTestLastFingerprint = toFieldTestFingerprint(latestObservedMatrixHit);
         btn.textContent = 'Testmodus stoppen';
         showToast('Testmodus aktiv: Matrix-Hits werden fortlaufend geloggt.');
       } else {
@@ -525,7 +542,8 @@
 
     function clearFieldTestLog() {
       fieldTestEntries = [];
-      fieldTestLastFingerprint = '';
+      fieldTestStartedAt = Date.now();
+      fieldTestLastFingerprint = toFieldTestFingerprint(latestObservedMatrixHit);
       updateFieldTestUi();
     }
 

@@ -15,6 +15,25 @@
       font-family: 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
+      --live-scale: 1;
+      --throw-seg-min-height: clamp(58px, calc(7.2vw * var(--live-scale)), 86px);
+      --throw-seg-seg-size: clamp(1.15rem, calc(1.15rem + 1.1vw * var(--live-scale)), 2.05rem);
+      --throw-seg-pts-size: clamp(.68rem, calc(.58rem + .35vw * var(--live-scale)), .95rem);
+      --focus-kachel-min-height: clamp(124px, calc(16vw * var(--live-scale)), 176px);
+      --focus-kachel-padding: clamp(12px, calc(1vw * var(--live-scale) + 8px), 18px);
+    }
+    body[data-display-profile="compact-tv"] {
+      --live-scale: .92;
+    }
+    body[data-display-profile="firetv-1024x860"] {
+      --live-scale: .94;
+      --throw-seg-min-height: clamp(60px, 7vw, 74px);
+      --throw-seg-seg-size: clamp(1.3rem, 1rem + 1vw, 1.75rem);
+      --throw-seg-pts-size: clamp(.72rem, .62rem + .22vw, .86rem);
+      --focus-kachel-min-height: clamp(126px, 15vw, 152px);
+    }
+    body[data-display-profile="large-tv"] {
+      --live-scale: 1.08;
     }
     .topbar {
       background: #111;
@@ -59,7 +78,7 @@
     .focus-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
     .focus-meta { color: #777; font-size: .8rem; margin-bottom: 14px; }
     .focus-kacheln { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; }
-    .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: 16px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: var(--focus-kachel-padding); min-height: var(--focus-kachel-min-height); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     .focus-kachel h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
     .focus-kachel .subline { color: #555; font-size: .72rem; margin-top: 6px; }
     .leg-list { width: 100%; display: grid; gap: 6px; max-height: 110px; overflow: auto; }
@@ -79,9 +98,9 @@
     .focus-leg-card h4 { color: #777; font-size: .7rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
     .focus-leg-card .leg-list { max-height: 360px; }
     .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
-    .throw-seg .seg { font-size: 1.55rem; color: var(--pc, #e63946); }
-    .throw-seg .pts { font-size: .78rem; color: #555; margin-top: 4px; }
+    .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: var(--throw-seg-min-height); display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; padding: 4px; }
+    .throw-seg .seg { font-size: var(--throw-seg-seg-size); line-height: 1; color: var(--pc, #e63946); }
+    .throw-seg .pts { font-size: var(--throw-seg-pts-size); color: #555; margin-top: 4px; }
     .focus-big-score { font-size: 5rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
     .focus-summary { margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .focus-summary div { background: #141414; border-radius: 10px; padding: 10px; text-align: center; }
@@ -183,9 +202,9 @@
       .focus-kacheln { gap: 8px; grid-template-columns: 1.1fr 1fr 1fr; }
       .focus-leg-card { border-radius: 14px; padding: 12px; }
       .focus-leg-card .leg-list { max-height: 250px; }
-      .focus-kachel { min-height: 116px; padding: 10px; border-radius: 12px; }
-      .throw-seg { min-height: 58px; }
-      .throw-seg .seg { font-size: 1.2rem; }
+      .focus-kachel { --focus-kachel-min-height: 116px; --focus-kachel-padding: 10px; border-radius: 12px; }
+      .throw-seg { --throw-seg-min-height: 58px; }
+      .throw-seg .seg { --throw-seg-seg-size: 1.2rem; }
       .focus-big-score { font-size: 3.35rem; }
       .focus-summary { margin-top: 8px; }
       .focus-summary strong { font-size: .95rem; }
@@ -220,6 +239,9 @@
       .focus-leg-card { min-height: 64px; padding: 10px; }
       .leg-list { max-height: 120px; }
       .focus-big-score { font-size: 2.9rem; }
+      .throw-seg { --throw-seg-min-height: 54px; }
+      .throw-seg .seg { --throw-seg-seg-size: 1.12rem; }
+      .throw-seg .pts { --throw-seg-pts-size: .72rem; }
 
       .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
       .sc-score { font-size: 2rem; }
@@ -228,6 +250,16 @@
 
     @media (max-height: 780px) and (max-width: 1150px) {
       .focus-player { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 1180px) {
+      .focus-kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .focus-kachel:first-child { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 860px) {
+      .focus-kacheln { grid-template-columns: 1fr; }
+      .focus-kachel:first-child { grid-column: auto; }
     }
   </style>
 </head>
@@ -285,6 +317,7 @@
   <div class="toast" id="toast"></div>
   <script>
     let liveState = null;
+    let liveDisplaySettings = { liveDisplayProfile: 'auto', liveDisplayScale: 100 };
 
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -366,13 +399,31 @@
     refreshArduinoStatus();
     setInterval(refreshArduinoStatus, 5000);
 
+    function clampDisplayScale(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return 100;
+      return Math.max(80, Math.min(125, Math.round(n)));
+    }
+
+    function applyLiveDisplaySettings(settings) {
+      const profile = String(settings && settings.liveDisplayProfile || 'auto').trim() || 'auto';
+      const scale = clampDisplayScale(settings && settings.liveDisplayScale);
+      liveDisplaySettings = { liveDisplayProfile: profile, liveDisplayScale: scale };
+      document.body.dataset.displayProfile = profile;
+      document.body.style.setProperty('--live-scale', String(scale / 100));
+    }
+
     async function loadAll() {
-      let state, highscores;
+      let state, highscores, settings;
       try {
-        const stateRes = await fetch('/api/live/state');
+        const [stateRes, settingsRes] = await Promise.all([
+          fetch('/api/live/state'),
+          fetch('/api/settings').catch(() => null)
+        ]);
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         state = await stateRes.json();
         liveState = state;
+        settings = settingsRes && settingsRes.ok ? await settingsRes.json() : null;
       } catch(e) {
         document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
         document.getElementById('sseStatus').textContent = 'Error';
@@ -383,6 +434,7 @@
         if (hsRes.ok) highscores = await hsRes.json();
       } catch { highscores = []; }
 
+      applyLiveDisplaySettings(settings || liveDisplaySettings);
       renderState(state);
       renderHighscores(highscores);
       document.getElementById('sseStatus').textContent = 'verbunden';
@@ -495,9 +547,9 @@
             '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
-            '<h4>Geworfene Punkte / Leg</h4>' +
+            '<h4>Punkte im aktuellen Leg</h4>' +
             '<div class="focus-big-score" style="font-size:4.2rem">' + legScore + '</div>' +
-            '<div style="color:#777;font-size:.82rem">Fortlaufend im Leg</div>' +
+            '<div style="color:#777;font-size:.82rem">Seit Start dieses Legs</div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<h4>Gesamt / Rest</h4>' +
@@ -525,13 +577,13 @@
 
       const legListHtml = turnScores.length
         ? turnScores.slice(-20).reverse().map((score, orderIdx) => {
-            const legIdx = turnScores.length - orderIdx;
-            return '<div class="leg-item"><span class="idx">Leg ' + legIdx + '</span><span class="score">' + score + '</span></div>';
+            const turnIdx = turnScores.length - orderIdx;
+            return '<div class="leg-item"><span class="idx">Aufnahme ' + turnIdx + '</span><span class="score">' + score + '</span></div>';
           }).join('')
-        : '<div class="subline">Noch keine Legs erfasst</div>';
+        : '<div class="subline">Noch keine Aufnahmen erfasst</div>';
 
       return '<aside class="focus-leg-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
-        '<h4>Leg-Liste</h4>' +
+        '<h4>Aufnahmen im Leg</h4>' +
         '<div class="leg-list">' + legListHtml + '</div>' +
       '</aside>';
     }

@@ -31,6 +31,7 @@
     textarea.mapping-json{width:100%;min-height:280px;resize:vertical;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:12px;border-radius:8px;font-size:.82rem;font-family:Consolas,monospace;line-height:1.45}
     textarea.mapping-json:focus{border-color:#e63946;outline:none}
     .mapping-hint{font-size:.72rem;color:#444;margin-top:8px;line-height:1.45}
+    .field-inline{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 
     .btn-save{background:#e63946;border:none;color:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:background .2s}
     .btn-save:hover{background:#c1121f}
@@ -104,6 +105,31 @@
       <button class="btn-save" id="saveMappingBtn">Mapping speichern</button>
     </fieldset>
   </div>
+
+  <div class="section">
+    <div class="sec-hd"><span class="sec-title">Live-Anzeige</span><div class="sec-line"></div></div>
+    <fieldset>
+      <div class="field-row">
+        <label>Anzeige-Profil</label>
+        <select id="liveDisplayProfile">
+          <option value="auto">Auto / Standard</option>
+          <option value="firetv-1024x860">Fire TV 1024x860</option>
+          <option value="compact-tv">Kompakt-TV</option>
+          <option value="large-tv">Großer TV</option>
+        </select>
+      </div>
+      <div class="field-hint">Waehlt ein optimiertes Layout fuer verschiedene TV-Klassen. Das Fire-TV-Profil ist auf 1024x860 abgestimmt.</div>
+      <div class="field-row">
+        <label>Anzeige-Skalierung</label>
+        <div class="field-inline">
+          <input type="number" id="liveDisplayScale" min="80" max="125" step="1" value="100" />
+          <span style="font-size:.8rem;color:#666">%</span>
+        </div>
+      </div>
+      <div class="field-hint">100 = Standard. Hoeher vergroessert Fokus-Kacheln und Wurfzahlen, niedriger macht das Layout kompakter.</div>
+      <button class="btn-save" id="saveDisplayBtn">Anzeige speichern</button>
+    </fieldset>
+  </div>
 </main>
 <div class="toast" id="toast"></div>
 <script>
@@ -127,6 +153,8 @@
       document.getElementById('ardEnabled').checked = settings.arduinoMonitorEnabled !== false;
       document.getElementById('ardPort').value = settings.arduinoPort || '';
       document.getElementById('ardBaud').value = String(settings.arduinoBaudRate || 115200);
+      document.getElementById('liveDisplayProfile').value = settings.liveDisplayProfile || 'auto';
+      document.getElementById('liveDisplayScale').value = String(settings.liveDisplayScale || 100);
     } catch(e) {
       document.getElementById('si-ip').textContent = 'Offline';
     }
@@ -177,6 +205,28 @@
       });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       showToast('Matrix-Mapping gespeichert.');
+    } catch(e) {
+      showToast('Fehler: ' + e.message, true);
+    }
+    this.disabled = false;
+  });
+
+  document.getElementById('saveDisplayBtn').addEventListener('click', async function() {
+    this.disabled = true;
+    const scale = Math.max(80, Math.min(125, parseInt(document.getElementById('liveDisplayScale').value, 10) || 100));
+    const settings = {
+      liveDisplayProfile: document.getElementById('liveDisplayProfile').value || 'auto',
+      liveDisplayScale: scale
+    };
+    try {
+      const r = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(settings)
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      document.getElementById('liveDisplayScale').value = String(scale);
+      showToast('Anzeige-Einstellungen gespeichert.');
     } catch(e) {
       showToast('Fehler: ' + e.message, true);
     }
