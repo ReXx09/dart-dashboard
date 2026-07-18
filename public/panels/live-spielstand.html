@@ -51,16 +51,13 @@
     .btn-icon.danger:hover { background: #e6394622; }
     .btn-icon:disabled { opacity: .3; cursor: default; }
     main { padding: 16px; max-width: 1600px; margin: 0 auto; display: grid; gap: 14px; }
-    .focus-player { display: grid; grid-template-columns: 1.45fr .75fr; gap: 14px; }
+    .focus-player { display: grid; grid-template-columns: 1.45fr .75fr; gap: 14px; align-items: stretch; }
+    .focus-player.single { grid-template-columns: 1fr; }
     .focus-card { background: linear-gradient(135deg, #191111, #141414); border-radius: 18px; padding: 20px; border: 2px solid var(--pc, #e63946); box-shadow: 0 0 45px rgba(230,57,70,.16); position: relative; overflow: hidden; }
     .focus-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 10%, var(--pc-glow, rgba(230,57,70,.18)), transparent 35%); pointer-events: none; }
     .focus-card > * { position: relative; }
-    .focus-head { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 10px; align-items: start; margin-bottom: 12px; }
-    .focus-title { min-width: 0; }
     .focus-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
     .focus-meta { color: #777; font-size: .8rem; margin-bottom: 14px; }
-    .focus-leg-tile { background: #101010; border: 1px solid #272727; border-radius: 12px; padding: 10px; min-height: 96px; display: flex; flex-direction: column; }
-    .focus-leg-tile h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
     .focus-kacheln { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; }
     .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: 16px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     .focus-kachel h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
@@ -69,6 +66,18 @@
     .leg-item { display: flex; justify-content: space-between; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 6px 8px; font-size: .74rem; }
     .leg-item .idx { color: #777; }
     .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .focus-leg-card {
+      background: #141414;
+      border-radius: 18px;
+      padding: 16px;
+      border: 2px solid #1e1e1e;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .focus-leg-card h4 { color: #777; font-size: .7rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
+    .focus-leg-card .leg-list { max-height: 360px; }
     .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
     .throw-seg .seg { font-size: 1.55rem; color: var(--pc, #e63946); }
@@ -169,11 +178,11 @@
       main { padding: 10px; gap: 8px; }
       .focus-player { gap: 8px; }
       .focus-card { padding: 14px; border-radius: 14px; }
-      .focus-head { grid-template-columns: minmax(0, 1fr) 210px; gap: 8px; margin-bottom: 8px; }
       .focus-name { font-size: 1.15rem; }
-      .focus-meta { font-size: .72rem; margin-bottom: 0; }
-      .focus-leg-tile { min-height: 82px; padding: 8px; border-radius: 10px; }
+      .focus-meta { font-size: .72rem; margin-bottom: 10px; }
       .focus-kacheln { gap: 8px; grid-template-columns: 1.1fr 1fr 1fr; }
+      .focus-leg-card { border-radius: 14px; padding: 12px; }
+      .focus-leg-card .leg-list { max-height: 250px; }
       .focus-kachel { min-height: 116px; padding: 10px; border-radius: 12px; }
       .throw-seg { min-height: 58px; }
       .throw-seg .seg { font-size: 1.2rem; }
@@ -206,10 +215,10 @@
         padding-right: 6px;
       }
 
+      .focus-player { grid-template-columns: 1fr; }
       .focus-kacheln { grid-template-columns: 1fr 1fr 1fr; }
-      .focus-head { grid-template-columns: 1fr; }
-      .focus-leg-tile { min-height: 64px; }
-      .leg-list { max-height: 42px; }
+      .focus-leg-card { min-height: 64px; padding: 10px; }
+      .leg-list { max-height: 120px; }
       .focus-big-score { font-size: 2.9rem; }
 
       .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
@@ -390,9 +399,11 @@
         .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
 
       if (isCricket) {
+        focusPlayer.classList.add('single');
         focusPlayer.innerHTML = renderCricketView(active, state);
       } else {
-        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state);
+        focusPlayer.classList.remove('single');
+        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
       }
       compactPlayers.innerHTML = compactOrder
         .map((p, idx) => renderCompactPlayer(p, idx, state.players.findIndex(sp => sp.slot === p.slot), mode)).join('');
@@ -447,20 +458,6 @@
       const totalScored = p.totalScored || 0;
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const legScore = p.throws.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
-      const turnScores = [];
-      for (let i = 0; i < throws.length; i += 3) {
-        const chunk = throws.slice(i, i + 3);
-        const score = chunk.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
-        turnScores.push(score);
-      }
-
-      const legListHtml = turnScores.length
-        ? turnScores.slice(-12).reverse().map((score, orderIdx) => {
-            const legIdx = turnScores.length - orderIdx;
-            return '<div class="leg-item"><span class="idx">Leg ' + legIdx + '</span><span class="score">' + score + '</span></div>';
-          }).join('')
-        : '<div class="subline">Noch keine Legs erfasst</div>';
-
       const throwsHtml = displayThrows.map((pt, ti) => {
         const label = pt === null ? '-' : String(pt);
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
@@ -471,16 +468,8 @@
       }).join('');
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-head">' +
-          '<div class="focus-title">' +
-            '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
-            '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
-          '</div>' +
-          '<div class="focus-leg-tile">' +
-            '<h4>Leg-Liste</h4>' +
-            '<div class="leg-list">' + legListHtml + '</div>' +
-          '</div>' +
-        '</div>' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe / Zahlen</h4>' +
@@ -504,6 +493,29 @@
           '<div><span>Ø 3-Dart</span><strong>' + avgStr + '</strong></div>' +
         '</div>' +
       '</div>';
+    }
+
+    function renderFocusLegCard(p) {
+      if (!p) return '';
+      const throws = Array.isArray(p.throws) ? p.throws : [];
+      const turnScores = [];
+      for (let i = 0; i < throws.length; i += 3) {
+        const chunk = throws.slice(i, i + 3);
+        const score = chunk.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
+        turnScores.push(score);
+      }
+
+      const legListHtml = turnScores.length
+        ? turnScores.slice(-20).reverse().map((score, orderIdx) => {
+            const legIdx = turnScores.length - orderIdx;
+            return '<div class="leg-item"><span class="idx">Leg ' + legIdx + '</span><span class="score">' + score + '</span></div>';
+          }).join('')
+        : '<div class="subline">Noch keine Legs erfasst</div>';
+
+      return '<aside class="focus-leg-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+        '<h4>Leg-Liste</h4>' +
+        '<div class="leg-list">' + legListHtml + '</div>' +
+      '</aside>';
     }
 
     function renderCompactPlayer(p, displayIdx, stateIdx, mode) {
