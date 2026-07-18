@@ -15,25 +15,6 @@
       font-family: 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
-      --live-scale: 1;
-      --throw-seg-min-height: clamp(58px, calc(7.2vw * var(--live-scale)), 86px);
-      --throw-seg-seg-size: clamp(1.15rem, calc(1.15rem + 1.1vw * var(--live-scale)), 2.05rem);
-      --throw-seg-pts-size: clamp(.68rem, calc(.58rem + .35vw * var(--live-scale)), .95rem);
-      --focus-kachel-min-height: clamp(124px, calc(16vw * var(--live-scale)), 176px);
-      --focus-kachel-padding: clamp(12px, calc(1vw * var(--live-scale) + 8px), 18px);
-    }
-    body[data-display-profile="compact-tv"] {
-      --live-scale: .92;
-    }
-    body[data-display-profile="firetv-1024x860"] {
-      --live-scale: .94;
-      --throw-seg-min-height: clamp(60px, 7vw, 74px);
-      --throw-seg-seg-size: clamp(1.3rem, 1rem + 1vw, 1.75rem);
-      --throw-seg-pts-size: clamp(.72rem, .62rem + .22vw, .86rem);
-      --focus-kachel-min-height: clamp(126px, 15vw, 152px);
-    }
-    body[data-display-profile="large-tv"] {
-      --live-scale: 1.08;
     }
     .topbar {
       background: #111;
@@ -78,7 +59,7 @@
     .focus-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
     .focus-meta { color: #777; font-size: .8rem; margin-bottom: 14px; }
     .focus-kacheln { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; }
-    .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: var(--focus-kachel-padding); min-height: var(--focus-kachel-min-height); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: 16px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     .focus-kachel h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
     .focus-kachel .subline { color: #555; font-size: .72rem; margin-top: 6px; }
     .leg-list { width: 100%; display: grid; gap: 6px; max-height: 110px; overflow: auto; }
@@ -98,9 +79,9 @@
     .focus-leg-card h4 { color: #777; font-size: .7rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
     .focus-leg-card .leg-list { max-height: 360px; }
     .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: var(--throw-seg-min-height); display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; padding: 4px; }
-    .throw-seg .seg { font-size: var(--throw-seg-seg-size); line-height: 1; color: var(--pc, #e63946); }
-    .throw-seg .pts { font-size: var(--throw-seg-pts-size); color: #555; margin-top: 4px; }
+    .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
+    .throw-seg .seg { font-size: 1.55rem; color: var(--pc, #e63946); }
+    .throw-seg .pts { font-size: .78rem; color: #555; margin-top: 4px; }
     .focus-big-score { font-size: 5rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
     .focus-summary { margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .focus-summary div { background: #141414; border-radius: 10px; padding: 10px; text-align: center; }
@@ -181,6 +162,20 @@
     .hs-muted { color: #444; font-style: italic; font-size: .78rem; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    body.tv-mode .topbar a,
+    body.tv-mode .header-status,
+    body.tv-mode .header-controls,
+    body.tv-mode .status-grid,
+    body.tv-mode .hs-panel,
+    body.tv-mode .footer {
+      display: none !important;
+    }
+    body.tv-mode .topbar { padding: 10px 16px; }
+    body.tv-mode main { max-width: none; padding: 12px; }
+    body.tv-mode .focus-player { grid-template-columns: 1.45fr .75fr; }
+    body.tv-mode .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+    body.tv-mode .focus-big-score { font-size: 4.6rem; }
+    body.tv-mode .focus-kachel { min-height: 138px; }
     @media (max-width: 768px) {
       .scoreboard { grid-template-columns: 1fr; }
       .status-grid { grid-template-columns: 1fr; }
@@ -202,9 +197,9 @@
       .focus-kacheln { gap: 8px; grid-template-columns: 1.1fr 1fr 1fr; }
       .focus-leg-card { border-radius: 14px; padding: 12px; }
       .focus-leg-card .leg-list { max-height: 250px; }
-      .focus-kachel { --focus-kachel-min-height: 116px; --focus-kachel-padding: 10px; border-radius: 12px; }
-      .throw-seg { --throw-seg-min-height: 58px; }
-      .throw-seg .seg { --throw-seg-seg-size: 1.2rem; }
+      .focus-kachel { min-height: 116px; padding: 10px; border-radius: 12px; }
+      .throw-seg { min-height: 58px; }
+      .throw-seg .seg { font-size: 1.2rem; }
       .focus-big-score { font-size: 3.35rem; }
       .focus-summary { margin-top: 8px; }
       .focus-summary strong { font-size: .95rem; }
@@ -239,9 +234,9 @@
       .focus-leg-card { min-height: 64px; padding: 10px; }
       .leg-list { max-height: 120px; }
       .focus-big-score { font-size: 2.9rem; }
-      .throw-seg { --throw-seg-min-height: 54px; }
-      .throw-seg .seg { --throw-seg-seg-size: 1.12rem; }
-      .throw-seg .pts { --throw-seg-pts-size: .72rem; }
+      .throw-seg { min-height: 54px; }
+      .throw-seg .seg { font-size: 1.12rem; }
+      .throw-seg .pts { font-size: .72rem; }
 
       .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
       .sc-score { font-size: 2rem; }
@@ -504,17 +499,14 @@
       '</div>';
     }
 
-    function getLegPointsForPlayer(player, state) {
-      const mode = String((state && state.game && state.game.mode) || '');
-      const numericMode = Number(mode);
-      const startScore = Number.isFinite(numericMode) && numericMode > 0 ? numericMode : 0;
+    function getPointsPerAufnahme(player, state) {
+      const turns = Math.max(0, Number(player && player.turns || 0));
+      const totalScored = Math.max(0, Number(player && player.totalScored || 0));
 
-      if (startScore > 0) {
-        const remaining = Math.max(0, Number(player && player.remaining || startScore));
-        return Math.max(0, startScore - remaining);
-      }
+      if (turns <= 0) return '-';
 
-      return Math.max(0, Number(player && player.totalScored || 0));
+      const pointsPerTurn = totalScored / turns;
+      return Number.isFinite(pointsPerTurn) ? pointsPerTurn.toFixed(1) : '-';
     }
 
     function renderFocusPlayer(p, idx, state) {
@@ -527,7 +519,7 @@
       const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const totalScored = p.totalScored || 0;
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
-      const legScore = getLegPointsForPlayer(p, state);
+      const legScore = getPointsPerAufnahme(p, state);
       const throwsHtml = displayThrows.map((pt, ti) => {
         const label = pt === null ? '-' : String(pt);
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
@@ -547,9 +539,9 @@
             '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
-            '<h4>Punkte im aktuellen Leg</h4>' +
+            '<h4>Punkte pro Aufnahme</h4>' +
             '<div class="focus-big-score" style="font-size:4.2rem">' + legScore + '</div>' +
-            '<div style="color:#777;font-size:.82rem">Seit Start dieses Legs</div>' +
+            '<div style="color:#777;font-size:.82rem">Durchschnitt seit Start dieses Legs</div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<h4>Gesamt / Rest</h4>' +
@@ -698,4 +690,6 @@
     }
   </script>
 </body>
+    const tvMode = new URLSearchParams(location.search).get('tv') === '1';
+    if (tvMode) document.body.classList.add('tv-mode');
 </html>

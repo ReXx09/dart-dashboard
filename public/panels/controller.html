@@ -127,13 +127,14 @@
       <div class="arduino-last-line" id="ctrlLastLine">Letzte serielle Zeile: -</div>
     </div>
     <div class="ctrl-section">
-      <h3>Feld-Testmodus</h3>
+      <h3>Matrix-Scanner (Rohwerte)</h3>
       <div class="action-row">
-        <button class="btn-sm primary" id="fieldTestToggle" onclick="toggleFieldTestMode()">Testmodus starten</button>
-        <button class="btn-sm" id="fieldTestOpenWindow" onclick="openFieldTestWindow()">Testfenster oeffnen</button>
+        <button class="btn-sm primary" id="fieldTestToggle" onclick="toggleFieldTestMode()">Scanner starten</button>
+        <button class="btn-sm" id="fieldTestOpenWindow" onclick="openFieldTestWindow()">Scannerfenster oeffnen</button>
+        <button class="btn-sm" onclick="exportFieldTestLog()">JSON export</button>
         <button class="btn-sm" onclick="clearFieldTestLog()">Log leeren</button>
       </div>
-      <div class="arduino-status" id="fieldTestStatus" style="margin-top:8px">Inaktiv - starte den Testmodus für fortlaufende Wurferfassung.</div>
+      <div class="arduino-status" id="fieldTestStatus" style="margin-top:8px">Inaktiv - starte den Scanner fuer fortlaufende Matrix-Erfassung.</div>
       <div class="arduino-monitor-grid" style="margin-top:10px">
         <div><span>Erfasste Würfe</span><strong id="fieldTestCount">0</strong></div>
         <div><span>Letzter Wert</span><strong id="fieldTestLastValue">-</strong></div>
@@ -141,6 +142,10 @@
         <div><span>Letzter Kanal</span><strong id="fieldTestLastChannel">-</strong></div>
         <div><span>Letzte Zeit</span><strong id="fieldTestLastTs">-</strong></div>
         <div><span>Quelle</span><strong id="fieldTestLastSource">-</strong></div>
+        <div><span>Roh-Zeile</span><strong id="fieldTestLastLine">-</strong></div>
+        <div><span>Aktive Reihen</span><strong id="fieldTestLastRows">-</strong></div>
+        <div><span>Aktive Spalten</span><strong id="fieldTestLastColumns">-</strong></div>
+        <div><span>Pair-Skew</span><strong id="fieldTestLastPairMs">-</strong></div>
       </div>
       <div class="arduino-last-line" id="fieldTestSummary">Wert-Haeufigkeit: -</div>
       <div class="field-test-log" id="fieldTestLog"></div>
@@ -517,7 +522,7 @@
       document.getElementById('ctrlActiveStateMode').textContent = (telemetry.activeStateMode || '-') + ' / ' + (telemetry.activeStateResolved || '-');
       document.getElementById('ctrlLastLine').textContent = 'Letzte serielle Zeile: ' + (latest.line || state.lastLine || '-');
 
-      captureFieldTestHit(matrixHit);
+      captureFieldTestHit(matrix.rawHit || matrixHit, matrix, { ...latest, telemetry });
     }
 
     function toFieldTestFingerprint(hit) {
@@ -531,11 +536,11 @@
       if (fieldTestMode) {
         fieldTestStartedAt = Date.now();
         fieldTestLastFingerprint = toFieldTestFingerprint(latestObservedMatrixHit);
-        btn.textContent = 'Testmodus stoppen';
-        showToast('Testmodus aktiv: Matrix-Hits werden fortlaufend geloggt.');
+        btn.textContent = 'Scanner stoppen';
+        showToast('Scanner aktiv: Matrix-Rohwerte werden fortlaufend geloggt.');
       } else {
-        btn.textContent = 'Testmodus starten';
-        showToast('Testmodus gestoppt.');
+        btn.textContent = 'Scanner starten';
+        showToast('Scanner gestoppt.');
       }
       updateFieldTestUi();
     }
@@ -545,6 +550,21 @@
       fieldTestStartedAt = Date.now();
       fieldTestLastFingerprint = toFieldTestFingerprint(latestObservedMatrixHit);
       updateFieldTestUi();
+    }
+
+    function exportFieldTestLog() {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        count: fieldTestEntries.length,
+        entries: fieldTestEntries.slice().reverse()
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'matrix-scanner-log.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     function isFieldTestWindowOpen() {
@@ -570,7 +590,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Feld-Testmodus</title>
+  <title>Matrix-Scanner</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #0a0a0a; color: #f1f1f1; font-family: 'Segoe UI', system-ui, sans-serif; padding: 16px; }
@@ -594,13 +614,14 @@
 </head>
 <body>
   <div class="header">
-    <h1>Feld-Testmodus</h1>
+    <h1>Matrix-Scanner</h1>
     <span class="badge">LIVE</span>
     <button class="btn" onclick="window.opener.clearFieldTestLog()">Log leeren</button>
+    <button class="btn" onclick="window.opener.exportFieldTestLog()">JSON export</button>
   </div>
   <div class="status" id="ftStatus">-</div>
   <div class="grid">
-    <div><span>Erfasste Wuerfe</span><strong id="ftCount">0</strong></div>
+    <div><span>Erfasste Scans</span><strong id="ftCount">0</strong></div>
     <div><span>Letzter Wert</span><strong id="ftLastValue">-</strong></div>
     <div><span>Letzter Code</span><strong id="ftLastCode">-</strong></div>
     <div><span>Letzter Kanal</span><strong id="ftLastChannel">-</strong></div>
@@ -632,8 +653,8 @@
       if (!statusEl || !countEl || !lastValueEl || !lastCodeEl || !lastChannelEl || !lastTsEl || !lastSourceEl || !summaryEl || !logEl) return;
 
       statusEl.textContent = fieldTestMode
-        ? 'Aktiv - jeder neue Matrix-Hit wird fortlaufend erfasst.'
-        : 'Inaktiv - starte den Testmodus fuer fortlaufende Wurferfassung.';
+        ? 'Aktiv - jeder neue Matrix-Hit und Rohimpuls wird fortlaufend erfasst.'
+        : 'Inaktiv - starte den Scanner fuer fortlaufende Matrix-Erfassung.';
 
       countEl.textContent = String(fieldTestEntries.length);
 
@@ -669,23 +690,39 @@
           '<td>' + escHtml(entry.value != null ? String(entry.value) : '-') + '</td>' +
           '<td>' + escHtml(entry.code != null ? String(entry.code) : '-') + '</td>' +
           '<td>' + escHtml(entry.channel) + '</td>' +
+          '<td>' + escHtml(entry.activeRows || '-') + '</td>' +
+          '<td>' + escHtml(entry.activeColumns || '-') + '</td>' +
+          '<td>' + escHtml(entry.pairMs != null ? String(entry.pairMs) : '-') + '</td>' +
           '<td>' + escHtml(entry.source) + '</td>' +
           '</tr>';
       }).join('');
 
       logEl.innerHTML = '<table>' +
-        '<thead><tr><th>#</th><th>Zeit</th><th>Wert</th><th>Code</th><th>Kanal</th><th>Quelle</th></tr></thead>' +
+        '<thead><tr><th>#</th><th>Zeit</th><th>Wert</th><th>Code</th><th>Kanal</th><th>Reihen</th><th>Spalten</th><th>Skew</th><th>Quelle</th></tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
         '</table>';
     }
 
-    function captureFieldTestHit(hit) {
+    function captureFieldTestHit(hit, matrix, latest) {
       if (!fieldTestMode || !hit) return;
 
       const ts = Number(hit.ts || 0);
       if (ts && ts < fieldTestStartedAt) return;
 
-      const fingerprint = toFieldTestFingerprint(hit);
+      const sniffer = matrix && matrix.sniffer ? matrix.sniffer : {};
+      const rawRows = sniffer.activeRows ? Object.keys(sniffer.activeRows) : [];
+      const rawColumns = sniffer.activeColumns ? Object.keys(sniffer.activeColumns) : [];
+      const fingerprint = [
+        hit.ts ?? '',
+        hit.ms ?? '',
+        hit.key ?? '',
+        hit.code ?? '',
+        hit.points ?? '',
+        latest && latest.line ? latest.line : '',
+        sniffer.lastMatrixHitPairMs ?? '',
+        rawRows.join(','),
+        rawColumns.join(',')
+      ].join('|');
       if (!fingerprint || fingerprint === fieldTestLastFingerprint) return;
       fieldTestLastFingerprint = fingerprint;
 
@@ -697,7 +734,14 @@
         channel: hit.key || (hit.row && hit.column ? `${hit.row}/${hit.column}` : '-'),
         row: hit.row || '-',
         column: hit.column || '-',
-        source: hit.source || 'matrix'
+        source: hit.source || 'matrix',
+        line: latest && latest.line ? latest.line : hit.line || '-',
+        pairMs: Number(sniffer.lastMatrixHitPairMs || hit.ms || 0) || null,
+        activeRows: rawRows.length ? rawRows.join(',') : '-',
+        activeColumns: rawColumns.length ? rawColumns.join(',') : '-',
+        activeRowCount: rawRows.length,
+        activeColumnCount: rawColumns.length,
+        activeCount: latest && latest.telemetry ? Number(latest.telemetry.activeCount || 0) : null
       };
 
       fieldTestEntries.unshift(entry);
@@ -718,11 +762,11 @@
       const logEl = document.getElementById('fieldTestLog');
 
       statusEl.textContent = fieldTestMode
-        ? 'Aktiv - jeder neue Matrix-Hit wird fortlaufend erfasst.'
-        : 'Inaktiv - starte den Testmodus für fortlaufende Wurferfassung.';
+        ? 'Aktiv - jeder neue Matrix-Hit und Rohimpuls wird fortlaufend erfasst.'
+        : 'Inaktiv - starte den Scanner für fortlaufende Matrix-Erfassung.';
 
       if (openBtnEl) {
-        openBtnEl.textContent = isFieldTestWindowOpen() ? 'Testfenster fokusieren' : 'Testfenster oeffnen';
+        openBtnEl.textContent = isFieldTestWindowOpen() ? 'Scannerfenster fokusieren' : 'Scannerfenster oeffnen';
       }
 
       countEl.textContent = String(fieldTestEntries.length);
@@ -733,6 +777,14 @@
       lastChannelEl.textContent = latest ? latest.channel : '-';
       lastTsEl.textContent = latest ? new Date(latest.ts).toLocaleTimeString('de-DE') : '-';
       lastSourceEl.textContent = latest ? latest.source : '-';
+      const lastLineEl = document.getElementById('fieldTestLastLine');
+      const lastRowsEl = document.getElementById('fieldTestLastRows');
+      const lastColumnsEl = document.getElementById('fieldTestLastColumns');
+      const lastPairMsEl = document.getElementById('fieldTestLastPairMs');
+      if (lastLineEl) lastLineEl.textContent = latest ? latest.line : '-';
+      if (lastRowsEl) lastRowsEl.textContent = latest ? String(latest.activeRowCount || 0) + ' (' + (latest.activeRows || '-') + ')' : '-';
+      if (lastColumnsEl) lastColumnsEl.textContent = latest ? String(latest.activeColumnCount || 0) + ' (' + (latest.activeColumns || '-') + ')' : '-';
+      if (lastPairMsEl) lastPairMsEl.textContent = latest && latest.pairMs != null ? String(latest.pairMs) + ' ms' : '-';
 
       const valueCounts = {};
       for (const entry of fieldTestEntries) {
@@ -749,7 +801,7 @@
       summaryEl.textContent = 'Wert-Haeufigkeit: ' + (summary || '-');
 
       if (fieldTestEntries.length === 0) {
-        logEl.innerHTML = '<div class="arduino-last-line" style="margin:0;border:0;border-radius:0">Keine Testwuerfe erfasst.</div>';
+        logEl.innerHTML = '<div class="arduino-last-line" style="margin:0;border:0;border-radius:0">Keine Scan-Daten erfasst.</div>';
         updateFieldTestWindow();
         return;
       }
@@ -762,12 +814,15 @@
           '<td>' + escHtml(entry.value != null ? String(entry.value) : '-') + '</td>' +
           '<td>' + escHtml(entry.code != null ? String(entry.code) : '-') + '</td>' +
           '<td>' + escHtml(entry.channel) + '</td>' +
+          '<td>' + escHtml(entry.activeRows || '-') + '</td>' +
+          '<td>' + escHtml(entry.activeColumns || '-') + '</td>' +
+          '<td>' + escHtml(entry.pairMs != null ? String(entry.pairMs) : '-') + '</td>' +
           '<td>' + escHtml(entry.source) + '</td>' +
           '</tr>';
       }).join('');
 
       logEl.innerHTML = '<table>' +
-        '<thead><tr><th>#</th><th>Zeit</th><th>Wert</th><th>Code</th><th>Kanal</th><th>Quelle</th></tr></thead>' +
+        '<thead><tr><th>#</th><th>Zeit</th><th>Wert</th><th>Code</th><th>Kanal</th><th>Reihen</th><th>Spalten</th><th>Skew</th><th>Quelle</th></tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
         '</table>';
 

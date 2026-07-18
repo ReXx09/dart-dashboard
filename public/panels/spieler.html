@@ -75,6 +75,19 @@
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: 0.88rem; opacity: 0; transition: all .3s; z-index: 999; white-space: nowrap; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+    body.tv-mode .topbar a,
+    body.tv-mode .status-badge,
+    body.tv-mode #saveBtn,
+    body.tv-mode footer {
+      display: none !important;
+    }
+    body.tv-mode main { max-width: none; padding: 14px 18px 16px; }
+    body.tv-mode .page-header { justify-content: flex-start; }
+    body.tv-mode .slots-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    body.tv-mode .slot-card { padding: 12px 14px; }
+    body.tv-mode .slot-name-input { font-size: 1rem; padding: 8px 10px; }
+    body.tv-mode .slot-info { min-height: 18px; }
+
     /* Section header */
     .section-header { display: flex; align-items: center; gap: 12px; }
     .section-header h2 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #555; font-weight: 600; white-space: nowrap; }
@@ -84,6 +97,12 @@
   </style>
 </head>
 <body>
+
+  <script>
+    if (new URLSearchParams(location.search).get('tv') === '1') {
+      document.body.classList.add('tv-mode');
+    }
+  </script>
 
   <div class="topbar">
     <a href="/">← Zurück</a>

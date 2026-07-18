@@ -307,6 +307,7 @@ const arduinoState = {
   lastEvent: null,
   lastHeartbeat: null,
   lastTrigger: null,
+  lastRawHit: null,
   pendingThrow: false,
   lastAutoThrow: null,
   lastMiss: null,
@@ -499,6 +500,7 @@ function summarizeMatrixHit(hit) {
 function buildArduinoStateView() {
   const matrixSnifferView = arduinoState.matrixSniffer ? { ...arduinoState.matrixSniffer } : null;
   const matrixHit = summarizeMatrixHit(matrixSniffer.lastMatrixHit);
+  const rawHit = summarizeMatrixHit(arduinoState.lastRawHit);
   const autoThrowHit = summarizeMatrixHit(arduinoState.lastAutoThrow && arduinoState.lastAutoThrow.hit ? arduinoState.lastAutoThrow.hit : null);
   const normalizedHit = autoThrowHit || matrixHit;
   const normalizedHitPoints = normalizedHit && Number.isFinite(Number(normalizedHit.points))
@@ -521,12 +523,14 @@ function buildArduinoStateView() {
     heartbeat: arduinoState.lastHeartbeat ? { ...arduinoState.lastHeartbeat } : null,
     trigger: arduinoState.lastTrigger ? { ...arduinoState.lastTrigger } : null,
     line: arduinoState.lastLine || '',
-    hit: normalizedHit
+    hit: normalizedHit,
+    rawHit
   };
 
   const matrix = {
     sniffer: matrixSnifferView,
     hit: normalizedHit,
+    rawHit,
     label: normalizedHit ? normalizedHit.label : null,
     code: normalizedHitCode,
     points: normalizedHitPoints
@@ -1113,6 +1117,11 @@ function parseArduinoLine(line) {
       mapped: !!mapped,
       source: 'arduino-matrix-raw'
     };
+    normalizeArduinoStatePatch({
+      lastLine: clean,
+      lastRawHit: { ...hit },
+      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
+    });
     const hitNow = Date.now();
     queueMatrixHitCandidate(hit, hitNow);
     return;

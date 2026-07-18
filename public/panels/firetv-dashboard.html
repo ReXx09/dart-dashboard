@@ -11,13 +11,13 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #090909;
-      --panel: #151515;
-      --line: #282828;
-      --text: #f3f3f3;
-      --muted: #7d7d7d;
+      --line: #262626;
+      --text: #f4f4f4;
+      --muted: #808080;
       --live: #e63946;
       --players: #457b9d;
       --scores: #f4a261;
+      --scale: 1;
     }
     body {
       min-height: 100vh;
@@ -32,34 +32,26 @@
     .shell {
       width: 100vw;
       height: 100vh;
-      padding: 20px;
+      padding: calc(18px * var(--scale));
       display: grid;
       grid-template-rows: auto 1fr auto;
-      gap: 18px;
+      gap: calc(16px * var(--scale));
     }
     .topbar {
       display: flex;
       align-items: center;
       gap: 14px;
-      padding: 14px 18px;
+      padding: calc(12px * var(--scale)) calc(16px * var(--scale));
       border: 1px solid var(--line);
-      border-radius: 20px;
+      border-radius: 18px;
       background: rgba(16,16,16,.94);
     }
-    .topbar h1 {
-      font-size: 1.55rem;
-      font-weight: 900;
-      letter-spacing: .02em;
-      flex: 1;
-    }
-    .topbar p {
-      color: var(--muted);
-      font-size: .92rem;
-    }
+    .title-wrap { flex: 1; }
+    .topbar h1 { font-size: calc(1.5rem * var(--scale)); font-weight: 900; letter-spacing: .02em; }
+    .topbar p { color: var(--muted); font-size: calc(.9rem * var(--scale)); margin-top: 4px; }
     .clock {
-      font-size: 1.2rem;
+      font-size: calc(1.15rem * var(--scale));
       font-weight: 800;
-      color: #f4f4f4;
       font-variant-numeric: tabular-nums;
       min-width: 110px;
       text-align: right;
@@ -67,7 +59,7 @@
     .grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 18px;
+      gap: calc(16px * var(--scale));
       min-height: 0;
     }
     .card {
@@ -75,8 +67,8 @@
       flex-direction: column;
       justify-content: space-between;
       min-height: 100%;
-      padding: 24px;
-      border-radius: 28px;
+      padding: calc(22px * var(--scale));
+      border-radius: calc(24px * var(--scale));
       text-decoration: none;
       color: inherit;
       border: 2px solid var(--accent, #333);
@@ -89,31 +81,24 @@
     .card:hover {
       transform: translateY(-4px);
       box-shadow: 0 20px 44px rgba(0,0,0,.42);
-      border-color: #ffffff;
+      border-color: #fff;
     }
-    .card-top {
-      display: grid;
-      gap: 16px;
-    }
+    .card-top { display: grid; gap: 14px; }
     .icon {
-      width: 72px;
-      height: 72px;
-      border-radius: 20px;
+      width: calc(70px * var(--scale));
+      height: calc(70px * var(--scale));
+      border-radius: calc(18px * var(--scale));
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2rem;
+      font-size: calc(2rem * var(--scale));
       background: var(--icon-bg, rgba(255,255,255,.08));
       box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
     }
-    .title {
-      font-size: 2rem;
-      font-weight: 900;
-      line-height: 1.05;
-    }
+    .title { font-size: calc(1.8rem * var(--scale)); font-weight: 900; line-height: 1.05; }
     .desc {
       color: #b7b7b7;
-      font-size: 1.02rem;
+      font-size: calc(.98rem * var(--scale));
       line-height: 1.5;
       max-width: 24ch;
     }
@@ -121,30 +106,22 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-top: 18px;
+      margin-top: calc(16px * var(--scale));
       color: var(--accent, #ccc);
-      font-size: .95rem;
+      font-size: calc(.9rem * var(--scale));
       font-weight: 800;
       letter-spacing: .08em;
       text-transform: uppercase;
     }
-    .arrow {
-      color: #f0f0f0;
-      font-size: 1.5rem;
-      line-height: 1;
-    }
+    .arrow { color: #f0f0f0; font-size: calc(1.45rem * var(--scale)); line-height: 1; }
     .bottom-note {
       text-align: center;
       color: #6f6f6f;
-      font-size: .84rem;
+      font-size: calc(.8rem * var(--scale));
       letter-spacing: .04em;
     }
+    .hidden { display: none !important; }
     @media (max-width: 1100px), (max-height: 860px) {
-      .shell { padding: 14px; gap: 12px; }
-      .topbar { padding: 12px 14px; border-radius: 16px; }
-      .topbar h1 { font-size: 1.3rem; }
-      .topbar p { font-size: .82rem; }
-      .clock { font-size: 1rem; min-width: 92px; }
       .grid { gap: 12px; }
       .card { padding: 18px; border-radius: 22px; }
       .icon { width: 58px; height: 58px; border-radius: 16px; font-size: 1.65rem; }
@@ -157,52 +134,94 @@
 <body>
   <div class="shell">
     <header class="topbar">
-      <div>
+      <div class="title-wrap">
         <h1>📺 Fire TV Start</h1>
-        <p>Nur die benoetigten Ansichten fuer den TV: Live, Spieler und Highscores.</p>
+        <p>Nur Live, Spieler und Highscores - kontrolliert im Browser, angezeigt auf dem TV.</p>
       </div>
       <div class="clock" id="clock">--:--:--</div>
     </header>
 
-    <main class="grid">
-      <a class="card" href="/panels/live-spielstand.html" style="--accent: var(--live); --icon-bg: rgba(230,57,70,.16)">
-        <div class="card-top">
-          <div class="icon">⚡</div>
-          <div class="title">Live-Spielstand</div>
-          <div class="desc">Aktuelles Spiel, aktiver Spieler, Wuerfe und Restpunkte in Echtzeit.</div>
-        </div>
-        <div class="card-foot"><span>Live</span><span class="arrow">→</span></div>
-      </a>
+    <main class="grid" id="grid"></main>
 
-      <a class="card" href="/panels/spieler.html" style="--accent: var(--players); --icon-bg: rgba(69,123,157,.16)">
-        <div class="card-top">
-          <div class="icon">👤</div>
-          <div class="title">Spieler</div>
-          <div class="desc">Aktive Spieler, Reihenfolge und Namen direkt auf dem TV aufrufen.</div>
-        </div>
-        <div class="card-foot"><span>Spieler</span><span class="arrow">→</span></div>
-      </a>
-
-      <a class="card" href="/panels/highscores.html" style="--accent: var(--scores); --icon-bg: rgba(244,162,97,.16)">
-        <div class="card-top">
-          <div class="icon">🏆</div>
-          <div class="title">Highscores</div>
-          <div class="desc">Bestleistungen, Spezialwerte und Ranglisten fuer die Anzeige am Fernseher.</div>
-        </div>
-        <div class="card-foot"><span>Scores</span><span class="arrow">→</span></div>
-      </a>
-    </main>
-
-    <div class="bottom-note">Controller, Testfunktionen und Admin bleiben bewusst nur in der normalen Browser-Startseite.</div>
+    <div class="bottom-note">Browser bleibt die Konfiguration - Fire TV bleibt die reine Anzeige.</div>
   </div>
 
   <script>
+    const CARD_DATA = {
+      live: {
+        href: '/panels/live-spielstand.html?tv=1',
+        icon: '⚡',
+        title: 'Live-Spielstand',
+        desc: 'Aktuelles Spiel, aktiver Spieler, Wuerfe und Restpunkte.',
+        label: 'Live',
+        accent: 'var(--live)',
+        iconBg: 'rgba(230,57,70,.16)'
+      },
+      spieler: {
+        href: '/panels/spieler.html?tv=1',
+        icon: '👤',
+        title: 'Spieler',
+        desc: 'Aktive Spieler, Reihenfolge und Namen auf einen Blick.',
+        label: 'Spieler',
+        accent: 'var(--players)',
+        iconBg: 'rgba(69,123,157,.16)'
+      },
+      highscores: {
+        href: '/panels/highscores.html?tv=1',
+        icon: '🏆',
+        title: 'Highscores',
+        desc: 'Bestleistungen, Spezialwerte und Ranglisten fuer den TV.',
+        label: 'Scores',
+        accent: 'var(--scores)',
+        iconBg: 'rgba(244,162,97,.16)'
+      }
+    };
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function updateClock() {
-      document.getElementById('clock').textContent = new Date().toLocaleTimeString('de-DE');
+      const clock = document.getElementById('clock');
+      if (!clock.classList.contains('hidden')) {
+        clock.textContent = new Date().toLocaleTimeString('de-DE');
+      }
+    }
+
+    function applySettings(settings) {
+      const scale = Math.max(80, Math.min(130, Number(settings.firetvUiScale || 100) || 100));
+      document.body.style.setProperty('--scale', String(scale / 100));
+      document.getElementById('clock').classList.toggle('hidden', settings.firetvShowClock === false);
+
+      const orderRaw = String(settings.firetvTileOrder || 'live,spieler,highscores');
+      const order = orderRaw.split(',').map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+      const finalOrder = order.filter((key) => CARD_DATA[key]).concat(Object.keys(CARD_DATA).filter((key) => !order.includes(key)));
+      const grid = document.getElementById('grid');
+      grid.innerHTML = finalOrder.map((key) => {
+        const card = CARD_DATA[key];
+        return '<a class="card" href="' + card.href + '" style="--accent:' + card.accent + ';--icon-bg:' + card.iconBg + '">' +
+          '<div class="card-top">' +
+            '<div class="icon">' + card.icon + '</div>' +
+            '<div class="title">' + escapeHtml(card.title) + '</div>' +
+            '<div class="desc">' + escapeHtml(card.desc) + '</div>' +
+          '</div>' +
+          '<div class="card-foot"><span>' + escapeHtml(card.label) + '</span><span class="arrow">→</span></div>' +
+        '</a>';
+      }).join('');
+    }
+
+    async function loadSettings() {
+      try {
+        const settings = await fetch('/api/settings').then((r) => r.json());
+        applySettings(settings || {});
+      } catch (_) {
+        applySettings({});
+      }
     }
 
     updateClock();
     setInterval(updateClock, 1000);
+    loadSettings();
   </script>
 </body>
 </html>

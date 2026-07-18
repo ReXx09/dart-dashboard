@@ -205,6 +205,16 @@
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     footer { text-align: center; padding: 14px; font-size: .7rem; color: #222; border-top: 1px solid #141414; }
+    body.tv-mode header { padding: 12px 18px; }
+    body.tv-mode main { max-width: none; padding: 14px 18px 18px; }
+    body.tv-mode .toolbar,
+    body.tv-mode .summary-grid,
+    body.tv-mode .legend,
+    body.tv-mode footer {
+      display: none !important;
+    }
+    body.tv-mode .tables-grid { grid-template-columns: 1fr; }
+    body.tv-mode .panel:first-child { min-height: calc(100vh - 170px); }
     @media (max-width: 900px) {
       .toolbar, .tables-grid, .summary-grid { grid-template-columns: 1fr; }
       .toolbar { display: flex; flex-direction: column; }
@@ -213,6 +223,11 @@
   </style>
 </head>
 <body>
+  <script>
+    if (new URLSearchParams(location.search).get('tv') === '1') {
+      document.body.classList.add('tv-mode');
+    }
+  </script>
   <header>
     <span class="logo">🏆</span>
     <div class="header-text">

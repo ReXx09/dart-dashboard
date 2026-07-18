@@ -32,7 +32,6 @@
     textarea.mapping-json:focus{border-color:#e63946;outline:none}
     .mapping-hint{font-size:.72rem;color:#444;margin-top:8px;line-height:1.45}
     .field-inline{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-
     .btn-save{background:#e63946;border:none;color:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:background .2s}
     .btn-save:hover{background:#c1121f}
     .btn-save:disabled{background:#333;color:#555;cursor:default}
@@ -107,29 +106,29 @@
   </div>
 
   <div class="section">
-    <div class="sec-hd"><span class="sec-title">Live-Anzeige</span><div class="sec-line"></div></div>
+    <div class="sec-hd"><span class="sec-title">Fire-TV</span><div class="sec-line"></div></div>
     <fieldset>
       <div class="field-row">
-        <label>Anzeige-Profil</label>
-        <select id="liveDisplayProfile">
-          <option value="auto">Auto / Standard</option>
-          <option value="firetv-1024x860">Fire TV 1024x860</option>
-          <option value="compact-tv">Kompakt-TV</option>
-          <option value="large-tv">Großer TV</option>
-        </select>
+        <label>Tile-Reihenfolge</label>
+        <input type="text" id="firetvTileOrder" placeholder="live,spieler,highscores" />
       </div>
-      <div class="field-hint">Waehlt ein optimiertes Layout fuer verschiedene TV-Klassen. Das Fire-TV-Profil ist auf 1024x860 abgestimmt.</div>
+      <div class="field-hint">Reihenfolge der drei Kacheln auf dem Fire-TV-Hub. Werte mit Komma trennen: live, spieler, highscores.</div>
       <div class="field-row">
         <label>Anzeige-Skalierung</label>
         <div class="field-inline">
-          <input type="number" id="liveDisplayScale" min="80" max="125" step="1" value="100" />
+          <input type="number" id="firetvUiScale" min="80" max="130" step="1" value="100" />
           <span style="font-size:.8rem;color:#666">%</span>
         </div>
       </div>
-      <div class="field-hint">100 = Standard. Hoeher vergroessert Fokus-Kacheln und Wurfzahlen, niedriger macht das Layout kompakter.</div>
-      <button class="btn-save" id="saveDisplayBtn">Anzeige speichern</button>
+      <div class="field-hint">100 = Standard. Hoehere Werte machen die Fire-TV-Kacheln groesser, niedrigere kompakter.</div>
+      <div class="field-row">
+        <label>Uhr anzeigen</label>
+        <input type="checkbox" id="firetvShowClock" />
+      </div>
+      <button class="btn-save" id="saveFireTvBtn">Fire-TV speichern</button>
     </fieldset>
   </div>
+
 </main>
 <div class="toast" id="toast"></div>
 <script>
@@ -153,8 +152,9 @@
       document.getElementById('ardEnabled').checked = settings.arduinoMonitorEnabled !== false;
       document.getElementById('ardPort').value = settings.arduinoPort || '';
       document.getElementById('ardBaud').value = String(settings.arduinoBaudRate || 115200);
-      document.getElementById('liveDisplayProfile').value = settings.liveDisplayProfile || 'auto';
-      document.getElementById('liveDisplayScale').value = String(settings.liveDisplayScale || 100);
+      document.getElementById('firetvTileOrder').value = settings.firetvTileOrder || 'live,spieler,highscores';
+      document.getElementById('firetvUiScale').value = String(settings.firetvUiScale || 100);
+      document.getElementById('firetvShowClock').checked = settings.firetvShowClock !== false;
     } catch(e) {
       document.getElementById('si-ip').textContent = 'Offline';
     }
@@ -211,22 +211,21 @@
     this.disabled = false;
   });
 
-  document.getElementById('saveDisplayBtn').addEventListener('click', async function() {
+  document.getElementById('saveFireTvBtn').addEventListener('click', async function() {
     this.disabled = true;
-    const scale = Math.max(80, Math.min(125, parseInt(document.getElementById('liveDisplayScale').value, 10) || 100));
     const settings = {
-      liveDisplayProfile: document.getElementById('liveDisplayProfile').value || 'auto',
-      liveDisplayScale: scale
+      firetvTileOrder: document.getElementById('firetvTileOrder').value.trim() || 'live,spieler,highscores',
+      firetvUiScale: Math.max(80, Math.min(130, parseInt(document.getElementById('firetvUiScale').value, 10) || 100)),
+      firetvShowClock: document.getElementById('firetvShowClock').checked
     };
     try {
       const r = await fetch('/api/settings', {
         method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify(settings)
       });
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      document.getElementById('liveDisplayScale').value = String(scale);
-      showToast('Anzeige-Einstellungen gespeichert.');
+      showToast('Fire-TV-Einstellungen gespeichert.');
     } catch(e) {
       showToast('Fehler: ' + e.message, true);
     }
