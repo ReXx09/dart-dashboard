@@ -534,14 +534,19 @@
       '</div>';
     }
 
-    function getPointsPerAufnahme(player, state) {
-      const turns = Math.max(0, Number(player && player.turns || 0));
-      const totalScored = Math.max(0, Number(player && player.totalScored || 0));
+    function getPointsPerAufnahme(player) {
+      const currentRound = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
+      if (currentRound.length > 0) {
+        return currentRound.reduce((sum, pt) => sum + (Number(pt) || 0), 0);
+      }
 
-      if (turns <= 0) return '-';
+      const throws = Array.isArray(player && player.throws) ? player.throws : [];
+      if (throws.length === 0) return '-';
 
-      const pointsPerTurn = totalScored / turns;
-      return Number.isFinite(pointsPerTurn) ? pointsPerTurn.toFixed(1) : '-';
+      const remainder = throws.length % 3;
+      const chunkSize = remainder === 0 ? 3 : remainder;
+      const lastChunk = throws.slice(-chunkSize);
+      return lastChunk.reduce((sum, t) => sum + (Number(t && t.points) || 0), 0);
     }
 
     function renderFocusPlayer(p, idx, state) {
@@ -554,7 +559,7 @@
       const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const totalScored = p.totalScored || 0;
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
-      const legScore = getPointsPerAufnahme(p, state);
+      const aufnahmeScore = getPointsPerAufnahme(p);
       const throwsHtml = displayThrows.map((pt, ti) => {
         const label = pt === null ? '-' : String(pt);
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
@@ -575,8 +580,8 @@
           '</div>' +
           '<div class="focus-kachel">' +
             '<h4>Punkte pro Aufnahme</h4>' +
-            '<div class="focus-big-score" style="font-size:4.2rem">' + legScore + '</div>' +
-            '<div style="color:#777;font-size:.82rem">Durchschnitt seit Start dieses Legs</div>' +
+            '<div class="focus-big-score" style="font-size:4.2rem">' + aufnahmeScore + '</div>' +
+            '<div style="color:#777;font-size:.82rem">Aktuelle Aufnahme</div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<h4>Gesamt / Rest</h4>' +
@@ -723,8 +728,8 @@
         if (r.ok) renderHighscores(await r.json());
       } catch {}
     }
-  </script>
-</body>
     const tvMode = new URLSearchParams(location.search).get('tv') === '1';
     if (tvMode) document.body.classList.add('tv-mode');
+  </script>
+</body>
 </html>

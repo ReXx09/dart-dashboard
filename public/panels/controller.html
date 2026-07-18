@@ -12,36 +12,140 @@
     .topbar a:hover { color: #fff; }
     .topbar h2 { font-size: 1.1rem; flex: 1; font-weight: 700; }
     .badge-ctrl { background: #457b9d; color: #fff; font-size: .65rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
+    main {
+      padding: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(240px, 310px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
     .section-nav {
       position: sticky;
-      top: 0;
+      top: 12px;
       z-index: 20;
-      background: rgba(10, 10, 10, .92);
-      backdrop-filter: blur(8px);
-      border-bottom: 1px solid #1b1b1b;
-      padding: 10px 16px;
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
+      background: linear-gradient(180deg, rgba(18,30,45,.96), rgba(12,22,35,.94));
+      border: 1px solid rgba(105, 136, 170, .24);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 0 20px 44px rgba(0,0,0,.35);
+      display: grid;
+      gap: 10px;
+    }
+    .section-nav .menu-head {
+      padding: 0 2px 2px;
+      color: #8ea3bf;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+      font-weight: 700;
+    }
+    .menu-link {
+      width: 100%;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-areas:
+        "no title"
+        "no sub";
+      gap: 2px 10px;
+      align-items: center;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(142,163,191,.16);
+      border-left: 4px solid var(--menu-accent, #457b9d);
+      background: linear-gradient(180deg, rgba(17,27,41,.9), rgba(8,15,25,.86));
+      color: #eaf2ff;
+      cursor: pointer;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .menu-link:hover {
+      transform: translateX(2px);
+      border-color: rgba(94, 156, 255, .34);
+    }
+    .menu-link:focus-visible {
+      outline: none;
+      border-color: rgba(94, 156, 255, .62);
+      box-shadow: 0 0 0 3px rgba(94, 156, 255, .22);
+    }
+    .menu-link.is-active {
+      border-color: rgba(61, 220, 151, .48);
+      box-shadow: 0 0 0 1px rgba(61, 220, 151, .2), 0 14px 28px rgba(0,0,0,.24);
+      background: linear-gradient(180deg, rgba(61,220,151,.16), rgba(7,14,22,.92));
+    }
+    .menu-no {
+      grid-area: no;
+      min-width: 34px;
+      min-height: 34px;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      background: rgba(255,255,255,.06);
+      color: var(--menu-accent, #457b9d);
+      font-size: .7rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+    }
+    .menu-title {
+      grid-area: title;
+      font-size: .86rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .menu-sub {
+      grid-area: sub;
+      color: #8ea3bf;
+      font-size: .73rem;
+      line-height: 1.3;
+    }
+    .menu-accent-1 { --menu-accent: #3ddc97; }
+    .menu-accent-2 { --menu-accent: #f9a826; }
+    .menu-accent-3 { --menu-accent: #ff6b6b; }
+    .menu-accent-4 { --menu-accent: #5e9cff; }
+    .menu-accent-5 { --menu-accent: #9b87ff; }
+    .menu-accent-6 { --menu-accent: #47d6b6; }
+    .content-viewer {
+      min-height: 76vh;
+      max-height: 78vh;
+      border-radius: 18px;
+      overflow: auto;
+      border: 1px solid rgba(105, 136, 170, .28);
+      box-shadow: 0 20px 48px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04);
+      background: linear-gradient(180deg, rgba(20, 32, 48, 0.94), rgba(12, 22, 34, 0.92));
+      padding: 14px;
       scrollbar-width: thin;
     }
-    .section-nav a {
-      flex: 0 0 auto;
-      color: #c9c9c9;
-      text-decoration: none;
-      font-size: .78rem;
-      font-weight: 700;
-      letter-spacing: .03em;
-      padding: 7px 12px;
-      border-radius: 999px;
-      border: 1px solid #242424;
-      background: #111;
-      transition: all .15s ease;
+    .viewer-bar {
+      position: sticky;
+      top: -14px;
+      z-index: 3;
+      margin: -14px -14px 12px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid rgba(142,163,191,.18);
+      background: rgba(10,18,28,.9);
+      color: #8ea3bf;
+      font-size: .76rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
     }
-    .section-nav a:hover { color: #fff; border-color: #3a3a3a; background: #171717; }
-    main { padding: 16px; max-width: 800px; margin: 0 auto; display: grid; gap: 14px; }
-    .ctrl-section { scroll-margin-top: 70px; }
-    .ctrl-section { background: #141414; border-radius: 14px; border: 1px solid #1e1e1e; padding: 16px; }
+    .ctrl-section {
+      display: none;
+      scroll-margin-top: 80px;
+    }
+    .ctrl-section {
+      background: #141414;
+      border-radius: 14px;
+      border: 1px solid #1e1e1e;
+      padding: 16px;
+      min-height: 320px;
+    }
+    .ctrl-section.is-active { display: block; }
     .ctrl-section h3 { font-size: .85rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
     .game-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .game-mode .label { font-size: .78rem; color: #555; }
@@ -94,25 +198,35 @@
     .arduino-dot.off { background: #555; }
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .section-nav { position: static; }
+      .content-viewer { max-height: none; min-height: 0; }
+      .ctrl-section { min-height: 0; }
+    }
   </style>
 </head>
 <body>
   <div class="topbar">
     <a href="/">← Zurück</a>
-    <h2>🎮 Controller</h2>
+    <h2 id="controllerTitle">🎮 Controller</h2>
     <span class="badge-ctrl">STEUERUNG</span>
   </div>
-  <div class="section-nav" aria-label="Controller Navigation">
-    <a href="#spiel">Spiel</a>
-    <a href="#spieler">Spieler</a>
-    <a href="#aktionen">Aktionen</a>
-    <a href="#arduino">Arduino</a>
-    <a href="#scanner">Scanner</a>
-    <a href="#tuning">Tuning</a>
-  </div>
   <main>
-    <div class="ctrl-section" id="spiel">
-      <h3>Spiel</h3>
+    <aside class="section-nav" aria-label="Controller Navigation">
+      <div class="menu-head">Einstellungs-Menue</div>
+      <button class="menu-link menu-accent-1" data-section="spiel" type="button" onclick="activateSection('spiel')"><span class="menu-no">01</span><span class="menu-title">Spielsteuerung</span><span class="menu-sub">Spiel, Spieler und Aktionen</span></button>
+      <button class="menu-link menu-accent-4" data-section="arduino" type="button" onclick="activateSection('arduino')"><span class="menu-no">02</span><span class="menu-title">Arduino</span><span class="menu-sub">Live-Zustand und Telemetrie</span></button>
+      <button class="menu-link menu-accent-5" data-section="scanner" type="button" onclick="activateSection('scanner')"><span class="menu-no">03</span><span class="menu-title">Scanner</span><span class="menu-sub">Rohwerte und Matrix-Log</span></button>
+      <button class="menu-link menu-accent-6" data-section="tuning" type="button" onclick="activateSection('tuning')"><span class="menu-no">04</span><span class="menu-title">Tuning</span><span class="menu-sub">Trefferparameter abstimmen</span></button>
+    </aside>
+    <section class="content-viewer">
+      <div class="viewer-bar">
+        <span>Controller Bereich</span>
+        <span>scrollbare Kachel</span>
+      </div>
+      <div class="ctrl-section" id="spiel">
+      <h3>Spielsteuerung</h3>
       <div class="game-mode">
         <span class="label">Modus:</span>
         <select id="gameModeSelect" onchange="changeMode(this.value)">
@@ -129,12 +243,10 @@
         <button class="btn-sm primary" onclick="resetLeg(true)" style="margin-left:auto">Neues Leg</button>
         <button class="btn-sm danger" onclick="resetLeg(false)">Reset</button>
       </div>
-    </div>
-    <div class="ctrl-section" id="spieler">
+      <div style="height:10px"></div>
       <h3>Spieler</h3>
       <div id="playerListContainer"><div style="color:#444">Lade Spieler...</div></div>
-    </div>
-    <div class="ctrl-section" id="aktionen">
+      <div style="height:10px"></div>
       <h3>Aktionen</h3>
       <div class="action-row">
         <button class="btn-sm" onclick="undoLast()">↩ Rückgängig (Undo)</button>
@@ -145,8 +257,8 @@
         <input class="points-in" id="ctrlPoints" type="number" min="0" max="180" value="60" />
         <button class="pts" id="ctrlThrowBtn">Werfen</button>
       </div>
-    </div>
-    <div class="ctrl-section" id="arduino">
+      </div>
+      <div class="ctrl-section" id="arduino">
       <h3>Arduino Monitor</h3>
       <div class="arduino-status" id="ctrlArduino"><span class="arduino-dot off"></span>Nicht verbunden</div>
       <div class="arduino-monitor-grid">
@@ -161,8 +273,8 @@
         <div><span>Aktiv-Logik</span><strong id="ctrlActiveStateMode">-</strong></div>
       </div>
       <div class="arduino-last-line" id="ctrlLastLine">Letzte serielle Zeile: -</div>
-    </div>
-    <div class="ctrl-section" id="scanner">
+      </div>
+      <div class="ctrl-section" id="scanner">
       <h3>Matrix-Scanner (Rohwerte)</h3>
       <div class="action-row">
         <button class="btn-sm primary" id="fieldTestToggle" onclick="toggleFieldTestMode()">Scanner starten</button>
@@ -185,8 +297,8 @@
       </div>
       <div class="arduino-last-line" id="fieldTestSummary">Wert-Haeufigkeit: -</div>
       <div class="field-test-log" id="fieldTestLog"></div>
-    </div>
-    <div class="ctrl-section" id="tuning">
+      </div>
+      <div class="ctrl-section" id="tuning">
       <h3>Treffer-Tuning (Lokal)</h3>
       <div class="tuning-row">
         <button class="btn-sm" onclick="openTuningInfoWindow()">Info-Fenster</button>
@@ -222,7 +334,8 @@
         </ul>
       </div>
       <div class="tuning-hint">Hinweis: Werte in kleinen Schritten aendern (10-30 ms) und danach 10-20 Testwuerfe je Feld pruefen.</div>
-    </div>
+      </div>
+    </section>
   </main>
   <div class="toast" id="toast"></div>
   <script>
@@ -286,6 +399,34 @@
       if (Number.isFinite(min) && n < min) return min;
       if (Number.isFinite(max) && n > max) return max;
       return Math.round(n);
+    }
+
+    function activateSection(sectionId) {
+      let id = String(sectionId || '').trim().toLowerCase();
+      if (id === 'spieler' || id === 'aktionen') id = 'spiel';
+      if (!id) return;
+
+      const target = document.getElementById(id);
+      if (!target) return;
+
+      document.querySelectorAll('.ctrl-section').forEach((section) => {
+        section.classList.toggle('is-active', section.id === id);
+      });
+
+      document.querySelectorAll('.menu-link').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-section') === id);
+      });
+
+      const viewer = document.querySelector('.content-viewer');
+      if (viewer) viewer.scrollTo({ top: 0, behavior: 'smooth' });
+
+      const title = document.getElementById('controllerTitle');
+      const h = target.querySelector('h3');
+      if (title && h) title.textContent = '🎮 Controller - ' + h.textContent;
+
+      if (location.hash !== '#' + id) {
+        history.replaceState(null, '', '#' + id);
+      }
     }
 
     function applyTuningToInputs(t) {
@@ -915,6 +1056,16 @@
       if (!tuningLoadedOnce) {
         tuningLoadedOnce = true;
         loadTuningSettings();
+      }
+
+      const hashId = String((location.hash || '').replace('#', '')).trim().toLowerCase();
+      const normalizedHash = (hashId === 'spieler' || hashId === 'aktionen') ? 'spiel' : hashId;
+      if (normalizedHash && document.getElementById(normalizedHash)) {
+        activateSection(normalizedHash);
+      } else if (hashId && document.getElementById(hashId)) {
+        activateSection(hashId);
+      } else if (!document.querySelector('.ctrl-section.is-active')) {
+        activateSection('spiel');
       }
     }
 
