@@ -319,6 +319,7 @@ const arduinoState = {
   lastAutoThrow: null,
   lastMiss: null,
   lastAutoThrowError: null,
+  playerSwitch: null,
   matrixSniffer: null,
   activeCount: null,
   lastUpdateMs: null,
@@ -548,6 +549,7 @@ function buildArduinoStateView() {
     lastAutoThrow: arduinoState.lastAutoThrow || null,
     lastMiss: arduinoState.lastMiss || null,
     lastAutoThrowError: arduinoState.lastAutoThrowError || null,
+    lastPlayerSwitch: arduinoState.playerSwitch || null,
     channelAutoDetect: arduinoState.channelAutoDetect || null
   };
 
@@ -1070,6 +1072,27 @@ function parseArduinoLine(line) {
     normalizeArduinoStatePatch({
       lastDiag: { ms: Number(diagMatch[1]), channel: diagMatch[2], edges: Number(diagMatch[3]), line: clean }
     });
+    return;
+  }
+
+  // PLAYER_SWITCH,<ms>
+  const psMatch = clean.match(/^PLAYER_SWITCH,(\d+)$/i);
+  if (psMatch) {
+    const playerSwitchEvt = { ms: Number(psMatch[1]), ts: Date.now(), line: clean };
+    normalizeArduinoStatePatch({ playerSwitch: playerSwitchEvt, lastLine: clean });
+    arduinoProcessingPromise = arduinoProcessingPromise
+      .catch(() => {})
+      .then(async () => {
+        const state = await getLiveState();
+        if (!Array.isArray(state.players) || state.players.length === 0) return;
+        const nextIdx = (state.game.activePlayer + 1) % state.players.length;
+        state.game.activePlayer = nextIdx;
+        state.game.currentThrow = 0;
+        state.game.throwRound = (state.game.throwRound || 1) + 1;
+        state.lastAction = { type: 'player-switch-btn', player: state.players[nextIdx].name, playerSlot: state.players[nextIdx].slot, ts: Date.now() };
+        await saveLiveState(state);
+        broadcastReload();
+      });
     return;
   }
 
