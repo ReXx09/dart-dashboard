@@ -121,6 +121,12 @@ class DataStore {
         leg_win INTEGER NOT NULL DEFAULT 0,
         ts INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        color TEXT
+      );
     `);
   }
 
@@ -146,6 +152,12 @@ class DataStore {
         kind TEXT,
         leg_win BOOLEAN NOT NULL DEFAULT FALSE,
         ts BIGINT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS profiles (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        color TEXT
       );
     `);
   }
@@ -176,6 +188,14 @@ class DataStore {
         kind VARCHAR(64) NULL,
         leg_win TINYINT(1) NOT NULL DEFAULT 0,
         ts BIGINT NOT NULL
+      );
+    `);
+
+    await this.my.query(`
+      CREATE TABLE IF NOT EXISTS profiles (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        name VARCHAR(255) NOT NULL,
+        color VARCHAR(32) NULL
       );
     `);
   }
@@ -227,17 +247,70 @@ class DataStore {
     return Number(rows[0].c || 0);
   }
 
-  async getPlayers() {
-    let rows = [];
+  async getProfiles() {
     if (this.isSQLite()) {
-      rows = await this.sqlite.all('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
-    } else if (this.isPostgres()) {
-      const result = await this.pg.query('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
-      rows = result.rows;
-    } else {
-      const result = await this.my.query('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
-      rows = result[0];
+      return this.sqlite.all('SELECT id, name, color FROM profiles ORDER BY name ASC');
     }
+    if (this.isPostgres()) {
+      const result = await this.pg.query('SELECT id, name, color FROM profiles ORDER BY name ASC');
+      return result.rows;
+    }
+    const [rows] = await this.my.query('SELECT id, name, color FROM profiles ORDER BY name ASC');
+    return rows;
+  }
+
+  async saveProfiles(list) {
+    const safeList = Array.isArray(list) ? list : [];
+    if (this.isSQLite()) {
+      await this.sqlite.exec('BEGIN TRANSACTION');
+      try {
+        await this.sqlite.run('DELETE FROM profiles');
+        for (const p of safeList) {
+          await this.sqlite.run(
+            'INSERT INTO profiles (name, color) VALUES (?, ?)',
+            [String(p.name || '').trim(), p.color || null]
+          );
+        }
+        await this.sqlite.exec('COMMIT');
+      } catch (err) {
+        await this.sqlite.exec('ROLLBACK');
+        throw err;
+      }
+      return;
+    }
+    if (this.isPostgres()) {
+      const client = await this.pg.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM profiles');
+        for (const p of safeList) {
+          await client.query(
+            'INSERT INTO profiles (name, color) VALUES ($1, $2)',
+            [String(p.name || '').trim(), p.color || null]
+          );
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+      return;
+    }
+    const connection = await this.my.getConnection();
+    try {
+      await connection.query('DELETE FROM profiles');
+      for (const p of safeList) {
+        await connection.query(
+          'INSERT INTO profiles (name, color) VALUES (?, ?)',
+          [String(p.name || '').trim(), p.color || null]
+        );
+      }
+    } finally {
+      connection.release();
+    }
+  }
 
     const defaults = Array.from({ length: 8 }, (_, i) => ({ slot: i + 1, name: '', active: false }));
     return defaults.map((d) => {

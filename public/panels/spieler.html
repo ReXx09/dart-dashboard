@@ -122,6 +122,24 @@
     .section-header h2 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #555; font-weight: 600; white-space: nowrap; }
     .section-header .line { flex: 1; height: 1px; background: #1e1e1e; }
 
+    /* Profile Manager */
+    .profile-manager { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 14px; }
+    .profile-manager h3 { font-size: .78rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+    .profile-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .profile-chip { display: flex; align-items: center; gap: 6px; background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 20px; padding: 4px 10px 4px 6px; font-size: .82rem; }
+    .profile-chip .p-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .profile-chip .p-del { cursor: pointer; color: #555; font-size: .7rem; margin-left: 4px; }
+    .profile-chip .p-del:hover { color: #e63946; }
+    .profile-add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .profile-add-row input { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 6px 10px; border-radius: 7px; font-size: .85rem; font-family: inherit; }
+    .profile-add-row input:focus { border-color: #457b9d; outline: none; }
+    .profile-add-row .btn-sm { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: .78rem; font-family: inherit; }
+    .profile-add-row .btn-sm:hover { background: #2a2a2a; }
+
+    .slot-name-row { display: flex; gap: 6px; align-items: center; }
+    .slot-name-row select { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 5px 8px; border-radius: 6px; font-size: .82rem; font-family: inherit; flex: 1; cursor: pointer; }
+    .slot-name-row select:focus { border-color: #e63946; outline: none; }
+
     footer { text-align: center; padding: 8px; font-size: .65rem; color: #222; border-top: 1px solid #111; }
   </style>
 </head>
@@ -151,6 +169,17 @@
       <button class="btn-save" id="saveBtn" onclick="saveAll()">💾 Speichern</button>
     </div>
 
+    <!-- PROFILE MANAGER -->
+    <div class="profile-manager">
+      <h3>Stammspieler-Profile</h3>
+      <div class="profile-list" id="profileList"></div>
+      <div class="profile-add-row">
+        <input type="text" id="profileNameInput" placeholder="Neuer Spielername..." maxlength="24" />
+        <button class="btn-sm" onclick="addProfile()">+ Hinzufügen</button>
+        <button class="btn-sm primary" id="saveProfilesBtn" onclick="saveProfiles()">Profile speichern</button>
+      </div>
+    </div>
+
     <!-- ACTIVE SUMMARY -->
     <div>
       <div class="section-header" style="margin-bottom:10px">
@@ -177,7 +206,9 @@
     ];
 
     let players = [];
+    let profiles = [];
     let dirty = false;
+    let profilesDirty = false;
 
     updateClock();
     setInterval(updateClock, 1000);
@@ -187,9 +218,15 @@
     }
 
     async function load() {
-      players = await fetch('/api/players').then(r => r.json());
+      const [p, pr] = await Promise.all([
+        fetch('/api/players').then(r => r.json()),
+        fetch('/api/profiles').then(r => r.json()).catch(() => [])
+      ]);
+      players = p;
+      profiles = Array.isArray(pr) ? pr : [];
       renderSlots();
       renderSummary();
+      renderProfiles();
     }
 
     function renderSlots() {
@@ -206,6 +243,10 @@
           `<span class="color-dot${c === color ? ' selected' : ''}" style="background:${c}" data-ci="${ci}" title="${c}" onclick="pickColor(${idx},${ci},event)"></span>`
         ).join('');
 
+        const profileOpts = profiles.map(pr =>
+          `<option value="${escHtml(pr.name)}"${pr.name === p.name ? ' selected' : ''}>${escHtml(pr.name)}</option>`
+        ).join('');
+
         card.innerHTML = `
           <div class="slot-head">
             <div class="slot-num">${p.slot}</div>
@@ -215,11 +256,17 @@
               <div class="toggle-track"></div>
             </label>
           </div>
-          <input class="slot-name-input" type="text"
-            placeholder="Name eingeben…"
-            value="${escHtml(p.name || '')}"
-            maxlength="24"
-            oninput="setName(${idx},this.value)" />
+          <div class="slot-name-row">
+            <select onchange="applyProfile(${idx},this)" ${profiles.length ? '' : 'style="display:none"'}>
+              <option value="">— Manuell —</option>
+              ${profileOpts}
+            </select>
+            <input class="slot-name-input" type="text"
+              placeholder="Name eingeben…"
+              value="${escHtml(p.name || '')}"
+              maxlength="24"
+              oninput="setName(${idx},this.value)" />
+          </div>
           <div class="slot-colors">
             <span>Farbe</span>
             ${colorDots}
@@ -306,6 +353,74 @@
 
     function escHtml(s) {
       return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escAttr(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Profile ──
+    function renderProfiles() {
+      const list = document.getElementById('profileList');
+      if (!profiles.length) {
+        list.innerHTML = '<span style="color:#444;font-size:.82rem">Noch keine Profile. Lege Stammspieler an, die du den Slots zuweisen kannst.</span>';
+        return;
+      }
+      list.innerHTML = profiles.map((pr, i) =>
+        '<div class="profile-chip">' +
+          '<span class="p-dot" style="background:' + escAttr(pr.color || '#555') + '"></span>' +
+          '<span>' + escHtml(pr.name) + '</span>' +
+          '<span class="p-del" onclick="removeProfile(' + i + ')">✕</span>' +
+        '</div>'
+      ).join('');
+    }
+
+    function addProfile() {
+      const input = document.getElementById('profileNameInput');
+      const name = input.value.trim();
+      if (!name) return;
+      profiles.push({ name, color: COLORS[profiles.length % COLORS.length] });
+      input.value = '';
+      profilesDirty = true;
+      renderProfiles();
+      renderSlots();
+      showToast('Profil "' + name + '" hinzugefügt (noch nicht gespeichert)');
+    }
+
+    function removeProfile(idx) {
+      const removed = profiles.splice(idx, 1)[0];
+      profilesDirty = true;
+      renderProfiles();
+      renderSlots();
+      if (removed) showToast('Profil "' + removed.name + '" entfernt');
+    }
+
+    async function saveProfiles() {
+      const btn = document.getElementById('saveProfilesBtn');
+      btn.disabled = true;
+      btn.textContent = '…';
+      await fetch('/api/profiles', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profiles)
+      });
+      profilesDirty = false;
+      btn.textContent = 'Profile speichern';
+      btn.disabled = false;
+      showToast('Profile gespeichert ✓');
+    }
+
+    function applyProfile(idx, sel) {
+      const name = sel.value;
+      players[idx].name = name;
+      if (name) {
+        const profile = profiles.find(pr => pr.name === name);
+        if (profile && profile.color) {
+          players[idx].color = profile.color;
+        }
+      }
+      renderSlots();
+      renderSummary();
+      markDirty();
     }
 
     load();

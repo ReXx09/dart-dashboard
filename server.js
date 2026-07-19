@@ -1546,6 +1546,22 @@ app.put('/api/players', async (req, res) => {
   }
 });
 
+// ── Profile ──
+app.get('/api/profiles', async (_req, res) => {
+  try { res.json(await dataStore.getProfiles()); }
+  catch (err) { res.status(500).json({ error: 'Profile konnten nicht geladen werden: ' + err.message }); }
+});
+
+app.put('/api/profiles', async (req, res) => {
+  if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
+  try {
+    await dataStore.saveProfiles(req.body);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Profile konnten nicht gespeichert werden: ' + err.message });
+  }
+});
+
 // ── Storage-Info ──
 app.get('/api/storage/info', (_req, res) => { res.json(dataStore.getInfo()); });
 
