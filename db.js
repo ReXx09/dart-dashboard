@@ -312,6 +312,18 @@ class DataStore {
     }
   }
 
+  async getPlayers() {
+    let rows = [];
+    if (this.isSQLite()) {
+      rows = await this.sqlite.all('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
+    } else if (this.isPostgres()) {
+      const result = await this.pg.query('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
+      rows = result.rows;
+    } else {
+      const result = await this.my.query('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
+      rows = result[0];
+    }
+
     const defaults = Array.from({ length: 8 }, (_, i) => ({ slot: i + 1, name: '', active: false }));
     return defaults.map((d) => {
       const row = rows.find((r) => Number(r.slot) === d.slot);
