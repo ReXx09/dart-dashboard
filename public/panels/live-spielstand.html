@@ -342,6 +342,10 @@
         <h4>Letzte Aktion</h4>
         <div class="value muted" id="lastAction">Keine Aktion</div>
       </div>
+      <div class="status-panel" id="countdownPanel" style="display:none">
+        <h4>Countdown</h4>
+        <div class="value" id="countdownDisplay" style="color:#f4a261;font-weight:700;font-size:1.1rem"></div>
+      </div>
     </div>
     <div class="hs-panel">
       <h4>🏆 Highscores</h4>
@@ -355,6 +359,29 @@
   <script>
     let liveState = null;
     let liveDisplaySettings = { liveDisplayProfile: 'auto', liveDisplayScale: 100 };
+    let countdownTimer = null;
+
+    function startCountdown(state) {
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      const action = state && state.lastAction;
+      if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) return;
+      const startedAt = action.autoAdvanceStartedAt || Date.now();
+      const delayMs = action.autoAdvanceDelayMs;
+      countdownTimer = setInterval(() => {
+        const elapsed = Date.now() - startedAt;
+        const remaining = Math.max(0, delayMs - elapsed);
+        const el = document.getElementById('countdownDisplay');
+        if (remaining <= 0) {
+          if (el) el.style.display = 'none';
+          if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+          return;
+        }
+        if (el) {
+          el.style.display = '';
+          el.textContent = 'Nächster Spieler in ' + Math.ceil(remaining / 1000) + 's';
+        }
+      }, 200);
+    }
 
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -515,6 +542,7 @@
       document.getElementById('lastAction').innerHTML = action
         ? escapeHtml(action.player || '-') + ' → ' + (action.points ?? '-') + (action.source ? ' [' + action.source + ']' : '') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
         : 'Keine Aktion';
+      startCountdown(state);
     }
     function renderCricketView(p, state) {
       if (!p) return '';

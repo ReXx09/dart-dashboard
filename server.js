@@ -636,22 +636,34 @@ async function advanceAfterThreeThrows(state, player, source) {
     ? Math.max(0, Number(runtimeTuning.singlePlayerSwitchDelayMs || 0))
     : Math.max(0, Number(runtimeTuning.playerSwitchDelayMs || 0));
 
+  // Pending-Auto-Advance markieren (UI zeigt Countdown)
+  state.lastAction.autoAdvancePending = true;
+  state.lastAction.autoAdvanceDelayMs = delayMs;
+  state.lastAction.autoAdvanceSinglePlayer = isSinglePlayerLeg;
+  state.lastAction.autoAdvanceStartedAt = Date.now();
+  state.lastAction.nextPlayer = null;
+  state.lastAction.nextPlayerSlot = null;
+  state.lastAction.nextSource = source;
+
+  // State SOFORT speichern + broadcasten (3. Wurf sichtbar)
+  await saveLiveState(state);
+  broadcastReload();
+
   if (delayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
+  // Jetzt den echten Player-Switch durchführen
   player.currentRoundPoints = [];
   state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
   state.game.currentThrow = 0;
   if (state.game.activePlayer === 0) {
     state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
   }
+  state.lastAction.autoAdvancePending = false;
   state.lastAction.autoAdvanced = true;
-  state.lastAction.autoAdvanceDelayMs = delayMs;
-  state.lastAction.autoAdvanceSinglePlayer = isSinglePlayerLeg;
   state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
   state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
-  state.lastAction.nextSource = source;
 }
 
 async function applyArduinoThrowFromChannel(channel, evt = {}) {

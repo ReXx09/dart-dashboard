@@ -166,9 +166,37 @@
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
     <section class="compact-players" id="compactPlayers"></section>
+    <div id="countdownDisplay" style="display:none;text-align:center;padding:6px;background:#1a1a1a;border:1px solid #e63946;border-radius:10px;color:#f4a261;font-weight:700;font-size:.9rem"></div>
   </main>
   <script>
     let liveState = null;
+    let countdownTimer = null;
+
+    function startCountdown(state) {
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      const action = state && state.lastAction;
+      if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) {
+        const el = document.getElementById('countdownDisplay');
+        if (el) el.style.display = 'none';
+        return;
+      }
+      const startedAt = action.autoAdvanceStartedAt || Date.now();
+      const delayMs = action.autoAdvanceDelayMs;
+      countdownTimer = setInterval(() => {
+        const elapsed = Date.now() - startedAt;
+        const remaining = Math.max(0, delayMs - elapsed);
+        const el = document.getElementById('countdownDisplay');
+        if (remaining <= 0) {
+          if (el) el.style.display = 'none';
+          if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+          return;
+        }
+        if (el) {
+          el.style.display = '';
+          el.textContent = 'Nächster Spieler in ' + Math.ceil(remaining / 1000) + 's';
+        }
+      }, 200);
+    }
 
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -313,8 +341,8 @@
       const active = state.players[activePlayer];
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
-      const isCricket = mode === 'cricket';
 
+      const isCricket = mode === 'cricket';
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
@@ -335,6 +363,7 @@
       } else {
         compactPlayers.innerHTML = '';
       }
+      startCountdown(state);
     }
 
     async function loadAll() {
