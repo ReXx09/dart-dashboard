@@ -27,29 +27,29 @@
     .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; }
     .live-badge { background: #e63946; color: #fff; font-size: .58rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
     main {
-      padding: 8px;
+      padding: 6px;
       max-width: none;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 4px;
       height: calc(100vh - 44px);
     }
     .focus-player {
       flex: 1;
       display: grid;
       grid-template-columns: 1.35fr .65fr;
-      gap: 5px;
+      gap: 4px;
       align-items: stretch;
       min-height: 0;
     }
     .focus-player.single { grid-template-columns: 1fr; }
-    .focus-player.has-others { flex: 0 0 auto; max-height: 72%; }
+    .focus-player.has-others { flex: 0 0 auto; max-height: 78%; }
     .compact-players {
       flex: 1;
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 5px;
+      gap: 4px;
       min-height: 0;
       align-content: start;
     }
@@ -74,11 +74,11 @@
     }
     .focus-card > * { position: relative; }
     .focus-name { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
-    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 5px; }
+    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; }
     .focus-kacheln {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 5px;
+      gap: 4px;
       flex: 1;
     }
     .focus-kachel {
@@ -86,45 +86,45 @@
       border: 1px solid #262626;
       border-radius: 11px;
       padding: 8px;
-      min-height: 130px;
+      min-height: 135px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
     }
-    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 5px; }
-    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 3px; }
-    .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%; }
+    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; }
+    .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; width: 100%; }
     .throw-seg {
       background: #1b1b1b;
       border: 1px solid #2b2b2b;
       border-radius: 10px;
-      min-height: 56px;
+      min-height: 58px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       font-weight: 800;
     }
-    .throw-seg .seg { font-size: 1.1rem; color: var(--pc, #e63946); }
+    .throw-seg .seg { font-size: 1.15rem; color: var(--pc, #e63946); }
     .throw-seg .pts { font-size: .66rem; color: #555; margin-top: 2px; }
-    .focus-big-score { font-size: 3.4rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
-    .focus-summary { margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-    .focus-summary div { background: #141414; border-radius: 10px; padding: 5px; text-align: center; }
-    .focus-summary span { display: block; color: #666; font-size: .52rem; text-transform: uppercase; letter-spacing: 1px; }
-    .focus-summary strong { display: block; color: #f1f1f1; font-size: .8rem; margin-top: 1px; }
+    .focus-big-score { font-size: 3.5rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .focus-summary { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .focus-summary div { background: #141414; border-radius: 10px; padding: 4px; text-align: center; }
+    .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
+    .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
-      padding: 6px;
+      padding: 5px;
       border: 2px solid #1e1e1e;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 4px;
     }
-    .focus-leg-card h4 { color: #777; font-size: .58rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
-    .leg-list { width: 100%; display: grid; gap: 3px; max-height: 320px; overflow: auto; }
+    .focus-leg-card h4 { color: #777; font-size: .56rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
+    .leg-list { width: 100%; display: grid; gap: 3px; max-height: 380px; overflow: auto; }
     .leg-item { display: flex; justify-content: space-between; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 4px 6px; font-size: .65rem; }
     .leg-item .idx { color: #777; }
     .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -151,10 +151,10 @@
 
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .focus-kachel { min-height: 145px; }
-      .focus-big-score { font-size: 3.7rem; }
-      .focus-player.has-others { max-height: 65%; }
-      .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 5px; }
+      .focus-kachel { min-height: 155px; }
+      .focus-big-score { font-size: 3.9rem; }
+      .focus-player.has-others { max-height: 70%; }
+      .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 4px; }
     }
   </style>
 </head>
@@ -221,8 +221,9 @@
       const lastThrows = throws.slice(-3);
       const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
-      const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns).toFixed(1) : '-';
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
       const throwsHtml = displayThrows.map((pt, ti) => {
@@ -255,9 +256,9 @@
           '</div>' +
         '</div>' +
         '<div class="focus-summary">' +
-          '<div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div>' +
+          '<div><span>Turns</span><strong>' + turns + '</strong></div>' +
           '<div><span>Gesamt Punkte</span><strong>' + totalScored + '</strong></div>' +
-          '<div><span>Ø 3-Dart</span><strong>' + avgStr + '</strong></div>' +
+          '<div><span>Leg Average</span><strong>' + legAvg + '</strong></div>' +
         '</div>' +
       '</div>';
     }
@@ -295,6 +296,9 @@
         const closed = !!cricketClosed[n];
         return '<div class="c-num' + (closed ? ' closed' : '') + '"><div class="num">' + n + '</div><div class="hits">' + (closed ? '✔' : hits + '/3') + '</div></div>';
       }).join('');
+      const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns).toFixed(1) : '-';
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
         '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
@@ -302,7 +306,7 @@
           '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div>' +
           '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
         '</div>' +
-        '<div class="focus-summary"><div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div><div><span>Punkte</span><strong>' + (p.totalScored || 0) + '</strong></div><div><span>Ø 3-Dart</span><strong>' + ((p.average || 0) > 0 ? Number(p.average).toFixed(1) : '-') + '</strong></div></div>' +
+        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Punkte</span><strong>' + totalScored + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
       '</div>';
     }
 

@@ -289,9 +289,9 @@
 
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .focus-kachel { min-height: 124px; }
+      .focus-kachel { min-height: 155px; }
       .focus-kachel:first-child { grid-column: auto; }
-      .focus-big-score { font-size: 3.35rem; }
+      .focus-big-score { font-size: 3.9rem; }
     }
 
     @media (max-width: 860px) {
@@ -558,6 +558,10 @@
         return '<div class="c-num' + (closed ? ' closed' : '') + '"><div class="num">' + n + '</div><div class="hits">' + (closed ? '✔' : hits + '/3') + '</div></div>';
       }).join('');
 
+      const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns).toFixed(1) : '-';
+
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
         '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
@@ -565,7 +569,7 @@
           '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div>' +
           '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
         '</div>' +
-        '<div class="focus-summary"><div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div><div><span>Punkte</span><strong>' + (p.totalScored || 0) + '</strong></div><div><span>Ø 3-Dart</span><strong>' + ((p.average || 0) > 0 ? Number(p.average).toFixed(1) : '-') + '</strong></div></div>' +
+        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Punkte</span><strong>' + totalScored + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
       '</div>';
     }
 
@@ -591,8 +595,9 @@
       const lastThrows = throws.slice(-3);
       const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
-      const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns).toFixed(1) : '-';
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
       const throwsHtml = displayThrows.map((pt, ti) => {
@@ -625,9 +630,9 @@
           '</div>' +
         '</div>' +
         '<div class="focus-summary">' +
-          '<div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div>' +
+          '<div><span>Turns</span><strong>' + turns + '</strong></div>' +
           '<div><span>Gesamt Punkte</span><strong>' + totalScored + '</strong></div>' +
-          '<div><span>Ø 3-Dart</span><strong>' + avgStr + '</strong></div>' +
+          '<div><span>Leg Average</span><strong>' + legAvg + '</strong></div>' +
         '</div>' +
       '</div>';
     }
