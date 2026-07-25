@@ -219,7 +219,7 @@ function getSettings() {
   const merged = {
     arduinoMonitorEnabled: true,
     arduinoPort: '',
-    arduinoBaudRate: 115200,
+    arduinoBaudRate: 500000,
     arduinoMatrixRawEnabled: runtimeTuning.arduinoMatrixRawEnabled,
     arduinoThrowWindowMs: runtimeTuning.arduinoThrowWindowMs,
     matrixHitReleaseMs: runtimeTuning.matrixHitReleaseMs,
@@ -628,6 +628,79 @@ function clearPendingArduinoThrow() {
   pendingArduinoThrow = null;
 }
 
+async function recordPlayerLegStats(player, state) {
+  try {
+    // Ensure player has stats entry
+    await dataStore.initPlayerStats(player.slot);
+
+    // Calculate leg average: (total_scored / darts_thrown) * 3
+    const dartsThrawn = Number(player.turns || 0);
+    const totalScored = Number(player.totalScored || 0);
+    const legAvg = dartsThrawn > 0 ? (totalScored / dartsThrawn * 3) : 0;
+    
+    // Get current turn history to detect 180s and high scores
+    const turns = player.turnHistory || [];
+    let count180 = 0, count171 = 0, count140 = 0, count100 = 0;
+    let maxScore = 0;
+    
+    turns.forEach(turn => {
+      const score = Number(turn.points || 0);
+      if (score === 180) count180++;
+      if (score >= 171) count171++;
+      if (score >= 140) count140++;
+      if (score >= 100) count100++;
+      maxScore = Math.max(maxScore, score);
+    });
+
+    // Determine checkout amount (initial score - 0)
+    const mode = state.game.mode || DEFAULT_MODE;
+    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+    const isCricket = modeDef.type === 'cricket';
+    const checkout = isCricket ? 0 : (modeDef.startScore - player.remaining);
+    
+    // Record leg in history
+    const won = player.remaining === 0 ? 1 : 0;
+    await dataStore.recordLegHistory(player.slot, legAvg, checkout, won, dartsThrawn);
+
+    // Update player stats
+    const currentStats = await dataStore.getPlayerStats(player.slot) || {};
+    const updates = {
+      legs_played: (Number(currentStats.legs_played || 0)) + 1,
+      legs_won: (Number(currentStats.legs_won || 0)) + (won ? 1 : 0),
+      total_darts: (Number(currentStats.total_darts || 0)) + dartsThrawn,
+      total_scored: (Number(currentStats.total_scored || 0)) + totalScored,
+      highest_leg_avg: Math.max(Number(currentStats.highest_leg_avg || 0), legAvg),
+      max_score: Math.max(Number(currentStats.max_score || 0), maxScore),
+      count_180: (Number(currentStats.count_180 || 0)) + count180,
+      count_171plus: (Number(currentStats.count_171plus || 0)) + count171,
+      count_140plus: (Number(currentStats.count_140plus || 0)) + count140,
+      count_100plus: (Number(currentStats.count_100plus || 0)) + count100
+    };
+
+    // Add checkout stats if not cricket
+    if (!isCricket) {
+      updates.checkout_attempts = (Number(currentStats.checkout_attempts || 0)) + (dartsThrawn > 0 ? 1 : 0);
+      if (checkout > 0) {
+        updates.checkout_success = (Number(currentStats.checkout_success || 0)) + 1;
+        updates.highest_checkout = Math.max(Number(currentStats.highest_checkout || 0), checkout);
+        if (checkout >= 100) updates.checkout_100plus = (Number(currentStats.checkout_100plus || 0)) + 1;
+        if (checkout >= 120) updates.checkout_120plus = (Number(currentStats.checkout_120plus || 0)) + 1;
+        if (checkout >= 160) updates.checkout_160plus = (Number(currentStats.checkout_160plus || 0)) + 1;
+      }
+    }
+
+    // Add cricket stats if applicable
+    if (isCricket) {
+      updates.cricket_legs = (Number(currentStats.cricket_legs || 0)) + 1;
+      updates.cricket_won = (Number(currentStats.cricket_won || 0)) + (won ? 1 : 0);
+    }
+
+    await dataStore.updatePlayerStats(player.slot, updates);
+  } catch (err) {
+    console.error('[Stats] Error recording player leg stats:', err);
+  }
+}
+
 async function advanceAfterThreeThrows(state, player, source) {
   if (state.game.status === 'leg-finished' || state.game.currentThrow < 3) return;
   const playersInLeg = Array.isArray(state.players) ? state.players.length : 0;
@@ -657,6 +730,8 @@ async function advanceAfterThreeThrows(state, player, source) {
   player.currentRoundPoints = [];
   state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
   state.game.currentThrow = 0;
+  // Neuen aktiven Spieler's currentRoundPoints leeren
+  state.players[state.game.activePlayer].currentRoundPoints = [];
   if (state.game.activePlayer === 0) {
     state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
   }
@@ -741,6 +816,8 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino' });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
+    // Record stats after leg finish
+    await recordPlayerLegStats(player, state);
   }
 
   if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
@@ -1012,6 +1089,8 @@ async function applyArduinoThrowFromMatrix(hit) {
     await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino-matrix' });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
+    // Record stats after leg finish
+    await recordPlayerLegStats(player, state);
   }
 
   if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
@@ -1778,6 +1857,8 @@ app.post('/api/live/throw', async (req, res) => {
       player.legs += 1;
       await addHighscore(player.name, points, { kind: 'checkout', legWin: true });
       state.game.status = 'leg-finished';
+      // Record stats after leg finish
+      await recordPlayerLegStats(player, state);
     }
 
     if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
@@ -1806,6 +1887,8 @@ app.post('/api/live/next-player', async (req, res) => {
     state.game.activePlayer = nextIndex;
     state.game.currentThrow = 0;
     state.game.throwRound = (state.game.throwRound || 1) + 1;
+    // Neuen aktiven Spieler's currentRoundPoints leeren
+    state.players[nextIndex].currentRoundPoints = [];
     state.lastAction = { type: 'next-player', player: state.players[nextIndex].name, playerSlot: state.players[nextIndex].slot, ts: Date.now() };
     const saved = await saveLiveState(state);
     broadcastReload();
@@ -1869,6 +1952,65 @@ app.post('/api/highscores', async (req, res) => {
     await addHighscore(player, score, { kind: 'manual' });
     res.json({ ok: true, highscores: await getHighscores() });
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht gespeichert werden: ' + err.message }); }
+});
+
+// ── Player Statistics ──
+app.get('/api/players/:id/stats', async (req, res) => {
+  try {
+    const playerId = Number(req.params.id);
+    if (!Number.isInteger(playerId) || playerId < 0) {
+      return res.status(400).json({ error: 'Invalid player ID' });
+    }
+    const stats = await dataStore.getPlayerStats(playerId);
+    if (!stats) {
+      return res.status(404).json({ error: 'Player stats not found' });
+    }
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: 'Stats konnten nicht geladen werden: ' + err.message });
+  }
+});
+
+app.get('/api/players/:id/history', async (req, res) => {
+  try {
+    const playerId = Number(req.params.id);
+    const limit = Number(req.query.limit || 50);
+    if (!Number.isInteger(playerId) || playerId < 0) {
+      return res.status(400).json({ error: 'Invalid player ID' });
+    }
+    const history = await dataStore.getLegHistory(playerId, Math.min(limit, 100));
+    res.json(history || []);
+  } catch (err) {
+    res.status(500).json({ error: 'History konnte nicht geladen werden: ' + err.message });
+  }
+});
+
+app.get('/api/players/:id/h2h/:opponentId', async (req, res) => {
+  try {
+    const playerId = Number(req.params.id);
+    const opponentId = Number(req.params.opponentId);
+    
+    if (!Number.isInteger(playerId) || playerId < 0 || !Number.isInteger(opponentId) || opponentId < 0) {
+      return res.status(400).json({ error: 'Invalid player IDs' });
+    }
+
+    // Get head-to-head record - for now, just return wins/losses from live state
+    const state = await getLiveState();
+    
+    // Simple H2H: count legs won against each other from recent games
+    // This is a simplified version - you could expand to track full history
+    const h2h = {
+      player_id: playerId,
+      opponent_id: opponentId,
+      player_wins: 0,
+      opponent_wins: 0,
+      total_legs: 0
+    };
+    
+    res.json(h2h);
+  } catch (err) {
+    res.status(500).json({ error: 'H2H konnte nicht geladen werden: ' + err.message });
+  }
 });
 
 // ──────────────────────────────────────────────

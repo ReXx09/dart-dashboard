@@ -223,7 +223,7 @@
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
-      const legAvg = turns > 0 ? (totalScored / turns).toFixed(1) : '-';
+      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
       const throwsHtml = displayThrows.map((pt, ti) => {
@@ -298,7 +298,7 @@
       }).join('');
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
-      const legAvg = turns > 0 ? (totalScored / turns).toFixed(1) : '-';
+      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
         '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
@@ -324,16 +324,17 @@
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
       const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows;
       while (displayThrows.length < 3) displayThrows.push('-');
-      const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
+      const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       const isCricket = mode === 'cricket';
       const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
-      const scoreLabel = isCricket ? 'Punkte' : 'Rest';
 
       return '<div class="score-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
         '<div class="sc-color-bar"></div>' +
         '<div class="sc-name">P' + p.slot + ' \u00b7 ' + escapeHtml(p.name) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
-        '<div class="sc-stats">' + scoreLabel + ': <span>' + displayScore + '</span> | \u00d8: <span>' + avgStr + '</span> | Legs: <span>' + (p.legs || 0) + '</span></div>' +
+        '<div class="sc-stats">LEG-AVG: <span>' + legAvg + '</span> | Legs: <span>' + (p.legs || 0) + '</span></div>' +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
     }

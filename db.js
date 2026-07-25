@@ -127,6 +127,46 @@ class DataStore {
         name TEXT NOT NULL,
         color TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS player_stats (
+        player_id INTEGER PRIMARY KEY,
+        season TEXT DEFAULT '2026',
+        games_played INTEGER DEFAULT 0,
+        games_won INTEGER DEFAULT 0,
+        legs_played INTEGER DEFAULT 0,
+        legs_won INTEGER DEFAULT 0,
+        total_darts INTEGER DEFAULT 0,
+        total_scored INTEGER DEFAULT 0,
+        highest_leg_avg REAL DEFAULT 0,
+        avg_first9 REAL DEFAULT 0,
+        checkout_attempts INTEGER DEFAULT 0,
+        checkout_success INTEGER DEFAULT 0,
+        highest_checkout INTEGER DEFAULT 0,
+        checkout_100plus INTEGER DEFAULT 0,
+        checkout_120plus INTEGER DEFAULT 0,
+        checkout_160plus INTEGER DEFAULT 0,
+        count_180 INTEGER DEFAULT 0,
+        count_171plus INTEGER DEFAULT 0,
+        count_140plus INTEGER DEFAULT 0,
+        count_100plus INTEGER DEFAULT 0,
+        max_score INTEGER DEFAULT 0,
+        cricket_legs INTEGER DEFAULT 0,
+        cricket_won INTEGER DEFAULT 0,
+        cricket_mpr REAL DEFAULT 0,
+        updated_at INTEGER DEFAULT 0,
+        FOREIGN KEY (player_id) REFERENCES players(slot)
+      );
+
+      CREATE TABLE IF NOT EXISTS leg_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id INTEGER NOT NULL,
+        leg_avg REAL DEFAULT 0,
+        checkout INTEGER DEFAULT 0,
+        won INTEGER DEFAULT 0,
+        darts_thrown INTEGER DEFAULT 0,
+        ts INTEGER NOT NULL,
+        FOREIGN KEY (player_id) REFERENCES players(slot)
+      );
     `);
   }
 
@@ -158,6 +198,46 @@ class DataStore {
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         color TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS player_stats (
+        player_id INTEGER PRIMARY KEY,
+        season TEXT DEFAULT '2026',
+        games_played INTEGER DEFAULT 0,
+        games_won INTEGER DEFAULT 0,
+        legs_played INTEGER DEFAULT 0,
+        legs_won INTEGER DEFAULT 0,
+        total_darts INTEGER DEFAULT 0,
+        total_scored INTEGER DEFAULT 0,
+        highest_leg_avg NUMERIC DEFAULT 0,
+        avg_first9 NUMERIC DEFAULT 0,
+        checkout_attempts INTEGER DEFAULT 0,
+        checkout_success INTEGER DEFAULT 0,
+        highest_checkout INTEGER DEFAULT 0,
+        checkout_100plus INTEGER DEFAULT 0,
+        checkout_120plus INTEGER DEFAULT 0,
+        checkout_160plus INTEGER DEFAULT 0,
+        count_180 INTEGER DEFAULT 0,
+        count_171plus INTEGER DEFAULT 0,
+        count_140plus INTEGER DEFAULT 0,
+        count_100plus INTEGER DEFAULT 0,
+        max_score INTEGER DEFAULT 0,
+        cricket_legs INTEGER DEFAULT 0,
+        cricket_won INTEGER DEFAULT 0,
+        cricket_mpr NUMERIC DEFAULT 0,
+        updated_at BIGINT DEFAULT 0,
+        FOREIGN KEY (player_id) REFERENCES players(slot)
+      );
+
+      CREATE TABLE IF NOT EXISTS leg_history (
+        id BIGSERIAL PRIMARY KEY,
+        player_id INTEGER NOT NULL,
+        leg_avg NUMERIC DEFAULT 0,
+        checkout INTEGER DEFAULT 0,
+        won BOOLEAN DEFAULT FALSE,
+        darts_thrown INTEGER DEFAULT 0,
+        ts BIGINT NOT NULL,
+        FOREIGN KEY (player_id) REFERENCES players(slot)
       );
     `);
   }
@@ -196,6 +276,50 @@ class DataStore {
         id INT PRIMARY KEY AUTO_INCREMENT,
         name VARCHAR(255) NOT NULL,
         color VARCHAR(32) NULL
+      );
+    `);
+
+    await this.my.query(`
+      CREATE TABLE IF NOT EXISTS player_stats (
+        player_id INT PRIMARY KEY,
+        season VARCHAR(32) DEFAULT '2026',
+        games_played INT DEFAULT 0,
+        games_won INT DEFAULT 0,
+        legs_played INT DEFAULT 0,
+        legs_won INT DEFAULT 0,
+        total_darts INT DEFAULT 0,
+        total_scored INT DEFAULT 0,
+        highest_leg_avg DECIMAL(6,2) DEFAULT 0,
+        avg_first9 DECIMAL(6,2) DEFAULT 0,
+        checkout_attempts INT DEFAULT 0,
+        checkout_success INT DEFAULT 0,
+        highest_checkout INT DEFAULT 0,
+        checkout_100plus INT DEFAULT 0,
+        checkout_120plus INT DEFAULT 0,
+        checkout_160plus INT DEFAULT 0,
+        count_180 INT DEFAULT 0,
+        count_171plus INT DEFAULT 0,
+        count_140plus INT DEFAULT 0,
+        count_100plus INT DEFAULT 0,
+        max_score INT DEFAULT 0,
+        cricket_legs INT DEFAULT 0,
+        cricket_won INT DEFAULT 0,
+        cricket_mpr DECIMAL(6,2) DEFAULT 0,
+        updated_at BIGINT DEFAULT 0,
+        FOREIGN KEY (player_id) REFERENCES players(slot)
+      );
+    `);
+
+    await this.my.query(`
+      CREATE TABLE IF NOT EXISTS leg_history (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        player_id INT NOT NULL,
+        leg_avg DECIMAL(6,2) DEFAULT 0,
+        checkout INT DEFAULT 0,
+        won TINYINT(1) DEFAULT 0,
+        darts_thrown INT DEFAULT 0,
+        ts BIGINT NOT NULL,
+        FOREIGN KEY (player_id) REFERENCES players(slot)
       );
     `);
   }
@@ -512,6 +636,156 @@ class DataStore {
       'INSERT INTO highscores (player, score, kind, leg_win, ts) VALUES (?, ?, ?, ?, ?)',
       [player, score, kind, legWin ? 1 : 0, ts]
     );
+  }
+
+  async initPlayerStats(playerId) {
+    const season = '2026';
+    const ts = Date.now();
+
+    if (this.isSQLite()) {
+      await this.sqlite.run(
+        `INSERT OR IGNORE INTO player_stats (player_id, season, updated_at) VALUES (?, ?, ?)`,
+        [playerId, season, ts]
+      );
+      return;
+    }
+
+    if (this.isPostgres()) {
+      await this.pg.query(
+        `INSERT INTO player_stats (player_id, season, updated_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        [playerId, season, ts]
+      );
+      return;
+    }
+
+    await this.my.query(
+      `INSERT IGNORE INTO player_stats (player_id, season, updated_at) VALUES (?, ?, ?)`,
+      [playerId, season, ts]
+    );
+  }
+
+  async getPlayerStats(playerId) {
+    if (this.isSQLite()) {
+      return await this.sqlite.get(
+        'SELECT * FROM player_stats WHERE player_id = ?',
+        [playerId]
+      );
+    }
+
+    if (this.isPostgres()) {
+      const result = await this.pg.query(
+        'SELECT * FROM player_stats WHERE player_id = $1',
+        [playerId]
+      );
+      return result.rows[0];
+    }
+
+    const [rows] = await this.my.query(
+      'SELECT * FROM player_stats WHERE player_id = ?',
+      [playerId]
+    );
+    return rows[0];
+  }
+
+  async updatePlayerStats(playerId, updates) {
+    const ts = Date.now();
+    const updateFields = Object.keys(updates);
+    const values = Object.values(updates);
+
+    if (this.isSQLite()) {
+      const cols = updateFields.map(f => `${f} = ?`).join(', ');
+      await this.sqlite.run(
+        `UPDATE player_stats SET ${cols}, updated_at = ? WHERE player_id = ?`,
+        [...values, ts, playerId]
+      );
+      return;
+    }
+
+    if (this.isPostgres()) {
+      const setClauses = updateFields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+      await this.pg.query(
+        `UPDATE player_stats SET ${setClauses}, updated_at = $${updateFields.length + 1} WHERE player_id = $${updateFields.length + 2}`,
+        [...values, ts, playerId]
+      );
+      return;
+    }
+
+    const setClauses = updateFields.map(f => `${f} = ?`).join(', ');
+    await this.my.query(
+      `UPDATE player_stats SET ${setClauses}, updated_at = ? WHERE player_id = ?`,
+      [...values, ts, playerId]
+    );
+  }
+
+  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn) {
+    const ts = Date.now();
+
+    if (this.isSQLite()) {
+      await this.sqlite.run(
+        `INSERT INTO leg_history (player_id, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?)`,
+        [playerId, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
+      );
+      // Keep rolling 50 legs
+      await this.sqlite.run(
+        `DELETE FROM leg_history WHERE player_id = ? AND id NOT IN (
+          SELECT id FROM leg_history WHERE player_id = ? ORDER BY ts DESC LIMIT 50
+        )`,
+        [playerId, playerId]
+      );
+      return;
+    }
+
+    if (this.isPostgres()) {
+      await this.pg.query(
+        `INSERT INTO leg_history (player_id, leg_avg, checkout, won, darts_thrown, ts) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [playerId, legAvg, checkout, won, dartsThrawn, ts]
+      );
+      // Keep rolling 50 legs
+      await this.pg.query(
+        `DELETE FROM leg_history WHERE player_id = $1 AND id NOT IN (
+          SELECT id FROM leg_history WHERE player_id = $1 ORDER BY ts DESC LIMIT 50
+        )`,
+        [playerId]
+      );
+      return;
+    }
+
+    await this.my.query(
+      `INSERT INTO leg_history (player_id, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?)`,
+      [playerId, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
+    );
+    // Keep rolling 50 legs
+    await this.my.query(
+      `DELETE FROM leg_history WHERE player_id = ? AND id NOT IN (
+        SELECT id FROM (
+          SELECT id FROM leg_history WHERE player_id = ? ORDER BY ts DESC LIMIT 50
+        ) AS subquery
+      )`,
+      [playerId, playerId]
+    );
+  }
+
+  async getLegHistory(playerId, limit = 50) {
+    if (this.isSQLite()) {
+      return await this.sqlite.all(
+        'SELECT * FROM leg_history WHERE player_id = ? ORDER BY ts DESC LIMIT ?',
+        [playerId, limit]
+      );
+    }
+
+    if (this.isPostgres()) {
+      const result = await this.pg.query(
+        'SELECT * FROM leg_history WHERE player_id = $1 ORDER BY ts DESC LIMIT $2',
+        [playerId, limit]
+      );
+      return result.rows;
+    }
+
+    const [rows] = await this.my.query(
+      'SELECT * FROM leg_history WHERE player_id = ? ORDER BY ts DESC LIMIT ?',
+      [playerId, limit]
+    );
+    return rows;
   }
 }
 
