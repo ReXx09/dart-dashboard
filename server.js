@@ -104,13 +104,13 @@ const ARDUINO_EVENT_ACTIVE_STATE_MODE = ['ACTIVE', 'IDLE', 'AUTO'].includes(ARDU
   : 'AUTO';
 const ARDUINO_THROW_WINDOW_MS = Number(process.env.ARDUINO_THROW_WINDOW_MS || 1200);
 const MATRIX_HIT_RELEASE_MS = Number(process.env.MATRIX_HIT_RELEASE_MS || 25);
-const MATRIX_HIT_REFRACTORY_MS = Number(process.env.MATRIX_HIT_REFRACTORY_MS || 260);
-const MATRIX_HIT_SUPPRESS_MS = Number(process.env.MATRIX_HIT_SUPPRESS_MS || 90);
-const MATRIX_HIT_CLUSTER_WINDOW_MS = Number(process.env.MATRIX_HIT_CLUSTER_WINDOW_MS || 70);
+const MATRIX_HIT_REFRACTORY_MS = Number(process.env.MATRIX_HIT_REFRACTORY_MS || 80);
+const MATRIX_HIT_SUPPRESS_MS = Number(process.env.MATRIX_HIT_SUPPRESS_MS || 0);
+const MATRIX_HIT_CLUSTER_WINDOW_MS = Number(process.env.MATRIX_HIT_CLUSTER_WINDOW_MS || 0);
 const MATRIX_EVT_PAIR_MAX_SKEW_MS = Number(process.env.MATRIX_EVT_PAIR_MAX_SKEW_MS || 220);
-const MATRIX_SAME_KEY_GUARD_MS = Number(process.env.MATRIX_SAME_KEY_GUARD_MS || 130);
-const ARDUINO_MATRIX_THROW_LOCK_MS = Number(process.env.ARDUINO_MATRIX_THROW_LOCK_MS || 220);
-const THROW_MIN_INTERVAL_MS = Number(process.env.THROW_MIN_INTERVAL_MS || 120);
+const MATRIX_SAME_KEY_GUARD_MS = Number(process.env.MATRIX_SAME_KEY_GUARD_MS || 50);
+const ARDUINO_MATRIX_THROW_LOCK_MS = Number(process.env.ARDUINO_MATRIX_THROW_LOCK_MS || 50);
+const THROW_MIN_INTERVAL_MS = Number(process.env.THROW_MIN_INTERVAL_MS || 0);
 const PLAYER_SWITCH_DELAY_MS = Number(process.env.PLAYER_SWITCH_DELAY_MS || 20000);
 const SINGLE_PLAYER_SWITCH_DELAY_MS = Number(process.env.SINGLE_PLAYER_SWITCH_DELAY_MS || 3000);
 
@@ -252,12 +252,12 @@ function refreshRuntimeTuning(settings = getSettings()) {
     matrixAutoThrowEnabled: settings.matrixAutoThrowEnabled !== false,
     arduinoThrowWindowMs: clampNumber(settings.arduinoThrowWindowMs, ARDUINO_THROW_WINDOW_MS, 100, 4000),
     matrixHitReleaseMs: clampNumber(settings.matrixHitReleaseMs, MATRIX_HIT_RELEASE_MS, 5, 300),
-    matrixHitRefractoryMs: clampNumber(settings.matrixHitRefractoryMs, MATRIX_HIT_REFRACTORY_MS, 80, 1200),
-    matrixHitSuppressMs: clampNumber(settings.matrixHitSuppressMs, MATRIX_HIT_SUPPRESS_MS, 20, 800),
-    matrixHitClusterWindowMs: clampNumber(settings.matrixHitClusterWindowMs, MATRIX_HIT_CLUSTER_WINDOW_MS, 20, 300),
+    matrixHitRefractoryMs: clampNumber(settings.matrixHitRefractoryMs, MATRIX_HIT_REFRACTORY_MS, 50, 1200),
+    matrixHitSuppressMs: clampNumber(settings.matrixHitSuppressMs, MATRIX_HIT_SUPPRESS_MS, 0, 800),
+    matrixHitClusterWindowMs: clampNumber(settings.matrixHitClusterWindowMs, MATRIX_HIT_CLUSTER_WINDOW_MS, 0, 300),
     matrixEvtPairMaxSkewMs: clampNumber(settings.matrixEvtPairMaxSkewMs, MATRIX_EVT_PAIR_MAX_SKEW_MS, 20, 600),
-    matrixSameKeyGuardMs: clampNumber(settings.matrixSameKeyGuardMs, MATRIX_SAME_KEY_GUARD_MS, 20, 800),
-    arduinoMatrixThrowLockMs: clampNumber(settings.arduinoMatrixThrowLockMs, ARDUINO_MATRIX_THROW_LOCK_MS, 50, 1500),
+    matrixSameKeyGuardMs: clampNumber(settings.matrixSameKeyGuardMs, MATRIX_SAME_KEY_GUARD_MS, 0, 800),
+    arduinoMatrixThrowLockMs: clampNumber(settings.arduinoMatrixThrowLockMs, ARDUINO_MATRIX_THROW_LOCK_MS, 0, 1500),
     throwMinIntervalMs: clampNumber(settings.throwMinIntervalMs, THROW_MIN_INTERVAL_MS, 0, 1200),
     playerSwitchDelayMs: clampNumber(settings.playerSwitchDelayMs, PLAYER_SWITCH_DELAY_MS, 0, 120000),
     singlePlayerSwitchDelayMs: clampNumber(settings.singlePlayerSwitchDelayMs, SINGLE_PLAYER_SWITCH_DELAY_MS, 0, 120000)
