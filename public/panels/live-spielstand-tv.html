@@ -27,29 +27,29 @@
     .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; }
     .live-badge { background: #e63946; color: #fff; font-size: .58rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
     main {
-      padding: 10px;
+      padding: 8px;
       max-width: none;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 5px;
       height: calc(100vh - 44px);
     }
     .focus-player {
       flex: 1;
       display: grid;
       grid-template-columns: 1.35fr .65fr;
-      gap: 8px;
+      gap: 5px;
       align-items: stretch;
       min-height: 0;
     }
     .focus-player.single { grid-template-columns: 1fr; }
-    .focus-player.has-others { flex: 0 0 auto; max-height: 62%; }
+    .focus-player.has-others { flex: 0 0 auto; max-height: 72%; }
     .compact-players {
       flex: 1;
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
+      gap: 5px;
       min-height: 0;
       align-content: start;
     }
@@ -57,7 +57,7 @@
     .focus-card {
       background: linear-gradient(135deg, #191111, #141414);
       border-radius: 14px;
-      padding: 12px;
+      padding: 10px;
       border: 2px solid var(--pc, #e63946);
       box-shadow: 0 0 30px rgba(230,57,70,.16);
       position: relative;
@@ -74,11 +74,11 @@
     }
     .focus-card > * { position: relative; }
     .focus-name { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
-    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 8px; }
+    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 5px; }
     .focus-kacheln {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 7px;
+      gap: 5px;
       flex: 1;
     }
     .focus-kachel {
@@ -86,46 +86,46 @@
       border: 1px solid #262626;
       border-radius: 11px;
       padding: 8px;
-      min-height: 108px;
+      min-height: 130px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
     }
-    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 7px; }
-    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 6px; }
-    .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
+    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 5px; }
+    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 3px; }
+    .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%; }
     .throw-seg {
       background: #1b1b1b;
       border: 1px solid #2b2b2b;
       border-radius: 10px;
-      min-height: 48px;
+      min-height: 56px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       font-weight: 800;
     }
-    .throw-seg .seg { font-size: 1rem; color: var(--pc, #e63946); }
+    .throw-seg .seg { font-size: 1.1rem; color: var(--pc, #e63946); }
     .throw-seg .pts { font-size: .66rem; color: #555; margin-top: 2px; }
-    .focus-big-score { font-size: 3.05rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
-    .focus-summary { margin-top: 7px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-    .focus-summary div { background: #141414; border-radius: 10px; padding: 7px; text-align: center; }
-    .focus-summary span { display: block; color: #666; font-size: .58rem; text-transform: uppercase; letter-spacing: 1px; }
-    .focus-summary strong { display: block; color: #f1f1f1; font-size: .86rem; margin-top: 2px; }
+    .focus-big-score { font-size: 3.4rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .focus-summary { margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+    .focus-summary div { background: #141414; border-radius: 10px; padding: 5px; text-align: center; }
+    .focus-summary span { display: block; color: #666; font-size: .52rem; text-transform: uppercase; letter-spacing: 1px; }
+    .focus-summary strong { display: block; color: #f1f1f1; font-size: .8rem; margin-top: 1px; }
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
-      padding: 10px;
+      padding: 6px;
       border: 2px solid #1e1e1e;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 5px;
     }
-    .focus-leg-card h4 { color: #777; font-size: .62rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
-    .leg-list { width: 100%; display: grid; gap: 5px; max-height: 250px; overflow: auto; }
-    .leg-item { display: flex; justify-content: space-between; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 5px 7px; font-size: .68rem; }
+    .focus-leg-card h4 { color: #777; font-size: .58rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
+    .leg-list { width: 100%; display: grid; gap: 3px; max-height: 320px; overflow: auto; }
+    .leg-item { display: flex; justify-content: space-between; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 4px 6px; font-size: .65rem; }
     .leg-item .idx { color: #777; }
     .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; }
 
@@ -151,10 +151,10 @@
 
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .focus-kachel { min-height: 124px; }
-      .focus-big-score { font-size: 3.35rem; }
-      .focus-player.has-others { max-height: 56%; }
-      .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; }
+      .focus-kachel { min-height: 145px; }
+      .focus-big-score { font-size: 3.7rem; }
+      .focus-player.has-others { max-height: 65%; }
+      .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 5px; }
     }
   </style>
 </head>
