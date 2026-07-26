@@ -46,9 +46,8 @@
     .focus-player.single { grid-template-columns: 1fr; }
     .focus-player.has-others { flex: 0 0 auto; max-height: 78%; }
     .compact-players {
-      flex: 1;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      display: flex;
+      flex-wrap: wrap;
       gap: 4px;
       min-height: 0;
       align-content: start;
@@ -154,7 +153,14 @@
       .focus-kachel { min-height: 155px; }
       .focus-big-score { font-size: 3.9rem; }
       .focus-player.has-others { max-height: 70%; }
-      .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 4px; }
+      .compact-players { gap: 3px; }
+      .score-card { padding: 6px 10px; gap: 4px; flex-direction: row; align-items: center; border-radius: 8px; }
+      .score-card .sc-color-bar { width: 3px; height: auto; align-self: stretch; flex-shrink: 0; }
+      .score-card .sc-name { font-size: .7rem; white-space: nowrap; flex-shrink: 0; }
+      .score-card .sc-score { font-size: 1.3rem; white-space: nowrap; flex-shrink: 0; }
+      .score-card .sc-stats { font-size: .55rem; white-space: nowrap; flex-shrink: 0; }
+      .score-card .sc-last-throws { flex-shrink: 0; }
+      .score-card .sc-throw-chip { font-size: .6rem; padding: 1px 4px; min-width: 18px; }
     }
   </style>
 </head>
@@ -330,11 +336,11 @@
       const isCricket = mode === 'cricket';
       const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
 
-      return '<div class="score-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+      return '<div class="score-card" data-tv style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
         '<div class="sc-color-bar"></div>' +
-        '<div class="sc-name">P' + p.slot + ' \u00b7 ' + escapeHtml(p.name) + '</div>' +
+        '<div class="sc-name">P' + p.slot + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
-        '<div class="sc-stats">LEG-AVG: <span>' + legAvg + '</span> | Legs: <span>' + (p.legs || 0) + '</span></div>' +
+        '<div class="sc-stats">LG-AVG <span>' + legAvg + '</span> Legs <span>' + (p.legs || 0) + '</span></div>' +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
     }
