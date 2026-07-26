@@ -47,12 +47,15 @@
     .focus-player.has-others { flex: 0 0 auto; max-height: 78%; }
     .compact-players {
       display: flex;
-      flex-wrap: wrap;
       gap: 4px;
+      flex: 1;
       min-height: 0;
-      align-content: start;
     }
     .compact-players:empty { display: none; }
+    .compact-players .score-card {
+      flex: 1;
+      min-width: 0;
+    }
     .focus-card {
       background: linear-gradient(135deg, #191111, #141414);
       border-radius: 14px;
@@ -136,6 +139,8 @@
       position: relative;
       overflow: hidden;
       display: flex;
+      flex: 1;
+      min-width: 0;
       flex-direction: column;
       gap: 6px;
     }
@@ -154,13 +159,13 @@
       .focus-big-score { font-size: 3.9rem; }
       .focus-player.has-others { max-height: 70%; }
       .compact-players { gap: 3px; }
-      .score-card { padding: 6px 10px; gap: 4px; flex-direction: row; align-items: center; border-radius: 8px; }
-      .score-card .sc-color-bar { width: 3px; height: auto; align-self: stretch; flex-shrink: 0; }
-      .score-card .sc-name { font-size: .7rem; white-space: nowrap; flex-shrink: 0; }
-      .score-card .sc-score { font-size: 1.3rem; white-space: nowrap; flex-shrink: 0; }
-      .score-card .sc-stats { font-size: .55rem; white-space: nowrap; flex-shrink: 0; }
-      .score-card .sc-last-throws { flex-shrink: 0; }
-      .score-card .sc-throw-chip { font-size: .6rem; padding: 1px 4px; min-width: 18px; }
+      .compact-players .score-card { padding: 6px 10px; gap: 4px; flex-direction: row; align-items: center; border-radius: 8px; }
+      .compact-players .score-card .sc-color-bar { width: 3px; height: auto; align-self: stretch; flex-shrink: 0; }
+      .compact-players .score-card .sc-name { font-size: .7rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-score { font-size: 1.3rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-stats { font-size: .55rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
+      .compact-players .score-card .sc-throw-chip { font-size: .6rem; padding: 1px 4px; min-width: 18px; }
     }
   </style>
 </head>
