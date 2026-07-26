@@ -44,11 +44,11 @@
       min-height: 0;
     }
     .focus-player.single { grid-template-columns: 1fr; }
-    .focus-player.has-others { flex: 0 0 auto; max-height: 82%; }
+    .focus-player.has-others { flex: 1; max-height: 82%; min-height: 0; }
     .compact-players {
       display: flex;
       gap: 4px;
-      flex: 0 0 auto;
+      flex-shrink: 0;
       max-height: 16%;
       min-height: 0;
     }
@@ -165,9 +165,9 @@
       .focus-summary div { padding: 3px; }
       .focus-summary span { font-size: .45rem; }
       .focus-summary strong { font-size: .7rem; }
-      .focus-player.has-others { max-height: 82%; }
+      .focus-player.has-others { flex: 1; }
       .focus-leg-card { display: none; } /* Leg-Historie ausblenden auf TV */
-      .compact-players { gap: 3px; max-height: 14%; }
+      .compact-players { gap: 3px; }
       .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
       .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
       .compact-players .score-card .sc-name { font-size: .65rem; white-space: nowrap; flex-shrink: 0; }
