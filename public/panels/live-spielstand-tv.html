@@ -44,11 +44,12 @@
       min-height: 0;
     }
     .focus-player.single { grid-template-columns: 1fr; }
-    .focus-player.has-others { flex: 0 0 auto; max-height: 78%; }
+    .focus-player.has-others { flex: 0 0 auto; max-height: 82%; }
     .compact-players {
       display: flex;
       gap: 4px;
-      flex: 1;
+      flex: 0 0 auto;
+      max-height: 16%;
       min-height: 0;
     }
     .compact-players:empty { display: none; }
@@ -155,17 +156,25 @@
 
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .focus-kachel { min-height: 155px; }
-      .focus-big-score { font-size: 3.9rem; }
-      .focus-player.has-others { max-height: 70%; }
-      .compact-players { gap: 3px; }
-      .compact-players .score-card { padding: 6px 10px; gap: 4px; flex-direction: row; align-items: center; border-radius: 8px; }
-      .compact-players .score-card .sc-color-bar { width: 3px; height: auto; align-self: stretch; flex-shrink: 0; }
-      .compact-players .score-card .sc-name { font-size: .7rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-score { font-size: 1.3rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-stats { font-size: .55rem; white-space: nowrap; flex-shrink: 0; }
+      .focus-kachel { min-height: 175px; padding: 6px; }
+      .focus-kachel h4 { font-size: .55rem; }
+      .throw-seg { min-height: 48px; }
+      .throw-seg .seg { font-size: 1rem; }
+      .focus-big-score { font-size: 4.2rem; }
+      .focus-summary { margin-top: 2px; }
+      .focus-summary div { padding: 3px; }
+      .focus-summary span { font-size: .45rem; }
+      .focus-summary strong { font-size: .7rem; }
+      .focus-player.has-others { max-height: 82%; }
+      .focus-leg-card { display: none; } /* Leg-Historie ausblenden auf TV */
+      .compact-players { gap: 3px; max-height: 14%; }
+      .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
+      .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
+      .compact-players .score-card .sc-name { font-size: .65rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-score { font-size: 1.1rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-stats { font-size: .5rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
-      .compact-players .score-card .sc-throw-chip { font-size: .6rem; padding: 1px 4px; min-width: 18px; }
+      .compact-players .score-card .sc-throw-chip { font-size: .55rem; padding: 1px 3px; min-width: 16px; border-radius: 4px; }
     }
   </style>
 </head>
@@ -340,10 +349,11 @@
       const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       const isCricket = mode === 'cricket';
       const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
+      const shortName = (p.name || '').length > 8 ? (p.name || '').substring(0, 8) + '...' : (p.name || '');
 
       return '<div class="score-card" data-tv style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
         '<div class="sc-color-bar"></div>' +
-        '<div class="sc-name">P' + p.slot + '</div>' +
+        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
         '<div class="sc-stats">LG-AVG <span>' + legAvg + '</span> Legs <span>' + (p.legs || 0) + '</span></div>' +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
