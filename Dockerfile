@@ -17,7 +17,7 @@ COPY public/ ./public/
 # data/ wird als Volume gemountet → Einstellungen bleiben erhalten
 RUN mkdir -p /app/data
 
-EXPOSE 3000
+EXPOSE 3100 3200
 
 ENV NODE_ENV=production
 

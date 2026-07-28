@@ -472,6 +472,7 @@
         if (sseArduino) { sseArduino.close(); sseArduino = null; }
       } else {
         initSSE();
+        loadAll();  // Daten neu laden beim Zurückkehren
       }
     });
 

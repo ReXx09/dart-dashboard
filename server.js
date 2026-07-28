@@ -709,6 +709,9 @@ async function advanceAfterThreeThrows(state, player, source) {
     ? Math.max(0, Number(runtimeTuning.singlePlayerSwitchDelayMs || 0))
     : Math.max(0, Number(runtimeTuning.playerSwitchDelayMs || 0));
 
+  // lastAction initialisieren falls null (Bugfix: Cannot set properties of null)
+  if (!state.lastAction) state.lastAction = {};
+
   // Pending-Auto-Advance markieren (UI zeigt Countdown)
   state.lastAction.autoAdvancePending = true;
   state.lastAction.autoAdvanceDelayMs = delayMs;
