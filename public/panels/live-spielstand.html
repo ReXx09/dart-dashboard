@@ -422,10 +422,30 @@
         }
       } catch { /* still zeigen was im live-state steht */ }
     }
-    // SSE für Arduino-Echtzeit-Updates
-    (function() {
-      const sse = new EventSource('/api/arduino/events');
-      sse.addEventListener('state', function(evt) {
+    // ── SSE für Live-Reload (mit Cleanup gegen Hänger) ──
+    let sseReload = null;
+    let sseArduino = null;
+
+    function initSSE() {
+      if (sseReload) { sseReload.close(); sseReload = null; }
+      if (sseArduino) { sseArduino.close(); sseArduino = null; }
+
+      sseReload = new EventSource('/api/events');
+      let reloadQueued = false;
+      sseReload.addEventListener('reload', () => {
+        if (reloadQueued) return;
+        reloadQueued = true;
+        setTimeout(() => {
+          reloadQueued = false;
+          loadAll().catch(() => {
+            document.getElementById('sseStatus').textContent = 'getrennt';
+          });
+        }, 120);
+      });
+      sseReload.addEventListener('error', () => { document.getElementById('sseStatus').textContent = 'getrennt'; });
+
+      sseArduino = new EventSource('/api/arduino/events');
+      sseArduino.addEventListener('state', function(evt) {
         try {
           const state = JSON.parse(evt.data);
           const el = document.getElementById('arduinoState');
@@ -440,26 +460,23 @@
           }
         } catch(e) {}
       });
-    })();
+    }
 
-    // ── SSE für Live-Reload ──
-    (function() {
-      const sse = new EventSource('/api/events');
-      let reloadQueued = false;
-      sse.addEventListener('reload', () => {
-        if (reloadQueued) return;
-        reloadQueued = true;
-        setTimeout(() => {
-          reloadQueued = false;
-          loadAll().catch(() => {
-            document.getElementById('sseStatus').textContent = 'getrennt';
-          });
-        }, 120);
-      });
-      sse.addEventListener('error', () => { document.getElementById('sseStatus').textContent = 'getrennt'; });
-    })();
+    window.addEventListener('beforeunload', () => {
+      if (sseReload) { sseReload.close(); sseReload = null; }
+      if (sseArduino) { sseArduino.close(); sseArduino = null; }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (sseReload) { sseReload.close(); sseReload = null; }
+        if (sseArduino) { sseArduino.close(); sseArduino = null; }
+      } else {
+        initSSE();
+      }
+    });
 
     loadAll();
+    initSSE();
     refreshArduinoStatus();
     setInterval(refreshArduinoStatus, 5000);
 
