@@ -1045,13 +1045,38 @@
     (function() {
       const sse = new EventSource('/api/events');
       sse.addEventListener('reload', () => loadAll());
-      const arduinoSse = new EventSource('/api/arduino/events');
-      arduinoSse.addEventListener('state', (evt) => {
-        try {
-          renderArduinoState(JSON.parse(evt.data));
-        } catch(_) {}
-      });
+      // Arduino SSE nur bei Bedarf (lazy), um Browser-Limit (6 SSE/Host) nicht zu verschwenden
+      let arduinoSse = null;
+      function ensureArduinoSse() {
+        if (arduinoSse) return;
+        arduinoSse = new EventSource('/api/arduino/events');
+        arduinoSse.addEventListener('state', (evt) => {
+          try { renderArduinoState(JSON.parse(evt.data)); } catch(_) {}
+        });
+      }
+      // Initial Arduino-State per Fetch laden
+      fetch('/api/arduino/state').then(r => r.json()).catch(() => ({})).then(renderArduinoState);
+      // Arduino SSE starten wenn Arduino-Tab aktiv wird
+      const originalActivate = window.activateSection;
+      window.activateSection = function(sectionId) {
+        if (sectionId === 'arduino') ensureArduinoSse();
+        return originalActivate(sectionId);
+      };
     })();
+
+    // SSE Cleanup bei Tab-Wechsel (wie im Live-Spielstand)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Arduino SSE schließen wenn Tab versteckt
+        if (arduinoSse) { arduinoSse.close(); arduinoSse = null; }
+      } else {
+        // Arduino SSE neu starten wenn Tab wieder sichtbar und Arduino-Tab aktiv
+        const activeSection = document.querySelector('.ctrl-section.is-active');
+        if (activeSection && activeSection.id === 'arduino') {
+          ensureArduinoSse();
+        }
+      }
+    });
 
     async function loadAll() {
       const res = await fetch('/api/live/state');

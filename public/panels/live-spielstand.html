@@ -593,7 +593,9 @@
 
     function getPointsPerAufnahme(player) {
       const currentRound = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
-      if (currentRound.length > 0) {
+      // Wenn currentRoundPoints existiert (auch wenn leer), ist das die aktuelle Aufnahme
+      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> 0 Punkte
+      if (currentRound.length >= 0) {
         return currentRound.reduce((sum, pt) => sum + (Number(pt) || 0), 0);
       }
 
@@ -611,7 +613,7 @@
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const lastThrows = throws.slice(-3);
-      const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows.map(t => t.points);
+      const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
@@ -681,7 +683,8 @@
     function renderCompactPlayer(p, displayIdx, stateIdx, mode) {
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
-      const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows;
+      // Wenn currentRoundPoints existiert (auch leer), das für Anzeige nutzen
+      const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows;
       while (displayThrows.length < 3) displayThrows.push('-');
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
