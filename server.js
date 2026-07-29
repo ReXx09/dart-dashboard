@@ -1233,8 +1233,9 @@ function parseArduinoLine(line) {
     return;
   }
 
-  // HIT/MATRIX,<ms>,R#,C#[,CODE,POINTS] (passiver Matrix-Sniffer)
-  const hitMatch = clean.match(/^(?:HIT|MATRIX),(\d+),R(\d+),C(\d+)(?:,(-?\d+),(-?\d+))?$/i);
+  // HIT/MATRIX,<ms>,R#,C#[,CODE,POINTS] (passiver Matrix-Sniffer - altes Format)
+// NEUES FORMAT: HIT,<ms>,R#,C#,CODE=<code>,PTS=<pts>,SEG=<name>
+  const hitMatch = clean.match(/^(?:HIT|MATRIX),(\d+),R(\d+),C(\d+)(?:,CODE=(-?\d+),PTS=(-?\d+),SEG=[^,]+)?$/i);
   if (hitMatch) {
     if (!runtimeTuning.arduinoMatrixRawEnabled) return;
     const row = `R${Number(hitMatch[2])}`;
@@ -1245,6 +1246,38 @@ function parseArduinoLine(line) {
     const rawPoints = hitMatch[5] != null ? Number(hitMatch[5]) : null;
     const hit = {
       ms: Number(hitMatch[1]),
+      row,
+      column,
+      key,
+      code: Number.isFinite(rawCode) ? rawCode : (mapped ? mapped.code : null),
+      points: Number.isFinite(rawPoints) ? rawPoints : (mapped ? mapped.points : 0),
+      ts: Date.now(),
+      line: clean,
+      mapped: !!mapped,
+      source: 'arduino-matrix-raw'
+    };
+    normalizeArduinoStatePatch({
+      lastLine: clean,
+      lastRawHit: { ...hit },
+      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit }
+    });
+    const hitNow = Date.now();
+    queueMatrixHitCandidate(hit, hitNow);
+    return;
+  }
+
+  // Fallback: altes Format HIT,<ms>,R#,C#[,CODE,POINTS]
+  const oldHitMatch = clean.match(/^(?:HIT|MATRIX),(\d+),R(\d+),C(\d+)(?:,(-?\d+),(-?\d+))?$/i);
+  if (oldHitMatch) {
+    if (!runtimeTuning.arduinoMatrixRawEnabled) return;
+    const row = `R${Number(oldHitMatch[2])}`;
+    const column = `C${Number(oldHitMatch[3])}`;
+    const key = `${row},${column}`;
+    const mapped = MATRIX_ROW_COLUMN_VALUES[key];
+    const rawCode = oldHitMatch[4] != null ? Number(oldHitMatch[4]) : null;
+    const rawPoints = oldHitMatch[5] != null ? Number(oldHitMatch[5]) : null;
+    const hit = {
+      ms: Number(oldHitMatch[1]),
       row,
       column,
       key,
