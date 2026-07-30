@@ -24,8 +24,13 @@
       align-items: center;
       gap: 10px;
     }
-    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; }
-    .live-badge { background: #e63946; color: #fff; font-size: .58rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
+    .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
+    .topbar a:hover { color: #fff; }
+    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
+    .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
+    .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
+    .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
+    .topbar .fs-btn.active { border-color: #f4a261; color: #f4a261; }
     main {
       padding: 6px;
       max-width: none;
@@ -76,7 +81,7 @@
       pointer-events: none;
     }
     .focus-card > * { position: relative; }
-    .focus-name { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
+    .focus-name { font-size: 2rem; font-weight: 800; margin-bottom: 2px; }
     .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; }
     .focus-kacheln {
       display: grid;
@@ -294,120 +299,6 @@
       .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
       .compact-players .score-card .sc-throw-chip { font-size: .55rem; padding: 1px 3px; min-width: 16px; border-radius: 4px; }
     }
-
-    /* Winner Overlay */
-    .winner-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-    .winner-overlay.show {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .winner-card {
-      background: linear-gradient(135deg, #1a1a2e, #16213e);
-      border: 3px solid #f4a261;
-      border-radius: 24px;
-      padding: 40px 60px;
-      text-align: center;
-      box-shadow: 0 0 60px rgba(244, 162, 97, 0.4), 0 20px 40px rgba(0,0,0,0.5);
-      transform: scale(0.9);
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    .winner-overlay.show .winner-card {
-      transform: scale(1);
-    }
-    .winner-icon {
-      font-size: 4rem;
-      margin-bottom: 16px;
-      animation: bounce 1s ease infinite;
-    }
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
-    .winner-title {
-      font-size: 2.5rem;
-      font-weight: 800;
-      color: #f4a261;
-      margin-bottom: 8px;
-      text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
-    }
-    .winner-name {
-      font-size: 3rem;
-      font-weight: 900;
-      color: #f4a261;
-      margin-bottom: 16px;
-      text-shadow: 0 0 30px rgba(244, 162, 97, 0.6);
-    }
-    .winner-stats {
-      display: flex;
-      gap: 32px;
-      justify-content: center;
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid rgba(244, 162, 97, 0.3);
-    }
-    .winner-stat {
-      text-align: center;
-    }
-    .winner-stat-label {
-      font-size: 0.8rem;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-    }
-    .winner-stat-value {
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: #f4a261;
-    }
-    .winner-btn {
-      background: linear-gradient(135deg, #f4a261, #e63946);
-      border: none;
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      padding: 16px 48px;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .winner-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
-    }
-    .confetti-container {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      overflow: hidden;
-      z-index: 10001;
-    }
-    .confetti {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      top: -10px;
-      animation: confetti-fall 3s linear forwards;
-    }
-    @keyframes confetti-fall {
-      to {
-        transform: translateY(100vh) rotate(720deg);
-        opacity: 0;
-      }
-    }
   </style>
 </head>
 <body>
@@ -418,8 +309,10 @@
   <div class="toast" id="toast"></div>
   
   <div class="topbar">
+    <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
-    <span class="live-badge">LIVE</span>
+    <div class="clock" id="clockDisplay">--:--:--</div>
+    <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
   </div>
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
@@ -734,6 +627,68 @@
       t.className = 'toast show' + (isError ? ' err' : '');
       setTimeout(() => t.className = 'toast', 2500);
     }
+
+    // ── Uhrzeit aktualisieren ──
+    function updateClock() {
+      const el = document.getElementById('clockDisplay');
+      if (el) el.textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ── Vollbild ein-/ausschalten ──
+    function toggleFullscreen() {
+      const doc = document;
+      const docEl = doc.documentElement;
+
+      if (!doc.fullscreenElement && !doc.webkitFullscreenElement && 
+          !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+        const request = docEl.requestFullscreen || 
+                        docEl.webkitRequestFullscreen || 
+                        docEl.mozRequestFullScreen || 
+                        docEl.msRequestFullscreen;
+        if (request) {
+          request.call(docEl).catch(function(err) {
+            showToast('Vollbild nicht möglich: ' + err.message, true);
+          });
+        } else {
+          showToast('Vollbild wird von diesem Browser nicht unterstützt', true);
+        }
+      } else {
+        const exit = doc.exitFullscreen || 
+                     doc.webkitExitFullscreen || 
+                     doc.mozCancelFullScreen || 
+                     doc.msExitFullscreen;
+        if (exit) exit.call(doc);
+      }
+    }
+
+    // ── Button-Icon anpassen bei Vollbild-Änderung ──
+    function updateFullscreenButton() {
+      const btn = document.getElementById('fsBtn');
+      if (!btn) return;
+      
+      const isFullscreen = !!(document.fullscreenElement || 
+                              document.webkitFullscreenElement || 
+                              document.mozFullScreenElement || 
+                              document.msFullscreenElement);
+      
+      btn.title = isFullscreen ? 'Vollbild beenden (ESC)' : 'Vollbild aktivieren';
+      
+      if (isFullscreen) {
+        btn.style.borderColor = '#f4a261';
+        btn.style.color = '#f4a261';
+      } else {
+        btn.style.borderColor = '#444';
+        btn.style.color = '#f1f1f1';
+      }
+    }
+
+    // ── Event-Listener für alle Browser ──
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+    document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+    document.addEventListener('MSFullscreenChange', updateFullscreenButton);
 
     async function loadAll() {
       try {
