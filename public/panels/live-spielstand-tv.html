@@ -148,6 +148,117 @@
     .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; }
     .score-card .sc-name { font-size: .86rem; font-weight: 700; }
     .score-card .sc-score { font-size: 2.2rem; font-weight: 800; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+
+    /* Winner Overlay */
+    .winner-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .winner-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .winner-card {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 3px solid #f4a261;
+      border-radius: 24px;
+      padding: 40px 60px;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(244, 162, 97, 0.4), 0 20px 40px rgba(0,0,0,0.5);
+      transform: scale(0.9);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .winner-overlay.show .winner-card {
+      transform: scale(1);
+    }
+    .winner-icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+      animation: bounce 1s ease infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .winner-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #f4a261;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
+    }
+    .winner-name {
+      font-size: 3rem;
+      font-weight: 900;
+      color: #f4a261;
+      margin-bottom: 16px;
+      text-shadow: 0 0 30px rgba(244, 162, 97, 0.6);
+    }
+    .winner-stats {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(244, 162, 97, 0.3);
+    }
+    .winner-stat {
+      text-align: center;
+    }
+    .winner-stat-label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .winner-stat-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #f4a261;
+    }
+    .winner-btn {
+      background: linear-gradient(135deg, #f4a261, #e63946);
+      border: none;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 16px 48px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .winner-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
+    }
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: -10px;
+      animation: confetti-fall 3s linear forwards;
+    }
+    @keyframes confetti-fall {
+      to {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
     .score-card .sc-stats { font-size: .68rem; color: #666; line-height: 1.5; }
     .score-card .sc-stats span { color: #aaa; font-weight: 600; }
     .score-card .sc-last-throws { display: flex; gap: 3px; }
@@ -176,9 +287,122 @@
       .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
       .compact-players .score-card .sc-throw-chip { font-size: .55rem; padding: 1px 3px; min-width: 16px; border-radius: 4px; }
     }
+
+    /* Winner Overlay */
+    .winner-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .winner-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .winner-card {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 3px solid #f4a261;
+      border-radius: 24px;
+      padding: 40px 60px;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(244, 162, 97, 0.4), 0 20px 40px rgba(0,0,0,0.5);
+      transform: scale(0.9);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .winner-overlay.show .winner-card {
+      transform: scale(1);
+    }
+    .winner-icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+      animation: bounce 1s ease infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .winner-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #f4a261;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
+    }
+    .winner-name {
+      font-size: 3rem;
+      font-weight: 900;
+      color: #f4a261;
+      margin-bottom: 16px;
+      text-shadow: 0 0 30px rgba(244, 162, 97, 0.6);
+    }
+    .winner-stats {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(244, 162, 97, 0.3);
+    }
+    .winner-stat {
+      text-align: center;
+    }
+    .winner-stat-label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .winner-stat-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #f4a261;
+    }
+    .winner-btn {
+      background: linear-gradient(135deg, #f4a261, #e63946);
+      border: none;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 16px 48px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .winner-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
+    }
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: -10px;
+      animation: confetti-fall 3s linear forwards;
+    }
+    @keyframes confetti-fall {
+      to {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- Winner Overlay -->
+  <div class="winner-overlay" id="winnerOverlay"></div>
+  
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+  
   <div class="topbar">
     <h2>🎯 Live-Spielstand</h2>
     <span class="live-badge">LIVE</span>
@@ -376,6 +600,10 @@
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
+      // Check for leg finished (winner)
+      const isLegFinished = state.game.status === 'leg-finished';
+      const winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
+
       if (isCricket) {
         focusPlayer.classList.add('single');
         focusPlayer.innerHTML = renderCricketView(active, state);
@@ -393,7 +621,102 @@
       } else {
         compactPlayers.innerHTML = '';
       }
+
+      // Winner overlay
+      if (isLegFinished && winner) {
+        showWinnerOverlay(winner, state);
+      } else {
+        hideWinnerOverlay();
+      }
+
       startCountdown(state);
+    }
+
+    startCountdown(state);
+    }
+
+    // ── Winner Overlay ──
+    function showWinnerOverlay(winner, state) {
+      const overlay = document.getElementById('winnerOverlay');
+      if (!overlay) return;
+      
+      const checkout = state.lastAction?.points || 0;
+      const dartsThrown = winner.turns * 3 - (3 - (state.game.currentThrow || 0));
+      const avg = winner.turns > 0 ? (winner.totalScored / winner.turns * 3).toFixed(1) : '-';
+      
+      overlay.innerHTML = `
+        <div class="confetti-container" id="confettiContainer"></div>
+        <div class="winner-content">
+          <div class="winner-icon">🏆</div>
+          <div class="winner-subtitle">LEG GEWONNEN</div>
+          <div class="winner-name">${escapeHtml(winner.name)}</div>
+          <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
+          <div class="winner-stats">
+            <div class="winner-stat">
+              <div class="winner-stat-label">Darts</div>
+              <div class="winner-stat-value">${dartsThrown}</div>
+            </div>
+            <div class="winner-stat">
+              <div class="winner-stat-label">Leg Average</div>
+              <div class="winner-stat-value">${avg}</div>
+            </div>
+            <div class="winner-stat">
+              <div class="winner-stat-label">Legs</div>
+              <div class="winner-stat-value">${winner.legs || 0}</div>
+            </div>
+          </div>
+          <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
+        </div>
+      `;
+      
+      overlay.style.display = 'flex';
+      createConfetti();
+    }
+
+    function hideWinnerOverlay() {
+      const overlay = document.getElementById('winnerOverlay');
+      if (overlay) overlay.style.display = 'none';
+    }
+
+    function createConfetti() {
+      const container = document.getElementById('confettiContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      const colors = ['#f4a261', '#e63946', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'];
+      for (let i = 0; i < 80; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.animationDelay = (Math.random() * 2) + 's';
+        confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+        container.appendChild(confetti);
+      }
+    }
+
+    // ── Next Leg ──
+    async function nextLeg() {
+      try {
+        var r = await fetch('/api/live/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ carryLegs: true })
+        });
+        if (!r.ok) { showToast('Fehler', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        hideWinnerOverlay();
+        showToast('Nächstes Leg gestartet');
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Toast ──
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      if (!t) return;
+      t.textContent = msg;
+      t.className = 'toast show' + (isError ? ' err' : '');
+      setTimeout(() => t.className = 'toast', 2500);
     }
 
     async function loadAll() {
