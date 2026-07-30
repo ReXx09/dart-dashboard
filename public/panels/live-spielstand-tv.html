@@ -466,6 +466,7 @@
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const lastThrows = throws.slice(-3);
       // Wenn currentRoundPoints existiert (auch leer), das für Anzeige nutzen
+      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> leere Slots anzeigen
       const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
@@ -569,8 +570,8 @@
     function renderCompactPlayer(p, mode) {
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
-      // Wenn currentRoundPoints existiert (auch leer), das für Anzeige nutzen
-      const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows;
+      // Wenn currentRoundPoints existiert UND Inhalt hat, das für Anzeige nutzen
+      const displayThrows = (Array.isArray(p.currentRoundPoints) && p.currentRoundPoints.length > 0) ? [...p.currentRoundPoints] : lastThrows;
       while (displayThrows.length < 3) displayThrows.push('-');
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
@@ -630,9 +631,6 @@
       }
 
       startCountdown(state);
-    }
-
-    startCountdown(state);
     }
 
     // ── Winner Overlay ──
