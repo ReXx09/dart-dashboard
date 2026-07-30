@@ -1847,6 +1847,7 @@ app.post('/api/live/throw', async (req, res) => {
 
   try {
     const state = await getLiveState();
+    if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
     if (targetIndex >= state.players.length) return res.status(400).json({ error: 'Spieler nicht gefunden.' });
 
     const player = state.players[targetIndex];
@@ -1912,6 +1913,7 @@ app.post('/api/live/throw', async (req, res) => {
 app.post('/api/live/next-player', async (req, res) => {
   try {
     const state = await getLiveState();
+    if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
     const currentPlayer = state.players[state.game.activePlayer];
     if (currentPlayer && Array.isArray(currentPlayer.currentRoundPoints)) {
       while (currentPlayer.currentRoundPoints.length < 3) {
@@ -1935,6 +1937,7 @@ app.post('/api/live/next-player', async (req, res) => {
 app.post('/api/live/undo', async (req, res) => {
   try {
     const state = await getLiveState();
+    if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
     let lastThrowTime = 0, lastThrowPlayer = -1;
 
     state.players.forEach((player, idx) => {

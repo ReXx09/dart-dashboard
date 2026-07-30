@@ -153,10 +153,13 @@
     .game-mode select { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 6px 10px; border-radius: 8px; font-size: .9rem; font-family: inherit; cursor: pointer; }
     .player-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: #0d0d0d; border: 1px solid #1a1a1a; margin-bottom: 6px; transition: all .2s; }
     .player-row.active { border-color: var(--pc, #e63946); background: #191111; }
+    .player-row.winner { border-color: #f4a261; background: #1a1508; box-shadow: 0 0 15px rgba(244, 162, 97, 0.3); }
     .player-row .slot { width: 26px; height: 26px; border-radius: 50%; font-size: .7rem; font-weight: 800; display: flex; align-items: center; justify-content: center; background: #222; color: #555; flex-shrink: 0; }
     .player-row.active .slot { background: var(--pc, #e63946); color: #fff; }
+    .player-row.winner .slot { background: #f4a261; color: #000; }
     .player-row .name { font-size: .94rem; font-weight: 600; flex: 1; min-width: 60px; }
     .player-row .score { font-size: 1.5rem; font-weight: 800; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 50px; text-align: right; }
+    .player-row.winner .score { color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
     .player-row .avg { font-size: .72rem; color: #555; min-width: 40px; text-align: right; }
     .btn-sm { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: background .15s; }
     .btn-sm:hover { background: #2a2a2a; }
@@ -1108,21 +1111,30 @@
       if (sel.value !== state.game.mode) sel.value = state.game.mode;
       document.getElementById('gameRound').textContent = state.game.throwRound || 1;
 
+      const isLegFinished = state.game.status === 'leg-finished';
+      const winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
+
       const container = document.getElementById('playerListContainer');
       container.innerHTML = state.players.map((p, idx) => {
         const isActive = idx === activeIdx;
+        const isWinner = isLegFinished && p.remaining === 0;
         const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
-        return '<div class="player-row' + (isActive ? ' active' : '') + '" style="--pc:' + escAttr(p.color || '#f4a261') + '">' +
+        const rowClass = 'player-row' + (isActive ? ' active' : '') + (isWinner ? ' winner' : '');
+        const scoreClass = isWinner ? 'score winner-score' : 'score';
+        const scoreDisplay = isWinner ? '🏆 ' + p.remaining : '' + p.remaining;
+        const btnHtml = isLegFinished ? '' : '<button class="btn-sm active-player" style="--pc:' + escAttr(p.color || '#f4a261') + '" onclick="quickThrow(' + p.slot + ')">+' + (Number(ctrlPoints.value || 60)) + '</button>';
+        return '<div class="player-row' + (isActive ? ' active' : '') + (isWinner ? ' winner' : '') + '" style="--pc:' + escAttr(p.color || '#f4a261') + '">' +
           '<div class="slot">' + p.slot + '</div>' +
-          '<div class="name">' + escHtml(p.name) + '</div>' +
+          '<div class="name">' + escHtml(p.name) + (isWinner ? ' 🏆' : '') + '</div>' +
           '<span style="font-size:.72rem;color:#555">Rest:</span>' +
-          '<div class="score">' + p.remaining + '</div>' +
+          '<div class="score">' + (isWinner ? '🏆 ' + p.remaining : '' + p.remaining) + '</div>' +
           '<div class="avg">' + avgStr + '</div>' +
-          '<button class="btn-sm active-player" style="--pc:' + escAttr(p.color || '#f4a261') + '" onclick="quickThrow(' + p.slot + ')">+' + (Number(ctrlPoints.value || 60)) + '</button>' +
+          btnHtml +
         '</div>';
       }).join('');
 
       ctrlThrowBtn.onclick = () => {
+        if (isLegFinished) { showToast('Spiel ist bereits beendet - Neues Leg starten'); return; }
         if (state.players[activeIdx]) {
           quickThrow(state.players[activeIdx].slot);
         }
@@ -1132,15 +1144,21 @@
     async function quickThrow(slot) {
       const pts = Number(ctrlPoints.value || 60);
       const res = await fetch('/api/live/throw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerSlot: slot, points: pts }) });
-      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); }
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); return; }
+      // State aktualisieren (frische Daten vom Server)
+      const fresh = await res.json();
+      liveState = fresh;
+      render(liveState);
     }
     async function changeMode(mode) {
       const res = await fetch('/api/game/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
-      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); }
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); return; }
+      liveState = await res.json();
+      render(liveState);
     }
-    async function nextPlayer() { const res = await fetch('/api/live/next-player', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }
-    async function undoLast() { const res = await fetch('/api/live/undo', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); } }
-    async function resetLeg(carryLegs) { await fetch('/api/live/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ carryLegs }) }); }
+    async function nextPlayer() { const res = await fetch('/api/live/next-player', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); return; } liveState = await res.json(); render(liveState); }
+    async function undoLast() { const res = await fetch('/api/live/undo', { method: 'POST' }); if (!res.ok) { const err = await res.json().catch(() => ({ error: 'Fehler' })); showToast(err.error || 'Fehler'); return; } liveState = await res.json(); render(liveState); }
+    async function resetLeg(carryLegs) { const res = await fetch('/api/live/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ carryLegs }) }); if (res.ok) { liveState = await res.json(); render(liveState); } }
     function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); }
     function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
     function escAttr(s) { return escHtml(s).replace(/#/g,'%23'); }
