@@ -452,7 +452,6 @@
       
       // Würfe für die linke Kachel (vertikal): Punkte oben (rot/groß), Segment unten (grau/klein)
       // Wir nutzen die letzten 3 Würfe aus dem throws Array für die Segmente
-      const lastThrows = throws.slice(-3);
       const throwsHtml = displayThrows.map((pt, ti) => {
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
         // Segment aus dem throws Array holen (falls vorhanden)

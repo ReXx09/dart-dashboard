@@ -2083,7 +2083,8 @@ function createFireTvServer() {
     'live-spielstand-tv.html',
     'live-spielstand.html',
     'spieler.html',
-    'highscores.html'
+    'highscores.html',
+    'statistics.html'
   ]);
 
   function proxyToBrowser(req, res) {
