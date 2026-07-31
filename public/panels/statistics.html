@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Statistiken – Löwen Dart</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a;
+      color: #f1f1f1;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #111;
+      border-bottom: 3px solid #e63946;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .logo { font-size: 2rem; }
+    .header-text h1 { font-size: 1.35rem; font-weight: 700; }
+    .header-text p { font-size: .78rem; color: #666; margin-top: 2px; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    #clock { font-size: 1.15rem; font-weight: 600; color: #e63946; font-variant-numeric: tabular-nums; text-align: right; }
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 28px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 340px) 1fr auto;
+      gap: 12px;
+      align-items: center;
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-radius: 14px;
+      padding: 14px;
+    }
+    label {
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #777;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: block;
+    }
+    select, input {
+      width: 100%;
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      color: #f1f1f1;
+      border-radius: 9px;
+      padding: 10px 12px;
+      font-size: .95rem;
+      font-family: inherit;
+      outline: none;
+    }
+    select:focus, input:focus { border-color: #e63946; }
+    .btn {
+      background: #1e1e1e;
+      border: 1px solid #2a2a2a;
+      color: #ddd;
+      border-radius: 9px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 700;
+      transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #2a2a2a; border-color: #e63946; }
+    .btn.primary { background: #e63946; border-color: #e63946; color: #fff; }
+    .btn.primary:hover { background: #c1121f; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .summary-card {
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-radius: 14px;
+      padding: 16px;
+      min-height: 92px;
+      position: relative;
+      overflow: hidden;
+    }
+    .summary-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--accent, #e63946);
+    }
+    .summary-label {
+      font-size: .62rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #777;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .summary-value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      color: #f1f1f1;
+      font-variant-numeric: tabular-nums;
+    }
+    .summary-sub {
+      font-size: .7rem;
+      color: #666;
+      margin-top: 4px;
+    }
+    .section {
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .section-title {
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #888;
+      font-weight: 700;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+    }
+    .stat-item {
+      background: #0f0f0f;
+      border: 1px solid #262626;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-label {
+      font-size: .58rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #f4a261;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-sub {
+      font-size: .65rem;
+      color: #555;
+      margin-top: 2px;
+    }
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .8rem;
+    }
+    .history-table th {
+      text-align: left;
+      font-size: .62rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #444;
+      padding: 8px 10px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .history-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: #1a1a1a; }
+    .history-table .won { color: #2a9d8f; font-weight: 700; }
+    .history-table .lost { color: #e63946; }
+    .history-table .checkout { color: #f4a261; font-weight: 700; }
+    .history-table .avg { color: #ddd; }
+    .history-table .darts { color: #888; font-size: .7rem; }
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #555;
+    }
+    .empty-state svg { width: 64px; height: 64px; margin-bottom: 12px; opacity: .5; }
+    .player-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      background: #0f0f0f;
+      border-radius: 8px;
+      padding: 4px;
+    }
+    .tab {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #777;
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 700;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .tab:hover { color: #ddd; }
+    .tab.active { background: #e63946; color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    @media (max-width: 768px) {
+      .toolbar { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">📊</span>
+    <div class="header-text">
+      <h1>Statistiken</h1>
+      <p>Spieler-Profile & Performance</p>
+    </div>
+    <div class="header-right">
+      <div id="clock">--:--:--</div>
+      <a href="/" class="btn" style="padding:8px 12px;font-size:.75rem">← Zurück</a>
+    </div>
+  </header>
+  <main>
+    <div class="toolbar">
+      <div>
+        <label for="playerSelect">Spieler</label>
+        <select id="playerSelect">
+          <option value="">-- Spieler wählen --</option>
+        </select>
+      </div>
+      <div>
+        <label for="seasonSelect">Saison</label>
+        <select id="seasonSelect">
+          <option value="2026">2026</option>
+          <option value="2025">2025</option>
+          <option value="2024">2024</option>
+        </select>
+      </div>
+      <button class="btn primary" id="refreshBtn">🔄 Aktualisieren</button>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid">
+      <!-- Summary cards injected here -->
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">Übersicht</button>
+      <button class="tab" data-tab="scoring">Scoring</button>
+      <button class="tab" data-tab="checkout">Checkout</button>
+      <button class="tab" data-tab="history">Leg-History</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-overview">
+      <div class="section">
+        <h2 class="section-title">Allgemein</h2>
+        <div class="stats-grid" id="overviewStats"></div>
+      </div>
+      <div class="section">
+        <h2 class="section-title">Durchschnitte</h2>
+        <div class="stats-grid" id="avgStats"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-scoring">
+      <div class="section">
+        <h2 class="section-title">High Scores</h2>
+        <div class="stats-grid" id="highScoreStats"></div>
+      </div>
+      <div class="section">
+        <h2 class="section-title">Verteilung</h2>
+        <div class="stats-grid" id="distributionStats"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-checkout">
+      <div class="section">
+        <h2 class="section-title">Checkout-Statistik</h2>
+        <div class="stats-grid" id="checkoutStats"></div>
+      </div>
+      <div class="section">
+        <h2 class="section-title">Checkout-Bereiche</h2>
+        <div class="stats-grid" id="checkoutRangeStats"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-history">
+      <div class="section">
+        <h2 class="section-title">Leg-History (letzte 50)</h2>
+        <div style="overflow-x:auto">
+          <table class="history-table" id="historyTable">
+            <thead>
+              <tr>
+                <th>Datum</th>
+                <th>Leg Avg</th>
+                <th>Checkout</th>
+                <th>Darts</th>
+                <th>Ergebnis</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="emptyHistory" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 12h6M9 12l-2 2m2-2l2 2M9 12V6m0 6v6"/>
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+          </svg>
+          <p>Keine Leg-History für diesen Spieler</p>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script>
+    const API_BASE = '/api';
+    let currentPlayerId = null;
+    let currentSeason = '2026';
+
+    // DOM Elements
+    const playerSelect = document.getElementById('playerSelect');
+    const seasonSelect = document.getElementById('seasonSelect');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const summaryGrid = document.getElementById('summaryGrid');
+
+    // Tab handling
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('de-DE');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Load players
+    async function loadPlayers() {
+      try {
+        const res = await fetch(API_BASE + '/live/state');
+        const state = await res.json();
+        if (state.players) {
+          playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
+          state.players.forEach(p => {
+            if (p.name) {
+              const opt = document.createElement('option');
+              opt.value = p.slot;
+              opt.textContent = `P${p.slot} · ${p.name}`;
+              playerSelect.appendChild(opt);
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load players:', e);
+      }
+    }
+
+    // Load stats for current player
+    async function loadStats() {
+      if (!currentPlayerId) return;
+      try {
+        const [statsRes, historyRes] = await Promise.all([
+          fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${currentSeason}`),
+          fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=50`)
+        ]);
+        const stats = await statsRes.json();
+        const history = await historyRes.json();
+        renderSummary(stats);
+        renderOverview(stats);
+        renderScoring(stats);
+        renderCheckout(stats);
+        renderHistory(history);
+      } catch (e) {
+        console.error('Failed to load stats:', e);
+      }
+    }
+
+    function renderSummary(stats) {
+      const s = stats || {};
+      const legsPlayed = Number(s.legs_played || 0);
+      const legsWon = Number(s.legs_won || 0);
+      const winPct = legsPlayed > 0 ? ((legsWon / legsPlayed) * 100).toFixed(1) : '0.0';
+      const avg = Number(s.total_scored || 0) / Math.max(1, Number(s.total_darts || 1)) * 3;
+      
+      summaryGrid.innerHTML = `
+        <div class="summary-card" style="--accent:#f4a261">
+          <div class="summary-label">Legs gespielt</div>
+          <div class="summary-value">${legsPlayed}</div>
+          <div class="summary-sub">Gewonnen: ${legsWon} (${winPct}%)</div>
+        </div>
+        <div class="summary-card" style="--accent:#2a9d8f">
+          <div class="summary-label">3-Dart Average</div>
+          <div class="summary-value">${avg.toFixed(2)}</div>
+          <div class="summary-sub">Highest Leg Avg: ${Number(s.highest_leg_avg || 0).toFixed(2)}</div>
+        </div>
+        <div class="summary-card" style="--accent:#e63946">
+          <div class="summary-label">180er</div>
+          <div class="summary-value">${Number(s.count_180 || 0)}</div>
+          <div class="summary-sub">Max Score: ${Number(s.max_score || 0)}</div>
+        </div>
+        <div class="summary-card" style="--accent:#f4a261">
+          <div class="summary-label">Checkout-Quote</div>
+          <div class="summary-value">${checkoutPct(s)}%</div>
+          <div class="summary-sub">Highest: ${Number(s.highest_checkout || 0)}</div>
+        </div>
+      `;
+    }
+
+    function checkoutPct(s) {
+      const attempts = Number(s.checkout_attempts || 0);
+      const success = Number(s.checkout_success || 0);
+      return attempts > 0 ? ((success / attempts) * 100).toFixed(1) : '0.0';
+    }
+
+    function renderOverview(stats) {
+      const s = stats || {};
+      const container = document.getElementById('overviewStats');
+      container.innerHTML = `
+        <div class="stat-item"><div class="stat-label">Games gespielt</div><div class="stat-value">${Number(s.games_played || 0)}</div><div class="stat-sub">Gewonnen: ${Number(s.games_won || 0)}</div></div>
+        <div class="stat-item"><div class="stat-label">Legs gespielt</div><div class="stat-value">${Number(s.legs_played || 0)}</div><div class="stat-sub">Gewonnen: ${Number(s.legs_won || 0)}</div></div>
+        <div class="stat-item"><div class="stat-label">Win %</div><div class="stat-value">${winPct(s)}%</div><div class="stat-sub">Legs</div></div>
+        <div class="stat-item"><div class="stat-label">Total Darts</div><div class="stat-value">${Number(s.total_darts || 0).toLocaleString()}</div><div class="stat-sub">Total Scored: ${Number(s.total_scored || 0).toLocaleString()}</div></div>
+      `;
+    }
+
+    function winPct(s) {
+      const played = Number(s.legs_played || 0);
+      const won = Number(s.legs_won || 0);
+      return played > 0 ? ((won / played) * 100).toFixed(1) : '0.0';
+    }
+
+    function renderAvg(stats) {
+      const s = stats || {};
+      const container = document.getElementById('avgStats');
+      const darts = Number(s.total_darts || 0);
+      const scored = Number(s.total_scored || 0);
+      const overallAvg = darts > 0 ? (scored / darts * 3).toFixed(2) : '0.00';
+      container.innerHTML = `
+        <div class="stat-item"><div class="stat-label">Overall Average</div><div class="stat-value">${overallAvg}</div><div class="stat-sub">3-Dart</div></div>
+        <div class="stat-item"><div class="stat-label">Highest Leg Avg</div><div class="stat-value">${Number(s.highest_leg_avg || 0).toFixed(2)}</div><div class="stat-sub">Bestes Leg</div></div>
+        <div class="stat-item"><div class="stat-label">First 9 Avg</div><div class="stat-value">${Number(s.avg_first9 || 0).toFixed(2)}</div><div class="stat-sub">Erste 9 Darts</div></div>
+        <div class="stat-item"><div class="stat-label">Max Score</div><div class="stat-value">${Number(s.max_score || 0)}</div><div class="stat-sub">Höchste Aufnahme</div></div>
+      `;
+    }
+
+    function renderScoring(stats) {
+      const s = stats || {};
+      const highScoreContainer = document.getElementById('highScoreStats');
+      highScoreContainer.innerHTML = `
+        <div class="stat-item"><div class="stat-label">180er</div><div class="stat-value">${Number(s.count_180 || 0)}</div><div class="stat-sub">Max 180</div></div>
+        <div class="stat-item"><div class="stat-label">171+</div><div class="stat-value">${Number(s.count_171plus || 0)}</div><div class="stat-sub">171-180</div></div>
+        <div class="stat-item"><div class="stat-label">140+</div><div class="stat-value">${Number(s.count_140plus || 0)}</div><div class="stat-sub">140-170</div></div>
+        <div class="stat-item"><div class="stat-label">100+</div><div class="stat-value">${Number(s.count_100plus || 0)}</div><div class="stat-sub">100-139</div></div>
+      `;
+
+      const distContainer = document.getElementById('distributionStats');
+      const total100plus = Number(s.count_100plus || 0) + Number(s.count_140plus || 0) + Number(s.count_171plus || 0) + Number(s.count_180 || 0);
+      const legsPlayed = Number(s.legs_played || 1);
+      distContainer.innerHTML = `
+        <div class="stat-item"><div class="stat-label">100+ pro Leg</div><div class="stat-value">${(total100plus / legsPlayed).toFixed(2)}</div><div class="stat-sub">Durchschnitt</div></div>
+        <div class="stat-item"><div class="stat-label">180er Quote</div><div class="stat-value">${legsPlayed > 0 ? ((Number(s.count_180 || 0) / legsPlayed) * 100).toFixed(1) : '0.0'}%</div><div class="stat-sub">Pro Leg</div></div>
+        <div class="stat-item"><div class="stat-label">High Finish</div><div class="stat-value">${Number(s.highest_checkout || 0)}</div><div class="stat-sub">Höchster Checkout</div></div>
+        <div class="stat-item"><div class="stat-label">Max Score</div><div class="stat-value">${Number(s.max_score || 0)}</div><div class="stat-sub">Einzelne Aufnahme</div></div>
+      `;
+    }
+
+    function renderCheckout(stats) {
+      const s = stats || {};
+      const checkoutContainer = document.getElementById('checkoutStats');
+      const attempts = Number(s.checkout_attempts || 0);
+      const success = Number(s.checkout_success || 0);
+      const pct = attempts > 0 ? ((success / attempts) * 100).toFixed(1) : '0.0';
+      checkoutContainer.innerHTML = `
+        <div class="stat-item"><div class="stat-label">Checkout-Quote</div><div class="stat-value">${pct}%</div><div class="stat-sub">${success} / ${attempts}</div></div>
+        <div class="stat-item"><div class="stat-label">Highest Checkout</div><div class="stat-value">${Number(s.highest_checkout || 0)}</div><div class="stat-sub">Bestes Finish</div></div>
+        <div class="stat-item"><div class="stat-label">Versuche</div><div class="stat-value">${attempts}</div><div class="stat-sub">Checkout-Attempts</div></div>
+        <div class="stat-item"><div class="stat-label">Erfolgreich</div><div class="stat-value">${success}</div><div class="stat-sub">Getroffene</div></div>
+      `;
+
+      const rangeContainer = document.getElementById('checkoutRangeStats');
+      rangeContainer.innerHTML = `
+        <div class="stat-item"><div class="stat-label">160+</div><div class="stat-value">${Number(s.checkout_160plus || 0)}</div><div class="stat-sub">High Finishes</div></div>
+        <div class="stat-item"><div class="stat-label">120+</div><div class="stat-value">${Number(s.checkout_120plus || 0)}</div><div class="stat-sub">Medium Finishes</div></div>
+        <div class="stat-item"><div class="stat-label">100+</div><div class="stat-value">${Number(s.checkout_100plus || 0)}</div><div class="stat-sub">Standard Finishes</div></div>
+        <div class="stat-item"><div class="stat-label"><100</div><div class="stat-value">${Math.max(0, Number(s.checkout_success || 0) - Number(s.checkout_100plus || 0) - Number(s.checkout_120plus || 0) - Number(s.checkout_160plus || 0))}</div><div class="stat-sub">Rest</div></div>
+      `;
+    }
+
+    function renderHistory(history) {
+      const tbody = document.querySelector('#historyTable tbody');
+      const emptyState = document.getElementById('emptyHistory');
+      if (!history || history.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+      emptyState.style.display = 'none';
+      tbody.innerHTML = history.map(h => `
+        <tr>
+          <td>${new Date(h.ts).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'2-digit'})} ${new Date(h.ts).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'})}</td>
+          <td class="avg">${Number(h.leg_avg || 0).toFixed(2)}</td>
+          <td class="checkout">${Number(h.checkout || 0) > 0 ? Number(h.checkout) : '—'}</td>
+          <td class="darts">${Number(h.darts_thrown || 0)}</td>
+          <td class="${h.won ? 'won' : 'lost'}">${h.won ? '✓ Gewonnen' : '✗ Verloren'}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Event listeners
+    playerSelect.addEventListener('change', () => {
+      currentPlayerId = playerSelect.value ? Number(playerSelect.value) : null;
+      loadStats();
+    });
+
+    seasonSelect.addEventListener('change', () => {
+      currentSeason = seasonSelect.value;
+      loadStats();
+    });
+
+    refreshBtn.addEventListener('click', loadStats);
+
+    // Init
+    loadPlayers().then(() => {
+      // Try to restore last selected player from localStorage
+      const saved = localStorage.getItem('stats_player');
+      if (saved && playerSelect.querySelector(`option[value="${saved}"]`)) {
+        playerSelect.value = saved;
+        currentPlayerId = Number(saved);
+        loadStats();
+      }
+    });
+
+    // Save player selection
+    playerSelect.addEventListener('change', () => {
+      if (playerSelect.value) localStorage.setItem('stats_player', playerSelect.value);
+      else localStorage.removeItem('stats_player');
+    });
+  </script>
+</body>
+</html>
