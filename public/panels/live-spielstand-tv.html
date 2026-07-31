@@ -94,14 +94,14 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      min-height: 280px;
+      min-height: 180px;
     }
     .focus-kachel:nth-child(2) {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      min-height: 280px;
-      padding: 12px 16px;
+      gap: 6px;
+      min-height: 180px;
+      padding: 10px 14px;
     }
     .focus-kachel:nth-child(2) > div {
       flex: 1;
@@ -111,7 +111,7 @@
       justify-content: center;
       text-align: center;
       width: 100%;
-      padding: 12px;
+      padding: 8px;
       background: #141414;
       border: 1px solid #2a2a2a;
       border-radius: 10px;
@@ -149,9 +149,9 @@
       align-items: center;
       font-weight: 800;
     }
-    .throw-seg .pts { font-size: 2.15rem; color: var(--pc, #e63946); }
-    .throw-seg .seg { font-size: 1.66rem; color: #555; margin-top: 2px; }
-    .focus-big-score { font-size: 5rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .throw-seg .pts { font-size: 1.4rem; color: var(--pc, #e63946); }
+    .throw-seg .seg { font-size: .85rem; color: #555; margin-top: 2px; }
+    .focus-big-score { font-size: 3.5rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
     .focus-summary { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
     .focus-summary div { background: #141414; border-radius: 10px; padding: 4px; text-align: center; }
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
@@ -567,8 +567,9 @@
       const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
       const shortName = (p.name || '').length > 8 ? (p.name || '').substring(0, 8) + '...' : (p.name || '');
 
-      return '<div class="score-card" data-tv style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
-        '<div class="sc-color-bar"></div>' +
+      const playerColor = escapeAttr(p.color || '#f4a261');
+      return '<div class="score-card" data-tv style="--pc:' + playerColor + '">' +
+        '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
         '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
         '<div class="sc-stats">LG-AVG <span>' + legAvg + '</span> Legs <span>' + (p.legs || 0) + '</span></div>' +

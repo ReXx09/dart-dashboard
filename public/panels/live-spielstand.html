@@ -64,20 +64,54 @@
     .focus-name { font-size: 2rem; font-weight: 800; margin-bottom: 4px; }
     .focus-meta { color: #777; font-size: .8rem; margin-bottom: 14px; }
 
-    /* ==================== KACHELN ==================== */
-    .focus-kacheln { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; }
+    /* ==================== KACHELN - Layout F ==================== */
+    .focus-kacheln { display: grid; grid-template-columns: 0.7fr 1.8fr; gap: 12px; }
+    .focus-kachel:nth-child(1) {
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 280px;
+    }
+    .focus-kachel:nth-child(2) {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 280px;
+      padding: 20px 24px;
+    }
+    .focus-kachel:nth-child(2) > div {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      width: 100%;
+      padding: 20px;
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+    }
+    .focus-kachel:nth-child(2) h4 {
+      margin: 0 0 12px 0;
+      font-size: .7rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
     .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 16px; padding: 16px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     .focus-kachel h4 { color: #777; font-size: .68rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
     .focus-kachel .subline { color: #555; font-size: .72rem; margin-top: 6px; }
 
     /* ==================== WURF-SEGMENTE ==================== */
-    .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .throw-segments { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 180px; }
     .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
-    .throw-seg .seg { font-size: 1.55rem; color: var(--pc, #e63946); }
-    .throw-seg .pts { font-size: .78rem; color: #555; margin-top: 4px; }
+    .throw-seg .pts { font-size: 1.55rem; color: var(--pc, #e63946); }
+    .throw-seg .seg { font-size: .78rem; color: #555; margin-top: 4px; }
 
     /* ==================== SCORE / REST PUNKTE ==================== */
-    .focus-big-score { font-size: 6rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .focus-big-score { font-size: clamp(4rem, 10vw, 8rem); font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
     .focus-summary { margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .focus-summary div { background: #141414; border-radius: 10px; padding: 10px; text-align: center; }
     .focus-summary span { display: block; color: #666; font-size: .66rem; text-transform: uppercase; letter-spacing: 1px; }
@@ -96,8 +130,12 @@
     }
     .focus-leg-card h4 { color: #777; font-size: .7rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
     .focus-leg-card .leg-list { max-height: 360px; }
-    .leg-list { width: 100%; display: grid; gap: 6px; max-height: 110px; overflow: auto; }
-    .leg-item { display: flex; justify-content: space-between; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 6px 8px; font-size: .74rem; }
+    .leg-list { width: 100%; display: grid; gap: 6px; max-height: 360px; overflow: auto; }
+    .leg-item { display: grid; grid-template-columns: 80px 1fr 80px; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 6px 10px; font-size: .74rem; gap: 10px; }
+    .leg-item .idx { color: #777; font-weight: 600; text-align: right; padding-right: 10px; border-right: 1px solid #333; }
+    .leg-item .throws { display: flex; justify-content: center; align-items: center; gap: 8px; color: #ddd; }
+    .leg-item .throws .sep { color: #555; font-weight: 300; }
+    .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
     .leg-item .idx { color: #777; }
     .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; }
 
@@ -397,15 +435,18 @@
     body.tv-mode .focus-name { font-size: 1.06rem; margin-bottom: 2px; }
     body.tv-mode .focus-meta { font-size: .68rem; margin-bottom: 5px; }
     body.tv-mode .focus-kacheln { gap: 5px; }
-    body.tv-mode .focus-kachel { min-height: 130px; padding: 8px; border-radius: 11px; }
+    body.tv-mode .focus-kachel:nth-child(1) { min-height: 200px; padding: 8px; border-radius: 11px; }
+    body.tv-mode .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; gap: 10px; }
+    body.tv-mode .focus-kachel:nth-child(2) > div { padding: 12px; }
+    body.tv-mode .focus-kachel:nth-child(2) h4 { font-size: .6rem; margin-bottom: 8px; }
     body.tv-mode .focus-kachel h4 { font-size: .6rem; margin-bottom: 5px; }
     body.tv-mode .focus-kachel .subline { font-size: .62rem; margin-top: 3px; }
-    body.tv-mode .throw-segments { gap: 4px; }
+    body.tv-mode .throw-segments { max-width: 130px; gap: 6px; }
     body.tv-mode .throw-seg { min-height: 56px; border-radius: 10px; }
     body.tv-mode .throw-seg .seg { font-size: 1.1rem; }
     body.tv-mode .throw-seg .pts { font-size: .66rem; margin-top: 2px; }
     body.tv-mode .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 5px; }
-    body.tv-mode .focus-big-score { font-size: 3.4rem; }
+    body.tv-mode .focus-big-score { font-size: clamp(3rem, 7vw, 5rem); }
     body.tv-mode .focus-summary { margin-top: 5px; gap: 4px; }
     body.tv-mode .focus-summary div { padding: 5px; }
     body.tv-mode .focus-summary span { font-size: .52rem; }
@@ -413,7 +454,8 @@
     body.tv-mode .focus-leg-card { padding: 6px; border-radius: 14px; }
     body.tv-mode .focus-leg-card h4 { font-size: .58rem; }
     body.tv-mode .focus-leg-card .leg-list { max-height: 320px; }
-    body.tv-mode .leg-item { padding: 4px 6px; font-size: .65rem; }
+    body.tv-mode .leg-item { grid-template-columns: 60px 1fr 60px; padding: 4px 8px; font-size: .65rem; gap: 6px; }
+    body.tv-mode .leg-item .idx { padding-right: 6px; }
     body.tv-mode .score-card { padding: 10px; border-radius: 10px; }
     body.tv-mode .sc-name { font-size: .78rem; }
     body.tv-mode .sc-score { font-size: 1.95rem; margin-bottom: 3px; }
@@ -447,16 +489,24 @@
       .focus-card { padding: 14px; border-radius: 14px; }
       .focus-name { font-size: 1.15rem; }
       .focus-meta { font-size: .72rem; margin-bottom: 10px; }
-      .focus-kacheln { gap: 8px; grid-template-columns: 1.1fr 1fr 1fr; }
+      .focus-kacheln { gap: 8px; }
+      .focus-kachel:nth-child(1) { min-height: 200px; }
+      .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; gap: 10px; }
+      .focus-kachel:nth-child(2) > div { padding: 12px; }
+      .focus-kachel:nth-child(2) h4 { font-size: .6rem; margin-bottom: 8px; }
       .focus-leg-card { border-radius: 14px; padding: 12px; }
       .focus-leg-card .leg-list { max-height: 250px; }
       .focus-kachel { min-height: 116px; padding: 10px; border-radius: 12px; }
+      .throw-segments { max-width: 130px; gap: 6px; }
       .throw-seg { min-height: 58px; }
-      .throw-seg .seg { font-size: 1.2rem; }
-      .focus-big-score { font-size: 3.35rem; }
+      .throw-seg .pts { font-size: 1.2rem; }
+      .throw-seg .seg { font-size: .68rem; }
+      .focus-big-score { font-size: clamp(3rem, 7vw, 5rem); }
       .focus-summary { margin-top: 8px; }
       .focus-summary strong { font-size: .95rem; }
-      .leg-list { max-height: 84px; }
+      .leg-list { max-height: 200px; }
+      .leg-item { grid-template-columns: 60px 1fr 60px; font-size: .65rem; padding: 4px 8px; gap: 6px; }
+      .leg-item .idx { padding-right: 6px; }
 
       .compact-players { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
       .score-card { padding: 12px; border-radius: 11px; }
@@ -483,13 +533,13 @@
       }
 
       .focus-player { grid-template-columns: minmax(0, 1fr) 320px; }
-      .focus-kacheln { grid-template-columns: 1fr 1fr 1fr; }
       .focus-leg-card { min-height: 64px; padding: 10px; }
       .leg-list { max-height: 120px; }
       .focus-big-score { font-size: 2.9rem; }
+      .throw-segments { max-width: 100px; gap: 4px; }
       .throw-seg { min-height: 54px; }
-      .throw-seg .seg { font-size: 1.12rem; }
-      .throw-seg .pts { font-size: .72rem; }
+      .throw-seg .pts { font-size: 1rem; }
+      .throw-seg .seg { font-size: .6rem; }
 
       .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
       .sc-score { font-size: 2rem; }
@@ -501,20 +551,24 @@
     }
 
     @media (max-width: 1180px) {
-      .focus-kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .focus-kachel:first-child { grid-column: 1 / -1; }
+      .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
+      .focus-kachel:nth-child(1) { min-height: 230px; }
+      .focus-kachel:nth-child(2) { min-height: 230px; padding: 16px 20px; }
     }
 
     @media (width: 1024px) and (height: 860px) {
-      .focus-kacheln { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .focus-kachel { min-height: 155px; }
-      .focus-kachel:first-child { grid-column: auto; }
-      .focus-big-score { font-size: 3.9rem; }
+      .focus-kachel:nth-child(1) { min-height: 200px; }
+      .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; }
+      .focus-big-score { font-size: clamp(3.5rem, 8vw, 6rem); }
+      .throw-segments { max-width: 140px; }
+      .throw-seg { min-height: 60px; }
+      .throw-seg .pts { font-size: 1.3rem; }
+      .throw-seg .seg { font-size: .72rem; }
     }
 
     @media (max-width: 860px) {
       .focus-kacheln { grid-template-columns: 1fr; }
-      .focus-kachel:first-child { grid-column: auto; }
+      .focus-kachel:nth-child(2) { gap: 10px; padding: 14px 16px; }
     }
   </style>
 </head>
@@ -848,8 +902,6 @@
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const lastThrows = throws.slice(-3);
-      // Wenn currentRoundPoints existiert (auch leer), das für Anzeige nutzen
-      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> leere Slots anzeigen
       const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
@@ -857,12 +909,15 @@
       const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
+
+      // Würfe: Punkte oben (rot/groß), Segment unten (grau/klein)
       const throwsHtml = displayThrows.map((pt, ti) => {
-        const label = pt === null ? '-' : String(pt);
-        const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
+        const pointsLabel = pt === null ? '-' : (pt === 0 ? '0' : '+' + pt);
+        const throwData = lastThrows[ti];
+        const segmentLabel = (throwData && throwData.segment) ? throwData.segment : (pt === null ? '-' : String(pt));
         return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
-          '<div class="seg">' + label + '</div>' +
           '<div class="pts">' + pointsLabel + '</div>' +
+          '<div class="seg">' + segmentLabel + '</div>' +
         '</div>';
       }).join('');
 
@@ -876,14 +931,14 @@
             '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
-            '<h4>Punkte pro Aufnahme</h4>' +
-            '<div class="focus-big-score" style="font-size:7rem">' + aufnahmeScore + '</div>' +
-            '<div style="color:#777;font-size:.82rem">Aktuelle Aufnahme</div>' +
-          '</div>' +
-          '<div class="focus-kachel">' +
-            '<h4>Gesamt / Rest</h4>' +
-            '<div class="focus-big-score">' + p.remaining + '</div>' +
-            '<div style="color:#777;font-size:.82rem">Restpunkte</div>' +
+            '<div>' +
+              '<h4>Gesamt / Rest</h4>' +
+              '<div class="focus-big-score">' + p.remaining + '</div>' +
+            '</div>' +
+            '<div>' +
+              '<h4>Punkte pro Aufnahme</h4>' +
+              '<div class="focus-big-score">' + aufnahmeScore + '</div>' +
+            '</div>' +
           '</div>' +
         '</div>' +
         '<div class="focus-summary">' +
@@ -901,16 +956,21 @@
       for (let i = 0; i < throws.length; i += 3) {
         const chunk = throws.slice(i, i + 3);
         const score = chunk.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
-        turnScores.push(score);
+        turnScores.push({ score, throws: chunk.map(t => t.segment || t.points) });
       }
-
       const legListHtml = turnScores.length
-        ? turnScores.slice(-20).reverse().map((score, orderIdx) => {
+        ? turnScores.slice(-20).reverse().map((turn, orderIdx) => {
             const turnIdx = turnScores.length - orderIdx;
-            return '<div class="leg-item"><span class="idx">Aufnahme ' + turnIdx + '</span><span class="score">' + score + '</span></div>';
+            const throwsHtml = turn.throws.map((seg, si) => 
+              '<span>' + escapeHtml(seg) + '</span>' + (si < turn.throws.length - 1 ? '<span class="sep">|</span>' : '')
+            ).join('');
+            return '<div class="leg-item">' +
+              '<span class="idx">Aufnahme ' + turnIdx + '</span>' +
+              '<span class="throws">' + throwsHtml + '</span>' +
+              '<span class="score">' + turn.score + '</span>' +
+            '</div>';
           }).join('')
         : '<div class="subline">Noch keine Aufnahmen erfasst</div>';
-
       return '<aside class="focus-leg-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
         '<h4>Aufnahmen im Leg</h4>' +
         '<div class="leg-list">' + legListHtml + '</div>' +
