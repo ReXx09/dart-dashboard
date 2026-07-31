@@ -23,14 +23,19 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
     }
     .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
     .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
     .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
+    .topbar select { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 4px 8px; border-radius: 8px; cursor: pointer; font-size: .72rem; font-family: inherit; }
+    .topbar select:hover { border-color: #f4a261; }
+    .topbar label { font-size: .68rem; color: #888; display: flex; align-items: center; gap: 4px; }
     .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
     .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
     .topbar .fs-btn.active { border-color: #f4a261; color: #f4a261; }
+
     main {
       padding: 6px;
       max-width: none;
@@ -52,6 +57,7 @@
     }
     .focus-player.single { grid-template-columns: 1fr; }
     .focus-player.has-others { flex: 1; max-height: 70%; min-height: 0; }
+
     .compact-players {
       display: flex;
       gap: 4px;
@@ -64,6 +70,29 @@
       flex: 1;
       min-width: 0;
     }
+
+    /* Countdown – immer mit fester Höhe, aber ausblendbar */
+    #countdownDisplay {
+      flex-shrink: 0;
+      height: 30px;
+      text-align: center;
+      padding: 4px 0;
+      background: #1a1a1a;
+      border: 1px solid #e63946;
+      border-radius: 10px;
+      color: #f4a261;
+      font-weight: 700;
+      font-size: .9rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+      line-height: 20px;
+    }
+    #countdownDisplay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
     .focus-card {
       background: linear-gradient(135deg, #191111, #141414);
       border-radius: 14px;
@@ -168,6 +197,28 @@
     }
     .throw-seg .pts { font-size: 1.2rem; color: var(--pc, #e63946); }
     .throw-seg .seg { font-size: .75rem; color: #555; margin-top: 1px; }
+    .throw-seg.bust { border-color: #e63946; background: #2a0a0a; box-shadow: 0 0 15px rgba(230,57,70,.4); }
+    .throw-seg.bust .pts { color: #e63946; font-size: 1.1rem; }
+    .throw-seg.bust .seg { color: #e63946; font-size: .65rem; }
+
+    /* Bust-Overlay */
+    .bust-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(230,57,70,.15);
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+      animation: bust-flash 0.6s ease-out;
+    }
+    .bust-overlay .bust-text {
+      background: #e63946; color: #fff;
+      font-size: 3rem; font-weight: 900;
+      padding: 20px 50px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: 4px;
+      box-shadow: 0 0 60px rgba(230,57,70,.6);
+      animation: bust-pulse 0.8s ease-in-out infinite alternate;
+    }
+    @keyframes bust-flash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes bust-pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
     .focus-big-score {
       font-size: clamp(4rem, 8vw, 6.5rem);
       font-weight: 900;
@@ -190,7 +241,7 @@
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
     .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
 
-    /* Leg-Liste – neu mit fester maximaler Höhe */
+    /* Leg-Liste – begrenzte Höhe */
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
@@ -200,8 +251,8 @@
       flex-direction: column;
       gap: 4px;
       overflow: hidden;
-      flex: 0 1 auto;          /* nicht dehnen, aber schrumpfen */
-      max-height: 40vh;         /* auf Tablets max. 40% der Bildschirmhöhe */
+      flex: 0 1 auto;
+      max-height: 40vh;
     }
     .focus-leg-card h4 {
       color: #777;
@@ -434,7 +485,7 @@
       .focus-summary span { font-size: .4rem; }
       .focus-summary strong { font-size: .65rem; }
       .focus-player.has-others { flex: 1; }
-      .focus-leg-card { display: none; }  /* im TV‑Modus ausblenden */
+      .focus-leg-card { display: none; }
       .compact-players { gap: 3px; max-height: 20%; }
       .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
       .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
@@ -456,24 +507,30 @@
   <div class="topbar">
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
+    <label>Modus <select id="gameModeSelect" onchange="changeMode(this.value)"></select></label>
+    <label>Finish <select id="checkoutRuleSelect" onchange="changeCheckoutRule(this.value)"></select></label>
     <div class="clock" id="clockDisplay">--:--:--</div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
   </div>
+
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
     <section class="compact-players" id="compactPlayers"></section>
-    <div id="countdownDisplay" style="display:none;text-align:center;padding:6px;background:#1a1a1a;border:1px solid #e63946;border-radius:10px;color:#f4a261;font-weight:700;font-size:.9rem"></div>
+    <!-- Countdown – immer im DOM, feste Höhe, Sichtbarkeit über Klasse -->
+    <div id="countdownDisplay">Nächster Spieler in 5s</div>
   </main>
+
   <script>
     let liveState = null;
     let countdownTimer = null;
+    let pendingWinner = null;
 
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
       const action = state && state.lastAction;
+      const el = document.getElementById('countdownDisplay');
       if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) {
-        const el = document.getElementById('countdownDisplay');
-        if (el) el.style.display = 'none';
+        if (el) el.classList.remove('visible');
         return;
       }
       const startedAt = action.autoAdvanceStartedAt || Date.now();
@@ -481,14 +538,13 @@
       countdownTimer = setInterval(() => {
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, delayMs - elapsed);
-        const el = document.getElementById('countdownDisplay');
         if (remaining <= 0) {
-          if (el) el.style.display = 'none';
+          if (el) el.classList.remove('visible');
           if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
           return;
         }
         if (el) {
-          el.style.display = '';
+          el.classList.add('visible');
           el.textContent = 'Nächster Spieler in ' + Math.ceil(remaining / 1000) + 's';
         }
       }, 200);
@@ -661,12 +717,42 @@
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
 
+      // ── Sync selectors ──
+      const modeSel = document.getElementById('gameModeSelect');
+      const ruleSel = document.getElementById('checkoutRuleSelect');
+      if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
+      if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
+
+      // ── Bust detection ──
+      const lastThrow = state.lastAction;
+      if (lastThrow && lastThrow.bust) {
+        showBustOverlay(active);
+        playBustSound();
+      } else {
+        hideBustOverlay();
+      }
+
       const isCricket = mode === 'cricket';
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
-      const winner = state.players.find(p => Number(p.remaining) === 0);
+      // Winner-Erkennung
+      let winner = state.players.find(p => Number(p.remaining) === 0);
+      if (!winner && state.game.status === 'leg-finished') {
+        // Fallback: Spieler mit den meisten Legs
+        winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+      }
 
+      if (winner) {
+        pendingWinner = winner;
+        showWinnerOverlay(winner, state);
+      } else if (pendingWinner) {
+        showWinnerOverlay(pendingWinner, state);
+      } else {
+        hideWinnerOverlay();
+      }
+
+      // Render der Kacheln
       if (isCricket) {
         focusPlayer.classList.add('single');
         focusPlayer.innerHTML = renderCricketView(active, state);
@@ -683,12 +769,6 @@
           .map((p) => renderCompactPlayer(p, mode)).join('');
       } else {
         compactPlayers.innerHTML = '';
-      }
-
-      if (winner) {
-        showWinnerOverlay(winner, state);
-      } else {
-        hideWinnerOverlay();
       }
 
       startCountdown(state);
@@ -727,7 +807,7 @@
               <div class="winner-stat-value">${winner.legs || 0}</div>
             </div>
           </div>
-          <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
+          <button class="winner-btn" onclick="nextLeg()">Nächstes Leg starten</button>
         </div>
       `;
 
@@ -742,6 +822,23 @@
         overlay.classList.remove('show');
         overlay.style.display = 'none';
       }
+    }
+
+    // ── Bust Overlay ──
+    function showBustOverlay(player) {
+      let overlay = document.getElementById('bustOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'bustOverlay';
+        overlay.className = 'bust-overlay';
+        overlay.innerHTML = '<div class="bust-text">✖ ÜBERWORFEN</div>';
+        document.body.appendChild(overlay);
+        setTimeout(() => { if (overlay) overlay.remove(); }, 1500);
+      }
+    }
+    function hideBustOverlay() {
+      const overlay = document.getElementById('bustOverlay');
+      if (overlay) overlay.remove();
     }
 
     function createConfetti() {
@@ -770,8 +867,9 @@
         });
         if (!r.ok) { showToast('Fehler', true); return; }
         liveState = await r.json();
-        renderState(liveState);
+        pendingWinner = null;
         hideWinnerOverlay();
+        renderState(liveState);
         showToast('Nächstes Leg gestartet');
       } catch(e) { showToast('Netzwerkfehler', true); }
     }
@@ -785,7 +883,7 @@
       setTimeout(() => t.className = 'toast', 2500);
     }
 
-    // ── Uhrzeit aktualisieren ──
+    // ── Uhrzeit ──
     function updateClock() {
       const el = document.getElementById('clockDisplay');
       if (el) el.textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -823,14 +921,11 @@
     function updateFullscreenButton() {
       const btn = document.getElementById('fsBtn');
       if (!btn) return;
-      
       const isFullscreen = !!(document.fullscreenElement || 
                               document.webkitFullscreenElement || 
                               document.mozFullScreenElement || 
                               document.msFullscreenElement);
-      
       btn.title = isFullscreen ? 'Vollbild beenden (ESC)' : 'Vollbild aktivieren';
-      
       if (isFullscreen) {
         btn.style.borderColor = '#f4a261';
         btn.style.color = '#f4a261';
@@ -845,17 +940,100 @@
     document.addEventListener('mozfullscreenchange', updateFullscreenButton);
     document.addEventListener('MSFullscreenChange', updateFullscreenButton);
 
+    // ── Spielmodus / Checkout-Regel ──
+    async function loadGameModes() {
+      try {
+        const [modesRes, rulesRes, stateRes] = await Promise.all([
+          fetch('/api/game/modes'),
+          fetch('/api/game/checkout-rules'),
+          fetch('/api/live/state')
+        ]);
+        if (modesRes.ok) {
+          const modes = await modesRes.json();
+          const sel = document.getElementById('gameModeSelect');
+          sel.innerHTML = Object.entries(modes).map(([key, m]) =>
+            '<option value="' + key + '">' + m.label + '</option>'
+          ).join('');
+        }
+        if (rulesRes.ok) {
+          const rules = await rulesRes.json();
+          const sel = document.getElementById('checkoutRuleSelect');
+          sel.innerHTML = Object.entries(rules).map(([key, r]) =>
+            '<option value="' + key + '">' + r.label + '</option>'
+          ).join('');
+        }
+        if (stateRes.ok) {
+          const state = await stateRes.json();
+          const modeSel = document.getElementById('gameModeSelect');
+          const ruleSel = document.getElementById('checkoutRuleSelect');
+          if (modeSel && state.game.mode) modeSel.value = state.game.mode;
+          if (ruleSel && state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
+        }
+      } catch {}
+    }
+
+    async function changeMode(mode) {
+      try {
+        const r = await fetch('/api/game/mode', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode })
+        });
+        if (!r.ok) { showToast('Modus-Wechsel fehlgeschlagen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Modus: ' + mode);
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    async function changeCheckoutRule(rule) {
+      try {
+        const r = await fetch('/api/game/checkout-rule', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rule })
+        });
+        if (!r.ok) { showToast('Regel-Wechsel fehlgeschlagen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Finish: ' + rule);
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    function playBustSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } catch {}
+    }
+
+    // ── State laden ──
     async function loadAll() {
       try {
         const stateRes = await fetch('/api/live/state');
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
+        // Sync selectors
+        const modeSel = document.getElementById('gameModeSelect');
+        const ruleSel = document.getElementById('checkoutRuleSelect');
+        if (modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
+        if (ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
         renderState(state);
       } catch(e) {
         document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
       }
     }
+
+    loadGameModes();
 
     (function() {
       const sse = new EventSource('/api/events');

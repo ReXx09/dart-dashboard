@@ -131,16 +131,24 @@ let runtimeTuning = {
 
 // ── Spielmodi ──────────────────────────────────
 const GAME_MODES = {
-  '501':   { label: '501',   type: 'x01',  startScore: 501,  cricketNumbers: null,   description: '501 Double Out' },
-  '301':   { label: '301',   type: 'x01',  startScore: 301,  cricketNumbers: null,   description: '301 Double Out' },
-  '701':   { label: '701',   type: 'x01',  startScore: 701,  cricketNumbers: null,   description: '701 Double Out' },
-  'cricket': { label: 'Cricket', type: 'cricket', startScore: 0, cricketNumbers: [15,16,17,18,19,20,25], description: 'Cricket – Zahlen schließen' },
-  'shanghai': { label: 'Shanghai', type: 'shanghai', startScore: 0, cricketNumbers: null, description: 'Shanghai – 1-9 S/D/T' },
-  'atc':    { label: 'Around the Clock', type: 'atc', startScore: 0, cricketNumbers: null, description: 'Around the Clock – 1-20 + Bull' },
+  '501':   { label: '501',   type: 'x01',  startScore: 501,  cricketNumbers: null,   description: '501' },
+  '301':   { label: '301',   type: 'x01',  startScore: 301,  cricketNumbers: null,   description: '301' },
+  '701':   { label: '701',   type: 'x01',  startScore: 701,  cricketNumbers: null,   description: '701' },
+  'cricket': { label: 'Cricket', type: 'cricket', startScore: 0, cricketNumbers: [15,16,17,18,19,20,25], description: 'Cricket' },
+  'elimination': { label: 'Elimination', type: 'elimination', startScore: 0, cricketNumbers: null, description: 'Elimination' },
+  'shanghai': { label: 'Shanghai', type: 'shanghai', startScore: 0, cricketNumbers: null, description: 'Shanghai' },
+  'atc':    { label: 'Around the Clock', type: 'atc', startScore: 0, cricketNumbers: null, description: 'Around the Clock' },
   'split':  { label: 'Split', type: 'split', startScore: 0, cricketNumbers: null, description: 'Split Score' }
 };
 
+const CHECKOUT_RULES = {
+  'single': { label: 'Single Out', description: 'Beliebiger Wurf auf 0' },
+  'double': { label: 'Double Out', description: 'Nur Double auf 0' },
+  'master': { label: 'Master Out', description: 'Double oder Triple auf 0' }
+};
+
 const DEFAULT_MODE = '501';
+const DEFAULT_CHECKOUT_RULE = 'double';
 
 function getStartScoreForMode(mode) {
   const def = GAME_MODES[mode];
@@ -150,6 +158,47 @@ function getStartScoreForMode(mode) {
 function getCricketNumbersForMode(mode) {
   const def = GAME_MODES[mode];
   return def && def.type === 'cricket' ? [...def.cricketNumbers] : null;
+}
+
+function isValidCheckout(remaining, points, rule) {
+  // remaining = what's left BEFORE this throw
+  // points = what was thrown
+  const nextRemaining = remaining - points;
+  if (nextRemaining < 0) return false; // bust (overthrow)
+  if (nextRemaining === 0) {
+    // Checkout attempt – validate the finishing dart
+    if (rule === 'single') return true; // any dart can finish
+    if (rule === 'double') {
+      // Must be a double: even number, and the dart value must be a double
+      // For manual throws we don't know S/D/T, so we check if points is even
+      // For matrix throws we check the multiplier
+      return points % 2 === 0;
+    }
+    if (rule === 'master') {
+      // Double or Triple: points must be even OR divisible by 3 with multiplier info
+      return points % 2 === 0 || points % 3 === 0;
+    }
+    return true;
+  }
+  return true; // not a checkout attempt, valid
+}
+
+function isDoublePoints(points) {
+  // A double value is an even number where points/2 is a valid dart number (1-20, 25)
+  if (points <= 0 || points > 50) return false;
+  if (points === 50) return true; // bullseye
+  if (points % 2 !== 0) return false;
+  const base = points / 2;
+  return base >= 1 && base <= 20;
+}
+
+function isMasterPoints(points) {
+  // Master out: double OR triple
+  if (isDoublePoints(points)) return true;
+  if (points <= 0 || points > 60) return false;
+  if (points % 3 !== 0) return false;
+  const base = points / 3;
+  return base >= 1 && base <= 20;
 }
 
 function defaultPlayerCricketState(mode) {
@@ -771,8 +820,9 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
       if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
     }
   } else {
+    const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
     const nextRemaining = player.remaining - value;
-    bust = nextRemaining < 0;
+    bust = !isValidCheckout(player.remaining, value, checkoutRule);
     if (!bust) {
       player.remaining = nextRemaining;
       player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
@@ -1038,8 +1088,9 @@ async function applyArduinoThrowFromMatrix(hit) {
       if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
     }
   } else {
+    const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
     const nextRemaining = player.remaining - value;
-    bust = nextRemaining < 0;
+    bust = !isValidCheckout(player.remaining, value, checkoutRule);
     if (!bust) {
       player.remaining = nextRemaining;
       player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
@@ -1488,7 +1539,7 @@ async function defaultLiveState(mode) {
   const startScore = getStartScoreForMode(m);
 
   return {
-    game: { mode: m, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0 },
+    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0 },
     players: fallbackPlayers.map(p => ({ ...p, remaining: startScore, legs: 0, turns: 0, totalScored: 0, bestTurn: 0, average: 0, throws: [], currentRoundPoints: [], ...defaultPlayerCricketState(m) })),
     lastAction: null,
     arduino: { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
@@ -1578,6 +1629,7 @@ function resetLiveState(carryLegs = false, modeOverride) {
   return {
     game: {
       mode,
+      checkoutRule: savedCheckoutRule || DEFAULT_CHECKOUT_RULE,
       status: 'running',
       startedAt: now,
       updatedAt: now,
@@ -1593,6 +1645,7 @@ function resetLiveState(carryLegs = false, modeOverride) {
 
 let savedLiveStateTemplate = [];
 let savedLiveMode = DEFAULT_MODE;
+let savedCheckoutRule = DEFAULT_CHECKOUT_RULE;
 
 async function getLiveState() {
   const mode = savedLiveMode || DEFAULT_MODE;
@@ -1602,6 +1655,9 @@ async function getLiveState() {
   const activePlayers = fallback.players;
   const savedMode = String(saved.game?.mode || '');
   if (GAME_MODES[savedMode]) savedLiveMode = savedMode;
+  // Restore or fallback checkout rule
+  const savedRule = String(saved.game?.checkoutRule || '');
+  if (CHECKOUT_RULES[savedRule]) savedCheckoutRule = savedRule;
   savedLiveStateTemplate = Array.isArray(saved.players) && saved.players.length > 0
     ? saved.players.map(p => ({ ...p, throws: Array.isArray(p.throws) ? p.throws : [], currentRoundPoints: Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [] }))
     : activePlayers;
@@ -1618,6 +1674,7 @@ async function getLiveState() {
   const state = {
     game: {
       mode: String(saved.game?.mode || fallback.game.mode),
+      checkoutRule: savedCheckoutRule || DEFAULT_CHECKOUT_RULE,
       status: String(saved.game?.status || fallback.game.status),
       startedAt: Number(saved.game?.startedAt || fallback.game.startedAt),
       updatedAt: Number(saved.game?.updatedAt || Date.now()),
@@ -1667,6 +1724,10 @@ app.get('/api/game/modes', (_req, res) => {
   res.json(GAME_MODES);
 });
 
+app.get('/api/game/checkout-rules', (_req, res) => {
+  res.json(CHECKOUT_RULES);
+});
+
 app.post('/api/game/mode', async (req, res) => {
   const mode = String(req.body?.mode || '').trim();
   if (!GAME_MODES[mode]) return res.status(400).json({ error: `Unbekannter Modus: ${mode}` });
@@ -1677,6 +1738,21 @@ app.post('/api/game/mode', async (req, res) => {
     broadcastReload();
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Modus-Wechsel fehlgeschlagen: ' + err.message }); }
+});
+
+app.post('/api/game/checkout-rule', async (req, res) => {
+  const rule = String(req.body?.rule || '').trim();
+  if (!CHECKOUT_RULES[rule]) return res.status(400).json({ error: `Unbekannte Regel: ${rule}` });
+  try {
+    savedCheckoutRule = rule;
+    // Apply to current state
+    const state = await getLiveState();
+    state.game.checkoutRule = rule;
+    state.game.updatedAt = Date.now();
+    const saved = await saveLiveState(state);
+    broadcastReload();
+    res.json(saved);
+  } catch (err) { res.status(500).json({ error: 'Regel-Wechsel fehlgeschlagen: ' + err.message }); }
 });
 
 // ── Players ──
@@ -1868,8 +1944,9 @@ app.post('/api/live/throw', async (req, res) => {
         if (player.cricketHits[dartNumber] >= 3) player.cricketClosed[dartNumber] = true;
       }
     } else {
+      const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
       const nextRemaining = player.remaining - points;
-      bust = nextRemaining < 0;
+      bust = !isValidCheckout(player.remaining, points, checkoutRule);
       if (!bust) { player.remaining = nextRemaining; player.totalScored += points; }
     }
 

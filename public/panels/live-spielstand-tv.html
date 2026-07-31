@@ -28,6 +28,9 @@
     .topbar a:hover { color: #fff; }
     .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
     .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
+    .topbar select { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 4px 8px; border-radius: 8px; cursor: pointer; font-size: .72rem; font-family: inherit; }
+    .topbar select:hover { border-color: #f4a261; }
+    .topbar label { font-size: .68rem; color: #888; display: flex; align-items: center; gap: 4px; }
     .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
     .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
     .topbar .fs-btn.active { border-color: #f4a261; color: #f4a261; }
@@ -350,6 +353,25 @@
     .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 2px 6px; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 24px; text-align: center; }
     .score-card .sc-throw-chip.empty { color: #333; }
 
+    /* Bust-Overlay */
+    .bust-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(230,57,70,.15);
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+      animation: bust-flash 0.6s ease-out;
+    }
+    .bust-overlay .bust-text {
+      background: #e63946; color: #fff;
+      font-size: 3rem; font-weight: 900;
+      padding: 20px 50px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: 4px;
+      box-shadow: 0 0 60px rgba(230,57,70,.6);
+      animation: bust-pulse 0.8s ease-in-out infinite alternate;
+    }
+    @keyframes bust-flash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes bust-pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
       .focus-kachel { min-height: 175px; padding: 6px; }
@@ -384,6 +406,8 @@
   <div class="topbar">
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
+    <label>Modus <select id="gameModeSelect" onchange="changeMode(this.value)"></select></label>
+    <label>Finish <select id="checkoutRuleSelect" onchange="changeCheckoutRule(this.value)"></select></label>
     <div class="clock" id="clockDisplay">--:--:--</div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
   </div>
@@ -590,6 +614,21 @@
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
 
+      // ── Sync selectors ──
+      const modeSel = document.getElementById('gameModeSelect');
+      const ruleSel = document.getElementById('checkoutRuleSelect');
+      if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
+      if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
+
+      // ── Bust detection ──
+      const lastThrow = state.lastAction;
+      if (lastThrow && lastThrow.bust) {
+        showBustOverlay(active);
+        playBustSound();
+      } else {
+        hideBustOverlay();
+      }
+
       const isCricket = mode === 'cricket';
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
@@ -776,17 +815,115 @@
     document.addEventListener('mozfullscreenchange', updateFullscreenButton);
     document.addEventListener('MSFullscreenChange', updateFullscreenButton);
 
+    // ── Spielmodus / Checkout-Regel ──
+    async function loadGameModes() {
+      try {
+        const [modesRes, rulesRes, stateRes] = await Promise.all([
+          fetch('/api/game/modes'),
+          fetch('/api/game/checkout-rules'),
+          fetch('/api/live/state')
+        ]);
+        if (modesRes.ok) {
+          const modes = await modesRes.json();
+          const sel = document.getElementById('gameModeSelect');
+          sel.innerHTML = Object.entries(modes).map(([key, m]) =>
+            '<option value="' + key + '">' + m.label + '</option>'
+          ).join('');
+        }
+        if (rulesRes.ok) {
+          const rules = await rulesRes.json();
+          const sel = document.getElementById('checkoutRuleSelect');
+          sel.innerHTML = Object.entries(rules).map(([key, r]) =>
+            '<option value="' + key + '">' + r.label + '</option>'
+          ).join('');
+        }
+        if (stateRes.ok) {
+          const state = await stateRes.json();
+          const modeSel = document.getElementById('gameModeSelect');
+          const ruleSel = document.getElementById('checkoutRuleSelect');
+          if (modeSel && state.game.mode) modeSel.value = state.game.mode;
+          if (ruleSel && state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
+        }
+      } catch {}
+    }
+
+    async function changeMode(mode) {
+      try {
+        const r = await fetch('/api/game/mode', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode })
+        });
+        if (!r.ok) { showToast('Modus-Wechsel fehlgeschlagen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Modus: ' + mode);
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    async function changeCheckoutRule(rule) {
+      try {
+        const r = await fetch('/api/game/checkout-rule', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rule })
+        });
+        if (!r.ok) { showToast('Regel-Wechsel fehlgeschlagen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Finish: ' + rule);
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Bust / Audio ──
+    function showBustOverlay(player) {
+      let overlay = document.getElementById('bustOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'bustOverlay';
+        overlay.className = 'bust-overlay';
+        overlay.innerHTML = '<div class="bust-text">✖ ÜBERWORFEN</div>';
+        document.body.appendChild(overlay);
+        setTimeout(() => { if (overlay) overlay.remove(); }, 1500);
+      }
+    }
+    function hideBustOverlay() {
+      const overlay = document.getElementById('bustOverlay');
+      if (overlay) overlay.remove();
+    }
+    function playBustSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } catch {}
+    }
+
     async function loadAll() {
       try {
         const stateRes = await fetch('/api/live/state');
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
+        // Sync selectors
+        const modeSel = document.getElementById('gameModeSelect');
+        const ruleSel = document.getElementById('checkoutRuleSelect');
+        if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
+        if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
         renderState(state);
       } catch(e) {
         document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
       }
     }
+
+    loadGameModes();
 
     (function() {
       const sse = new EventSource('/api/events');
