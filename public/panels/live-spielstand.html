@@ -29,9 +29,6 @@
     .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
     .topbar h2 { font-size: 1.1rem; flex: 1; font-weight: 700; }
-    .live-badge { background: #e63946; color: #fff; font-size: .65rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
-    .header-status { font-size: .75rem; color: #555; }
-    .header-status span { color: #2a9d8f; }
     .header-controls { display: flex; gap: 6px; align-items: center; }
     .header-controls select { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 5px 8px; border-radius: 6px; font-size: .78rem; font-family: inherit; cursor: pointer; }
     .btn-icon {
@@ -152,7 +149,7 @@
       display: flex;
       gap: 4px;
       flex-shrink: 0;
-      max-height: 28%;
+      max-height: 35%;
       min-height: 0;
     }
     .compact-players:empty { display: none; }
@@ -163,7 +160,7 @@
     .score-card {
       background: #141414;
       border-radius: 12px;
-      padding: 12px;
+      padding: 14px;
       border: 2px solid #1e1e1e;
       position: relative;
       overflow: hidden;
@@ -171,15 +168,15 @@
       flex: 1;
       min-width: 0;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     }
-    .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; }
-    .score-card .sc-name { font-size: .86rem; font-weight: 700; }
-    .score-card .sc-score { font-size: 2.2rem; font-weight: 800; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
-    .score-card .sc-stats { font-size: .68rem; color: #666; line-height: 1.5; }
+    .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; margin-bottom: 10px; flex-shrink: 0; }
+    .score-card .sc-name { font-size: .9rem; font-weight: 700; }
+    .score-card .sc-score { font-size: 2.4rem; font-weight: 800; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .score-card .sc-stats { font-size: .72rem; color: #666; line-height: 1.6; }
     .score-card .sc-stats span { color: #aaa; font-weight: 600; }
-    .score-card .sc-last-throws { display: flex; gap: 3px; }
-    .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 2px 6px; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 24px; text-align: center; }
+    .score-card .sc-last-throws { display: flex; gap: 4px; margin-top: 4px; }
+    .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 3px 8px; font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
     .score-card .sc-throw-chip.empty { color: #333; }
     .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .status-panel { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 12px; }
@@ -414,7 +411,6 @@
       }
     }
     body.tv-mode .topbar a,
-    body.tv-mode .header-status,
     body.tv-mode .header-controls,
     body.tv-mode .status-grid,
     body.tv-mode .hs-panel,
@@ -423,7 +419,6 @@
     }
     body.tv-mode .topbar { padding: 8px 14px; }
     body.tv-mode .topbar h2 { font-size: .98rem; }
-    body.tv-mode .live-badge { font-size: .58rem; padding: 3px 8px; }
     body.tv-mode main { max-width: none; padding: 8px; gap: 5px; }
     body.tv-mode .focus-player { grid-template-columns: 1.35fr .65fr; gap: 5px; }
     body.tv-mode .focus-card { padding: 10px; border-radius: 14px; }
@@ -475,7 +470,6 @@
     @media (max-height: 900px) and (min-width: 900px) {
       .topbar { padding: 8px 14px; gap: 8px; }
       .topbar h2 { font-size: 1rem; }
-      .header-status { font-size: .68rem; }
       .header-controls select { padding: 4px 7px; font-size: .72rem; }
       .btn-icon { padding: 5px 9px; font-size: .72rem; }
 
@@ -574,8 +568,6 @@
   <div class="topbar">
     <a href="/">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
-    <span class="live-badge">LIVE</span>
-    <div class="header-status">SSE: <span id="sseStatus">verbunden</span></div>
     <div class="header-controls">
       <select id="gameModeSelect" onchange="changeMode(this.value)">
         <option value="501">501</option>
@@ -595,28 +587,6 @@
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
     <section class="compact-players" id="compactPlayers"></section>
-    <div class="status-grid">
-      <div class="status-panel">
-        <h4>Arduino</h4>
-        <div class="value" id="arduinoState"><span class="arduino-dot off"></span>Nicht verbunden</div>
-      </div>
-      <div class="status-panel">
-        <h4>Matrix-Hit</h4>
-        <div class="value muted" id="matrixHitState">-</div>
-      </div>
-      <div class="status-panel">
-        <h4>Auto-Wurf</h4>
-        <div class="value muted" id="autoThrowState">-</div>
-      </div>
-      <div class="status-panel">
-        <h4>Letzte Aktion</h4>
-        <div class="value muted" id="lastAction">Keine Aktion</div>
-      </div>
-      <div class="status-panel" id="countdownPanel" style="display:none">
-        <h4>Countdown</h4>
-        <div class="value" id="countdownDisplay" style="color:#f4a261;font-weight:700;font-size:1.1rem"></div>
-      </div>
-    </div>
     <div class="hs-panel">
       <h4>🏆 Highscores</h4>
       <table class="hs-table">
@@ -707,12 +677,10 @@
         reloadQueued = true;
         setTimeout(() => {
           reloadQueued = false;
-          loadAll().catch(() => {
-            document.getElementById('sseStatus').textContent = 'getrennt';
-          });
+          loadAll().catch(() => { });
         }, 120);
       });
-      sseReload.addEventListener('error', () => { document.getElementById('sseStatus').textContent = 'getrennt'; });
+      sseReload.addEventListener('error', () => { });
 
       sseArduino = new EventSource('/api/arduino/events');
       sseArduino.addEventListener('state', function(evt) {
@@ -779,7 +747,6 @@
         settings = settingsRes && settingsRes.ok ? await settingsRes.json() : null;
       } catch(e) {
         document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
-        document.getElementById('sseStatus').textContent = 'Error';
         return;
       }
       try {
@@ -790,7 +757,6 @@
       applyLiveDisplaySettings(settings || liveDisplaySettings);
       renderState(state);
       renderHighscores(highscores);
-      document.getElementById('sseStatus').textContent = 'verbunden';
     }
 
     // ── State Rendern ──
