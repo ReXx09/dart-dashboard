@@ -628,49 +628,46 @@
 
     // ── Winner Overlay ──
     function showWinnerOverlay(winner, state) {
-      const overlay = document.getElementById('winnerOverlay');
-      if (!overlay) return;
-      
-      const checkout = state.lastAction?.points || 0;
-      const dartsThrown = winner.turns * 3 - (3 - (state.game.currentThrow || 0));
-      const avg = winner.turns > 0 ? (winner.totalScored / winner.turns * 3).toFixed(1) : '-';
-      
-      overlay.innerHTML = `
-        <div class="confetti-container" id="confettiContainer"></div>
-        <div class="winner-card">
-          <div class="winner-icon">🏆</div>
-          <div class="winner-subtitle">LEG GEWONNEN</div>
-          <div class="winner-name">${escapeHtml(winner.name)}</div>
-          <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
-          <div class="winner-stats">
-            <div class="winner-stat">
-              <div class="winner-stat-label">Darts</div>
-              <div class="winner-stat-value">${dartsThrown}</div>
-            </div>
-            <div class="winner-stat">
-              <div class="winner-stat-label">Leg Average</div>
-              <div class="winner-stat-value">${avg}</div>
-            </div>
-            <div class="winner-stat">
-              <div class="winner-stat-label">Legs</div>
-              <div class="winner-stat-value">${winner.legs || 0}</div>
-            </div>
-          </div>
-          <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
-        </div>
-      `;
-      
-      overlay.classList.add('show');
-      overlay.style.display = 'flex';
-      createConfetti();
-    }
+  const overlay = document.getElementById('winnerOverlay');
+  if (!overlay) return;
 
-    function hideWinnerOverlay() {
-      const overlay = document.getElementById('winnerOverlay');
-      if (overlay) {
-        overlay.classList.remove('show');
-        overlay.style.display = 'none';
-      }
+  // Zuverlässige Werte aus dem Spieler-Objekt
+  const throws = Array.isArray(winner.throws) ? winner.throws : [];
+  const checkout = throws.length > 0 ? (Number(throws[throws.length - 1].points) || 0) : 0;
+  const dartsThrown = throws.length;
+  const avg = (winner.turns && winner.turns > 0)
+    ? ((winner.totalScored || 0) / winner.turns * 3).toFixed(1)
+    : '-';
+
+  overlay.innerHTML = `
+    <div class="confetti-container" id="confettiContainer"></div>
+    <div class="winner-card">
+      <div class="winner-icon">🏆</div>
+      <div class="winner-subtitle">LEG GEWONNEN</div>
+      <div class="winner-name">${escapeHtml(winner.name)}</div>
+      <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
+      <div class="winner-stats">
+        <div class="winner-stat">
+          <div class="winner-stat-label">Darts</div>
+          <div class="winner-stat-value">${dartsThrown}</div>
+        </div>
+        <div class="winner-stat">
+          <div class="winner-stat-label">Leg Average</div>
+          <div class="winner-stat-value">${avg}</div>
+        </div>
+        <div class="winner-stat">
+          <div class="winner-stat-label">Legs</div>
+          <div class="winner-stat-value">${winner.legs || 0}</div>
+        </div>
+      </div>
+      <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
+    </div>
+  `;
+
+  overlay.classList.add('show');
+  overlay.style.display = 'flex';
+  createConfetti();
+}
     }
 
     function createConfetti() {
