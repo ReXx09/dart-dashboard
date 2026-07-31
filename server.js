@@ -750,6 +750,44 @@ async function recordPlayerLegStats(player, state) {
   }
 }
 
+async function advanceAfterBust(state, player, source) {
+  if (state.game.status === 'leg-finished') return;
+  const playersInLeg = Array.isArray(state.players) ? state.players.length : 0;
+  const isSinglePlayerLeg = playersInLeg <= 1;
+  const delayMs = isSinglePlayerLeg
+    ? Math.max(0, Number(runtimeTuning.singlePlayerSwitchDelayMs || 0))
+    : Math.max(0, Number(runtimeTuning.playerSwitchDelayMs || 0));
+
+  if (!state.lastAction) state.lastAction = {};
+
+  state.lastAction.autoAdvancePending = true;
+  state.lastAction.autoAdvanceDelayMs = delayMs;
+  state.lastAction.autoAdvanceSinglePlayer = isSinglePlayerLeg;
+  state.lastAction.autoAdvanceStartedAt = Date.now();
+  state.lastAction.nextPlayer = null;
+  state.lastAction.nextPlayerSlot = null;
+  state.lastAction.nextSource = source;
+
+  await saveLiveState(state);
+  broadcastReload();
+
+  if (delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  player.currentRoundPoints = [];
+  state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
+  state.game.currentThrow = 0;
+  state.players[state.game.activePlayer].currentRoundPoints = [];
+  if (state.game.activePlayer === 0) {
+    state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
+  }
+  state.lastAction.autoAdvancePending = false;
+  state.lastAction.autoAdvanced = true;
+  state.lastAction.nextPlayer = state.players[state.game.activePlayer].name;
+  state.lastAction.nextPlayerSlot = state.players[state.game.activePlayer].slot;
+}
+
 async function advanceAfterThreeThrows(state, player, source) {
   if (state.game.status === 'leg-finished' || state.game.currentThrow < 3) return;
   const playersInLeg = Array.isArray(state.players) ? state.players.length : 0;
@@ -873,7 +911,9 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     await recordPlayerLegStats(player, state);
   }
 
-  if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
+  if (bust && state.game.status !== 'leg-finished') {
+    await advanceAfterBust(state, player, 'arduino');
+  } else if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
     await advanceAfterThreeThrows(state, player, 'arduino');
   }
 
@@ -1147,7 +1187,9 @@ async function applyArduinoThrowFromMatrix(hit) {
     await recordPlayerLegStats(player, state);
   }
 
-  if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
+  if (bust && state.game.status !== 'leg-finished') {
+    await advanceAfterBust(state, player, 'arduino-matrix');
+  } else if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
     await advanceAfterThreeThrows(state, player, 'arduino-matrix');
   }
 
@@ -1975,7 +2017,9 @@ app.post('/api/live/throw', async (req, res) => {
       await recordPlayerLegStats(player, state);
     }
 
-    if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
+    if (bust && state.game.status !== 'leg-finished') {
+      await advanceAfterBust(state, player, 'manual');
+    } else if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
       await advanceAfterThreeThrows(state, player, 'manual');
     }
 
