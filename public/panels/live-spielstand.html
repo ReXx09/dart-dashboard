@@ -801,15 +801,7 @@
       const matrix = arduino.matrix || {};
       const telemetry = arduino.telemetry || arduino;
       const automation = arduino.automation || arduino;
-      document.getElementById('arduinoState').innerHTML = connection.connected
-        ? '<span class="arduino-dot on"></span>Verbunden | active=' + (telemetry.activeCount || 0)
-        : '<span class="arduino-dot off"></span>Nicht verbunden';
-      document.getElementById('matrixHitState').textContent = describeMatrixHit(matrix.hit || matrix.sniffer || null);
-      document.getElementById('autoThrowState').textContent = describeAutoThrow(automation.lastAutoThrow || null);
       const action = state.lastAction;
-      document.getElementById('lastAction').innerHTML = action
-        ? escapeHtml(action.player || '-') + ' → ' + (action.points ?? '-') + (action.source ? ' [' + action.source + ']' : '') + (action.bust ? ' (BUST)' : '') + (action.type === 'undo' ? ' (UNDO)' : '') + (action.type === 'next-player' ? ' (NEXT)' : '')
-        : 'Keine Aktion';
       startCountdown(state);
     }
     function renderCricketView(p, state) {
