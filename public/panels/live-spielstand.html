@@ -39,6 +39,7 @@
       flex-direction: column;
       gap: 4px;
       height: calc(100vh - 44px);
+      overflow: hidden;
     }
     .focus-player {
       flex: 1;
@@ -47,6 +48,7 @@
       gap: 4px;
       align-items: stretch;
       min-height: 0;
+      overflow: hidden;
     }
     .focus-player.single { grid-template-columns: 1fr; }
     .focus-player.has-others { flex: 1; max-height: 70%; min-height: 0; }
@@ -72,6 +74,8 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      flex: 1;
+      min-height: 0;
     }
     .focus-card::before {
       content: '';
@@ -81,27 +85,28 @@
       pointer-events: none;
     }
     .focus-card > * { position: relative; }
-    .focus-name { font-size: 2rem; font-weight: 800; margin-bottom: 2px; }
-    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; }
+    .focus-name { font-size: 2rem; font-weight: 800; margin-bottom: 2px; flex-shrink: 0; }
+    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; flex-shrink: 0; }
     .focus-kacheln {
       display: grid;
-      grid-template-columns: 0.7fr 1.8fr;
+      grid-template-columns: 0.6fr 1.4fr;
       gap: 4px;
       flex: 1;
+      min-height: 0;
     }
     .focus-kachel:nth-child(1) {
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      min-height: 220px;
+      min-height: 0;
     }
     .focus-kachel:nth-child(2) {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;            /* nebeneinander */
       gap: 8px;
-      min-height: 220px;
       padding: 12px 16px;
+      min-height: 0;
     }
     .focus-kachel:nth-child(2) > div {
       flex: 1;
@@ -115,6 +120,7 @@
       background: #141414;
       border: 1px solid #2a2a2a;
       border-radius: 10px;
+      min-height: 0;
     }
     .focus-kachel:nth-child(2) h4 {
       margin: 0 0 8px 0;
@@ -128,31 +134,42 @@
       border: 1px solid #262626;
       border-radius: 11px;
       padding: 8px;
-      min-height: 135px;
+      min-height: 0;
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
+      overflow: hidden;
     }
-    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
-    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; }
-    .throw-segments { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 150px; }
+    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; flex-shrink: 0; }
+    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; flex-shrink: 0; }
+    .throw-segments {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+      max-width: 140px;
+      flex: 1;
+      justify-content: center;
+    }
     .throw-seg {
       background: #1b1b1b;
       border: 1px solid #2b2b2b;
       border-radius: 10px;
-      min-height: 60px;
+      min-height: 36px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       font-weight: 800;
+      padding: 2px 0;
     }
-    .throw-seg .pts { font-size: 1.4rem; color: var(--pc, #e63946); }
-    .throw-seg .seg { font-size: .85rem; color: #555; margin-top: 2px; }
+    .throw-seg .pts { font-size: 1.2rem; color: var(--pc, #e63946); }
+    .throw-seg .seg { font-size: .75rem; color: #555; margin-top: 1px; }
     .focus-big-score {
-      font-size: clamp(6rem, 6vw, 7rem);
+      font-size: clamp(3.8rem, 8vw, 6.5rem);
       font-weight: 900;
       line-height: 1.2;
       color: var(--pc, #f4a261);
@@ -160,8 +177,15 @@
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
+      max-width: 100%;
     }
-    .focus-summary { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .focus-summary {
+      margin-top: 4px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3px;
+      flex-shrink: 0;
+    }
     .focus-summary div { background: #141414; border-radius: 10px; padding: 4px; text-align: center; }
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
     .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
@@ -173,9 +197,12 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
     }
-    .focus-leg-card h4 { color: #777; font-size: .56rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
-    .leg-list { width: 100%; display: grid; gap: 3px; max-height: 380px; overflow: auto; }
+    .focus-leg-card h4 { color: #777; font-size: .56rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; flex-shrink: 0; }
+    .leg-list { width: 100%; display: grid; gap: 3px; overflow: auto; flex: 1; }
     .leg-item { 
       display: grid; 
       grid-template-columns: 80px 1fr 80px; 
@@ -379,26 +406,27 @@
     }
 
     @media (width: 1024px) and (height: 860px) {
-      .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
-      .focus-kachel { min-height: 175px; padding: 6px; }
-      .focus-kachel h4 { font-size: .55rem; }
-      .throw-seg { min-height: 48px; }
-      .throw-seg .pts { font-size: 1rem; }
-      .focus-big-score { font-size: clamp(6rem, 8vw, 7.5rem); }
+      .focus-kacheln { grid-template-columns: 0.5fr 1.5fr; }
+      .focus-kachel { min-height: 0; padding: 6px; }
+      .focus-kachel h4 { font-size: .5rem; }
+      .throw-seg { min-height: 30px; }
+      .throw-seg .pts { font-size: .9rem; }
+      .throw-seg .seg { font-size: .65rem; }
+      .focus-big-score { font-size: clamp(4.5rem, 10vw, 7rem); }
       .focus-summary { margin-top: 2px; }
       .focus-summary div { padding: 3px; }
-      .focus-summary span { font-size: .45rem; }
-      .focus-summary strong { font-size: .7rem; }
+      .focus-summary span { font-size: .4rem; }
+      .focus-summary strong { font-size: .65rem; }
       .focus-player.has-others { flex: 1; }
       .focus-leg-card { display: none; }
       .compact-players { gap: 3px; max-height: 20%; }
       .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
       .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
-      .compact-players .score-card .sc-name { font-size: .65rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-score { font-size: 1.1rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-stats { font-size: .5rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-name { font-size: .6rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-score { font-size: 1rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-stats { font-size: .45rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
-      .compact-players .score-card .sc-throw-chip { font-size: .55rem; padding: 1px 3px; min-width: 16px; border-radius: 4px; }
+      .compact-players .score-card .sc-throw-chip { font-size: .5rem; padding: 1px 3px; min-width: 14px; border-radius: 4px; }
     }
   </style>
 </head>
@@ -500,11 +528,11 @@
           '</div>' +
           '<div class="focus-kachel">' +
             '<div>' +
-              '<h4>Gesamt / Rest</h4>' +
+              '<h4>Rest</h4>' +
               '<div class="focus-big-score">' + p.remaining + '</div>' +
             '</div>' +
             '<div>' +
-              '<h4>Punkte pro Aufnahme</h4>' +
+              '<h4>pro Aufnahme</h4>' +
               '<div class="focus-big-score">' + aufnahmeScore + '</div>' +
             '</div>' +
           '</div>' +
@@ -614,7 +642,7 @@
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
-      // Winner-Erkennung: Spieler mit Rest 0 (unabhängig vom Server-Status)
+      // Winner-Erkennung: Spieler mit Rest 0
       const winner = state.players.find(p => Number(p.remaining) === 0);
 
       if (isCricket) {
@@ -635,7 +663,6 @@
         compactPlayers.innerHTML = '';
       }
 
-      // Winner Overlay anzeigen, wenn ein Spieler auf 0 ist
       if (winner) {
         showWinnerOverlay(winner, state);
       } else {
