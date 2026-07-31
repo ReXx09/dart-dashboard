@@ -152,15 +152,15 @@
     .throw-seg .pts { font-size: 1.4rem; color: var(--pc, #e63946); }
     .throw-seg .seg { font-size: .85rem; color: #555; margin-top: 2px; }
     .focus-big-score {
-  font-size: clamp(3.2rem, 6vw, 5.5rem);
-  font-weight: 900;
-  line-height: 1.2;
-  color: var(--pc, #f4a261);
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
+      font-size: clamp(3.2rem, 6vw, 5.5rem);
+      font-weight: 900;
+      line-height: 1.2;
+      color: var(--pc, #f4a261);
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
     .focus-summary { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
     .focus-summary div { background: #141414; border-radius: 10px; padding: 4px; text-align: center; }
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
@@ -271,16 +271,15 @@
       margin-bottom: 16px;
       animation: bounce 1s ease infinite;
     }
+    .winner-subtitle {
+      font-size: 1.2rem;
+      color: #aaa;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
     @keyframes bounce {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-10px); }
-    }
-    .winner-title {
-      font-size: 2.5rem;
-      font-weight: 800;
-      color: #f4a261;
-      margin-bottom: 8px;
-      text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
     }
     .winner-name {
       font-size: 3rem;
@@ -329,6 +328,35 @@
       transform: scale(1.05);
       box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
     }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1a1a1a;
+      color: #f1f1f1;
+      padding: 12px 28px;
+      border-radius: 12px;
+      border: 1px solid #333;
+      font-size: .9rem;
+      opacity: 0;
+      transition: opacity .3s ease, transform .3s ease;
+      z-index: 9999;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    .toast.err {
+      border-color: #e63946;
+      color: #e63946;
+    }
+
     .confetti-container {
       position: fixed;
       inset: 0;
@@ -349,15 +377,6 @@
         opacity: 0;
       }
     }
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
-    .score-card .sc-stats { font-size: .68rem; color: #666; line-height: 1.5; }
-    .score-card .sc-stats span { color: #aaa; font-weight: 600; }
-    .score-card .sc-last-throws { display: flex; gap: 3px; }
-    .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 2px 6px; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 24px; text-align: center; }
-    .score-card .sc-throw-chip.empty { color: #333; }
 
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
@@ -371,7 +390,7 @@
       .focus-summary span { font-size: .45rem; }
       .focus-summary strong { font-size: .7rem; }
       .focus-player.has-others { flex: 1; }
-      .focus-leg-card { display: none; } /* Leg-Historie ausblenden auf TV */
+      .focus-leg-card { display: none; }
       .compact-players { gap: 3px; max-height: 20%; }
       .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
       .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
@@ -436,8 +455,6 @@
 
     function getPointsPerAufnahme(player) {
       const currentRound = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
-      // Wenn currentRoundPoints existiert (auch wenn leer), ist das die aktuelle Aufnahme
-      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> 0 Punkte
       if (currentRound.length >= 0) {
         return currentRound.reduce((sum, pt) => sum + (Number(pt) || 0), 0);
       }
@@ -454,8 +471,6 @@
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const lastThrows = throws.slice(-3);
-      // Wenn currentRoundPoints existiert (auch leer), das für Anzeige nutzen
-      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> leere Slots anzeigen
       const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
@@ -464,11 +479,8 @@
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
       
-      // Würfe für die linke Kachel (vertikal): Punkte oben (rot/groß), Segment unten (grau/klein)
-      // Wir nutzen die letzten 3 Würfe aus dem throws Array für die Segmente
       const throwsHtml = displayThrows.map((pt, ti) => {
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
-        // Segment aus dem throws Array holen (falls vorhanden)
         const throwData = lastThrows[ti];
         const segmentLabel = (throwData && throwData.segment) ? throwData.segment : (pt === null ? '-' : String(pt));
         return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
@@ -571,7 +583,6 @@
     function renderCompactPlayer(p, mode) {
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
-      // Wenn currentRoundPoints existiert UND Inhalt hat, das für Anzeige nutzen
       const displayThrows = (Array.isArray(p.currentRoundPoints) && p.currentRoundPoints.length > 0) ? [...p.currentRoundPoints] : lastThrows;
       while (displayThrows.length < 3) displayThrows.push('-');
       const totalScored = p.totalScored || 0;
@@ -603,9 +614,8 @@
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
-      // Check for leg finished (winner)
-      const isLegFinished = state.game.status === 'leg-finished';
-      const winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
+      // Winner-Erkennung: Spieler mit Rest 0 (unabhängig vom Server-Status)
+      const winner = state.players.find(p => Number(p.remaining) === 0);
 
       if (isCricket) {
         focusPlayer.classList.add('single');
@@ -625,8 +635,8 @@
         compactPlayers.innerHTML = '';
       }
 
-      // Winner overlay
-      if (isLegFinished && winner) {
+      // Winner Overlay anzeigen, wenn ein Spieler auf 0 ist
+      if (winner) {
         showWinnerOverlay(winner, state);
       } else {
         hideWinnerOverlay();
@@ -637,46 +647,52 @@
 
     // ── Winner Overlay ──
     function showWinnerOverlay(winner, state) {
-  const overlay = document.getElementById('winnerOverlay');
-  if (!overlay) return;
+      const overlay = document.getElementById('winnerOverlay');
+      if (!overlay) return;
 
-  // Zuverlässige Werte aus dem Spieler-Objekt
-  const throws = Array.isArray(winner.throws) ? winner.throws : [];
-  const checkout = throws.length > 0 ? (Number(throws[throws.length - 1].points) || 0) : 0;
-  const dartsThrown = throws.length;
-  const avg = (winner.turns && winner.turns > 0)
-    ? ((winner.totalScored || 0) / winner.turns * 3).toFixed(1)
-    : '-';
+      const throws = Array.isArray(winner.throws) ? winner.throws : [];
+      const checkout = throws.length > 0 ? (Number(throws[throws.length - 1].points) || 0) : 0;
+      const dartsThrown = throws.length;
+      const avg = (winner.turns && winner.turns > 0)
+        ? ((winner.totalScored || 0) / winner.turns * 3).toFixed(1)
+        : '-';
 
-  overlay.innerHTML = `
-    <div class="confetti-container" id="confettiContainer"></div>
-    <div class="winner-card">
-      <div class="winner-icon">🏆</div>
-      <div class="winner-subtitle">LEG GEWONNEN</div>
-      <div class="winner-name">${escapeHtml(winner.name)}</div>
-      <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
-      <div class="winner-stats">
-        <div class="winner-stat">
-          <div class="winner-stat-label">Darts</div>
-          <div class="winner-stat-value">${dartsThrown}</div>
+      overlay.innerHTML = `
+        <div class="confetti-container" id="confettiContainer"></div>
+        <div class="winner-card">
+          <div class="winner-icon">🏆</div>
+          <div class="winner-subtitle">LEG GEWONNEN</div>
+          <div class="winner-name">${escapeHtml(winner.name)}</div>
+          <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
+          <div class="winner-stats">
+            <div class="winner-stat">
+              <div class="winner-stat-label">Darts</div>
+              <div class="winner-stat-value">${dartsThrown}</div>
+            </div>
+            <div class="winner-stat">
+              <div class="winner-stat-label">Leg Average</div>
+              <div class="winner-stat-value">${avg}</div>
+            </div>
+            <div class="winner-stat">
+              <div class="winner-stat-label">Legs</div>
+              <div class="winner-stat-value">${winner.legs || 0}</div>
+            </div>
+          </div>
+          <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
         </div>
-        <div class="winner-stat">
-          <div class="winner-stat-label">Leg Average</div>
-          <div class="winner-stat-value">${avg}</div>
-        </div>
-        <div class="winner-stat">
-          <div class="winner-stat-label">Legs</div>
-          <div class="winner-stat-value">${winner.legs || 0}</div>
-        </div>
-      </div>
-      <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
-    </div>
-  `;
+      `;
 
-  overlay.classList.add('show');
-  overlay.style.display = 'flex';
-  createConfetti();
-}
+      overlay.classList.add('show');
+      overlay.style.display = 'flex';
+      createConfetti();
+    }
+
+    function hideWinnerOverlay() {
+      const overlay = document.getElementById('winnerOverlay');
+      if (overlay) {
+        overlay.classList.remove('show');
+        overlay.style.display = 'none';
+      }
     }
 
     function createConfetti() {
@@ -728,7 +744,7 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // ── Vollbild ein-/ausschalten ──
+    // ── Vollbild ──
     function toggleFullscreen() {
       const doc = document;
       const docEl = doc.documentElement;
@@ -755,7 +771,6 @@
       }
     }
 
-    // ── Button-Icon anpassen bei Vollbild-Änderung ──
     function updateFullscreenButton() {
       const btn = document.getElementById('fsBtn');
       if (!btn) return;
@@ -776,7 +791,6 @@
       }
     }
 
-    // ── Event-Listener für alle Browser ──
     document.addEventListener('fullscreenchange', updateFullscreenButton);
     document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
     document.addEventListener('mozfullscreenchange', updateFullscreenButton);
