@@ -330,6 +330,31 @@
     .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 3px 8px; font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
     .score-card .sc-throw-chip.empty { color: #333; }
 
+    /* === NEU: Cricket‑Grid für kompakte Kacheln === */
+    .cricket-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2px 6px;
+      margin: 4px 0;
+      font-size: 0.65rem;
+      line-height: 1.4;
+    }
+    .cricket-num {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(255,255,255,0.05);
+      padding: 0 4px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .cricket-num .dot {
+      font-size: 0.5rem;
+      display: inline-block;
+    }
+    /* === Ende neu === */
+
     /* Winner Overlay */
     .winner-overlay {
       position: fixed;
@@ -472,6 +497,7 @@
       }
     }
 
+    /* Spezielle TV-Auflösung (1024x860) – kompakte Kacheln in einer Zeile */
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: 0.5fr 1.5fr; }
       .focus-kachel { min-height: 0; padding: 6px; }
@@ -494,6 +520,15 @@
       .compact-players .score-card .sc-stats { font-size: .45rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
       .compact-players .score-card .sc-throw-chip { font-size: .5rem; padding: 1px 3px; min-width: 14px; border-radius: 4px; }
+      /* Cricket-Grid für die kompakte Zeile */
+      .compact-players .score-card .cricket-grid {
+        font-size: 0.5rem;
+        gap: 1px 3px;
+        margin: 0;
+      }
+      .compact-players .score-card .cricket-num .dot {
+        font-size: 0.4rem;
+      }
     }
   </style>
 </head>
@@ -687,6 +722,7 @@
       return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
     }
 
+    // === VERBESSERTE kompakte Kachel für Cricket ===
     function renderCompactPlayer(p, mode) {
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
@@ -700,10 +736,31 @@
       const shortName = (p.name || '').length > 8 ? (p.name || '').substring(0, 8) + '...' : (p.name || '');
 
       const playerColor = escapeAttr(p.color || '#f4a261');
+      
+      let cricketGridHtml = '';
+      if (isCricket) {
+        const cricketHits = p.cricketHits || {};
+        const cricketClosed = p.cricketClosed || {};
+        const nums = [15,16,17,18,19,20,25];
+        const gridItems = nums.map(n => {
+          const hits = cricketHits[n] || 0;
+          const closed = !!cricketClosed[n];
+          let dotsHtml = '';
+          for (let i=0; i<3; i++) {
+            const filled = i < hits;
+            dotsHtml += `<span class="dot" style="color:${filled ? playerColor : '#555'}">${filled ? '●' : '○'}</span>`;
+          }
+          const closedMark = closed ? ' ✔' : '';
+          return `<span class="cricket-num" style="${closed ? 'opacity:0.8;' : ''}">${n}${closedMark} ${dotsHtml}</span>`;
+        }).join(' ');
+        cricketGridHtml = `<div class="cricket-grid">${gridItems}</div>`;
+      }
+
       return '<div class="score-card" data-tv style="--pc:' + playerColor + '">' +
         '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
         '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
+        (isCricket ? cricketGridHtml : '') +
         '<div class="sc-stats">LG-AVG <span>' + legAvg + '</span> Legs <span>' + (p.legs || 0) + '</span></div>' +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
@@ -739,7 +796,6 @@
       // Winner-Erkennung
       let winner = state.players.find(p => Number(p.remaining) === 0);
       if (!winner && state.game.status === 'leg-finished') {
-        // Fallback: Spieler mit den meisten Legs
         winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
       }
 
@@ -1022,7 +1078,6 @@
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
-        // Sync selectors
         const modeSel = document.getElementById('gameModeSelect');
         const ruleSel = document.getElementById('checkoutRuleSelect');
         if (modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
