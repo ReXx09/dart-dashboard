@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Live-Spielstand</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a;
+      color: #f1f1f1;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .topbar {
+      background: #111;
+      border-bottom: 3px solid #e63946;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    /* ==================== HEADER ==================== */
+    .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
+    .topbar a:hover { color: #fff; }
+    .topbar h2 { font-size: 1.1rem; flex: 1; font-weight: 700; }
+    .header-controls { display: flex; gap: 6px; align-items: center; }
+    .header-controls select { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 5px 8px; border-radius: 6px; font-size: .78rem; font-family: inherit; cursor: pointer; }
+    .btn-icon {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #aaa;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .78rem;
+      font-family: inherit;
+      transition: background .15s, color .15s;
+    }
+    .btn-icon:hover { background: #252525; color: #fff; }
+    .btn-icon.primary { background: #e6394622; border-color: #e63946; color: #e63946; }
+    .btn-icon.primary:hover { background: #e6394633; }
+    .btn-icon.danger { background: #e6394611; border-color: #e6394644; color: #e63946; }
+    .btn-icon.danger:hover { background: #e6394622; }
+    .btn-icon:disabled { opacity: .3; cursor: default; }
+
+    /* ==================== MAIN LAYOUT ==================== */
+    main { padding: 16px; max-width: 1600px; margin: 0 auto; display: grid; gap: 14px; }
+    .focus-player { display: grid; grid-template-columns: 1.35fr .65fr; gap: 4px; align-items: stretch; }
+    .focus-player.single { grid-template-columns: 1fr; }
+    .focus-player.has-others { flex: 1; max-height: 70%; min-height: 0; }
+    .compact-players {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+      max-height: 28%;
+      min-height: 0;
+    }
+    .compact-players:empty { display: none; }
+    .compact-players .score-card {
+      flex: 1;
+      min-width: 0;
+    }
+    .focus-card { background: linear-gradient(135deg, #191111, #141414); border-radius: 14px; padding: 10px; border: 2px solid var(--pc, #e63946); box-shadow: 0 0 30px rgba(230,57,70,.16); position: relative; overflow: hidden; display: flex; flex-direction: column; }
+    .focus-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 10%, var(--pc-glow, rgba(230,57,70,.18)), transparent 35%); pointer-events: none; }
+    .focus-card > * { position: relative; }
+    .focus-name { font-size: 2rem; font-weight: 800; margin-bottom: 2px; }
+    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; }
+
+    /* ==================== KACHELN - Layout F ==================== */
+    .focus-kacheln { display: grid; grid-template-columns: 0.7fr 1.8fr; gap: 12px; }
+    .focus-kachel:nth-child(1) {
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 280px;
+    }
+    .focus-kachel:nth-child(2) {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 280px;
+      padding: 20px 24px;
+    }
+    .focus-kachel:nth-child(2) > div {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      width: 100%;
+      padding: 8px;
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+    }
+    .focus-kachel:nth-child(2) h4 {
+      margin: 0 0 6px 0;
+      font-size: .55rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 11px; padding: 8px; min-height: 135px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; }
+
+    /* ==================== WURF-SEGMENTE ==================== */
+    .throw-segments { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 180px; }
+    .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
+    .throw-seg .pts { font-size: 1.55rem; color: var(--pc, #e63946); }
+    .throw-seg .seg { font-size: .78rem; color: #555; margin-top: 4px; }
+
+    /* ==================== SCORE / REST PUNKTE ==================== */
+    .focus-big-score { font-size: clamp(4rem, 10vw, 8rem); font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .focus-summary { margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .focus-summary div { background: #141414; border-radius: 10px; padding: 10px; text-align: center; }
+    .focus-summary span { display: block; color: #666; font-size: .66rem; text-transform: uppercase; letter-spacing: 1px; }
+    .focus-summary strong { display: block; color: #f1f1f1; font-size: 1.05rem; margin-top: 2px; }
+
+    /* ==================== LEG-HISTORIE ==================== */
+    .focus-leg-card {
+      background: #141414;
+      border-radius: 14px;
+      padding: 5px;
+      border: 2px solid #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .focus-leg-card h4 { color: #777; font-size: .56rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
+    .focus-leg-card .leg-list { max-height: 380px; }
+    .leg-list { width: 100%; display: grid; gap: 3px; max-height: 380px; overflow: auto; }
+    .leg-item { display: grid; grid-template-columns: 80px 1fr 80px; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 4px 8px; font-size: .65rem; gap: 8px; }
+    .leg-item .idx { color: #777; font-weight: 600; text-align: right; padding-right: 8px; border-right: 1px solid #333; }
+    .leg-item .throws { display: flex; justify-content: center; align-items: center; gap: 6px; color: #ddd; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .leg-item .throws .sep { color: #555; font-weight: 300; }
+    .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+
+    /* ==================== COMPACT PLAYER CARDS ==================== */
+    .compact-players {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+      max-height: 35%;
+      min-height: 0;
+    }
+    .compact-players:empty { display: none; }
+    .compact-players .score-card {
+      flex: 1;
+      min-width: 0;
+    }
+    .score-card {
+      background: #141414;
+      border-radius: 12px;
+      padding: 14px;
+      border: 2px solid #1e1e1e;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex: 1;
+      min-width: 0;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; margin-bottom: 10px; flex-shrink: 0; }
+    .score-card .sc-name { font-size: .9rem; font-weight: 700; }
+    .score-card .sc-score { font-size: 2.4rem; font-weight: 800; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .score-card .sc-stats { font-size: .72rem; color: #666; line-height: 1.6; }
+    .score-card .sc-stats span { color: #aaa; font-weight: 600; }
+    .score-card .sc-last-throws { display: flex; gap: 4px; margin-top: 4px; }
+    .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 3px 8px; font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
+    .score-card .sc-throw-chip.empty { color: #333; }
+
+    /* Cricket-Grid */
+    .cricket-grid { display: grid; gap: 6px; margin-top: 8px; }
+    .cricket-grid.horizontal { grid-template-columns: repeat(7, 1fr); }
+    .cricket-grid .c-num { text-align: center; background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 8px; padding: 6px; }
+    .cricket-grid .c-num .num { font-size: .85rem; font-weight: 700; color: #f1f1f1; }
+    .cricket-grid .c-num .hits { font-size: .7rem; color: #555; }
+    .cricket-grid .c-num.closed { border-color: #2a9d8f; background: #0d1a1a; }
+    .cricket-grid .c-num.closed .num { color: #2a9d8f; }
+    .hs-panel { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 12px; }
+    .hs-panel h4 { font-size: .68rem; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+    .hs-table { width: 100%; border-collapse: collapse; }
+    .hs-table th { text-align: left; font-size: .65rem; color: #444; text-transform: uppercase; padding: 4px 6px; border-bottom: 1px solid #1e1e1e; }
+    .hs-table td { padding: 4px 6px; font-size: .8rem; border-bottom: 1px solid #1a1a1a; }
+    .hs-table tr:last-child td { border-bottom: none; }
+    .hs-table .rank { color: #555; font-weight: 600; }
+    .hs-table .name { color: #ddd; }
+    .hs-table .score { color: #f4a261; font-weight: 700; text-align: right; }
+    .hs-table .when { color: #444; text-align: right; font-size: .7rem; }
+    .hs-muted { color: #444; font-style: italic; font-size: .78rem; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ==================== WINNER OVERLAY ==================== */
+    .winner-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .winner-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .winner-card {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 3px solid #f4a261;
+      border-radius: 24px;
+      padding: 40px 60px;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(244, 162, 97, 0.4), 0 20px 40px rgba(0,0,0,0.5);
+      transform: scale(0.9);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .winner-overlay.show .winner-card {
+      transform: scale(1);
+    }
+    .winner-icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+      animation: bounce 1s ease infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .winner-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #f4a261;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
+    }
+    .winner-name {
+      font-size: 3.5rem;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+    }
+    .winner-subtitle {
+      font-size: 1.2rem;
+      color: #f4a261;
+      margin-bottom: 24px;
+    }
+    .winner-stats {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+    .winner-stat {
+      background: rgba(244, 162, 97, 0.1);
+      border: 1px solid rgba(244, 162, 97, 0.3);
+      border-radius: 12px;
+      padding: 12px 24px;
+    }
+    .winner-stat-label {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .winner-stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f4a261;
+    }
+    .winner-btn {
+      background: linear-gradient(135deg, #f4a261, #e63946);
+      border: none;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 16px 48px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .winner-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
+    }
+    .confetti-container {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 10001;
+    }
+    .winner-overlay.show .winner-card {
+      transform: scale(1);
+    }
+    .winner-icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+      animation: bounce 1s ease infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .winner-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #f4a261;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
+    }
+    .winner-name {
+      font-size: 3.5rem;
+      font-weight: 900;
+      color: #fff;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+    }
+    .winner-subtitle {
+      font-size: 1.2rem;
+      color: #f4a261;
+      margin-bottom: 24px;
+    }
+    .winner-stats {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+    .winner-stat {
+      background: rgba(244, 162, 97, 0.1);
+      border: 1px solid rgba(244, 162, 97, 0.3);
+      border-radius: 12px;
+      padding: 12px 24px;
+    }
+    .winner-stat-label {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .winner-stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f4a261;
+    }
+    .winner-btn {
+      background: linear-gradient(135deg, #f4a261, #e63946);
+      border: none;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 16px 48px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .winner-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
+    }
+    .confetti-container {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 10001;
+    }
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: -10px;
+      animation: confetti-fall 3s linear forwards;
+    }
+    @keyframes confetti-fall {
+      to {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+    body.tv-mode .topbar a,
+    body.tv-mode .header-controls,
+    body.tv-mode .hs-panel,
+    body.tv-mode .footer {
+      display: none !important;
+    }
+    body.tv-mode .topbar { padding: 8px 14px; }
+    body.tv-mode .topbar h2 { font-size: .98rem; }
+    body.tv-mode main { max-width: none; padding: 8px; gap: 5px; }
+    body.tv-mode .focus-player { grid-template-columns: 1.35fr .65fr; gap: 5px; }
+    body.tv-mode .focus-card { padding: 10px; border-radius: 14px; }
+    body.tv-mode .focus-name { font-size: 1.06rem; margin-bottom: 2px; }
+    body.tv-mode .focus-meta { font-size: .68rem; margin-bottom: 5px; }
+    body.tv-mode .focus-kacheln { gap: 5px; }
+    body.tv-mode .focus-kachel:nth-child(1) { min-height: 200px; padding: 8px; border-radius: 11px; }
+    body.tv-mode .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; gap: 10px; }
+    body.tv-mode .focus-kachel:nth-child(2) > div { padding: 12px; }
+    body.tv-mode .focus-kachel:nth-child(2) h4 { font-size: .6rem; margin-bottom: 8px; }
+    body.tv-mode .focus-kachel h4 { font-size: .6rem; margin-bottom: 5px; }
+    body.tv-mode .focus-kachel .subline { font-size: .62rem; margin-top: 3px; }
+    body.tv-mode .throw-segments { max-width: 130px; gap: 6px; }
+    body.tv-mode .throw-seg { min-height: 56px; border-radius: 10px; }
+    body.tv-mode .throw-seg .seg { font-size: 1.1rem; }
+    body.tv-mode .throw-seg .pts { font-size: .66rem; margin-top: 2px; }
+    body.tv-mode .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 5px; }
+    body.tv-mode .focus-big-score { font-size: clamp(3rem, 7vw, 5rem); }
+    body.tv-mode .focus-summary { margin-top: 5px; gap: 4px; }
+    body.tv-mode .focus-summary div { padding: 5px; }
+    body.tv-mode .focus-summary span { font-size: .52rem; }
+    body.tv-mode .focus-summary strong { font-size: .8rem; margin-top: 1px; }
+    body.tv-mode .focus-leg-card { padding: 6px; border-radius: 14px; }
+    body.tv-mode .focus-leg-card h4 { font-size: .58rem; }
+    body.tv-mode .focus-leg-card .leg-list { max-height: 320px; }
+    body.tv-mode .leg-item { grid-template-columns: 60px 1fr 60px; padding: 4px 8px; font-size: .65rem; gap: 6px; }
+    body.tv-mode .leg-item .idx { padding-right: 6px; }
+    body.tv-mode .score-card { padding: 10px; border-radius: 10px; }
+    body.tv-mode .sc-name { font-size: .78rem; }
+    body.tv-mode .sc-score { font-size: 1.95rem; margin-bottom: 3px; }
+    body.tv-mode .sc-stats { font-size: .66rem; line-height: 1.35; }
+    body.tv-mode .sc-last-throws { margin-top: 5px; gap: 3px; }
+    body.tv-mode .sc-throw-chip { font-size: .66rem; padding: 2px 5px; min-width: 24px; }
+    body.tv-mode .sc-average { margin-top: 5px; font-size: .6rem; }
+    body.tv-mode .sc-average strong { font-size: .75rem; }
+    body.tv-mode .sc-legs { right: 8px; bottom: 7px; font-size: .58rem; }
+
+    @media (max-width: 1100px) and (max-height: 900px) {
+      body.tv-mode .focus-player { grid-template-columns: 1fr; }
+      body.tv-mode .focus-leg-card .leg-list { max-height: 120px; }
+      body.tv-mode .compact-players { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
+    }
+    @media (max-width: 768px) {
+      .scoreboard { grid-template-columns: 1fr; }
+      .sc-score { font-size: 3rem; }
+    }
+
+    @media (max-height: 900px) and (min-width: 900px) {
+      .topbar { padding: 8px 14px; gap: 8px; }
+      .topbar h2 { font-size: 1rem; }
+      .header-controls select { padding: 4px 7px; font-size: .72rem; }
+      .btn-icon { padding: 5px 9px; font-size: .72rem; }
+
+      main { padding: 10px; gap: 8px; }
+      .focus-player { gap: 8px; }
+      .focus-card { padding: 14px; border-radius: 14px; }
+      .focus-name { font-size: 1.15rem; }
+      .focus-meta { font-size: .72rem; margin-bottom: 10px; }
+      .focus-kacheln { gap: 8px; }
+      .focus-kachel:nth-child(1) { min-height: 200px; }
+      .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; gap: 10px; }
+      .focus-kachel:nth-child(2) > div { padding: 12px; }
+      .focus-kachel:nth-child(2) h4 { font-size: .6rem; margin-bottom: 8px; }
+      .focus-leg-card { border-radius: 14px; padding: 12px; }
+      .focus-leg-card .leg-list { max-height: 250px; }
+      .focus-kachel { min-height: 116px; padding: 10px; border-radius: 12px; }
+      .throw-segments { max-width: 130px; gap: 6px; }
+      .throw-seg { min-height: 58px; }
+      .throw-seg .pts { font-size: 1.2rem; }
+      .throw-seg .seg { font-size: .68rem; }
+      .focus-big-score { font-size: clamp(3rem, 7vw, 5rem); }
+      .focus-summary { margin-top: 8px; }
+      .focus-summary strong { font-size: .95rem; }
+      .leg-list { max-height: 200px; }
+      .leg-item { grid-template-columns: 60px 1fr 60px; font-size: .65rem; padding: 4px 8px; gap: 6px; }
+      .leg-item .idx { padding-right: 6px; }
+
+      .compact-players { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+      .score-card { padding: 12px; border-radius: 11px; }
+      .sc-name { font-size: .86rem; }
+      .sc-score { font-size: 2.45rem; }
+      .sc-stats { font-size: .7rem; line-height: 1.45; }
+      .sc-last-throws { margin-top: 6px; }
+      .sc-throw-chip { padding: 3px 6px; font-size: .72rem; }
+
+      .hs-panel { padding: 8px; }
+      .hs-panel h4 { margin-bottom: 6px; }
+      .hs-table th { padding: 3px 4px; }
+      .hs-table td { padding: 3px 4px; }
+    }
+
+    @media (max-height: 780px) and (min-width: 900px) {
+      main {
+        max-height: calc(100vh - 58px);
+        overflow-y: auto;
+        padding-right: 6px;
+      }
+
+      .focus-player { grid-template-columns: minmax(0, 1fr) 320px; }
+      .focus-leg-card { min-height: 64px; padding: 10px; }
+      .leg-list { max-height: 120px; }
+      .focus-big-score { font-size: 2.9rem; }
+      .throw-segments { max-width: 100px; gap: 4px; }
+      .throw-seg { min-height: 54px; }
+      .throw-seg .pts { font-size: 1rem; }
+      .throw-seg .seg { font-size: .6rem; }
+
+      .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+      .sc-score { font-size: 2rem; }
+    }
+
+    @media (max-height: 780px) and (max-width: 1150px) {
+      .focus-player { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 1180px) {
+      .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
+      .focus-kachel:nth-child(1) { min-height: 230px; }
+      .focus-kachel:nth-child(2) { min-height: 230px; padding: 16px 20px; }
+    }
+
+    @media (width: 1024px) and (height: 860px) {
+      .focus-kachel:nth-child(1) { min-height: 200px; }
+      .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; }
+      .focus-big-score { font-size: clamp(3.5rem, 8vw, 6rem); }
+      .throw-segments { max-width: 140px; }
+      .throw-seg { min-height: 60px; }
+      .throw-seg .pts { font-size: 1.3rem; }
+      .throw-seg .seg { font-size: .72rem; }
+    }
+
+    @media (max-width: 860px) {
+      .focus-kacheln { grid-template-columns: 1fr; }
+      .focus-kachel:nth-child(2) { gap: 10px; padding: 14px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Winner Overlay -->
+  <div class="winner-overlay" id="winnerOverlay"></div>
+  
+  <div class="topbar">
+    <a href="/">← Zurück</a>
+    <h2>🎯 Live-Spielstand</h2>
+    <div class="header-controls">
+      <select id="gameModeSelect" onchange="changeMode(this.value)">
+        <option value="501">501</option>
+        <option value="301">301</option>
+        <option value="701">701</option>
+        <option value="cricket">Cricket</option>
+        <option value="shanghai">Shanghai</option>
+        <option value="atc">Around the Clock</option>
+        <option value="split">Split</option>
+      </select>
+      <button class="btn-icon" onclick="undoLast()" id="undoBtn" title="Letzten Wurf rückgängig">↩ Undo</button>
+      <button class="btn-icon" onclick="nextPlayer()" id="nextBtn" title="Nächster Spieler">⏭ Next</button>
+      <button class="btn-icon primary" onclick="resetLeg(true)">Neues Leg</button>
+      <button class="btn-icon danger" onclick="resetLeg(false)">Reset</button>
+    </div>
+  </div>
+  <main>
+    <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
+    <section class="compact-players" id="compactPlayers"></section>
+    <div class="hs-panel">
+      <h4>🏆 Highscores</h4>
+      <table class="hs-table">
+        <thead><tr><th>#</th><th>Spieler</th><th>Score</th><th>Typ</th><th>Zeit</th></tr></thead>
+        <tbody id="highscoreBody"><tr><td colspan="5" class="hs-muted">Keine Einträge</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+  <div class="toast" id="toast"></div>
+  <script>
+    let liveState = null;
+    let liveDisplaySettings = { liveDisplayProfile: 'auto', liveDisplayScale: 100 };
+    let countdownTimer = null;
+
+    function startCountdown(state) {
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      const action = state && state.lastAction;
+      if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) return;
+      const startedAt = action.autoAdvanceStartedAt || Date.now();
+      const delayMs = action.autoAdvanceDelayMs;
+      countdownTimer = setInterval(() => {
+        const elapsed = Date.now() - startedAt;
+        const remaining = Math.max(0, delayMs - elapsed);
+        const el = document.getElementById('countdownDisplay');
+        if (remaining <= 0) {
+          if (el) el.style.display = 'none';
+          if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+          return;
+        }
+        if (el) {
+          el.style.display = '';
+          el.textContent = 'Nächster Spieler in ' + Math.ceil(remaining / 1000) + 's';
+        }
+      }, 200);
+    }
+
+    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // ── SSE für Live-Reload ──
+    (function() {
+      const sse = new EventSource('/api/events');
+      let reloadQueued = false;
+      sse.addEventListener('reload', () => {
+        if (reloadQueued) return;
+        reloadQueued = true;
+        setTimeout(() => {
+          reloadQueued = false;
+          loadAll().catch(() => {});
+        }, 120);
+      });
+    })();
+
+    function clampDisplayScale(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return 100;
+      return Math.max(80, Math.min(125, Math.round(n)));
+    }
+
+    function applyLiveDisplaySettings(settings) {
+      const profile = String(settings && settings.liveDisplayProfile || 'auto').trim() || 'auto';
+      const scale = clampDisplayScale(settings && settings.liveDisplayScale);
+      liveDisplaySettings = { liveDisplayProfile: profile, liveDisplayScale: scale };
+      document.body.dataset.displayProfile = profile;
+      document.body.style.setProperty('--live-scale', String(scale / 100));
+    }
+
+    // ── State Laden & Rendern ──
+    async function loadAll() {
+      let state, highscores, settings;
+      try {
+        const [stateRes, settingsRes] = await Promise.all([
+          fetch('/api/live/state'),
+          fetch('/api/settings').catch(() => null)
+        ]);
+        if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
+        state = await stateRes.json();
+        liveState = state;
+        settings = settingsRes && settingsRes.ok ? await settingsRes.json() : null;
+      } catch(e) {
+        document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
+        return;
+      }
+      try {
+        const hsRes = await fetch('/api/highscores');
+        if (hsRes.ok) highscores = await hsRes.json();
+      } catch { highscores = []; }
+
+      applyLiveDisplaySettings(settings || liveDisplaySettings);
+      renderState(state);
+      renderHighscores(highscores);
+    }
+
+    // ── State Rendern ──
+    function renderState(state) {
+      if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
+      const activePlayer = state.game.activePlayer || 0;
+      const mode = state.game.mode || '501';
+      const sel = document.getElementById('gameModeSelect');
+      if (sel.value !== mode) sel.value = mode;
+      const active = state.players[activePlayer];
+      const focusPlayer = document.getElementById('focusPlayer');
+      const compactPlayers = document.getElementById('compactPlayers');
+
+      const isCricket = mode === 'cricket';
+      const hasOthers = state.players.length > 1;
+      focusPlayer.classList.toggle('has-others', hasOthers);
+
+      // Check for leg finished (winner)
+      const isLegFinished = state.game.status === 'leg-finished';
+      const winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
+
+      if (isCricket) {
+        focusPlayer.classList.add('single');
+        focusPlayer.innerHTML = renderCricketView(active, state);
+      } else {
+        focusPlayer.classList.remove('single');
+        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
+      }
+
+      if (hasOthers) {
+        const compactOrder = [...state.players]
+          .filter((_p, idx) => idx !== activePlayer)
+          .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
+        compactPlayers.innerHTML = compactOrder
+          .map((p) => renderCompactPlayer(p, mode)).join('');
+      } else {
+        compactPlayers.innerHTML = '';
+      }
+
+      // Winner overlay
+      if (isLegFinished && winner) {
+        showWinnerOverlay(winner, state);
+      } else {
+        hideWinnerOverlay();
+      }
+
+      startCountdown(state);
+    }
+    function renderCricketView(p, state) {
+      if (!p) return '';
+      const activeIdx = state.game.activePlayer || 0;
+      const throws = Array.isArray(p.throws) ? p.throws : [];
+      const lastThrows = throws.slice(-3);
+      const cricketHits = p.cricketHits || {};
+      const cricketClosed = p.cricketClosed || {};
+      const nums = [15,16,17,18,19,20,25];
+      const gridHtml = nums.map(n => {
+        const hits = cricketHits[n] || 0;
+        const closed = !!cricketClosed[n];
+        return '<div class="c-num' + (closed ? ' closed' : '') + '"><div class="num">' + n + '</div><div class="hits">' + (closed ? '✔' : hits + '/3') + '</div></div>';
+      }).join('');
+
+      const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+
+      return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+        '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr">' +
+          '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div>' +
+          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
+        '</div>' +
+        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Punkte</span><strong>' + totalScored + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
+      '</div>';
+    }
+
+    function getPointsPerAufnahme(player) {
+      const currentRound = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
+      // Wenn currentRoundPoints existiert (auch wenn leer), ist das die aktuelle Aufnahme
+      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> 0 Punkte
+      if (currentRound.length >= 0) {
+        return currentRound.reduce((sum, pt) => sum + (Number(pt) || 0), 0);
+      }
+
+      const throws = Array.isArray(player && player.throws) ? player.throws : [];
+      if (throws.length === 0) return '-';
+
+      const remainder = throws.length % 3;
+      const chunkSize = remainder === 0 ? 3 : remainder;
+      const lastChunk = throws.slice(-chunkSize);
+      return lastChunk.reduce((sum, t) => sum + (Number(t && t.points) || 0), 0);
+    }
+
+    function renderFocusPlayer(p, idx, state) {
+      if (!p) return '';
+      const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
+      const throws = Array.isArray(p.throws) ? p.throws : [];
+      const lastThrows = throws.slice(-3);
+      const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
+      while (displayThrows.length < 3) displayThrows.push(null);
+      const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+      const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
+      const aufnahmeScore = getPointsPerAufnahme(p);
+
+      // Würfe: Punkte oben (rot/groß), Segment unten (grau/klein)
+      const throwsHtml = displayThrows.map((pt, ti) => {
+        const pointsLabel = pt === null ? '-' : (pt === 0 ? '0' : '+' + pt);
+        const throwData = lastThrows[ti];
+        const segmentLabel = (throwData && throwData.segment) ? throwData.segment : (pt === null ? '-' : String(pt));
+        return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+          '<div class="pts">' + pointsLabel + '</div>' +
+          '<div class="seg">' + segmentLabel + '</div>' +
+        '</div>';
+      }).join('');
+
+      return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+        '<div class="focus-kacheln">' +
+          '<div class="focus-kachel">' +
+            '<h4>Aktuelle Würfe / Zahlen</h4>' +
+            '<div class="throw-segments">' + throwsHtml + '</div>' +
+            '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
+          '</div>' +
+          '<div class="focus-kachel">' +
+            '<div>' +
+              '<h4>Gesamt / Rest</h4>' +
+              '<div class="focus-big-score">' + p.remaining + '</div>' +
+            '</div>' +
+            '<div>' +
+              '<h4>Punkte pro Aufnahme</h4>' +
+              '<div class="focus-big-score">' + aufnahmeScore + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="focus-summary">' +
+          '<div><span>Turns</span><strong>' + turns + '</strong></div>' +
+          '<div><span>Gesamt Punkte</span><strong>' + totalScored + '</strong></div>' +
+          '<div><span>Leg Average</span><strong>' + legAvg + '</strong></div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function renderFocusLegCard(p) {
+      if (!p) return '';
+      const throws = Array.isArray(p.throws) ? p.throws : [];
+      const turnScores = [];
+      for (let i = 0; i < throws.length; i += 3) {
+        const chunk = throws.slice(i, i + 3);
+        const score = chunk.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
+        turnScores.push({ score, throws: chunk.map(t => t.segment || t.points) });
+      }
+      const legListHtml = turnScores.length
+        ? turnScores.slice(-20).reverse().map((turn, orderIdx) => {
+            const turnIdx = turnScores.length - orderIdx;
+            const throwsHtml = turn.throws.map((seg, si) => 
+              '<span>' + escapeHtml(seg) + '</span>' + (si < turn.throws.length - 1 ? '<span class="sep">|</span>' : '')
+            ).join('');
+            return '<div class="leg-item">' +
+              '<span class="idx">Aufnahme ' + turnIdx + '</span>' +
+              '<span class="throws">' + throwsHtml + '</span>' +
+              '<span class="score">' + turn.score + '</span>' +
+            '</div>';
+          }).join('')
+        : '<div class="subline">Noch keine Aufnahmen erfasst</div>';
+      return '<aside class="focus-leg-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+        '<h4>Aufnahmen im Leg</h4>' +
+        '<div class="leg-list">' + legListHtml + '</div>' +
+      '</aside>';
+    }
+
+    function renderCompactPlayer(p, mode) {
+      const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
+      const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
+      // Wenn currentRoundPoints existiert UND Inhalt hat, das für Anzeige nutzen
+      const displayThrows = (Array.isArray(p.currentRoundPoints) && p.currentRoundPoints.length > 0) ? [...p.currentRoundPoints] : lastThrows;
+      while (displayThrows.length < 3) displayThrows.push('-');
+      const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+      const isCricket = mode === 'cricket';
+      const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
+      const shortName = (p.name || '').length > 8 ? (p.name || '').substring(0, 8) + '...' : (p.name || '');
+
+      const playerColor = escapeAttr(p.color || '#f4a261');
+      return '<div class="score-card" data-tv style="--pc:' + playerColor + '">' +
+        '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
+        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
+        '<div class="sc-score">' + displayScore + '</div>' +
+        '<div class="sc-stats">LG-AVG <span>' + legAvg + '</span> Legs <span>' + (p.legs || 0) + '</span></div>' +
+        '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
+      '</div>';
+    }
+
+    function colorToRgba(hex, alpha) {
+      const clean = String(hex || '#e63946').replace('#', '');
+      if (clean.length !== 6) return 'rgba(230,57,70,' + alpha + ')';
+      const r = parseInt(clean.slice(0, 2), 16);
+      const g = parseInt(clean.slice(2, 4), 16);
+      const b = parseInt(clean.slice(4, 6), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
+    // ── Toast ──
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (isError ? ' err' : '');
+      setTimeout(() => t.className = 'toast', 2500);
+    }
+
+    // ── Winner Overlay ──
+    function showWinnerOverlay(winner, state) {
+      const overlay = document.getElementById('winnerOverlay');
+      if (!overlay) return;
+      
+      const checkout = state.lastAction?.points || 0;
+      const dartsThrown = winner.turns * 3 - (3 - (state.game.currentThrow || 0));
+      const avg = winner.turns > 0 ? (winner.totalScored / winner.turns * 3).toFixed(1) : '-';
+      
+      overlay.innerHTML = `
+        <div class="confetti-container" id="confettiContainer"></div>
+        <div class="winner-card">
+          <div class="winner-icon">🏆</div>
+          <div class="winner-subtitle">LEG GEWONNEN</div>
+          <div class="winner-name">${escapeHtml(winner.name)}</div>
+          <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
+          <div class="winner-stats">
+            <div class="winner-stat">
+              <div class="winner-stat-label">Darts</div>
+              <div class="winner-stat-value">${dartsThrown}</div>
+            </div>
+            <div class="winner-stat">
+              <div class="winner-stat-label">Leg Average</div>
+              <div class="winner-stat-value">${avg}</div>
+            </div>
+            <div class="winner-stat">
+              <div class="winner-stat-label">Legs</div>
+              <div class="winner-stat-value">${winner.legs || 0}</div>
+            </div>
+          </div>
+          <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
+        </div>
+      `;
+      
+      overlay.classList.add('show');
+      overlay.style.display = 'flex';
+      createConfetti();
+    }
+
+    function hideWinnerOverlay() {
+      const overlay = document.getElementById('winnerOverlay');
+      if (overlay) {
+        overlay.classList.remove('show');
+        overlay.style.display = 'none';
+      }
+    }
+
+    function createConfetti() {
+      const container = document.getElementById('confettiContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      const colors = ['#f4a261', '#e63946', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'];
+      for (let i = 0; i < 80; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.animationDelay = (Math.random() * 2) + 's';
+        confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+        container.appendChild(confetti);
+      }
+    }
+
+    // ── Highscores ──
+    function renderHighscores(list) {
+      const tbody = document.getElementById('highscoreBody');
+      if (!Array.isArray(list) || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="hs-muted">Keine Einträge</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.slice(0, 20).map(function(entry, idx) {
+        var d = entry.ts ? new Date(entry.ts) : null;
+        var timeStr = d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '-';
+        return '<tr><td class="rank">' + (idx + 1) + '</td><td class="name">' + escapeHtml(entry.player) + '</td><td class="score">' + entry.score + '</td><td>' + (entry.kind || '-') + '</td><td class="when">' + timeStr + '</td></tr>';
+      }).join('');
+    }
+
+    // ── Undo ──
+    async function undoLast() {
+      try {
+        var r = await fetch('/api/live/undo', { method: 'POST' });
+        if (!r.ok) { showToast('Kein Wurf zum Rückgängigmachen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Letzter Wurf rückgängig');
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Next Player ──
+    async function nextPlayer() {
+      try {
+        var r = await fetch('/api/live/next-player', { method: 'POST' });
+        if (!r.ok) { showToast('Fehler', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Nächster Spieler');
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Next Leg (nach Leg-Gewinn) ──
+    async function nextLeg() {
+      try {
+        var r = await fetch('/api/live/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ carryLegs: true })
+        });
+        if (!r.ok) { showToast('Fehler', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        hideWinnerOverlay();
+        showToast('Nächstes Leg gestartet');
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    async function changeMode(mode) {
+      try {
+        var r = await fetch('/api/game/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+        if (!r.ok) { showToast('Modus-Wechsel fehlgeschlagen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('Modus: ' + mode);
+        loadHighscoresOnly();
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Reset ──
+    async function resetLeg(carryLegs) {
+      try {
+        var r = await fetch('/api/live/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ carryLegs: carryLegs })
+        });
+        if (!r.ok) { showToast('Reset fehlgeschlagen', true); return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast(carryLegs ? 'Neues Leg gestartet (Legs erhalten)' : 'Spiel zurückgesetzt');
+        loadHighscoresOnly();
+      } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Highscores separat laden ──
+    async function loadHighscoresOnly() {
+      try {
+        var r = await fetch('/api/highscores');
+        if (r.ok) renderHighscores(await r.json());
+      } catch {}
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>

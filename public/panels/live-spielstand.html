@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Live-Spielstand</title>
+  <title>Live-Spielstand TV</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -14,44 +14,40 @@
       color: #f1f1f1;
       font-family: 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh;
-      overflow-x: hidden;
+      overflow: hidden;
     }
     .topbar {
       background: #111;
       border-bottom: 3px solid #e63946;
-      padding: 12px 24px;
+      padding: 8px 14px;
       display: flex;
       align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
+      gap: 10px;
     }
-    /* ==================== HEADER ==================== */
     .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1.1rem; flex: 1; font-weight: 700; }
-    .header-controls { display: flex; gap: 6px; align-items: center; }
-    .header-controls select { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 5px 8px; border-radius: 6px; font-size: .78rem; font-family: inherit; cursor: pointer; }
-    .btn-icon {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      color: #aaa;
-      padding: 6px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: background .15s, color .15s;
+    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
+    .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
+    .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
+    .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
+    .topbar .fs-btn.active { border-color: #f4a261; color: #f4a261; }
+    main {
+      padding: 6px;
+      max-width: none;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      height: calc(100vh - 44px);
     }
-    .btn-icon:hover { background: #252525; color: #fff; }
-    .btn-icon.primary { background: #e6394622; border-color: #e63946; color: #e63946; }
-    .btn-icon.primary:hover { background: #e6394633; }
-    .btn-icon.danger { background: #e6394611; border-color: #e6394644; color: #e63946; }
-    .btn-icon.danger:hover { background: #e6394622; }
-    .btn-icon:disabled { opacity: .3; cursor: default; }
-
-    /* ==================== MAIN LAYOUT ==================== */
-    main { padding: 16px; max-width: 1600px; margin: 0 auto; display: grid; gap: 14px; }
-    .focus-player { display: grid; grid-template-columns: 1.35fr .65fr; gap: 4px; align-items: stretch; }
+    .focus-player {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.35fr .65fr;
+      gap: 4px;
+      align-items: stretch;
+      min-height: 0;
+    }
     .focus-player.single { grid-template-columns: 1fr; }
     .focus-player.has-others { flex: 1; max-height: 70%; min-height: 0; }
     .compact-players {
@@ -66,27 +62,46 @@
       flex: 1;
       min-width: 0;
     }
-    .focus-card { background: linear-gradient(135deg, #191111, #141414); border-radius: 14px; padding: 10px; border: 2px solid var(--pc, #e63946); box-shadow: 0 0 30px rgba(230,57,70,.16); position: relative; overflow: hidden; display: flex; flex-direction: column; }
-    .focus-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 20% 10%, var(--pc-glow, rgba(230,57,70,.18)), transparent 35%); pointer-events: none; }
+    .focus-card {
+      background: linear-gradient(135deg, #191111, #141414);
+      border-radius: 14px;
+      padding: 10px;
+      border: 2px solid var(--pc, #e63946);
+      box-shadow: 0 0 30px rgba(230,57,70,.16);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .focus-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 10%, var(--pc-glow, rgba(230,57,70,.18)), transparent 35%);
+      pointer-events: none;
+    }
     .focus-card > * { position: relative; }
     .focus-name { font-size: 2rem; font-weight: 800; margin-bottom: 2px; }
     .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; }
-
-    /* ==================== KACHELN - Layout F ==================== */
-    .focus-kacheln { display: grid; grid-template-columns: 0.7fr 1.8fr; gap: 12px; }
+    .focus-kacheln {
+      display: grid;
+      grid-template-columns: 0.7fr 1.8fr;
+      gap: 4px;
+      flex: 1;
+    }
     .focus-kachel:nth-child(1) {
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      min-height: 280px;
+      min-height: 220px;
     }
     .focus-kachel:nth-child(2) {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      min-height: 280px;
-      padding: 20px 24px;
+      gap: 8px;
+      min-height: 220px;
+      padding: 12px 16px;
     }
     .focus-kachel:nth-child(2) > div {
       flex: 1;
@@ -96,36 +111,51 @@
       justify-content: center;
       text-align: center;
       width: 100%;
-      padding: 8px;
+      padding: 10px;
       background: #141414;
       border: 1px solid #2a2a2a;
       border-radius: 10px;
     }
     .focus-kachel:nth-child(2) h4 {
-      margin: 0 0 6px 0;
-      font-size: .55rem;
+      margin: 0 0 8px 0;
+      font-size: .6rem;
       color: #888;
       text-transform: uppercase;
       letter-spacing: 1.5px;
     }
-    .focus-kachel { background: #0f0f0f; border: 1px solid #262626; border-radius: 11px; padding: 8px; min-height: 135px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .focus-kachel {
+      background: #0f0f0f;
+      border: 1px solid #262626;
+      border-radius: 11px;
+      padding: 8px;
+      min-height: 135px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
     .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
     .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; }
-
-    /* ==================== WURF-SEGMENTE ==================== */
-    .throw-segments { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 180px; }
-    .throw-seg { background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 12px; min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: 800; }
-    .throw-seg .pts { font-size: 1.55rem; color: var(--pc, #e63946); }
-    .throw-seg .seg { font-size: .78rem; color: #555; margin-top: 4px; }
-
-    /* ==================== SCORE / REST PUNKTE ==================== */
-    .focus-big-score { font-size: clamp(4rem, 10vw, 8rem); font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
-    .focus-summary { margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .focus-summary div { background: #141414; border-radius: 10px; padding: 10px; text-align: center; }
-    .focus-summary span { display: block; color: #666; font-size: .66rem; text-transform: uppercase; letter-spacing: 1px; }
-    .focus-summary strong { display: block; color: #f1f1f1; font-size: 1.05rem; margin-top: 2px; }
-
-    /* ==================== LEG-HISTORIE ==================== */
+    .throw-segments { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 150px; }
+    .throw-seg {
+      background: #1b1b1b;
+      border: 1px solid #2b2b2b;
+      border-radius: 10px;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-weight: 800;
+    }
+    .throw-seg .pts { font-size: 1.4rem; color: var(--pc, #e63946); }
+    .throw-seg .seg { font-size: .85rem; color: #555; margin-top: 2px; }
+    .focus-big-score { font-size: 3.5rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .focus-summary { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .focus-summary div { background: #141414; border-radius: 10px; padding: 4px; text-align: center; }
+    .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
+    .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
@@ -136,27 +166,45 @@
       gap: 4px;
     }
     .focus-leg-card h4 { color: #777; font-size: .56rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
-    .focus-leg-card .leg-list { max-height: 380px; }
     .leg-list { width: 100%; display: grid; gap: 3px; max-height: 380px; overflow: auto; }
-    .leg-item { display: grid; grid-template-columns: 80px 1fr 80px; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 4px 8px; font-size: .65rem; gap: 8px; }
-    .leg-item .idx { color: #777; font-weight: 600; text-align: right; padding-right: 8px; border-right: 1px solid #333; }
-    .leg-item .throws { display: flex; justify-content: center; align-items: center; gap: 6px; color: #ddd; font-family: 'Segoe UI', system-ui, sans-serif; }
-    .leg-item .throws .sep { color: #555; font-weight: 300; }
-    .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+    .leg-item { 
+      display: grid; 
+      grid-template-columns: 80px 1fr 80px; 
+      align-items: center; 
+      background: #1b1b1b; 
+      border: 1px solid #2b2b2b; 
+      border-radius: 8px; 
+      padding: 4px 8px; 
+      font-size: .65rem; 
+      gap: 8px;
+    }
+    .leg-item .idx { 
+      color: #777; 
+      font-weight: 600;
+      text-align: right;
+      padding-right: 8px;
+      border-right: 1px solid #333;
+    }
+    .leg-item .throws { 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      gap: 6px; 
+      color: #ddd;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .leg-item .throws .sep { 
+      color: #555; 
+      font-weight: 300; 
+    }
+    .leg-item .score { 
+      color: #f4a261; 
+      font-weight: 700; 
+      font-variant-numeric: tabular-nums; 
+      text-align: right;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
 
-    /* ==================== COMPACT PLAYER CARDS ==================== */
-    .compact-players {
-      display: flex;
-      gap: 4px;
-      flex-shrink: 0;
-      max-height: 35%;
-      min-height: 0;
-    }
-    .compact-players:empty { display: none; }
-    .compact-players .score-card {
-      flex: 1;
-      min-width: 0;
-    }
     .score-card {
       background: #141414;
       border-radius: 12px;
@@ -179,29 +227,7 @@
     .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 3px 8px; font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
     .score-card .sc-throw-chip.empty { color: #333; }
 
-    /* Cricket-Grid */
-    .cricket-grid { display: grid; gap: 6px; margin-top: 8px; }
-    .cricket-grid.horizontal { grid-template-columns: repeat(7, 1fr); }
-    .cricket-grid .c-num { text-align: center; background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 8px; padding: 6px; }
-    .cricket-grid .c-num .num { font-size: .85rem; font-weight: 700; color: #f1f1f1; }
-    .cricket-grid .c-num .hits { font-size: .7rem; color: #555; }
-    .cricket-grid .c-num.closed { border-color: #2a9d8f; background: #0d1a1a; }
-    .cricket-grid .c-num.closed .num { color: #2a9d8f; }
-    .hs-panel { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 12px; }
-    .hs-panel h4 { font-size: .68rem; color: #555; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
-    .hs-table { width: 100%; border-collapse: collapse; }
-    .hs-table th { text-align: left; font-size: .65rem; color: #444; text-transform: uppercase; padding: 4px 6px; border-bottom: 1px solid #1e1e1e; }
-    .hs-table td { padding: 4px 6px; font-size: .8rem; border-bottom: 1px solid #1a1a1a; }
-    .hs-table tr:last-child td { border-bottom: none; }
-    .hs-table .rank { color: #555; font-weight: 600; }
-    .hs-table .name { color: #ddd; }
-    .hs-table .score { color: #f4a261; font-weight: 700; text-align: right; }
-    .hs-table .when { color: #444; text-align: right; font-size: .7rem; }
-    .hs-muted { color: #444; font-style: italic; font-size: .78rem; }
-    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e1e1e; border: 1px solid #333; color: #f1f1f1; padding: 10px 24px; border-radius: 8px; font-size: .88rem; opacity: 0; transition: all .3s; z-index: 999; }
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* ==================== WINNER OVERLAY ==================== */
+    /* Winner Overlay */
     .winner-overlay {
       position: fixed;
       inset: 0;
@@ -248,122 +274,33 @@
       text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
     }
     .winner-name {
-      font-size: 3.5rem;
+      font-size: 3rem;
       font-weight: 900;
-      color: #fff;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 4px;
-    }
-    .winner-subtitle {
-      font-size: 1.2rem;
       color: #f4a261;
-      margin-bottom: 24px;
-    }
-    .winner-stats {
-      display: flex;
-      gap: 32px;
-      justify-content: center;
-      margin-bottom: 32px;
-      flex-wrap: wrap;
-    }
-    .winner-stat {
-      background: rgba(244, 162, 97, 0.1);
-      border: 1px solid rgba(244, 162, 97, 0.3);
-      border-radius: 12px;
-      padding: 12px 24px;
-    }
-    .winner-stat-label {
-      font-size: 0.75rem;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-    }
-    .winner-stat-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #f4a261;
-    }
-    .winner-btn {
-      background: linear-gradient(135deg, #f4a261, #e63946);
-      border: none;
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      padding: 16px 48px;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .winner-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
-    }
-    .confetti-container {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      overflow: hidden;
-      z-index: 10001;
-    }
-    .winner-overlay.show .winner-card {
-      transform: scale(1);
-    }
-    .winner-icon {
-      font-size: 4rem;
       margin-bottom: 16px;
-      animation: bounce 1s ease infinite;
-    }
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
-    .winner-title {
-      font-size: 2.5rem;
-      font-weight: 800;
-      color: #f4a261;
-      margin-bottom: 8px;
-      text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
-    }
-    .winner-name {
-      font-size: 3.5rem;
-      font-weight: 900;
-      color: #fff;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 4px;
-    }
-    .winner-subtitle {
-      font-size: 1.2rem;
-      color: #f4a261;
-      margin-bottom: 24px;
+      text-shadow: 0 0 30px rgba(244, 162, 97, 0.6);
     }
     .winner-stats {
       display: flex;
       gap: 32px;
       justify-content: center;
-      margin-bottom: 32px;
-      flex-wrap: wrap;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(244, 162, 97, 0.3);
     }
     .winner-stat {
-      background: rgba(244, 162, 97, 0.1);
-      border: 1px solid rgba(244, 162, 97, 0.3);
-      border-radius: 12px;
-      padding: 12px 24px;
+      text-align: center;
     }
     .winner-stat-label {
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       color: #888;
       text-transform: uppercase;
       letter-spacing: 1px;
       margin-bottom: 4px;
     }
     .winner-stat-value {
-      font-size: 1.5rem;
-      font-weight: 700;
+      font-size: 1.8rem;
+      font-weight: 800;
       color: #f4a261;
     }
     .winner-btn {
@@ -403,148 +340,37 @@
         opacity: 0;
       }
     }
-    body.tv-mode .topbar a,
-    body.tv-mode .header-controls,
-    body.tv-mode .hs-panel,
-    body.tv-mode .footer {
-      display: none !important;
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
     }
-    body.tv-mode .topbar { padding: 8px 14px; }
-    body.tv-mode .topbar h2 { font-size: .98rem; }
-    body.tv-mode main { max-width: none; padding: 8px; gap: 5px; }
-    body.tv-mode .focus-player { grid-template-columns: 1.35fr .65fr; gap: 5px; }
-    body.tv-mode .focus-card { padding: 10px; border-radius: 14px; }
-    body.tv-mode .focus-name { font-size: 1.06rem; margin-bottom: 2px; }
-    body.tv-mode .focus-meta { font-size: .68rem; margin-bottom: 5px; }
-    body.tv-mode .focus-kacheln { gap: 5px; }
-    body.tv-mode .focus-kachel:nth-child(1) { min-height: 200px; padding: 8px; border-radius: 11px; }
-    body.tv-mode .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; gap: 10px; }
-    body.tv-mode .focus-kachel:nth-child(2) > div { padding: 12px; }
-    body.tv-mode .focus-kachel:nth-child(2) h4 { font-size: .6rem; margin-bottom: 8px; }
-    body.tv-mode .focus-kachel h4 { font-size: .6rem; margin-bottom: 5px; }
-    body.tv-mode .focus-kachel .subline { font-size: .62rem; margin-top: 3px; }
-    body.tv-mode .throw-segments { max-width: 130px; gap: 6px; }
-    body.tv-mode .throw-seg { min-height: 56px; border-radius: 10px; }
-    body.tv-mode .throw-seg .seg { font-size: 1.1rem; }
-    body.tv-mode .throw-seg .pts { font-size: .66rem; margin-top: 2px; }
-    body.tv-mode .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 5px; }
-    body.tv-mode .focus-big-score { font-size: clamp(3rem, 7vw, 5rem); }
-    body.tv-mode .focus-summary { margin-top: 5px; gap: 4px; }
-    body.tv-mode .focus-summary div { padding: 5px; }
-    body.tv-mode .focus-summary span { font-size: .52rem; }
-    body.tv-mode .focus-summary strong { font-size: .8rem; margin-top: 1px; }
-    body.tv-mode .focus-leg-card { padding: 6px; border-radius: 14px; }
-    body.tv-mode .focus-leg-card h4 { font-size: .58rem; }
-    body.tv-mode .focus-leg-card .leg-list { max-height: 320px; }
-    body.tv-mode .leg-item { grid-template-columns: 60px 1fr 60px; padding: 4px 8px; font-size: .65rem; gap: 6px; }
-    body.tv-mode .leg-item .idx { padding-right: 6px; }
-    body.tv-mode .score-card { padding: 10px; border-radius: 10px; }
-    body.tv-mode .sc-name { font-size: .78rem; }
-    body.tv-mode .sc-score { font-size: 1.95rem; margin-bottom: 3px; }
-    body.tv-mode .sc-stats { font-size: .66rem; line-height: 1.35; }
-    body.tv-mode .sc-last-throws { margin-top: 5px; gap: 3px; }
-    body.tv-mode .sc-throw-chip { font-size: .66rem; padding: 2px 5px; min-width: 24px; }
-    body.tv-mode .sc-average { margin-top: 5px; font-size: .6rem; }
-    body.tv-mode .sc-average strong { font-size: .75rem; }
-    body.tv-mode .sc-legs { right: 8px; bottom: 7px; font-size: .58rem; }
-
-    @media (max-width: 1100px) and (max-height: 900px) {
-      body.tv-mode .focus-player { grid-template-columns: 1fr; }
-      body.tv-mode .focus-leg-card .leg-list { max-height: 120px; }
-      body.tv-mode .compact-players { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
-    }
-    @media (max-width: 768px) {
-      .scoreboard { grid-template-columns: 1fr; }
-      .sc-score { font-size: 3rem; }
-    }
-
-    @media (max-height: 900px) and (min-width: 900px) {
-      .topbar { padding: 8px 14px; gap: 8px; }
-      .topbar h2 { font-size: 1rem; }
-      .header-controls select { padding: 4px 7px; font-size: .72rem; }
-      .btn-icon { padding: 5px 9px; font-size: .72rem; }
-
-      main { padding: 10px; gap: 8px; }
-      .focus-player { gap: 8px; }
-      .focus-card { padding: 14px; border-radius: 14px; }
-      .focus-name { font-size: 1.15rem; }
-      .focus-meta { font-size: .72rem; margin-bottom: 10px; }
-      .focus-kacheln { gap: 8px; }
-      .focus-kachel:nth-child(1) { min-height: 200px; }
-      .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; gap: 10px; }
-      .focus-kachel:nth-child(2) > div { padding: 12px; }
-      .focus-kachel:nth-child(2) h4 { font-size: .6rem; margin-bottom: 8px; }
-      .focus-leg-card { border-radius: 14px; padding: 12px; }
-      .focus-leg-card .leg-list { max-height: 250px; }
-      .focus-kachel { min-height: 116px; padding: 10px; border-radius: 12px; }
-      .throw-segments { max-width: 130px; gap: 6px; }
-      .throw-seg { min-height: 58px; }
-      .throw-seg .pts { font-size: 1.2rem; }
-      .throw-seg .seg { font-size: .68rem; }
-      .focus-big-score { font-size: clamp(3rem, 7vw, 5rem); }
-      .focus-summary { margin-top: 8px; }
-      .focus-summary strong { font-size: .95rem; }
-      .leg-list { max-height: 200px; }
-      .leg-item { grid-template-columns: 60px 1fr 60px; font-size: .65rem; padding: 4px 8px; gap: 6px; }
-      .leg-item .idx { padding-right: 6px; }
-
-      .compact-players { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
-      .score-card { padding: 12px; border-radius: 11px; }
-      .sc-name { font-size: .86rem; }
-      .sc-score { font-size: 2.45rem; }
-      .sc-stats { font-size: .7rem; line-height: 1.45; }
-      .sc-last-throws { margin-top: 6px; }
-      .sc-throw-chip { padding: 3px 6px; font-size: .72rem; }
-
-      .hs-panel { padding: 8px; }
-      .hs-panel h4 { margin-bottom: 6px; }
-      .hs-table th { padding: 3px 4px; }
-      .hs-table td { padding: 3px 4px; }
-    }
-
-    @media (max-height: 780px) and (min-width: 900px) {
-      main {
-        max-height: calc(100vh - 58px);
-        overflow-y: auto;
-        padding-right: 6px;
-      }
-
-      .focus-player { grid-template-columns: minmax(0, 1fr) 320px; }
-      .focus-leg-card { min-height: 64px; padding: 10px; }
-      .leg-list { max-height: 120px; }
-      .focus-big-score { font-size: 2.9rem; }
-      .throw-segments { max-width: 100px; gap: 4px; }
-      .throw-seg { min-height: 54px; }
-      .throw-seg .pts { font-size: 1rem; }
-      .throw-seg .seg { font-size: .6rem; }
-
-      .compact-players { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
-      .sc-score { font-size: 2rem; }
-    }
-
-    @media (max-height: 780px) and (max-width: 1150px) {
-      .focus-player { grid-template-columns: 1fr; }
-    }
-
-    @media (max-width: 1180px) {
-      .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
-      .focus-kachel:nth-child(1) { min-height: 230px; }
-      .focus-kachel:nth-child(2) { min-height: 230px; padding: 16px 20px; }
-    }
+    .score-card .sc-stats { font-size: .68rem; color: #666; line-height: 1.5; }
+    .score-card .sc-stats span { color: #aaa; font-weight: 600; }
+    .score-card .sc-last-throws { display: flex; gap: 3px; }
+    .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 2px 6px; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 24px; text-align: center; }
+    .score-card .sc-throw-chip.empty { color: #333; }
 
     @media (width: 1024px) and (height: 860px) {
-      .focus-kachel:nth-child(1) { min-height: 200px; }
-      .focus-kachel:nth-child(2) { min-height: 200px; padding: 14px 16px; }
-      .focus-big-score { font-size: clamp(3.5rem, 8vw, 6rem); }
-      .throw-segments { max-width: 140px; }
-      .throw-seg { min-height: 60px; }
-      .throw-seg .pts { font-size: 1.3rem; }
-      .throw-seg .seg { font-size: .72rem; }
-    }
-
-    @media (max-width: 860px) {
-      .focus-kacheln { grid-template-columns: 1fr; }
-      .focus-kachel:nth-child(2) { gap: 10px; padding: 14px 16px; }
+      .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
+      .focus-kachel { min-height: 175px; padding: 6px; }
+      .focus-kachel h4 { font-size: .55rem; }
+      .throw-seg { min-height: 48px; }
+      .throw-seg .pts { font-size: 1rem; }
+      .focus-big-score { font-size: 4.2rem; }
+      .focus-summary { margin-top: 2px; }
+      .focus-summary div { padding: 3px; }
+      .focus-summary span { font-size: .45rem; }
+      .focus-summary strong { font-size: .7rem; }
+      .focus-player.has-others { flex: 1; }
+      .focus-leg-card { display: none; } /* Leg-Historie ausblenden auf TV */
+      .compact-players { gap: 3px; max-height: 20%; }
+      .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
+      .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
+      .compact-players .score-card .sc-name { font-size: .65rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-score { font-size: 1.1rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-stats { font-size: .5rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
+      .compact-players .score-card .sc-throw-chip { font-size: .55rem; padding: 1px 3px; min-width: 16px; border-radius: 4px; }
     }
   </style>
 </head>
@@ -552,46 +378,32 @@
   <!-- Winner Overlay -->
   <div class="winner-overlay" id="winnerOverlay"></div>
   
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+  
   <div class="topbar">
-    <a href="/">← Zurück</a>
+    <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
-    <div class="header-controls">
-      <select id="gameModeSelect" onchange="changeMode(this.value)">
-        <option value="501">501</option>
-        <option value="301">301</option>
-        <option value="701">701</option>
-        <option value="cricket">Cricket</option>
-        <option value="shanghai">Shanghai</option>
-        <option value="atc">Around the Clock</option>
-        <option value="split">Split</option>
-      </select>
-      <button class="btn-icon" onclick="undoLast()" id="undoBtn" title="Letzten Wurf rückgängig">↩ Undo</button>
-      <button class="btn-icon" onclick="nextPlayer()" id="nextBtn" title="Nächster Spieler">⏭ Next</button>
-      <button class="btn-icon primary" onclick="resetLeg(true)">Neues Leg</button>
-      <button class="btn-icon danger" onclick="resetLeg(false)">Reset</button>
-    </div>
+    <div class="clock" id="clockDisplay">--:--:--</div>
+    <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
   </div>
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
     <section class="compact-players" id="compactPlayers"></section>
-    <div class="hs-panel">
-      <h4>🏆 Highscores</h4>
-      <table class="hs-table">
-        <thead><tr><th>#</th><th>Spieler</th><th>Score</th><th>Typ</th><th>Zeit</th></tr></thead>
-        <tbody id="highscoreBody"><tr><td colspan="5" class="hs-muted">Keine Einträge</td></tr></tbody>
-      </table>
-    </div>
+    <div id="countdownDisplay" style="display:none;text-align:center;padding:6px;background:#1a1a1a;border:1px solid #e63946;border-radius:10px;color:#f4a261;font-weight:700;font-size:.9rem"></div>
   </main>
-  <div class="toast" id="toast"></div>
   <script>
     let liveState = null;
-    let liveDisplaySettings = { liveDisplayProfile: 'auto', liveDisplayScale: 100 };
     let countdownTimer = null;
 
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
       const action = state && state.lastAction;
-      if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) return;
+      if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) {
+        const el = document.getElementById('countdownDisplay');
+        if (el) el.style.display = 'none';
+        return;
+      }
       const startedAt = action.autoAdvanceStartedAt || Date.now();
       const delayMs = action.autoAdvanceDelayMs;
       countdownTimer = setInterval(() => {
@@ -613,135 +425,6 @@
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-    // ── SSE für Live-Reload ──
-    (function() {
-      const sse = new EventSource('/api/events');
-      let reloadQueued = false;
-      sse.addEventListener('reload', () => {
-        if (reloadQueued) return;
-        reloadQueued = true;
-        setTimeout(() => {
-          reloadQueued = false;
-          loadAll().catch(() => {});
-        }, 120);
-      });
-    })();
-
-    function clampDisplayScale(value) {
-      const n = Number(value);
-      if (!Number.isFinite(n)) return 100;
-      return Math.max(80, Math.min(125, Math.round(n)));
-    }
-
-    function applyLiveDisplaySettings(settings) {
-      const profile = String(settings && settings.liveDisplayProfile || 'auto').trim() || 'auto';
-      const scale = clampDisplayScale(settings && settings.liveDisplayScale);
-      liveDisplaySettings = { liveDisplayProfile: profile, liveDisplayScale: scale };
-      document.body.dataset.displayProfile = profile;
-      document.body.style.setProperty('--live-scale', String(scale / 100));
-    }
-
-    // ── State Laden & Rendern ──
-    async function loadAll() {
-      let state, highscores, settings;
-      try {
-        const [stateRes, settingsRes] = await Promise.all([
-          fetch('/api/live/state'),
-          fetch('/api/settings').catch(() => null)
-        ]);
-        if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
-        state = await stateRes.json();
-        liveState = state;
-        settings = settingsRes && settingsRes.ok ? await settingsRes.json() : null;
-      } catch(e) {
-        document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
-        return;
-      }
-      try {
-        const hsRes = await fetch('/api/highscores');
-        if (hsRes.ok) highscores = await hsRes.json();
-      } catch { highscores = []; }
-
-      applyLiveDisplaySettings(settings || liveDisplaySettings);
-      renderState(state);
-      renderHighscores(highscores);
-    }
-
-    // ── State Rendern ──
-    function renderState(state) {
-      if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
-      const activePlayer = state.game.activePlayer || 0;
-      const mode = state.game.mode || '501';
-      const sel = document.getElementById('gameModeSelect');
-      if (sel.value !== mode) sel.value = mode;
-      const active = state.players[activePlayer];
-      const focusPlayer = document.getElementById('focusPlayer');
-      const compactPlayers = document.getElementById('compactPlayers');
-
-      const isCricket = mode === 'cricket';
-      const hasOthers = state.players.length > 1;
-      focusPlayer.classList.toggle('has-others', hasOthers);
-
-      // Check for leg finished (winner)
-      const isLegFinished = state.game.status === 'leg-finished';
-      const winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
-
-      if (isCricket) {
-        focusPlayer.classList.add('single');
-        focusPlayer.innerHTML = renderCricketView(active, state);
-      } else {
-        focusPlayer.classList.remove('single');
-        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
-      }
-
-      if (hasOthers) {
-        const compactOrder = [...state.players]
-          .filter((_p, idx) => idx !== activePlayer)
-          .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
-        compactPlayers.innerHTML = compactOrder
-          .map((p) => renderCompactPlayer(p, mode)).join('');
-      } else {
-        compactPlayers.innerHTML = '';
-      }
-
-      // Winner overlay
-      if (isLegFinished && winner) {
-        showWinnerOverlay(winner, state);
-      } else {
-        hideWinnerOverlay();
-      }
-
-      startCountdown(state);
-    }
-    function renderCricketView(p, state) {
-      if (!p) return '';
-      const activeIdx = state.game.activePlayer || 0;
-      const throws = Array.isArray(p.throws) ? p.throws : [];
-      const lastThrows = throws.slice(-3);
-      const cricketHits = p.cricketHits || {};
-      const cricketClosed = p.cricketClosed || {};
-      const nums = [15,16,17,18,19,20,25];
-      const gridHtml = nums.map(n => {
-        const hits = cricketHits[n] || 0;
-        const closed = !!cricketClosed[n];
-        return '<div class="c-num' + (closed ? ' closed' : '') + '"><div class="num">' + n + '</div><div class="hits">' + (closed ? '✔' : hits + '/3') + '</div></div>';
-      }).join('');
-
-      const totalScored = p.totalScored || 0;
-      const turns = p.turns || 0;
-      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
-
-      return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
-        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
-        '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr">' +
-          '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div>' +
-          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
-        '</div>' +
-        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Punkte</span><strong>' + totalScored + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
-      '</div>';
-    }
-
     function getPointsPerAufnahme(player) {
       const currentRound = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
       // Wenn currentRoundPoints existiert (auch wenn leer), ist das die aktuelle Aufnahme
@@ -749,10 +432,8 @@
       if (currentRound.length >= 0) {
         return currentRound.reduce((sum, pt) => sum + (Number(pt) || 0), 0);
       }
-
       const throws = Array.isArray(player && player.throws) ? player.throws : [];
       if (throws.length === 0) return '-';
-
       const remainder = throws.length % 3;
       const chunkSize = remainder === 0 ? 3 : remainder;
       const lastChunk = throws.slice(-chunkSize);
@@ -764,6 +445,8 @@
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const lastThrows = throws.slice(-3);
+      // Wenn currentRoundPoints existiert (auch leer), das für Anzeige nutzen
+      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> leere Slots anzeigen
       const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
@@ -771,10 +454,12 @@
       const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
-
-      // Würfe: Punkte oben (rot/groß), Segment unten (grau/klein)
+      
+      // Würfe für die linke Kachel (vertikal): Punkte oben (rot/groß), Segment unten (grau/klein)
+      // Wir nutzen die letzten 3 Würfe aus dem throws Array für die Segmente
       const throwsHtml = displayThrows.map((pt, ti) => {
-        const pointsLabel = pt === null ? '-' : (pt === 0 ? '0' : '+' + pt);
+        const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
+        // Segment aus dem throws Array holen (falls vorhanden)
         const throwData = lastThrows[ti];
         const segmentLabel = (throwData && throwData.segment) ? throwData.segment : (pt === null ? '-' : String(pt));
         return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
@@ -839,6 +524,41 @@
       '</aside>';
     }
 
+    function renderCricketView(p, state) {
+      if (!p) return '';
+      const throws = Array.isArray(p.throws) ? p.throws : [];
+      const lastThrows = throws.slice(-3);
+      const cricketHits = p.cricketHits || {};
+      const cricketClosed = p.cricketClosed || {};
+      const nums = [15,16,17,18,19,20,25];
+      const gridHtml = nums.map(n => {
+        const hits = cricketHits[n] || 0;
+        const closed = !!cricketClosed[n];
+        return '<div class="c-num' + (closed ? ' closed' : '') + '"><div class="num">' + n + '</div><div class="hits">' + (closed ? '✔' : hits + '/3') + '</div></div>';
+      }).join('');
+      const totalScored = p.totalScored || 0;
+      const turns = p.turns || 0;
+      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+      return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+        '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr">' +
+          '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div>' +
+          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
+        '</div>' +
+        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Punkte</span><strong>' + totalScored + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
+      '</div>';
+    }
+
+    function colorToRgba(hex, alpha) {
+      const clean = String(hex || '#e63946').replace('#', '');
+      if (clean.length !== 6) return 'rgba(230,57,70,' + alpha + ')';
+      const r = parseInt(clean.slice(0, 2), 16);
+      const g = parseInt(clean.slice(2, 4), 16);
+      const b = parseInt(clean.slice(4, 6), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
     function renderCompactPlayer(p, mode) {
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
@@ -862,21 +582,48 @@
       '</div>';
     }
 
-    function colorToRgba(hex, alpha) {
-      const clean = String(hex || '#e63946').replace('#', '');
-      if (clean.length !== 6) return 'rgba(230,57,70,' + alpha + ')';
-      const r = parseInt(clean.slice(0, 2), 16);
-      const g = parseInt(clean.slice(2, 4), 16);
-      const b = parseInt(clean.slice(4, 6), 16);
-      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
-    }
+    function renderState(state) {
+      if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
+      const activePlayer = state.game.activePlayer || 0;
+      const mode = state.game.mode || '501';
+      const active = state.players[activePlayer];
+      const focusPlayer = document.getElementById('focusPlayer');
+      const compactPlayers = document.getElementById('compactPlayers');
 
-    // ── Toast ──
-    function showToast(msg, isError) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.className = 'toast show' + (isError ? ' err' : '');
-      setTimeout(() => t.className = 'toast', 2500);
+      const isCricket = mode === 'cricket';
+      const hasOthers = state.players.length > 1;
+      focusPlayer.classList.toggle('has-others', hasOthers);
+
+      // Check for leg finished (winner)
+      const isLegFinished = state.game.status === 'leg-finished';
+      const winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
+
+      if (isCricket) {
+        focusPlayer.classList.add('single');
+        focusPlayer.innerHTML = renderCricketView(active, state);
+      } else {
+        focusPlayer.classList.remove('single');
+        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
+      }
+
+      if (hasOthers) {
+        const compactOrder = [...state.players]
+          .filter((_p, idx) => idx !== activePlayer)
+          .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
+        compactPlayers.innerHTML = compactOrder
+          .map((p) => renderCompactPlayer(p, mode)).join('');
+      } else {
+        compactPlayers.innerHTML = '';
+      }
+
+      // Winner overlay
+      if (isLegFinished && winner) {
+        showWinnerOverlay(winner, state);
+      } else {
+        hideWinnerOverlay();
+      }
+
+      startCountdown(state);
     }
 
     // ── Winner Overlay ──
@@ -942,43 +689,7 @@
       }
     }
 
-    // ── Highscores ──
-    function renderHighscores(list) {
-      const tbody = document.getElementById('highscoreBody');
-      if (!Array.isArray(list) || list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="hs-muted">Keine Einträge</td></tr>';
-        return;
-      }
-      tbody.innerHTML = list.slice(0, 20).map(function(entry, idx) {
-        var d = entry.ts ? new Date(entry.ts) : null;
-        var timeStr = d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '-';
-        return '<tr><td class="rank">' + (idx + 1) + '</td><td class="name">' + escapeHtml(entry.player) + '</td><td class="score">' + entry.score + '</td><td>' + (entry.kind || '-') + '</td><td class="when">' + timeStr + '</td></tr>';
-      }).join('');
-    }
-
-    // ── Undo ──
-    async function undoLast() {
-      try {
-        var r = await fetch('/api/live/undo', { method: 'POST' });
-        if (!r.ok) { showToast('Kein Wurf zum Rückgängigmachen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Letzter Wurf rückgängig');
-      } catch(e) { showToast('Netzwerkfehler', true); }
-    }
-
-    // ── Next Player ──
-    async function nextPlayer() {
-      try {
-        var r = await fetch('/api/live/next-player', { method: 'POST' });
-        if (!r.ok) { showToast('Fehler', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Nächster Spieler');
-      } catch(e) { showToast('Netzwerkfehler', true); }
-    }
-
-    // ── Next Leg (nach Leg-Gewinn) ──
+    // ── Next Leg ──
     async function nextLeg() {
       try {
         var r = await fetch('/api/live/reset', {
@@ -994,40 +705,101 @@
       } catch(e) { showToast('Netzwerkfehler', true); }
     }
 
-    async function changeMode(mode) {
-      try {
-        var r = await fetch('/api/game/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
-        if (!r.ok) { showToast('Modus-Wechsel fehlgeschlagen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Modus: ' + mode);
-        loadHighscoresOnly();
-      } catch(e) { showToast('Netzwerkfehler', true); }
+    // ── Toast ──
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      if (!t) return;
+      t.textContent = msg;
+      t.className = 'toast show' + (isError ? ' err' : '');
+      setTimeout(() => t.className = 'toast', 2500);
     }
 
-    // ── Reset ──
-    async function resetLeg(carryLegs) {
-      try {
-        var r = await fetch('/api/live/reset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ carryLegs: carryLegs })
-        });
-        if (!r.ok) { showToast('Reset fehlgeschlagen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast(carryLegs ? 'Neues Leg gestartet (Legs erhalten)' : 'Spiel zurückgesetzt');
-        loadHighscoresOnly();
-      } catch(e) { showToast('Netzwerkfehler', true); }
+    // ── Uhrzeit aktualisieren ──
+    function updateClock() {
+      const el = document.getElementById('clockDisplay');
+      if (el) el.textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ── Vollbild ein-/ausschalten ──
+    function toggleFullscreen() {
+      const doc = document;
+      const docEl = doc.documentElement;
+
+      if (!doc.fullscreenElement && !doc.webkitFullscreenElement && 
+          !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+        const request = docEl.requestFullscreen || 
+                        docEl.webkitRequestFullscreen || 
+                        docEl.mozRequestFullScreen || 
+                        docEl.msRequestFullscreen;
+        if (request) {
+          request.call(docEl).catch(function(err) {
+            showToast('Vollbild nicht möglich: ' + err.message, true);
+          });
+        } else {
+          showToast('Vollbild wird von diesem Browser nicht unterstützt', true);
+        }
+      } else {
+        const exit = doc.exitFullscreen || 
+                     doc.webkitExitFullscreen || 
+                     doc.mozCancelFullScreen || 
+                     doc.msExitFullscreen;
+        if (exit) exit.call(doc);
+      }
     }
 
-    // ── Highscores separat laden ──
-    async function loadHighscoresOnly() {
-      try {
-        var r = await fetch('/api/highscores');
-        if (r.ok) renderHighscores(await r.json());
-      } catch {}
+    // ── Button-Icon anpassen bei Vollbild-Änderung ──
+    function updateFullscreenButton() {
+      const btn = document.getElementById('fsBtn');
+      if (!btn) return;
+      
+      const isFullscreen = !!(document.fullscreenElement || 
+                              document.webkitFullscreenElement || 
+                              document.mozFullScreenElement || 
+                              document.msFullscreenElement);
+      
+      btn.title = isFullscreen ? 'Vollbild beenden (ESC)' : 'Vollbild aktivieren';
+      
+      if (isFullscreen) {
+        btn.style.borderColor = '#f4a261';
+        btn.style.color = '#f4a261';
+      } else {
+        btn.style.borderColor = '#444';
+        btn.style.color = '#f1f1f1';
+      }
     }
+
+    // ── Event-Listener für alle Browser ──
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+    document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+    document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+
+    async function loadAll() {
+      try {
+        const stateRes = await fetch('/api/live/state');
+        if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
+        const state = await stateRes.json();
+        liveState = state;
+        renderState(state);
+      } catch(e) {
+        document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
+      }
+    }
+
+    (function() {
+      const sse = new EventSource('/api/events');
+      let reloadQueued = false;
+      sse.addEventListener('reload', () => {
+        if (reloadQueued) return;
+        reloadQueued = true;
+        setTimeout(() => {
+          reloadQueued = false;
+          loadAll().catch(() => {});
+        }, 120);
+      });
+    })();
 
     loadAll();
   </script>
