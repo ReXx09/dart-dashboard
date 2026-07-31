@@ -94,14 +94,14 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      min-height: 180px;
+      min-height: 220px;
     }
     .focus-kachel:nth-child(2) {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      min-height: 180px;
-      padding: 10px 14px;
+      gap: 8px;
+      min-height: 220px;
+      padding: 12px 16px;
     }
     .focus-kachel:nth-child(2) > div {
       flex: 1;
@@ -111,14 +111,14 @@
       justify-content: center;
       text-align: center;
       width: 100%;
-      padding: 8px;
+      padding: 10px;
       background: #141414;
       border: 1px solid #2a2a2a;
       border-radius: 10px;
     }
     .focus-kachel:nth-child(2) h4 {
-      margin: 0 0 6px 0;
-      font-size: .55rem;
+      margin: 0 0 8px 0;
+      font-size: .6rem;
       color: #888;
       text-transform: uppercase;
       letter-spacing: 1.5px;
@@ -137,21 +137,21 @@
     }
     .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
     .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; }
-    .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; width: 100%; }
+    .throw-segments { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 150px; }
     .throw-seg {
       background: #1b1b1b;
       border: 1px solid #2b2b2b;
       border-radius: 10px;
-      min-height: 58px;
+      min-height: 60px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       font-weight: 800;
     }
-    .throw-seg .pts { font-size: 1.0rem; color: var(--pc, #e63946); }
+    .throw-seg .pts { font-size: 1.4rem; color: var(--pc, #e63946); }
     .throw-seg .seg { font-size: .85rem; color: #555; margin-top: 2px; }
-    .focus-big-score { font-size: 3.0rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .focus-big-score { font-size: 3.5rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
     .focus-summary { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
     .focus-summary div { background: #141414; border-radius: 10px; padding: 4px; text-align: center; }
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
@@ -218,7 +218,7 @@
       flex-direction: column;
       gap: 6px;
     }
-    .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; }
+    .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; margin-bottom: 8px; flex-shrink: 0; }
     .score-card .sc-name { font-size: .86rem; font-weight: 700; }
     .score-card .sc-score { font-size: 2.2rem; font-weight: 800; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
 
@@ -466,20 +466,20 @@
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
         '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
-        '<div class="focus-kacheln" style="grid-template-columns: 0.7fr 1.8fr;">' +
+        '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe / Zahlen</h4>' +
-            '<div class="throw-segments" style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:150px;">' + throwsHtml + '</div>' +
+            '<div class="throw-segments">' + throwsHtml + '</div>' +
             '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
-          '<div class="focus-kachel" style="display:flex;flex-direction:column;gap:16px;min-height:280px;padding:20px 24px;">' +
-            '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;width:100%;padding:20px;background:#141414;border:1px solid #2a2a2a;border-radius:12px;">' +
-              '<h4 style="margin:0 0 12px 0;font-size:.7rem;color:#888;text-transform:uppercase;letter-spacing:1.5px;">Gesamt / Rest</h4>' +
-              '<div class="focus-big-score" style="font-size:clamp(4rem,10vw,8rem);line-height:1;color:#f4a261;">' + p.remaining + '</div>' +
+          '<div class="focus-kachel">' +
+            '<div>' +
+              '<h4>Gesamt / Rest</h4>' +
+              '<div class="focus-big-score">' + p.remaining + '</div>' +
             '</div>' +
-            '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;width:100%;padding:20px;background:#141414;border:1px solid #2a2a2a;border-radius:12px;">' +
-              '<h4 style="margin:0 0 12px 0;font-size:.7rem;color:#888;text-transform:uppercase;letter-spacing:1.5px;">Punkte pro Aufnahme</h4>' +
-              '<div class="focus-big-score" style="font-size:clamp(4rem,10vw,8rem);line-height:1;color:#f4a261;">' + aufnahmeScore + '</div>' +
+            '<div>' +
+              '<h4>Punkte pro Aufnahme</h4>' +
+              '<div class="focus-big-score">' + aufnahmeScore + '</div>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -506,10 +506,10 @@
             const throwsHtml = turn.throws.map((seg, si) => 
               '<span>' + escapeHtml(seg) + '</span>' + (si < turn.throws.length - 1 ? '<span class="sep">|</span>' : '')
             ).join('');
-            return '<div class="leg-item" style="display:grid;grid-template-columns:80px 1fr 80px;align-items:center;">' +
-              '<span class="idx" style="color:#777;font-weight:600;text-align:right;padding-right:12px;border-right:1px solid #333;">Aufnahme ' + turnIdx + '</span>' +
-              '<span class="throws" style="display:flex;justify-content:center;align-items:center;gap:8px;color:#ddd;">' + throwsHtml + '</span>' +
-              '<span class="score" style="color:#f4a261;font-weight:700;font-variant-numeric:tabular-nums;text-align:right;">' + turn.score + '</span>' +
+            return '<div class="leg-item">' +
+              '<span class="idx">Aufnahme ' + turnIdx + '</span>' +
+              '<span class="throws">' + throwsHtml + '</span>' +
+              '<span class="score">' + turn.score + '</span>' +
             '</div>';
           }).join('')
         : '<div class="subline">Noch keine Aufnahmen erfasst</div>';
