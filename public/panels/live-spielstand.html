@@ -103,7 +103,7 @@
     }
     .focus-kachel:nth-child(2) {
       display: flex;
-      flex-direction: row;            /* nebeneinander */
+      flex-direction: column;
       gap: 8px;
       padding: 12px 16px;
       min-height: 0;
@@ -169,7 +169,7 @@
     .throw-seg .pts { font-size: 1.2rem; color: var(--pc, #e63946); }
     .throw-seg .seg { font-size: .75rem; color: #555; margin-top: 1px; }
     .focus-big-score {
-      font-size: clamp(8rem, 8vw, 9rem);
+      font-size: clamp(4rem, 8vw, 6.5rem);
       font-weight: 900;
       line-height: 1.2;
       color: var(--pc, #f4a261);
@@ -189,6 +189,8 @@
     .focus-summary div { background: #141414; border-radius: 10px; padding: 4px; text-align: center; }
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
     .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
+
+    /* Leg-Liste – neu mit fester maximaler Höhe */
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
@@ -198,45 +200,59 @@
       flex-direction: column;
       gap: 4px;
       overflow: hidden;
+      flex: 0 1 auto;          /* nicht dehnen, aber schrumpfen */
+      max-height: 40vh;         /* auf Tablets max. 40% der Bildschirmhöhe */
+    }
+    .focus-leg-card h4 {
+      color: #777;
+      font-size: .56rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .leg-list {
+      width: 100%;
+      display: grid;
+      gap: 3px;
+      overflow: auto;
       flex: 1;
       min-height: 0;
     }
-    .focus-leg-card h4 { color: #777; font-size: .56rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; flex-shrink: 0; }
-    .leg-list { width: 100%; display: grid; gap: 3px; overflow: auto; flex: 1; }
     .leg-item { 
-      display: grid; 
-      grid-template-columns: 80px 1fr 80px; 
-      align-items: center; 
-      background: #1b1b1b; 
-      border: 1px solid #2b2b2b; 
-      border-radius: 8px; 
-      padding: 4px 8px; 
-      font-size: .65rem; 
+      display: grid;
+      grid-template-columns: 80px 1fr 80px;
+      align-items: center;
+      background: #1b1b1b;
+      border: 1px solid #2b2b2b;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: .65rem;
       gap: 8px;
     }
-    .leg-item .idx { 
-      color: #777; 
+    .leg-item .idx {
+      color: #777;
       font-weight: 600;
       text-align: right;
       padding-right: 8px;
       border-right: 1px solid #333;
     }
-    .leg-item .throws { 
-      display: flex; 
-      justify-content: center; 
-      align-items: center; 
-      gap: 6px; 
+    .leg-item .throws {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
       color: #ddd;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
-    .leg-item .throws .sep { 
-      color: #555; 
-      font-weight: 300; 
+    .leg-item .throws .sep {
+      color: #555;
+      font-weight: 300;
     }
-    .leg-item .score { 
-      color: #f4a261; 
-      font-weight: 700; 
-      font-variant-numeric: tabular-nums; 
+    .leg-item .score {
+      color: #f4a261;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
       text-align: right;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
@@ -418,7 +434,7 @@
       .focus-summary span { font-size: .4rem; }
       .focus-summary strong { font-size: .65rem; }
       .focus-player.has-others { flex: 1; }
-      .focus-leg-card { display: none; }
+      .focus-leg-card { display: none; }  /* im TV‑Modus ausblenden */
       .compact-players { gap: 3px; max-height: 20%; }
       .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
       .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
@@ -499,7 +515,7 @@
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const lastThrows = throws.slice(-3);
-      const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
+      const displayThrows = (currentRound.length > 0) ? [...currentRound] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
@@ -509,11 +525,18 @@
       
       const throwsHtml = displayThrows.map((pt, ti) => {
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
-        const throwData = lastThrows[ti];
-        const segmentLabel = (throwData && throwData.segment) ? throwData.segment : (pt === null ? '-' : String(pt));
+        let segmentLabel = '';
+        if (currentRound.length === 0) {
+          const throwData = lastThrows[ti];
+          if (throwData && throwData.segment) {
+            segmentLabel = throwData.segment;
+          } else {
+            segmentLabel = pt !== null ? String(pt) : '-';
+          }
+        }
         return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
-          '<div class="seg">' + segmentLabel + '</div>' +
+          (segmentLabel ? '<div class="seg">' + segmentLabel + '</div>' : '') +
         '</div>';
       }).join('');
 
@@ -642,7 +665,6 @@
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
-      // Winner-Erkennung: Spieler mit Rest 0
       const winner = state.players.find(p => Number(p.remaining) === 0);
 
       if (isCricket) {
