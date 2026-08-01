@@ -6,6 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
+  <!-- PWA Meta Tags für "Zum Startbildschirm hinzufügen" -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Dart Dashboard" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <link rel="manifest" href="/manifest.json" />
   <title>Live-Spielstand TV</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1422,6 +1429,28 @@
     function toggleFullscreen() {
       const doc = document;
       const docEl = doc.documentElement;
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isAndroid = /Android/.test(navigator.userAgent);
+      const isTablet = isIOS || isAndroid || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+
+      console.log('[Fullscreen] Toggle called', {
+        fullscreenElement: !!doc.fullscreenElement,
+        webkitFullscreenElement: !!doc.webkitFullscreenElement,
+        mozFullScreenElement: !!doc.mozFullScreenElement,
+        msFullscreenElement: !!doc.msFullscreenElement,
+        isSecureContext: window.isSecureContext,
+        location: window.location.href,
+        isIOS,
+        isAndroid,
+        isTablet,
+        standalone: window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
+      });
+
+      // Bereits im Standalone-Modus (PWA) → nichts tun
+      if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+        showToast('Bereits im Vollbild-Modus (PWA)', false);
+        return;
+      }
 
       if (!doc.fullscreenElement && !doc.webkitFullscreenElement && 
           !doc.mozFullScreenElement && !doc.msFullscreenElement) {
@@ -1430,8 +1459,29 @@
                         docEl.mozRequestFullScreen || 
                         docEl.msRequestFullscreen;
         if (request) {
-          request.call(docEl).catch(function(err) {
-            showToast('Vollbild nicht möglich: ' + err.message, true);
+          // iOS: requestFullscreen auf documentElement funktioniert NICHT
+          // Nur auf Video-Elementen erlaubt
+          if (isIOS) {
+            console.warn('[Fullscreen] iOS detected - documentElement fullscreen not supported');
+            showToast('iOS: "Zum Startbildschirm hinzufügen" für echten Vollbild-Modus', true);
+            return;
+          }
+          
+          request.call(docEl).then(() => {
+            console.log('[Fullscreen] Entered successfully');
+          }).catch(function(err) {
+            console.error('[Fullscreen] Error:', err.name, err.message);
+            
+            // Tablet-spezifische Fehlerbehandlung
+            if (isTablet) {
+              if (err.name === 'TypeError' || err.name === 'SecurityError') {
+                showToast('Tablet: "Zum Startbildschirm hinzufügen" für Vollbild nutzen', true);
+              } else {
+                showToast('Vollbild nicht möglich: ' + err.message, true);
+              }
+            } else {
+              showToast('Vollbild nicht möglich: ' + err.message, true);
+            }
           });
         } else {
           showToast('Vollbild wird von diesem Browser nicht unterstützt', true);
