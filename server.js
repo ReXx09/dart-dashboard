@@ -2343,6 +2343,19 @@ app.delete('/api/highscores', async (_req, res) => {
   } catch (err) { res.status(500).json({ error: 'Highscores konnten nicht gelöscht werden: ' + err.message }); }
 });
 
+// ── Täglicher Höchstwert ──
+app.get('/api/highscores/daily', async (_req, res) => {
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const fromTs = todayStart.getTime();
+    const all = await getHighscores();
+    const today = all.filter(e => Number(e.ts) >= fromTs).sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0));
+    const best = today.length > 0 ? today[0] : null;
+    res.json({ best, count: today.length, list: today });
+  } catch (err) { res.status(500).json({ error: 'Daily-Highscore fehlgeschlagen: ' + err.message }); }
+});
+
 // ── Player Statistics ──
 app.get('/api/players/:id/stats', async (req, res) => {
   try {

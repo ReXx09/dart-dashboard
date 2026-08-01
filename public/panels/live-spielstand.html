@@ -35,6 +35,34 @@
     .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
     .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
     .topbar .fs-btn.active { border-color: #f4a261; color: #f4a261; }
+    .topbar .miss-btn {
+      background: #8b0000;
+      border: 1px solid #e63946;
+      color: #f1f1f1;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .78rem;
+      font-family: inherit;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .topbar .miss-btn:hover { background: #a00; border-color: #f4a261; color: #f4a261; }
+    .topbar .miss-btn:disabled { opacity: .4; cursor: default; }
+    .daily-hs {
+      font-size: .72rem;
+      color: #f4a261;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 3px 10px;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
+    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
 
     main {
       padding: 6px;
@@ -601,6 +629,8 @@
     <label>Finish <select id="checkoutRuleSelect" onchange="changeCheckoutRule(this.value)"></select></label>
     <div class="clock" id="clockDisplay">--:--:--</div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
+    <button class="miss-btn" id="missBtn" onclick="skipPlayer()" title="Fehlwurf – zum nächsten Spieler wechseln">✖ Fehlwurf</button>
+    <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
 
   <main>
@@ -1185,6 +1215,43 @@
     document.addEventListener('mozfullscreenchange', updateFullscreenButton);
     document.addEventListener('MSFullscreenChange', updateFullscreenButton);
 
+    // ── Fehlwurf – nächster Spieler ──
+    async function skipPlayer() {
+      const btn = document.getElementById('missBtn');
+      if (btn) btn.disabled = true;
+      try {
+        const r = await fetch('/api/live/next-player', { method: 'POST' });
+        if (!r.ok) { showToast('Wechsel fehlgeschlagen', true); if (btn) btn.disabled = false; return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('➡ Fehlwurf – weiter mit ' + (liveState.players[liveState.game.activePlayer]?.name || 'nächstem Spieler'));
+      } catch(e) { showToast('Netzwerkfehler', true); }
+      if (btn) setTimeout(() => btn.disabled = false, 1000);
+    }
+
+    // ── Täglicher Höchstwert ──
+    let dailyHighscoreCache = null;
+    async function loadDailyHighscore() {
+      try {
+        const r = await fetch('/api/highscores/daily');
+        if (!r.ok) return;
+        const data = await r.json();
+        dailyHighscoreCache = data;
+        renderDailyHighscore(data);
+      } catch {}
+    }
+    function renderDailyHighscore(data) {
+      const el = document.getElementById('dailyHsDisplay');
+      if (!el) return;
+      if (data && data.best) {
+        el.querySelector('.hs-val').textContent = data.best.score + ' (' + data.best.player + ')';
+        el.title = 'Heute: ' + data.count + ' Einträge · Bester: ' + data.best.player + ' mit ' + data.best.score;
+      } else {
+        el.querySelector('.hs-val').textContent = '–';
+        el.title = data && data.count ? data.count + ' Einträge' : 'Keine Einträge heute';
+      }
+    }
+
     // ── Spielmodus / Checkout-Regel ──
     async function loadGameModes() {
       try {
@@ -1293,6 +1360,8 @@
       } catch(e) {
         document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
       }
+      // Daily Highscore parallel laden
+      loadDailyHighscore();
     }
 
     loadGameModes();
