@@ -579,24 +579,25 @@ class DataStore {
 
     if (this.isSQLite()) {
       rows = await this.sqlite.all(
-        'SELECT player, score, kind, leg_win AS legWin, ts FROM highscores ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, score, kind, leg_win AS legWin, ts FROM highscores ORDER BY score DESC, ts DESC LIMIT ?',
         [safeLimit]
       );
     } else if (this.isPostgres()) {
       const result = await this.pg.query(
-        'SELECT player, score, kind, leg_win AS "legWin", ts FROM highscores ORDER BY score DESC, ts DESC LIMIT $1',
+        'SELECT id, player, score, kind, leg_win AS "legWin", ts FROM highscores ORDER BY score DESC, ts DESC LIMIT $1',
         [safeLimit]
       );
       rows = result.rows;
     } else {
       const result = await this.my.query(
-        'SELECT player, score, kind, leg_win AS legWin, ts FROM highscores ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, score, kind, leg_win AS legWin, ts FROM highscores ORDER BY score DESC, ts DESC LIMIT ?',
         [safeLimit]
       );
       rows = result[0];
     }
 
     return rows.map((r) => ({
+      id: Number(r.id || 0),
       player: String(r.player || ''),
       score: Number(r.score || 0),
       kind: r.kind || null,
@@ -636,6 +637,33 @@ class DataStore {
       'INSERT INTO highscores (player, score, kind, leg_win, ts) VALUES (?, ?, ?, ?, ?)',
       [player, score, kind, legWin ? 1 : 0, ts]
     );
+  }
+
+  async deleteHighscore(id) {
+    const safeId = Number(id);
+    if (!Number.isFinite(safeId) || safeId <= 0) return;
+
+    if (this.isSQLite()) {
+      await this.sqlite.run('DELETE FROM highscores WHERE id = ?', [safeId]);
+      return;
+    }
+    if (this.isPostgres()) {
+      await this.pg.query('DELETE FROM highscores WHERE id = $1', [safeId]);
+      return;
+    }
+    await this.my.query('DELETE FROM highscores WHERE id = ?', [safeId]);
+  }
+
+  async clearAllHighscores() {
+    if (this.isSQLite()) {
+      await this.sqlite.run('DELETE FROM highscores');
+      return;
+    }
+    if (this.isPostgres()) {
+      await this.pg.query('DELETE FROM highscores');
+      return;
+    }
+    await this.my.query('DELETE FROM highscores');
   }
 
   async initPlayerStats(playerId) {

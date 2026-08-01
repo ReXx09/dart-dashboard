@@ -142,6 +142,34 @@
     </fieldset>
   </div>
 
+  <div class="section">
+    <div class="sec-hd"><span class="sec-title">Highscore-Verwaltung</span><div class="sec-line"></div></div>
+    <fieldset>
+      <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:.82rem;color:#888">Einträge: <strong id="hsCount" style="color:#f4a261">0</strong></span>
+        <button class="btn-save" id="refreshHsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Aktualisieren</button>
+        <button class="btn-save" id="clearAllHsBtn" style="background:#8b0000;border:none;padding:6px 14px;font-size:.78rem">🗑 Alle löschen</button>
+      </div>
+      <div style="max-height:400px;overflow-y:auto;border:1px solid #1e1e1e;border-radius:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+          <thead>
+            <tr style="background:#0d0d0d;position:sticky;top:0">
+              <th style="padding:8px 10px;text-align:left;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">#</th>
+              <th style="padding:8px 10px;text-align:left;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Spieler</th>
+              <th style="padding:8px 10px;text-align:right;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Score</th>
+              <th style="padding:8px 10px;text-align:left;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Typ</th>
+              <th style="padding:8px 10px;text-align:left;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Datum</th>
+              <th style="padding:8px 10px;text-align:center;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Aktion</th>
+            </tr>
+          </thead>
+          <tbody id="hsTableBody">
+            <tr><td colspan="6" style="padding:30px;text-align:center;color:#555">Lade Highscores...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </fieldset>
+  </div>
+
 </main>
 <div class="toast" id="toast"></div>
 <script>
@@ -266,6 +294,105 @@
   });
 
   load();
+</script>
+
+<script>
+  // ── Highscore-Verwaltung ──
+  let hsData = [];
+
+  async function loadHighscores() {
+    try {
+      const r = await fetch('/api/highscores');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      hsData = await r.json();
+      renderHighscores();
+    } catch(e) {
+      document.getElementById('hsTableBody').innerHTML = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#e63946">Fehler beim Laden: ' + e.message + '</td></tr>';
+    }
+  }
+
+  function formatHSTime(ts) {
+    if (!ts) return '-';
+    return new Date(ts).toLocaleString('de-DE', {
+      day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'
+    });
+  }
+
+  function renderHighscores() {
+    document.getElementById('hsCount').textContent = hsData.length;
+    const body = document.getElementById('hsTableBody');
+    if (!hsData.length) {
+      body.innerHTML = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#555">Keine Highscore-Einträge vorhanden.</td></tr>';
+      return;
+    }
+    body.innerHTML = hsData.map((entry, idx) => {
+      const kind = entry.kind || 'score';
+      return '<tr>' +
+        '<td style="padding:8px 10px;color:#666;font-weight:700">' + (idx + 1) + '</td>' +
+        '<td style="padding:8px 10px;color:#f1f1f1">' + escapeHtml(entry.player) + '</td>' +
+        '<td style="padding:8px 10px;text-align:right;color:#f4a261;font-weight:700">' + entry.score + '</td>' +
+        '<td style="padding:8px 10px;color:#888;font-size:.72rem">' + escapeHtml(kind) + (entry.legWin ? ' / LegWin' : '') + '</td>' +
+        '<td style="padding:8px 10px;color:#666;font-size:.72rem">' + formatHSTime(entry.ts) + '</td>' +
+        '<td style="padding:8px 10px;text-align:center">' +
+          '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>' +
+        '</td>' +
+        '</tr>';
+    }).join('');
+
+    // Event-Listener für alle Lösch-Buttons
+    body.querySelectorAll('[data-hs-id]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const id = Number(this.dataset.hsId);
+        const name = this.dataset.hsName;
+        const score = this.dataset.hsScore;
+        if (confirm('Highscore von "' + name + '" mit ' + score + ' Punkten wirklich löschen?')) {
+          deleteHighscore(id);
+        }
+      });
+    });
+  }
+
+  async function deleteHighscore(id) {
+    const btn = document.querySelector('[data-hs-id="' + id + '"]');
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+      const r = await fetch('/api/highscores/' + id, { method: 'DELETE' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await loadHighscores();
+      showToast('Highscore gelöscht ✓');
+    } catch(e) {
+      showToast('Fehler beim Löschen: ' + e.message, true);
+      if (btn) { btn.disabled = false; btn.textContent = '✕ Löschen'; }
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escapeAttr(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  document.getElementById('refreshHsBtn').addEventListener('click', loadHighscores);
+  document.getElementById('clearAllHsBtn').addEventListener('click', async function() {
+    if (!confirm('ALLE Highscore-Einträge unwiderruflich löschen?')) return;
+    if (!confirm('Wirklich ALLE ' + hsData.length + ' Einträge löschen?')) return;
+    this.disabled = true;
+    this.textContent = '…';
+    try {
+      const r = await fetch('/api/highscores', { method: 'DELETE' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await loadHighscores();
+      showToast('Alle Highscores gelöscht ✓');
+    } catch(e) {
+      showToast('Fehler: ' + e.message, true);
+    }
+    this.disabled = false;
+    this.textContent = '🗑 Alle löschen';
+  });
+
+  // Highscores automatisch laden
+  loadHighscores();
 </script>
 </body>
 </html>

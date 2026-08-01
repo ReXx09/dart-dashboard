@@ -2327,6 +2327,22 @@ app.post('/api/highscores', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht gespeichert werden: ' + err.message }); }
 });
 
+app.delete('/api/highscores/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'Ungültige ID.' });
+  try {
+    await dataStore.deleteHighscore(id);
+    res.json({ ok: true, highscores: await getHighscores() });
+  } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht gelöscht werden: ' + err.message }); }
+});
+
+app.delete('/api/highscores', async (_req, res) => {
+  try {
+    await dataStore.clearAllHighscores();
+    res.json({ ok: true, highscores: [] });
+  } catch (err) { res.status(500).json({ error: 'Highscores konnten nicht gelöscht werden: ' + err.message }); }
+});
+
 // ── Player Statistics ──
 app.get('/api/players/:id/stats', async (req, res) => {
   try {
