@@ -209,6 +209,55 @@ function defaultPlayerCricketState(mode) {
   return { cricketHits: hits, cricketClosed: {} };
 }
 
+// ── Cricket Scoring ──────────────────────────────────
+function calculateCricketPoints(player, allPlayers) {
+  if (!player.cricketHits || !player.cricketClosed) return 0;
+  const nums = Object.keys(player.cricketHits).map(Number);
+  let points = 0;
+  
+  for (const num of nums) {
+    const hits = player.cricketHits[num] || 0;
+    const closed = player.cricketClosed[num] || false;
+    
+    if (closed && hits > 3) {
+      // Punkte nur auf geschlossenen Zahlen, die Gegner NICHT geschlossen haben
+      let opponentHasClosed = false;
+      for (const opp of allPlayers) {
+        if (opp.slot === player.slot) continue;
+        if (opp.cricketClosed && opp.cricketClosed[num]) {
+          opponentHasClosed = true;
+          break;
+        }
+      }
+      if (!opponentHasClosed) {
+        points += (hits - 3) * num;
+      }
+    }
+  }
+  return points;
+}
+
+function checkCricketWin(player, allPlayers) {
+  if (!player.cricketClosed) return false;
+  const nums = Object.keys(player.cricketClosed).map(Number);
+  
+  // Alle Zahlen müssen geschlossen sein
+  const allClosed = nums.every(n => player.cricketClosed[n] === true);
+  if (!allClosed) return false;
+  
+  // Punkte berechnen
+  const myPoints = calculateCricketPoints(player, allPlayers);
+  
+  // Prüfen ob Gegner mehr Punkte haben
+  for (const opp of allPlayers) {
+    if (opp.slot === player.slot) continue;
+    const oppPoints = calculateCricketPoints(opp, allPlayers);
+    if (oppPoints > myPoints) return false;
+  }
+  
+  return true;
+}
+
 const dataStore = new DataStore();
 
 // ──────────────────────────────────────────────
@@ -849,7 +898,6 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
 
   let bust = false;
   if (isCricket) {
-    player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
     const nums = getCricketNumbersForMode(mode);
     if (nums && nums.includes(value)) {
       if (!player.cricketHits) player.cricketHits = {};
@@ -857,6 +905,9 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
       player.cricketHits[value] = Math.min(3, (player.cricketHits[value] || 0) + 1);
       if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
     }
+    // Cricket-Punkte neu berechnen
+    player.cricketPoints = calculateCricketPoints(player, state.players);
+    player.totalScored = player.cricketPoints;
   } else {
     const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
     const nextRemaining = player.remaining - value;
@@ -907,6 +958,13 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino' });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
+    // Record stats after leg finish
+    await recordPlayerLegStats(player, state);
+  } else if (isCricket && checkCricketWin(player, state.players)) {
+    player.legs = Math.max(0, Number(player.legs || 0)) + 1;
+    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino' });
+    state.game.status = 'leg-finished';
+    state.lastAction.cricketWin = true;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
   }
@@ -1119,7 +1177,6 @@ async function applyArduinoThrowFromMatrix(hit) {
 
   let bust = false;
   if (isCricket) {
-    player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
     const nums = getCricketNumbersForMode(mode);
     if (nums && nums.includes(value)) {
       if (!player.cricketHits) player.cricketHits = {};
@@ -1127,6 +1184,9 @@ async function applyArduinoThrowFromMatrix(hit) {
       player.cricketHits[value] = Math.min(3, (player.cricketHits[value] || 0) + 1);
       if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
     }
+    // Cricket-Punkte neu berechnen
+    player.cricketPoints = calculateCricketPoints(player, state.players);
+    player.totalScored = player.cricketPoints;
   } else {
     const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
     const nextRemaining = player.remaining - value;
@@ -1183,6 +1243,13 @@ async function applyArduinoThrowFromMatrix(hit) {
     await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino-matrix' });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
+    // Record stats after leg finish
+    await recordPlayerLegStats(player, state);
+  } else if (isCricket && checkCricketWin(player, state.players)) {
+    player.legs = Math.max(0, Number(player.legs || 0)) + 1;
+    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix' });
+    state.game.status = 'leg-finished';
+    state.lastAction.cricketWin = true;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
   }
@@ -1975,8 +2042,6 @@ app.post('/api/live/throw', async (req, res) => {
 
     let bust = false;
     if (isCricket) {
-      player.totalScored += points;
-      player.remaining = 0;
       const dartNumber = Number(req.body?.number || points);
       const multiplier = Number(req.body?.multiplier || 1);
       if (!player.cricketHits) player.cricketHits = {};
@@ -1985,6 +2050,9 @@ app.post('/api/live/throw', async (req, res) => {
         player.cricketHits[dartNumber] = Math.min(3, (player.cricketHits[dartNumber] || 0) + multiplier);
         if (player.cricketHits[dartNumber] >= 3) player.cricketClosed[dartNumber] = true;
       }
+      // Cricket-Punkte neu berechnen
+      player.cricketPoints = calculateCricketPoints(player, state.players);
+      player.totalScored = player.cricketPoints;
     } else {
       const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
       const nextRemaining = player.remaining - points;
@@ -2013,6 +2081,13 @@ app.post('/api/live/throw', async (req, res) => {
       player.legs += 1;
       await addHighscore(player.name, points, { kind: 'checkout', legWin: true });
       state.game.status = 'leg-finished';
+      // Record stats after leg finish
+      await recordPlayerLegStats(player, state);
+    } else if (isCricket && checkCricketWin(player, state.players)) {
+      player.legs += 1;
+      await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true });
+      state.game.status = 'leg-finished';
+      state.lastAction.cricketWin = true;
       // Record stats after leg finish
       await recordPlayerLegStats(player, state);
     }

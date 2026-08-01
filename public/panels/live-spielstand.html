@@ -187,7 +187,7 @@
       background: #1b1b1b;
       border: 1px solid #2b2b2b;
       border-radius: 10px;
-      min-height: 36px;
+      min-height: 56px;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -353,6 +353,40 @@
       font-size: 0.5rem;
       display: inline-block;
     }
+    .c-num {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      min-width: 36px;
+    }
+    .c-num .num { font-weight: 700; font-size: .75rem; }
+    .c-num .hits { font-size: .6rem; color: #888; }
+    .c-num.closed .hits { color: #2a9d8f; }
+    .c-num .c-points { font-size: .55rem; color: #f4a261; font-weight: 700; }
+
+    /* Cricket Punkte-Aufschlüsselung */
+    .cricket-points {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: .65rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .cp-row {
+      display: grid;
+      grid-template-columns: 30px 40px 1fr;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 4px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 4px;
+    }
+    .cp-num { font-weight: 700; color: #f4a261; text-align: center; }
+    .cp-hits { color: #888; font-size: .6rem; text-align: center; }
+    .cp-pts { color: #f4a261; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+    .cp-empty { color: #555; font-size: .65rem; text-align: center; padding: 20px; }
     /* === Ende neu === */
 
     /* Winner Overlay */
@@ -693,23 +727,45 @@
       const lastThrows = throws.slice(-3);
       const cricketHits = p.cricketHits || {};
       const cricketClosed = p.cricketClosed || {};
+      const cricketPoints = p.cricketPoints || 0;
       const nums = [15,16,17,18,19,20,25];
+      
+      // Punkte-Aufschlüsselung pro Zahl
+      const pointsBreakdown = nums.map(n => {
+        const hits = cricketHits[n] || 0;
+        const closed = !!cricketClosed[n];
+        const pointsOnNum = closed && hits > 3 ? (hits - 3) * n : 0;
+        return { num: n, hits, closed, points: pointsOnNum };
+      });
+      
       const gridHtml = nums.map(n => {
         const hits = cricketHits[n] || 0;
         const closed = !!cricketClosed[n];
-        return '<div class="c-num' + (closed ? ' closed' : '') + '"><div class="num">' + n + '</div><div class="hits">' + (closed ? '✔' : hits + '/3') + '</div></div>';
+        const pointsOnNum = closed && hits > 3 ? (hits - 3) * n : 0;
+        return '<div class="c-num' + (closed ? ' closed' : '') + '">' +
+          '<div class="num">' + n + '</div>' +
+          '<div class="hits">' + (closed ? '✔' : hits + '/3') + '</div>' +
+          (pointsOnNum > 0 ? '<div class="c-points">+' + pointsOnNum + '</div>' : '') +
+        '</div>';
       }).join('');
+      
+      // Punkte-Kachel HTML
+      const pointsHtml = pointsBreakdown.filter(x => x.closed).map(x => 
+        '<div class="cp-row"><span class="cp-num">' + x.num + '</span><span class="cp-hits">' + x.hits + '/3</span><span class="cp-pts">' + (x.points > 0 ? '+' + x.points : '—') + '</span></div>'
+      ).join('') || '<div class="cp-empty">Noch keine Zahlen geschlossen</div>';
+      
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
       const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
         '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
-        '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr">' +
+        '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr 1fr">' +
           '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div>' +
+          '<div class="focus-kachel"><h4>Punkte pro Zahl</h4><div class="cricket-points">' + pointsHtml + '</div></div>' +
           '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
         '</div>' +
-        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Punkte</span><strong>' + totalScored + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
+        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Cricket Punkte</span><strong>' + cricketPoints + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
       '</div>';
     }
 
@@ -761,7 +817,6 @@
         '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
         (isCricket ? cricketGridHtml : '') +
-        '<div class="sc-stats">LG-AVG <span>' + legAvg + '</span> Legs <span>' + (p.legs || 0) + '</span></div>' +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
     }
