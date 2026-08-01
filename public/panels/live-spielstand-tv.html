@@ -408,6 +408,28 @@
     @keyframes bust-flash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
     @keyframes bust-pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
 
+    /* Elimination-Overlay */
+    .elimination-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(139,0,0,.25);
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+      animation: elimination-flash 0.8s ease-out;
+    }
+    .elimination-overlay .elimination-text {
+      background: linear-gradient(135deg, #8b0000, #ff0000); color: #fff;
+      font-size: 3.5rem; font-weight: 900;
+      padding: 30px 60px; border-radius: 25px;
+      text-transform: uppercase; letter-spacing: 6px;
+      box-shadow: 0 0 80px rgba(255,0,0,.8), 0 0 160px rgba(139,0,0,.6);
+      animation: elimination-pulse 0.6s ease-in-out infinite alternate;
+      text-shadow: 0 0 20px rgba(255,255,255,.5);
+    }
+    @keyframes elimination-flash { 0% { opacity: 0; transform: scale(0.8); } 15% { opacity: 1; transform: scale(1.05); } 85% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
+    @keyframes elimination-pulse { from { transform: scale(1); box-shadow: 0 0 80px rgba(255,0,0,.8), 0 0 160px rgba(139,0,0,.6); } to { transform: scale(1.1); box-shadow: 0 0 120px rgba(255,0,0,1), 0 0 240px rgba(139,0,0,.8); } }
+
+    /* Winner Overlay */
+
     @media (width: 1024px) and (height: 860px) {
       .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
       .focus-kachel { min-height: 175px; padding: 6px; }
@@ -514,6 +536,7 @@
       const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
+      const isElimination = state.game.mode === 'elimination';
       
       // Würfe für die linke Kachel (vertikal): Punkte oben (rot/groß), Segment unten (grau/klein)
       // Wir nutzen die letzten 3 Würfe aus dem throws Array für die Segmente
@@ -528,8 +551,12 @@
         '</div>';
       }).join('');
 
+      // Elimination: Punkte statt Rest anzeigen
+      const bigScoreLabel = isElimination ? 'Punkte' : 'Gesamt / Rest';
+      const bigScoreValue = isElimination ? totalScored : p.remaining;
+
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</div>' +
         '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
@@ -539,8 +566,8 @@
           '</div>' +
           '<div class="focus-kachel">' +
             '<div>' +
-              '<h4>Gesamt / Rest</h4>' +
-              '<div class="focus-big-score">' + p.remaining + '</div>' +
+              '<h4>' + bigScoreLabel + '</h4>' +
+              '<div class="focus-big-score">' + bigScoreValue + '</div>' +
             '</div>' +
             '<div>' +
               '<h4>Punkte pro Aufnahme</h4>' +
@@ -651,13 +678,14 @@
       const turns = p.turns || 0;
       const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       const isCricket = mode === 'cricket';
-      const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
+      const isElimination = mode === 'elimination';
+      const displayScore = isCricket ? (p.totalScored || 0) : (isElimination ? (p.totalScored || 0) : p.remaining);
       const shortName = (p.name || '').length > 8 ? (p.name || '').substring(0, 8) + '...' : (p.name || '');
 
       const playerColor = escapeAttr(p.color || '#f4a261');
       return '<div class="score-card" data-tv style="--pc:' + playerColor + '">' +
         '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
-        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
+        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + (isElimination ? ' · Elim' : '') + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
@@ -686,7 +714,20 @@
         hideBustOverlay();
       }
 
+      // ── Elimination detection ──
+      if (lastThrow && lastThrow.type === 'elimination') {
+        const eliminatedPlayer = state.players.find(p => p.slot === lastThrow.playerSlot);
+        const eliminatorPlayer = state.players.find(p => p.slot === lastThrow.eliminatedBySlot);
+        if (eliminatedPlayer && eliminatorPlayer) {
+          showEliminationOverlay(eliminatedPlayer, eliminatorPlayer);
+          playEliminationSound();
+        }
+      } else {
+        hideEliminationOverlay();
+      }
+
       const isCricket = mode === 'cricket';
+      const isElimination = mode === 'elimination';
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
@@ -726,36 +767,79 @@
     function showWinnerOverlay(winner, state) {
       const overlay = document.getElementById('winnerOverlay');
       if (!overlay) return;
+
+      const isCricket = state.game.mode === 'cricket';
+      const throws = Array.isArray(winner.throws) ? winner.throws : [];
       
-      const checkout = state.lastAction?.points || 0;
-      const dartsThrown = winner.turns * 3 - (3 - (state.game.currentThrow || 0));
-      const avg = winner.turns > 0 ? (winner.totalScored / winner.turns * 3).toFixed(1) : '-';
-      
-      overlay.innerHTML = `
-        <div class="confetti-container" id="confettiContainer"></div>
-        <div class="winner-card">
-          <div class="winner-icon">🏆</div>
-          <div class="winner-subtitle">LEG GEWONNEN</div>
-          <div class="winner-name">${escapeHtml(winner.name)}</div>
-          <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
-          <div class="winner-stats">
-            <div class="winner-stat">
-              <div class="winner-stat-label">Darts</div>
-              <div class="winner-stat-value">${dartsThrown}</div>
+      if (isCricket) {
+        // Cricket-spezifisches Overlay
+        const closedCount = winner.cricketClosed ? Object.values(winner.cricketClosed).filter(v => v).length : 0;
+        const cricketPoints = winner.cricketPoints || 0;
+        const dartsThrown = throws.length;
+        const avg = (winner.turns && winner.turns > 0)
+          ? ((winner.totalScored || 0) / winner.turns * 3).toFixed(1)
+          : '-';
+
+        overlay.innerHTML = `
+          <div class="confetti-container" id="confettiContainer"></div>
+          <div class="winner-card">
+            <div class="winner-icon">🏆</div>
+            <div class="winner-subtitle">CRICKET GEWONNEN</div>
+            <div class="winner-name">${escapeHtml(winner.name)}</div>
+            <div class="winner-subtitle">Cricket Punkte: ${cricketPoints}</div>
+            <div class="winner-stats">
+              <div class="winner-stat">
+                <div class="winner-stat-label">Geschlossene Zahlen</div>
+                <div class="winner-stat-value">${closedCount}/7</div>
+              </div>
+              <div class="winner-stat">
+                <div class="winner-stat-label">Darts</div>
+                <div class="winner-stat-value">${dartsThrown}</div>
+              </div>
+              <div class="winner-stat">
+                <div class="winner-stat-label">Leg Average</div>
+                <div class="winner-stat-value">${avg}</div>
+              </div>
+              <div class="winner-stat">
+                <div class="winner-stat-label">Legs</div>
+                <div class="winner-stat-value">${winner.legs || 0}</div>
+              </div>
             </div>
-            <div class="winner-stat">
-              <div class="winner-stat-label">Leg Average</div>
-              <div class="winner-stat-value">${avg}</div>
-            </div>
-            <div class="winner-stat">
-              <div class="winner-stat-label">Legs</div>
-              <div class="winner-stat-value">${winner.legs || 0}</div>
-            </div>
+            <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
           </div>
-          <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
-        </div>
-      `;
-      
+        `;
+      } else {
+        // x01 (501, 301, etc.) Overlay
+        const checkout = state.lastAction?.points || 0;
+        const dartsThrown = winner.turns * 3 - (3 - (state.game.currentThrow || 0));
+        const avg = winner.turns > 0 ? (winner.totalScored / winner.turns * 3).toFixed(1) : '-';
+
+        overlay.innerHTML = `
+          <div class="confetti-container" id="confettiContainer"></div>
+          <div class="winner-card">
+            <div class="winner-icon">🏆</div>
+            <div class="winner-subtitle">LEG GEWONNEN</div>
+            <div class="winner-name">${escapeHtml(winner.name)}</div>
+            <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
+            <div class="winner-stats">
+              <div class="winner-stat">
+                <div class="winner-stat-label">Darts</div>
+                <div class="winner-stat-value">${dartsThrown}</div>
+              </div>
+              <div class="winner-stat">
+                <div class="winner-stat-label">Leg Average</div>
+                <div class="winner-stat-value">${avg}</div>
+              </div>
+              <div class="winner-stat">
+                <div class="winner-stat-label">Legs</div>
+                <div class="winner-stat-value">${winner.legs || 0}</div>
+              </div>
+            </div>
+            <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
+          </div>
+        `;
+      }
+
       overlay.classList.add('show');
       overlay.style.display = 'flex';
       createConfetti();
@@ -946,6 +1030,24 @@
       const overlay = document.getElementById('bustOverlay');
       if (overlay) overlay.remove();
     }
+
+    // ── Elimination Overlay ──
+    function showEliminationOverlay(eliminatedPlayer, eliminatorPlayer) {
+      let overlay = document.getElementById('eliminationOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'eliminationOverlay';
+        overlay.className = 'elimination-overlay';
+        overlay.innerHTML = '<div class="elimination-text">💀 ELIMINIERT! 💀</div>';
+        document.body.appendChild(overlay);
+        setTimeout(() => { if (overlay) overlay.remove(); }, 2000);
+      }
+    }
+    function hideEliminationOverlay() {
+      const overlay = document.getElementById('eliminationOverlay');
+      if (overlay) overlay.remove();
+    }
+
     function playBustSound() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -960,6 +1062,24 @@
         gain.connect(ctx.destination);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.4);
+      } catch {}
+    }
+
+    function playEliminationSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // Dramatischerer Sound für Elimination - tiefer, länger
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.8);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 1.2);
       } catch {}
     }
 

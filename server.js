@@ -258,6 +258,69 @@ function checkCricketWin(player, allPlayers) {
   return true;
 }
 
+// ── Elimination Scoring ──────────────────────────────────
+function calculateEliminationPoints(player) {
+  // In Elimination, points are simply accumulated from 0 upwards
+  return player.totalScored || 0;
+}
+
+function checkEliminationWin(state) {
+  const modeDef = GAME_MODES[state.game.mode];
+  if (!modeDef || modeDef.type !== 'elimination') return false;
+  
+  // Spiel endet nach 10 Aufnahmen (throwRound > 10)
+  return state.game.throwRound > 10;
+}
+
+function getEliminationWinner(state) {
+  // Gewinner ist der Spieler mit den meisten Punkten nach 10 Aufnahmen
+  let winner = null;
+  let maxPoints = -1;
+  for (const player of state.players) {
+    const points = calculateEliminationPoints(player);
+    if (points > maxPoints) {
+      maxPoints = points;
+      winner = player;
+    }
+  }
+  return winner;
+}
+
+function applyEliminationHit(state, player, value) {
+  // Prüfen ob ein anderer Spieler genau diese Punktzahl hat
+  for (const other of state.players) {
+    if (other.slot === player.slot) continue;
+    const otherPoints = calculateEliminationPoints(other);
+    if (otherPoints === value) {
+      // ELIMINATION! Anderen Spieler auf 0 zurücksetzen
+      other.totalScored = 0;
+      other.throws = other.throws || [];
+      other.throws.push({
+        points: 0,
+        remaining: 0,
+        bust: false,
+        eliminated: true,
+        eliminatedBy: player.slot,
+        ts: Date.now(),
+        source: 'elimination'
+      });
+      state.lastAction = {
+        type: 'elimination',
+        source: 'elimination',
+        playerIndex: state.players.indexOf(other),
+        playerSlot: other.slot,
+        player: other.name,
+        eliminatedBy: player.name,
+        eliminatedBySlot: player.slot,
+        points: value,
+        ts: Date.now()
+      };
+      return true; // Elimination passiert
+    }
+  }
+  return false; // Keine Elimination
+}
+
 const dataStore = new DataStore();
 
 // ──────────────────────────────────────────────
@@ -909,12 +972,25 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     player.cricketPoints = calculateCricketPoints(player, state.players);
     player.totalScored = player.cricketPoints;
   } else {
-    const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
-    const nextRemaining = player.remaining - value;
-    bust = !isValidCheckout(player.remaining, value, checkoutRule);
-    if (!bust) {
-      player.remaining = nextRemaining;
+    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+    const isElimination = modeDef.type === 'elimination';
+    
+    if (isElimination) {
+      // Elimination: Punkte addieren von 0 aufwärts
       player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+      // Prüfen auf Elimination
+      const eliminated = applyEliminationHit(state, player, value);
+      if (eliminated) {
+        state.lastAction.type = 'elimination';
+      }
+    } else {
+      const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
+      const nextRemaining = player.remaining - value;
+      bust = !isValidCheckout(player.remaining, value, checkoutRule);
+      if (!bust) {
+        player.remaining = nextRemaining;
+        player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+      }
     }
   }
 
@@ -967,6 +1043,18 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     state.lastAction.cricketWin = true;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
+  } else if (isElimination && checkEliminationWin(state)) {
+    const winner = getEliminationWinner(state);
+    if (winner) {
+      winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
+      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino' });
+      state.game.status = 'leg-finished';
+      state.lastAction.eliminationWin = true;
+      state.lastAction.winner = winner.name;
+      state.lastAction.winnerSlot = winner.slot;
+      // Record stats after leg finish
+      await recordPlayerLegStats(winner, state);
+    }
   }
 
   if (bust && state.game.status !== 'leg-finished') {
@@ -1188,12 +1276,25 @@ async function applyArduinoThrowFromMatrix(hit) {
     player.cricketPoints = calculateCricketPoints(player, state.players);
     player.totalScored = player.cricketPoints;
   } else {
-    const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
-    const nextRemaining = player.remaining - value;
-    bust = !isValidCheckout(player.remaining, value, checkoutRule);
-    if (!bust) {
-      player.remaining = nextRemaining;
+    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+    const isElimination = modeDef.type === 'elimination';
+    
+    if (isElimination) {
+      // Elimination: Punkte addieren von 0 aufwärts
       player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+      // Prüfen auf Elimination
+      const eliminated = applyEliminationHit(state, player, value);
+      if (eliminated) {
+        state.lastAction.type = 'elimination';
+      }
+    } else {
+      const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
+      const nextRemaining = player.remaining - value;
+      bust = !isValidCheckout(player.remaining, value, checkoutRule);
+      if (!bust) {
+        player.remaining = nextRemaining;
+        player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
+      }
     }
   }
 
@@ -1252,6 +1353,18 @@ async function applyArduinoThrowFromMatrix(hit) {
     state.lastAction.cricketWin = true;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
+  } else if (isElimination && checkEliminationWin(state)) {
+    const winner = getEliminationWinner(state);
+    if (winner) {
+      winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
+      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino-matrix' });
+      state.game.status = 'leg-finished';
+      state.lastAction.eliminationWin = true;
+      state.lastAction.winner = winner.name;
+      state.lastAction.winnerSlot = winner.slot;
+      // Record stats after leg finish
+      await recordPlayerLegStats(winner, state);
+    }
   }
 
   if (bust && state.game.status !== 'leg-finished') {
@@ -2054,10 +2167,23 @@ app.post('/api/live/throw', async (req, res) => {
       player.cricketPoints = calculateCricketPoints(player, state.players);
       player.totalScored = player.cricketPoints;
     } else {
-      const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
-      const nextRemaining = player.remaining - points;
-      bust = !isValidCheckout(player.remaining, points, checkoutRule);
-      if (!bust) { player.remaining = nextRemaining; player.totalScored += points; }
+      const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+      const isElimination = modeDef.type === 'elimination';
+      
+      if (isElimination) {
+        // Elimination: Punkte addieren von 0 aufwärts
+        player.totalScored = Math.max(0, Number(player.totalScored || 0)) + points;
+        // Prüfen auf Elimination
+        const eliminated = applyEliminationHit(state, player, points);
+        if (eliminated) {
+          state.lastAction.type = 'elimination';
+        }
+      } else {
+        const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
+        const nextRemaining = player.remaining - points;
+        bust = !isValidCheckout(player.remaining, points, checkoutRule);
+        if (!bust) { player.remaining = nextRemaining; player.totalScored += points; }
+      }
     }
 
     player.turns += 1;
@@ -2090,6 +2216,18 @@ app.post('/api/live/throw', async (req, res) => {
       state.lastAction.cricketWin = true;
       // Record stats after leg finish
       await recordPlayerLegStats(player, state);
+    } else if (isElimination && checkEliminationWin(state)) {
+      const winner = getEliminationWinner(state);
+      if (winner) {
+        winner.legs += 1;
+        await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true });
+        state.game.status = 'leg-finished';
+        state.lastAction.eliminationWin = true;
+        state.lastAction.winner = winner.name;
+        state.lastAction.winnerSlot = winner.slot;
+        // Record stats after leg finish
+        await recordPlayerLegStats(winner, state);
+      }
     }
 
     if (bust && state.game.status !== 'leg-finished') {
