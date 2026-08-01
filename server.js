@@ -1054,13 +1054,13 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     }
   }
 
+  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino');
+
   if (bust && state.game.status !== 'leg-finished') {
     await advanceAfterBust(state, player, 'arduino');
   } else if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
     await advanceAfterThreeThrows(state, player, 'arduino');
   }
-
-  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino');
 
   const saved = await saveLiveState(state);
   broadcastReload();
@@ -1109,11 +1109,11 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
     ts: Date.now()
   };
 
+  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino-miss');
+
   if (state.game.currentThrow >= 3) {
     await advanceAfterThreeThrows(state, player, 'arduino-miss');
   }
-
-  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino-miss');
 
   const saved = await saveLiveState(state);
   broadcastReload();
@@ -1361,13 +1361,13 @@ async function applyArduinoThrowFromMatrix(hit) {
     }
   }
 
+  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino-matrix');
+
   if (bust && state.game.status !== 'leg-finished') {
     await advanceAfterBust(state, player, 'arduino-matrix');
   } else if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
     await advanceAfterThreeThrows(state, player, 'arduino-matrix');
   }
-
-  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino-matrix');
 
   const saved = await saveLiveState(state);
   broadcastReload();
@@ -2222,13 +2222,13 @@ app.post('/api/live/throw', async (req, res) => {
       }
     }
 
+    await addTurnScoreHighscoreIfNeeded(player, state, 'manual');
+
     if (bust && state.game.status !== 'leg-finished') {
       await advanceAfterBust(state, player, 'manual');
     } else if (state.game.status !== 'leg-finished' && state.game.currentThrow >= 3) {
       await advanceAfterThreeThrows(state, player, 'manual');
     }
-
-    await addTurnScoreHighscoreIfNeeded(player, state, 'manual');
 
     const saved = await saveLiveState(state);
     broadcastReload();
