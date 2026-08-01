@@ -1052,13 +1052,22 @@
       const cricketPoints = p.cricketPoints || 0;
       const nums = [15,16,17,18,19,20,25];
       
-      // Zahlen-Grid mit visuellen Hit-Markern
+      // Zahlen-Grid mit visuellen Hit-Markern (wie TV)
       const gridHtml = nums.map(n => {
         const hits = cricketHits[n] || 0;
         const closed = !!cricketClosed[n];
-        return '<div class="c-num' + (closed ? ' closed' : '') + '">' +
-          '<div class="num">' + n + '</div>' +
-          '<div class="hits">' + (closed ? '✔' : hits + '/3') + '</div>' +
+        
+        // Hit markers: 3 Kreise für Hit-Status
+        const markers = [1, 2, 3].map(h => {
+          let cls = 'hit-marker';
+          if (closed) cls += ' closed';
+          else if (hits >= h) cls += ' hit-' + h;
+          return '<div class="' + cls + '"></div>';
+        }).join('');
+        
+        return '<div class="cricket-num' + (closed ? ' closed' : '') + '">' +
+          '<div class="num-label">' + n + '</div>' +
+          '<div class="cricket-hits">' + markers + '</div>' +
         '</div>';
       }).join('');
       
@@ -1130,15 +1139,21 @@
         const gridItems = nums.map(n => {
           const hits = cricketHits[n] || 0;
           const closed = !!cricketClosed[n];
-          let dotsHtml = '';
-          for (let i=0; i<3; i++) {
-            const filled = i < hits;
-            dotsHtml += `<span class="dot" style="color:${filled ? playerColor : '#555'}">${filled ? '●' : '○'}</span>`;
-          }
-          const closedMark = closed ? ' ✔' : '';
-          return `<span class="cricket-num" style="${closed ? 'opacity:0.8;' : ''}">${n}${closedMark} ${dotsHtml}</span>`;
-        }).join(' ');
-        cricketGridHtml = `<div class="cricket-grid">${gridItems}</div>`;
+          
+          // Hit markers: 3 Kreise für Hit-Status (wie TV)
+          const markers = [1, 2, 3].map(h => {
+            let cls = 'hit-marker';
+            if (closed) cls += ' closed';
+            else if (hits >= h) cls += ' hit-' + h;
+            return '<div class="' + cls + '"></div>';
+          }).join('');
+          
+          return '<div class="cricket-num' + (closed ? ' closed' : '') + '">' +
+            '<div class="num-label">' + n + '</div>' +
+            '<div class="cricket-hits">' + markers + '</div>' +
+          '</div>';
+        }).join('');
+        cricketGridHtml = '<div class="cricket-grid">' + gridItems + '</div>';
       }
 
       return '<div class="score-card" data-tv style="--pc:' + playerColor + '">' +
