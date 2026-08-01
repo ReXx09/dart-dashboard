@@ -303,7 +303,7 @@
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
     .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
 
-    /* Leg-Liste – feste Höhe */
+    /* Leg-Liste – feste Höhe (25% reduziert) */
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
@@ -314,8 +314,8 @@
       gap: 4px;
       overflow: hidden;
       flex-shrink: 0;
-      /* Höhe: h4 (~18px) + gap (4px) + leg-list max-height (380px) + padding (10px) = ~412px */
-      height: 412px;
+      /* Höhe: h4 (~18px) + gap (4px) + leg-list max-height (285px) + padding (10px) = ~317px */
+      height: 317px;
     }
     .focus-leg-card h4 {
       color: #777;
@@ -341,7 +341,7 @@
       flex-direction: column;
       gap: 5px;
       flex-shrink: 0;
-      /* Feste Höhe: title (~12px) + select-row (44px) + gap (5px) + button-row (48px) + padding (12px) = ~121px */
+      /* Feste Höhe: title (~12px) + button-row (48px) + gap (5px) + button-row (48px) + padding (12px) = ~125px */
       height: 125px !important;
     }
     .focus-controls-card .ctrl-title {
@@ -496,8 +496,8 @@
       display: grid;
       gap: 3px;
       overflow: auto;
-      /* Wie im TV: max-height statt fester Höhe auf Items */
-      max-height: 380px;
+      /* 25% reduziert: 380px → 285px */
+      max-height: 285px;
     }
     .leg-item { 
       display: grid;
@@ -795,7 +795,6 @@
         font-size: 0.4rem;
       }
       .focus-controls-card .ctrl-title { font-size: .42rem; }
-      .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 8px 4px; height: 100%; }
       .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 16px 6px; }
       .focus-controls-card { display: none; height: 125px !important; }
     }
