@@ -2152,6 +2152,7 @@ app.post('/api/live/throw', async (req, res) => {
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     const isCricket = modeDef.type === 'cricket';
+    const isElimination = modeDef.type === 'elimination';
 
     let bust = false;
     if (isCricket) {
@@ -2167,9 +2168,6 @@ app.post('/api/live/throw', async (req, res) => {
       player.cricketPoints = calculateCricketPoints(player, state.players);
       player.totalScored = player.cricketPoints;
     } else {
-      const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
-      const isElimination = modeDef.type === 'elimination';
-      
       if (isElimination) {
         // Elimination: Punkte addieren von 0 aufwärts
         player.totalScored = Math.max(0, Number(player.totalScored || 0)) + points;
