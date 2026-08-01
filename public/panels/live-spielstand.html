@@ -1175,9 +1175,9 @@
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         } else {
           // Fallback: Client-seitig prüfen ob alle Zahlen geschlossen
-          // Nur wenn bereits Würfe gemacht wurden (mindestens 3 Würfe = 1 Aufnahme)
-          const throws = Array.isArray(active.throws) ? active.throws : [];
-          if (throws.length >= 3) {
+          // NUR wenn: Server-Status NICHT 'leg-finished' UND mind. 7 Würfe gesamt (1 volle Runde)
+          const totalThrows = state.players.reduce((sum, p) => sum + (Array.isArray(p.throws) ? p.throws.length : 0), 0);
+          if (totalThrows >= 7) {
             winner = state.players.find(p => {
               const closed = p.cricketClosed || {};
               const keys = Object.keys(closed);
