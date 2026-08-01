@@ -791,7 +791,16 @@
 
       // Check for leg finished (winner)
       const isLegFinished = state.game.status === 'leg-finished';
-      const winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
+      let winner = null;
+      if (isElimination) {
+        // Bei Elimination: Kein Check auf remaining === 0 (alle starten bei 0!)
+        if (isLegFinished) {
+          winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+        }
+      } else {
+        // x01 / Cricket: Winner hat remaining === 0
+        winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
+      }
 
       if (isCricket) {
         focusPlayer.classList.add('single');

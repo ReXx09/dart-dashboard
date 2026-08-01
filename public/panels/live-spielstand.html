@@ -367,7 +367,7 @@
     .focus-controls-card .ctrl-row select:focus { border-color: #e63946; outline: none; }
     .focus-controls-card .ctrl-btn {
       flex: 1;
-      padding: 6px 8px;
+      padding: 12px 8px;
       border-radius: 8px;
       border: 1px solid #2a2a2a;
       background: #1a1a1a;
@@ -392,6 +392,8 @@
       overflow: auto;
       flex: 1;
       min-height: 0;
+      /* 10 Einträge fix: 10 * (4px padding + 4px padding + 1px border + 1px border + 3px gap) ≈ 10 * 13px = 130px + etwas Puffer */
+      max-height: 140px;
     }
     .leg-item { 
       display: grid;
@@ -688,7 +690,7 @@
       }
       .focus-controls-card .ctrl-title { font-size: .42rem; }
       .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 2px 4px; }
-      .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 4px 6px; }
+      .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 8px 6px; }
     }
   </style>
 </head>
@@ -1035,9 +1037,19 @@
       focusPlayer.classList.toggle('has-others', hasOthers);
 
       // Winner-Erkennung
-      let winner = state.players.find(p => Number(p.remaining) === 0);
-      if (!winner && state.game.status === 'leg-finished') {
-        winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+      let winner = null;
+      if (isElimination) {
+        // Bei Elimination: Kein Check auf remaining === 0 (alle starten bei 0!)
+        // Gewinner wird serverseitig bei throwRound > 10 ermittelt
+        if (state.game.status === 'leg-finished') {
+          winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+        }
+      } else {
+        // x01 / Cricket: Winner hat remaining === 0
+        winner = state.players.find(p => Number(p.remaining) === 0);
+        if (!winner && state.game.status === 'leg-finished') {
+          winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+        }
       }
 
       if (winner) {
