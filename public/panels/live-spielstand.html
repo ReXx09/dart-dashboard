@@ -1202,10 +1202,12 @@
             console.log('[Winner-Check] Cricket: Fallback check triggered (totalThrows:', totalThrows, ')');
             winner = state.players.find(p => {
               const closed = p.cricketClosed || {};
-              const keys = Object.keys(closed);
-              // Fix: [].every() gibt true → daher explizit prüfen
-              if (keys.length === 0) return false;
-              return keys.every(k => closed[k] === true);
+              const required = [15, 16, 17, 18, 19, 20, 25];
+              // ALLE 7 Zahlen müssen geschlossen sein
+              const allClosed = required.every(n => closed[n] === true);
+              if (!allClosed) return false;
+              // Punkte-Vergleich bleibt Server-logik vorbehalten
+              return true;
             });
             if (winner) console.log('[Winner-Check] Cricket: Fallback winner found:', winner.name);
           }

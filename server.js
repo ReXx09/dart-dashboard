@@ -239,20 +239,16 @@ function calculateCricketPoints(player, allPlayers) {
 
 function checkCricketWin(player, allPlayers) {
   if (!player.cricketClosed) return false;
-  const nums = Object.keys(player.cricketClosed).map(Number);
   
-  // KEINE geschlossenen Zahlen → kein Gewinner!
-  // Fix: [].every() gibt fälschlich true → daher explizit prüfen
-  if (nums.length === 0) return false;
-  
-  // Alle Zahlen müssen geschlossen sein
-  const allClosed = nums.every(n => player.cricketClosed[n] === true);
+  // ALLE 7 Zahlen (15-20, 25) müssen geschlossen sein
+  const requiredNumbers = [15, 16, 17, 18, 19, 20, 25];
+  const allClosed = requiredNumbers.every(n => player.cricketClosed[n] === true);
   if (!allClosed) return false;
   
   // Punkte berechnen
   const myPoints = calculateCricketPoints(player, allPlayers);
   
-  // Prüfen ob Gegner mehr Punkte haben
+  // Prüfen ob Gegner mehr Punkte haben (auch wenn sie noch nicht alle Zahlen geschlossen haben)
   for (const opp of allPlayers) {
     if (opp.slot === player.slot) continue;
     const oppPoints = calculateCricketPoints(opp, allPlayers);
