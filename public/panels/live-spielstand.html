@@ -658,6 +658,7 @@
     let liveState = null;
     let countdownTimer = null;
     let pendingWinner = null;
+    let isFirstLoad = true;
 
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
@@ -975,6 +976,7 @@
       if (!overlay) return;
 
       const isCricket = state.game.mode === 'cricket';
+      const isElimination = state.game.mode === 'elimination';
       const throws = Array.isArray(winner.throws) ? winner.throws : [];
       
       if (isCricket) {
@@ -1389,8 +1391,9 @@
         const ruleSel = document.getElementById('checkoutRuleSelect');
         if (modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
         if (ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
-        // Automatische Leg-Recovery: Wenn Spiel bereits beendet, neues Leg starten
-        if (state.game.status === 'leg-finished') {
+        // Auto-Recovery NUR beim ersten Laden (nicht bei SSE-Updates)
+        if (isFirstLoad && state.game.status === 'leg-finished') {
+          isFirstLoad = false;
           try {
             const resetRes = await fetch('/api/live/reset', {
               method: 'POST',
@@ -1406,15 +1409,12 @@
               if (ruleSel2.value !== freshState.game.checkoutRule) ruleSel2.value = freshState.game.checkoutRule;
               renderState(freshState);
               showToast('↻ Neues Leg automatisch gestartet');
-            } else {
-              renderState(state); // Winner-Overlay anzeigen
+              return;
             }
-          } catch {
-            renderState(state);
-          }
-        } else {
-          renderState(state);
+          } catch {}
         }
+        isFirstLoad = false;
+        renderState(state);
       } catch(e) {
         document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
       }
