@@ -319,20 +319,14 @@
       transition: all 0.3s ease;
       position: relative;
     }
-    .hit-marker.hit-1 {
-      background: #e63946;
-      border-color: #e63946;
-    }
-    .hit-marker.hit-2 {
-      background: #f4a261;
-      border-color: #f4a261;
-    }
+    .hit-marker.hit-1,
+    .hit-marker.hit-2,
     .hit-marker.hit-3 {
       background: #2a9d8f;
       border-color: #2a9d8f;
     }
     .hit-marker.closed {
-      background: #2a9d8f;
+      background: #1a1a1a;
       border-color: #2a9d8f;
     }
     .hit-marker.closed::after {
@@ -341,7 +335,7 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      color: #fff;
+      color: #2a9d8f;
       font-size: 14px;
       font-weight: 900;
       line-height: 1;
@@ -577,8 +571,19 @@
         width: 14px;
         height: 14px;
       }
+      .compact-players .score-card .hit-marker.hit-1,
+      .compact-players .score-card .hit-marker.hit-2,
+      .compact-players .score-card .hit-marker.hit-3 {
+        background: #2a9d8f;
+        border-color: #2a9d8f;
+      }
+      .compact-players .score-card .hit-marker.closed {
+        background: #1a1a1a;
+        border-color: #2a9d8f;
+      }
       .compact-players .score-card .hit-marker.closed::after {
         font-size: 10px;
+        color: #2a9d8f;
       }
       .topbar select { padding: 8px 8px !important; }
     }
