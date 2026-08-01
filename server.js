@@ -287,11 +287,20 @@ function getEliminationWinner(state) {
 }
 
 function applyEliminationHit(state, player, value) {
-  // Prüfen ob ein anderer Spieler genau diese Punktzahl hat
+  // Fix: Vergleiche den AKTUELLEN Punktestand des werfenden Spielers
+  // (nachdem der Wurf addiert wurde) mit allen anderen Spielern
+  const currentPlayerScore = calculateEliminationPoints(player);
+  
   for (const other of state.players) {
     if (other.slot === player.slot) continue;
     const otherPoints = calculateEliminationPoints(other);
-    if (otherPoints === value) {
+    
+    // Elimination: Punktestand des anderen Spielers entspricht MEINEM aktuellen Score
+    if (otherPoints === currentPlayerScore) {
+      // Nur eliminieren wenn der andere NICHT bereits bei 0 ist
+      // (verhindert "Selbst-Elimination" durch Startwert 0)
+      if (otherPoints === 0 && currentPlayerScore === 0) continue;
+      
       // ELIMINATION! Anderen Spieler auf 0 zurücksetzen
       other.totalScored = 0;
       other.throws = other.throws || [];
@@ -315,10 +324,10 @@ function applyEliminationHit(state, player, value) {
         points: value,
         ts: Date.now()
       };
-      return true; // Elimination passiert
+      return true;
     }
   }
-  return false; // Keine Elimination
+  return false;
 }
 
 const dataStore = new DataStore();
