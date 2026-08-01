@@ -958,6 +958,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const mode = state.game.mode || DEFAULT_MODE;
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
+  const isElimination = modeDef.type === 'elimination';
 
   let bust = false;
   if (isCricket) {
@@ -968,13 +969,9 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
       player.cricketHits[value] = Math.min(3, (player.cricketHits[value] || 0) + 1);
       if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
     }
-    // Cricket-Punkte neu berechnen
     player.cricketPoints = calculateCricketPoints(player, state.players);
     player.totalScored = player.cricketPoints;
   } else {
-    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
-    const isElimination = modeDef.type === 'elimination';
-    
     if (isElimination) {
       // Elimination: Punkte addieren von 0 aufwärts
       player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
@@ -1262,6 +1259,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   const mode = state.game.mode || DEFAULT_MODE;
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
+  const isElimination = modeDef.type === 'elimination';
 
   let bust = false;
   if (isCricket) {
@@ -1272,13 +1270,9 @@ async function applyArduinoThrowFromMatrix(hit) {
       player.cricketHits[value] = Math.min(3, (player.cricketHits[value] || 0) + 1);
       if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
     }
-    // Cricket-Punkte neu berechnen
     player.cricketPoints = calculateCricketPoints(player, state.players);
     player.totalScored = player.cricketPoints;
   } else {
-    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
-    const isElimination = modeDef.type === 'elimination';
-    
     if (isElimination) {
       // Elimination: Punkte addieren von 0 aufwärts
       player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
