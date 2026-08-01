@@ -573,35 +573,64 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 2px 6px;
-      margin: 4px 0;
-      font-size: 0.65rem;
-      line-height: 1.4;
+      gap: 8px 12px;
+      margin: 8px 0;
     }
     .cricket-num {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      background: rgba(255,255,255,0.05);
-      padding: 0 4px;
-      border-radius: 4px;
-      white-space: nowrap;
-    }
-    .cricket-num .dot {
-      font-size: 0.5rem;
-      display: inline-block;
-    }
-    .c-num {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 1px;
-      min-width: 36px;
+      gap: 4px;
+      min-width: 50px;
     }
-    .c-num .num { font-weight: 700; font-size: .75rem; }
-    .c-num .hits { font-size: .6rem; color: #888; }
-    .c-num.closed .hits { color: #2a9d8f; }
-    .c-num .c-points { font-size: .55rem; color: #f4a261; font-weight: 700; }
+    .cricket-num .num-label {
+      font-weight: 700;
+      font-size: .7rem;
+      color: #f1f1f1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .cricket-hits {
+      display: flex;
+      gap: 3px;
+    }
+    .hit-marker {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 2px solid #333;
+      background: #1a1a1a;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    .hit-marker.hit-1,
+    .hit-marker.hit-2,
+    .hit-marker.hit-3 {
+      background: #2a9d8f;
+      border-color: #2a9d8f;
+    }
+    .hit-marker.closed {
+      background: #1a1a1a;
+      border-color: #2a9d8f;
+    }
+    .hit-marker.closed::after {
+      content: '✕';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #2a9d8f;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1;
+      pointer-events: none;
+    }
+    .cricket-num .points {
+      font-size: .55rem;
+      color: #f4a261;
+      font-weight: 700;
+      white-space: nowrap;
+    }
 
     /* Winner Overlay */
     .winner-overlay {
@@ -770,15 +799,36 @@
       .compact-players .score-card .sc-throw-chip { font-size: .5rem; padding: 1px 3px; min-width: 14px; border-radius: 4px; }
       /* Cricket-Grid für die kompakte Zeile */
       .compact-players .score-card .cricket-grid {
-        font-size: 0.5rem;
-        gap: 1px 3px;
-        margin: 0;
+        gap: 4px 6px;
+        margin: 4px 0;
       }
-      .compact-players .score-card .cricket-num .dot {
-        font-size: 0.4rem;
+      .compact-players .score-card .cricket-num {
+        min-width: 40px;
+        gap: 2px;
+      }
+      .compact-players .score-card .num-label {
+        font-size: .55rem;
+      }
+      .compact-players .score-card .hit-marker {
+        width: 14px;
+        height: 14px;
+      }
+      .compact-players .score-card .hit-marker.hit-1,
+      .compact-players .score-card .hit-marker.hit-2,
+      .compact-players .score-card .hit-marker.hit-3 {
+        background: #2a9d8f;
+        border-color: #2a9d8f;
+      }
+      .compact-players .score-card .hit-marker.closed {
+        background: #1a1a1a;
+        border-color: #2a9d8f;
+      }
+      .compact-players .score-card .hit-marker.closed::after {
+        font-size: 10px;
+        color: #2a9d8f;
       }
       .focus-controls-card .ctrl-title { font-size: .42rem; }
-      .focus-controls-card .ctrl-btn { font-size: .65rem; padding: 16px 6px; display: flex; flex-direction: column; align-items: center; justify_content: center; gap: 2px; }
+      .focus-controls-card .ctrl-btn { font-size: .65rem; padding: 16px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
       .focus-controls-card { display: none; height: 155px !important; }
     }
 
