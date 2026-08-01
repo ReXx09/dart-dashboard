@@ -241,6 +241,10 @@ function checkCricketWin(player, allPlayers) {
   if (!player.cricketClosed) return false;
   const nums = Object.keys(player.cricketClosed).map(Number);
   
+  // KEINE geschlossenen Zahlen → kein Gewinner!
+  // Fix: [].every() gibt fälschlich true → daher explizit prüfen
+  if (nums.length === 0) return false;
+  
   // Alle Zahlen müssen geschlossen sein
   const allClosed = nums.every(n => player.cricketClosed[n] === true);
   if (!allClosed) return false;

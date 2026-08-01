@@ -1203,7 +1203,9 @@
             winner = state.players.find(p => {
               const closed = p.cricketClosed || {};
               const keys = Object.keys(closed);
-              return keys.length >= 7 && keys.every(k => closed[k] === true);
+              // Fix: [].every() gibt true → daher explizit prüfen
+              if (keys.length === 0) return false;
+              return keys.every(k => closed[k] === true);
             });
             if (winner) console.log('[Winner-Check] Cricket: Fallback winner found:', winner.name);
           }
