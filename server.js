@@ -888,9 +888,11 @@ async function advanceAfterBust(state, player, source) {
   }
 
   player.currentRoundPoints = [];
+  player.turnScoreRecorded = false;
   state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
   state.game.currentThrow = 0;
   state.players[state.game.activePlayer].currentRoundPoints = [];
+  state.players[state.game.activePlayer].turnScoreRecorded = false;
   if (state.game.activePlayer === 0) {
     state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
   }
@@ -930,10 +932,12 @@ async function advanceAfterThreeThrows(state, player, source) {
 
   // Jetzt den echten Player-Switch durchführen
   player.currentRoundPoints = [];
+  player.turnScoreRecorded = false;
   state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
   state.game.currentThrow = 0;
   // Neuen aktiven Spieler's currentRoundPoints leeren
   state.players[state.game.activePlayer].currentRoundPoints = [];
+  state.players[state.game.activePlayer].turnScoreRecorded = false;
   if (state.game.activePlayer === 0) {
     state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
   }
@@ -1817,7 +1821,7 @@ function sanitizePlayerState(player, fallback) {
   const average = calculateCurrentRoundAverage({ currentRoundPoints });
   const cricketHits = player?.cricketHits || {};
   const cricketClosed = player?.cricketClosed || {};
-  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, cricketHits, cricketClosed };
+  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, cricketHits, cricketClosed, turnScoreRecorded: !!player?.turnScoreRecorded };
 }
 
 function resetLiveState(carryLegs = false, modeOverride) {
@@ -2253,6 +2257,7 @@ app.post('/api/live/next-player', async (req, res) => {
     state.game.throwRound = (state.game.throwRound || 1) + 1;
     // Neuen aktiven Spieler's currentRoundPoints leeren
     state.players[nextIndex].currentRoundPoints = [];
+    state.players[nextIndex].turnScoreRecorded = false;
     state.lastAction = { type: 'next-player', player: state.players[nextIndex].name, playerSlot: state.players[nextIndex].slot, ts: Date.now() };
     const saved = await saveLiveState(state);
     broadcastReload();
