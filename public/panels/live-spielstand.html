@@ -1168,8 +1168,20 @@
         if (state.game.status === 'leg-finished') {
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         }
+      } else if (isCricket) {
+        // Cricket: Gewinner hat alle Zahlen geschlossen ODER Zielscore erreicht
+        // Prüfe serverseitigen Status oder Client-seitig: alle 7 Zahlen geschlossen
+        if (state.game.status === 'leg-finished') {
+          winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+        } else {
+          // Fallback: Client-seitig prüfen ob alle Zahlen geschlossen
+          winner = state.players.find(p => {
+            const closed = p.cricketClosed || {};
+            return Object.keys(closed).length >= 7 && Object.values(closed).every(v => v === true);
+          });
+        }
       } else {
-        // x01 / Cricket: Winner hat remaining === 0
+        // x01 (501, 301, etc.): Winner hat remaining === 0
         winner = state.players.find(p => Number(p.remaining) === 0);
         if (!winner && state.game.status === 'leg-finished') {
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
