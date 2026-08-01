@@ -62,6 +62,32 @@
     }
     .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
     .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .topbar .restart-btn {
+      background: #1a1a1a;
+      border: 1px solid #f4a261;
+      color: #f4a261;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .78rem;
+      font-family: inherit;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .topbar .restart-btn:hover { background: #252525; border-color: #e63946; color: #e63946; }
+    .topbar .restart-btn {
+      background: #1a1a1a;
+      border: 1px solid #f4a261;
+      color: #f4a261;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .78rem;
+      font-family: inherit;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .topbar .restart-btn:hover { background: #252525; border-color: #e63946; color: #e63946; }
     main {
       padding: 6px;
       max-width: none;
@@ -497,6 +523,7 @@
     <div class="clock" id="clockDisplay">--:--:--</div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <button class="miss-btn" id="missBtn" onclick="skipPlayer()" title="Fehlwurf – zum nächsten Spieler wechseln">✖ Fehlwurf</button>
+    <button class="restart-btn" id="restartLegBtn" onclick="restartLeg()" title="Leg zurücksetzen – alle Punkte auf Startwert">↻ Leg-Neustart</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
   <main>
@@ -1021,6 +1048,24 @@
         el.querySelector('.hs-val').textContent = '–';
         el.title = data && data.count ? data.count + ' Einträge' : 'Keine Einträge heute';
       }
+    }
+
+    // ── Leg-Neustart ──
+    async function restartLeg() {
+      const btn = document.getElementById('restartLegBtn');
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      try {
+        const r = await fetch('/api/live/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ carryLegs: false })
+        });
+        if (!r.ok) { showToast('Neustart fehlgeschlagen', true); if (btn) { btn.disabled = false; btn.textContent = '↻ Leg-Neustart'; } return; }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('↻ Leg zurückgesetzt');
+      } catch(e) { showToast('Netzwerkfehler', true); }
+      if (btn) { btn.disabled = false; btn.textContent = '↻ Leg-Neustart'; }
     }
 
     // ── Spielmodus / Checkout-Regel ──
