@@ -783,6 +783,39 @@ function codeToPoints(code) {
   return 0;
 }
 
+function codeToSegment(code) {
+  if (!code || code <= 0) return null;
+  if (code == 125) return 'S25';
+  if (code == 225) return 'DBULL';
+
+  const base = code % 100;
+  const multiplier = Math.floor(code / 100);
+
+  if (base == 0 || base > 20) return null;
+  if (multiplier == 1) return 'S' + base;
+  if (multiplier == 2) return 'D' + base;
+  if (multiplier == 3) return 'T' + base;
+  return null;
+}
+
+function pointsToSegment(points) {
+  // Bestmögliche Segment-Bezeichnung für manuelle Würfe ermitteln
+  if (points <= 0) return null;
+  if (points === 50) return 'DBULL';
+  if (points === 25) return 'S25';
+  // Prüfen ob Triple
+  for (let i = 1; i <= 20; i++) {
+    if (points === i * 3) return 'T' + i;
+  }
+  // Prüfen ob Double
+  for (let i = 1; i <= 20; i++) {
+    if (points === i * 2) return 'D' + i;
+  }
+  // Single
+  if (points >= 1 && points <= 20) return 'S' + points;
+  return null;
+}
+
 function clearPendingArduinoThrow() {
   if (pendingArduinoThrowTimer) clearTimeout(pendingArduinoThrowTimer);
   pendingArduinoThrowTimer = null;
@@ -1008,6 +1041,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     bust,
     ts: Date.now(),
     source: 'arduino',
+    segment: pointsToSegment(value),
     channel: formatChannel(channel),
     raw: evt.line || null
   });
@@ -1309,6 +1343,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     bust,
     ts: Date.now(),
     source: 'arduino-matrix',
+    segment: codeToSegment(hit.code) || pointsToSegment(value),
     row: hit.row,
     column: hit.column,
     code: hit.code,
@@ -2189,7 +2224,7 @@ app.post('/api/live/throw', async (req, res) => {
     player.currentRoundPoints.push(points);
 
     if (!Array.isArray(player.throws)) player.throws = [];
-    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode });
+    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: pointsToSegment(points) });
 
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;

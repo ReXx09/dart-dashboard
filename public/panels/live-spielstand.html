@@ -324,6 +324,67 @@
       text-align: center;
       flex-shrink: 0;
     }
+    .focus-right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .focus-controls-card {
+      background: #141414;
+      border-radius: 14px;
+      padding: 6px 10px;
+      border: 2px solid #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+    .focus-controls-card .ctrl-title {
+      color: #777;
+      font-size: .52rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      text-align: center;
+    }
+    .focus-controls-card .ctrl-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .focus-controls-card .ctrl-row select {
+      flex: 1;
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      color: #f1f1f1;
+      padding: 3px 6px;
+      border-radius: 6px;
+      font-size: .65rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .focus-controls-card .ctrl-row select:focus { border-color: #e63946; outline: none; }
+    .focus-controls-card .ctrl-btn {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid #2a2a2a;
+      background: #1a1a1a;
+      color: #f1f1f1;
+      font-size: .72rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: center;
+    }
+    .focus-controls-card .ctrl-btn:hover { border-color: #f4a261; color: #f4a261; }
+    .focus-controls-card .ctrl-btn.miss { border-color: #e63946; background: #8b0000; }
+    .focus-controls-card .ctrl-btn.miss:hover { background: #a00; border-color: #f4a261; color: #f4a261; }
+    .focus-controls-card .ctrl-btn.restart { border-color: #f4a261; color: #f4a261; }
+    .focus-controls-card .ctrl-btn.restart:hover { border-color: #e63946; color: #e63946; }
+    .focus-controls-card .ctrl-btn:disabled { opacity: .4; cursor: default; }
     .leg-list {
       width: 100%;
       display: grid;
@@ -625,6 +686,9 @@
       .compact-players .score-card .cricket-num .dot {
         font-size: 0.4rem;
       }
+      .focus-controls-card .ctrl-title { font-size: .42rem; }
+      .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 2px 4px; }
+      .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 4px 6px; }
     }
   </style>
 </head>
@@ -717,18 +781,19 @@
       
       const throwsHtml = displayThrows.map((pt, ti) => {
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
-        let segmentLabel = '';
-        if (currentRound.length === 0) {
+        // Segment aus dem passenden Wurf-Eintrag holen
+        let segmentLabel = '-';
+        if (pt !== null) {
           const throwData = lastThrows[ti];
           if (throwData && throwData.segment) {
             segmentLabel = throwData.segment;
           } else {
-            segmentLabel = pt !== null ? String(pt) : '-';
+            segmentLabel = String(pt);
           }
         }
         return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
-          (segmentLabel ? '<div class="seg">' + segmentLabel + '</div>' : '') +
+          '<div class="seg">' + segmentLabel + '</div>' +
         '</div>';
       }).join('');
 
@@ -790,6 +855,38 @@
         '<h4>Aufnahmen im Leg</h4>' +
         '<div class="leg-list">' + legListHtml + '</div>' +
       '</aside>';
+    }
+
+    function renderControlsCard(state) {
+      if (!state) return '';
+      const mode = state.game.mode || '501';
+      const rule = state.game.checkoutRule || 'double';
+      const modeLabel = mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? 'Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode;
+      const ruleLabel = rule === 'single' ? 'Single Out' : rule === 'double' ? 'Double Out' : rule === 'master' ? 'Master Out' : rule;
+      return '<div class="focus-controls-card">' +
+        '<div class="ctrl-title">⚙ Steuerung</div>' +
+        '<div class="ctrl-row">' +
+          '<select id="ctrlModeSelect" onchange="changeMode(this.value)" title="Spielmodus">' +
+            '<option value="501"' + (mode === '501' ? ' selected' : '') + '>501</option>' +
+            '<option value="301"' + (mode === '301' ? ' selected' : '') + '>301</option>' +
+            '<option value="701"' + (mode === '701' ? ' selected' : '') + '>701</option>' +
+            '<option value="cricket"' + (mode === 'cricket' ? ' selected' : '') + '>Cricket</option>' +
+            '<option value="elimination"' + (mode === 'elimination' ? ' selected' : '') + '>Elimination</option>' +
+            '<option value="shanghai"' + (mode === 'shanghai' ? ' selected' : '') + '>Shanghai</option>' +
+            '<option value="atc"' + (mode === 'atc' ? ' selected' : '') + '>ATC</option>' +
+            '<option value="split"' + (mode === 'split' ? ' selected' : '') + '>Split</option>' +
+          '</select>' +
+          '<select id="ctrlRuleSelect" onchange="changeCheckoutRule(this.value)" title="Finish-Regel">' +
+            '<option value="double"' + (rule === 'double' ? ' selected' : '') + '>Double Out</option>' +
+            '<option value="single"' + (rule === 'single' ? ' selected' : '') + '>Single Out</option>' +
+            '<option value="master"' + (rule === 'master' ? ' selected' : '') + '>Master Out</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="ctrl-row">' +
+          '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
+          '<button class="ctrl-btn restart" id="focusRestartBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>' +
+        '</div>' +
+      '</div>';
     }
 
     function renderCricketView(p, state) {
@@ -901,11 +998,15 @@
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
 
-      // ── Sync selectors ──
+      // ── Sync selectors (Topbar + Control-Kachel) ──
       const modeSel = document.getElementById('gameModeSelect');
       const ruleSel = document.getElementById('checkoutRuleSelect');
+      const ctrlModeSel = document.getElementById('ctrlModeSelect');
+      const ctrlRuleSel = document.getElementById('ctrlRuleSelect');
       if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
       if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
+      if (ctrlModeSel && ctrlModeSel.value !== state.game.mode) ctrlModeSel.value = state.game.mode;
+      if (ctrlRuleSel && ctrlRuleSel.value !== state.game.checkoutRule) ctrlRuleSel.value = state.game.checkoutRule;
 
       // ── Bust detection ──
       const lastThrow = state.lastAction;
@@ -954,7 +1055,11 @@
         focusPlayer.innerHTML = renderCricketView(active, state);
       } else {
         focusPlayer.classList.remove('single');
-        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
+        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) +
+          '<div class="focus-right-col">' +
+            renderFocusLegCard(active) +
+            renderControlsCard(state) +
+          '</div>';
       }
 
       if (hasOthers) {
@@ -1389,8 +1494,12 @@
         liveState = state;
         const modeSel = document.getElementById('gameModeSelect');
         const ruleSel = document.getElementById('checkoutRuleSelect');
+        const ctrlModeSel = document.getElementById('ctrlModeSelect');
+        const ctrlRuleSel = document.getElementById('ctrlRuleSelect');
         if (modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
         if (ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
+        if (ctrlModeSel && ctrlModeSel.value !== state.game.mode) ctrlModeSel.value = state.game.mode;
+        if (ctrlRuleSel && ctrlRuleSel.value !== state.game.checkoutRule) ctrlRuleSel.value = state.game.checkoutRule;
         // Auto-Recovery NUR beim ersten Laden (nicht bei SSE-Updates)
         if (isFirstLoad && state.game.status === 'leg-finished') {
           isFirstLoad = false;
@@ -1405,8 +1514,12 @@
               liveState = freshState;
               const modeSel2 = document.getElementById('gameModeSelect');
               const ruleSel2 = document.getElementById('checkoutRuleSelect');
+              const ctrlModeSel2 = document.getElementById('ctrlModeSelect');
+              const ctrlRuleSel2 = document.getElementById('ctrlRuleSelect');
               if (modeSel2.value !== freshState.game.mode) modeSel2.value = freshState.game.mode;
               if (ruleSel2.value !== freshState.game.checkoutRule) ruleSel2.value = freshState.game.checkoutRule;
+              if (ctrlModeSel2 && ctrlModeSel2.value !== freshState.game.mode) ctrlModeSel2.value = freshState.game.mode;
+              if (ctrlRuleSel2 && ctrlRuleSel2.value !== freshState.game.checkoutRule) ctrlRuleSel2.value = freshState.game.checkoutRule;
               renderState(freshState);
               showToast('↻ Neues Leg automatisch gestartet');
               return;
