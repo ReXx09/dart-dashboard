@@ -1160,35 +1160,59 @@
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
+      // ── DEBUG: Log Server State ──
+      console.log('[Winner-Check] Server State:', {
+        mode: state.game.mode,
+        status: state.game.status,
+        throwRound: state.game.throwRound,
+        currentThrow: state.game.currentThrow,
+        activePlayer: state.game.activePlayer,
+        players: state.players.map(p => ({
+          slot: p.slot,
+          name: p.name,
+          remaining: p.remaining,
+          totalScored: p.totalScored,
+          throws: p.throws?.length || 0,
+          cricketClosed: p.cricketClosed,
+          cricketHits: p.cricketHits,
+          legs: p.legs
+        }))
+      });
+
       // Winner-Erkennung
       let winner = null;
       if (isElimination) {
         // Bei Elimination: Kein Check auf remaining === 0 (alle starten bei 0!)
         // Gewinner wird serverseitig bei throwRound > 10 ermittelt
         if (state.game.status === 'leg-finished') {
+          console.log('[Winner-Check] Elimination: leg-finished triggered');
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         }
       } else if (isCricket) {
         // Cricket: Gewinner hat alle Zahlen geschlossen ODER Zielscore erreicht
         // Prüfe serverseitigen Status oder Client-seitig: alle 7 Zahlen geschlossen
         if (state.game.status === 'leg-finished') {
+          console.log('[Winner-Check] Cricket: leg-finished triggered (SERVER)');
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         } else {
           // Fallback: Client-seitig prüfen ob alle Zahlen geschlossen
           // NUR wenn: Server-Status NICHT 'leg-finished' UND mind. 7 Würfe gesamt (1 volle Runde)
           const totalThrows = state.players.reduce((sum, p) => sum + (Array.isArray(p.throws) ? p.throws.length : 0), 0);
           if (totalThrows >= 7) {
+            console.log('[Winner-Check] Cricket: Fallback check triggered (totalThrows:', totalThrows, ')');
             winner = state.players.find(p => {
               const closed = p.cricketClosed || {};
               const keys = Object.keys(closed);
               return keys.length >= 7 && keys.every(k => closed[k] === true);
             });
+            if (winner) console.log('[Winner-Check] Cricket: Fallback winner found:', winner.name);
           }
         }
       } else {
         // x01 (501, 301, etc.): Winner hat remaining === 0
         winner = state.players.find(p => Number(p.remaining) === 0);
         if (!winner && state.game.status === 'leg-finished') {
+          console.log('[Winner-Check] x01: leg-finished triggered');
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         }
       }
