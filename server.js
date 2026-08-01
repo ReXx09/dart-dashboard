@@ -621,7 +621,7 @@ function flushMatrixHitCluster() {
   matrixSniffer.lastMatrixHitMs = now;
   normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: acceptedHit } });
 
-  if (ARDUINO_AUTO_THROW_MATRIX_ENABLED && (acceptedHit.mapped || ARDUINO_AUTO_THROW_MATRIX_UNMAPPED)) {
+  if (runtimeTuning.matrixAutoThrowEnabled !== false && (acceptedHit.mapped || ARDUINO_AUTO_THROW_MATRIX_UNMAPPED)) {
     handleArduinoMatrixHit(acceptedHit);
   }
 }

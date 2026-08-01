@@ -303,21 +303,22 @@
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
     .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
 
-    /* Leg-Liste – feste Höhe wie im Mockup */
+    /* Leg-Liste – begrenzte Höhe */
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
-      padding: 8px;
+      padding: 5px;
       border: 2px solid #1e1e1e;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
       overflow: hidden;
-      height: 420px; /* feste Höhe wie im Mockup */
+      flex: 0 1 auto;
+      max-height: 40vh;
     }
     .focus-leg-card h4 {
       color: #777;
-      font-size: .6rem;
+      font-size: .56rem;
       letter-spacing: 1.5px;
       text-transform: uppercase;
       text-align: center;
@@ -326,68 +327,73 @@
     .focus-right-col {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
       min-height: 0;
       overflow: hidden;
     }
     .focus-controls-card {
       background: #141414;
       border-radius: 14px;
-      padding: 12px 16px;
+      padding: 6px 10px;
       border: 2px solid #1e1e1e;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 5px;
       flex-shrink: 0;
     }
     .focus-controls-card .ctrl-title {
       color: #777;
-      font-size: .56rem;
+      font-size: .52rem;
       letter-spacing: 1.5px;
       text-transform: uppercase;
       text-align: center;
     }
-    .focus-controls-card .ctrl-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 8px;
+    .focus-controls-card .ctrl-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
     }
+    .focus-controls-card .ctrl-row select {
+      flex: 1;
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      color: #f1f1f1;
+      padding: 6px 6px;
+      border-radius: 6px;
+      font-size: .65rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .focus-controls-card .ctrl-row select:focus { border-color: #e63946; outline: none; }
     .focus-controls-card .ctrl-btn {
-      padding: 14px 16px;
-      border-radius: 10px;
+      flex: 1;
+      padding: 12px 8px;
+      border-radius: 8px;
       border: 1px solid #2a2a2a;
       background: #1a1a1a;
       color: #f1f1f1;
-      font-size: .75rem;
+      font-size: .72rem;
       font-weight: 700;
       font-family: inherit;
       cursor: pointer;
       transition: all .15s;
       text-align: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
     }
     .focus-controls-card .ctrl-btn:hover { border-color: #f4a261; color: #f4a261; }
-    .focus-controls-card .ctrl-btn.primary { border-color: #e63946; background: linear-gradient(135deg, #2a0a0a, #1a1a1a); }
-    .focus-controls-card .ctrl-btn.primary:hover { border-color: #ff4d5a; background: linear-gradient(135deg, #3a0d0d, #222); }
-    .focus-controls-card .ctrl-btn.success { border-color: #2e7d32; background: linear-gradient(135deg, #0a2a0a, #1a1a1a); }
-    .focus-controls-card .ctrl-btn.success:hover { border-color: #4caf50; background: linear-gradient(135deg, #0d3a0d, #222); }
     .focus-controls-card .ctrl-btn.miss { border-color: #e63946; background: #8b0000; }
     .focus-controls-card .ctrl-btn.miss:hover { background: #a00; border-color: #f4a261; color: #f4a261; }
     .focus-controls-card .ctrl-btn.restart { border-color: #f4a261; color: #f4a261; }
     .focus-controls-card .ctrl-btn.restart:hover { border-color: #e63946; color: #e63946; }
     .focus-controls-card .ctrl-btn:disabled { opacity: .4; cursor: default; }
-    .focus-controls-card .ctrl-btn svg { width: 18px; height: 18px; }
     .leg-list {
       width: 100%;
       display: grid;
-      gap: 4px;
+      gap: 3px;
       overflow: auto;
       flex: 1;
       min-height: 0;
-      height: 360px; /* feste Höhe wie im Mockup */
+      /* 10 Einträge fix: 10 * (4px padding + 4px padding + 1px border + 1px border + 3px gap) ≈ 10 * 13px = 130px + etwas Puffer */
+      max-height: 140px;
     }
     .leg-item { 
       display: grid;
@@ -396,15 +402,15 @@
       background: #1b1b1b;
       border: 1px solid #2b2b2b;
       border-radius: 8px;
-      padding: 6px 10px;
-      font-size: .68rem;
-      gap: 10px;
+      padding: 4px 8px;
+      font-size: .65rem;
+      gap: 8px;
     }
     .leg-item .idx {
       color: #777;
       font-weight: 600;
       text-align: right;
-      padding-right: 10px;
+      padding-right: 8px;
       border-right: 1px solid #333;
     }
     .leg-item .throws {
@@ -683,9 +689,8 @@
         font-size: 0.4rem;
       }
       .focus-controls-card .ctrl-title { font-size: .42rem; }
-      .focus-controls-card .ctrl-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
-      .focus-controls-card .ctrl-btn { font-size: .5rem; padding: 8px 6px; }
-      .focus-controls-card .ctrl-btn svg { width: 14px; height: 14px; }
+      .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 4px 4px; }
+      .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 8px 6px; }
     }
   </style>
 </head>
@@ -858,25 +863,30 @@
       if (!state) return '';
       const mode = state.game.mode || '501';
       const rule = state.game.checkoutRule || 'double';
+      const modeLabel = mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? 'Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode;
+      const ruleLabel = rule === 'single' ? 'Single Out' : rule === 'double' ? 'Double Out' : rule === 'master' ? 'Master Out' : rule;
       return '<div class="focus-controls-card">' +
         '<div class="ctrl-title">⚙ Steuerung</div>' +
-        '<div class="ctrl-grid">' +
-          '<button class="ctrl-btn primary" onclick="nextTurn()" title="Nächste Aufnahme">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>' +
-            'Nächste Aufnahme' +
-          '</button>' +
-          '<button class="ctrl-btn success" onclick="undoThrow()" title="Rückgängig">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6M3 13a9 9 0 1 0 2.7-6.3L3 7"/></svg>' +
-            'Rückgängig' +
-          '</button>' +
-          '<button class="ctrl-btn miss" onclick="skipPlayer()" title="Fehlwurf (0)">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
-            'Fehlwurf (0)' +
-          '</button>' +
-          '<button class="ctrl-btn restart" onclick="restartLeg()" title="Neues Leg">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>' +
-            'Neues Leg' +
-          '</button>' +
+        '<div class="ctrl-row">' +
+          '<select id="ctrlModeSelect" onchange="changeMode(this.value)" title="Spielmodus">' +
+            '<option value="501"' + (mode === '501' ? ' selected' : '') + '>501</option>' +
+            '<option value="301"' + (mode === '301' ? ' selected' : '') + '>301</option>' +
+            '<option value="701"' + (mode === '701' ? ' selected' : '') + '>701</option>' +
+            '<option value="cricket"' + (mode === 'cricket' ? ' selected' : '') + '>Cricket</option>' +
+            '<option value="elimination"' + (mode === 'elimination' ? ' selected' : '') + '>Elimination</option>' +
+            '<option value="shanghai"' + (mode === 'shanghai' ? ' selected' : '') + '>Shanghai</option>' +
+            '<option value="atc"' + (mode === 'atc' ? ' selected' : '') + '>ATC</option>' +
+            '<option value="split"' + (mode === 'split' ? ' selected' : '') + '>Split</option>' +
+          '</select>' +
+          '<select id="ctrlRuleSelect" onchange="changeCheckoutRule(this.value)" title="Finish-Regel">' +
+            '<option value="double"' + (rule === 'double' ? ' selected' : '') + '>Double Out</option>' +
+            '<option value="single"' + (rule === 'single' ? ' selected' : '') + '>Single Out</option>' +
+            '<option value="master"' + (rule === 'master' ? ' selected' : '') + '>Master Out</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="ctrl-row">' +
+          '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
+          '<button class="ctrl-btn restart" id="focusRestartBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>' +
         '</div>' +
       '</div>';
     }
@@ -1392,34 +1402,6 @@
         showToast('↻ Leg zurückgesetzt');
       } catch(e) { showToast('Netzwerkfehler', true); }
       if (btn) { btn.disabled = false; btn.textContent = '↻ Leg-Neustart'; }
-    }
-
-    // ── Nächste Aufnahme ──
-    async function nextTurn() {
-      const btn = document.querySelector('.ctrl-btn.primary');
-      if (btn) btn.disabled = true;
-      try {
-        const r = await fetch('/api/live/next-player', { method: 'POST' });
-        if (!r.ok) { showToast('Wechsel fehlgeschlagen', true); if (btn) btn.disabled = false; return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('➡ Nächste Aufnahme – ' + (liveState.players[liveState.game.activePlayer]?.name || 'nächster Spieler'));
-      } catch(e) { showToast('Netzwerkfehler', true); }
-      if (btn) setTimeout(() => btn.disabled = false, 1000);
-    }
-
-    // ── Rückgängig ──
-    async function undoThrow() {
-      const btn = document.querySelector('.ctrl-btn.success');
-      if (btn) btn.disabled = true;
-      try {
-        const r = await fetch('/api/live/undo', { method: 'POST' });
-        if (!r.ok) { showToast('Rückgängig fehlgeschlagen', true); if (btn) btn.disabled = false; return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('↩ Wurf rückgängig gemacht');
-      } catch(e) { showToast('Netzwerkfehler', true); }
-      if (btn) setTimeout(() => btn.disabled = false, 1000);
     }
 
     // ── Spielmodus / Checkout-Regel ──
