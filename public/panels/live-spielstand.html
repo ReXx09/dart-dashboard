@@ -357,20 +357,6 @@
       align-items: stretch;
       flex: 1;
     }
-    .focus-controls-card .ctrl-row select {
-      flex: 1;
-      background: #0d0d0d;
-      border: 1px solid #2a2a2a;
-      color: #f1f1f1;
-      padding: 16px 6px !important;
-      border-radius: 6px;
-      font-size: .65rem;
-      font-family: inherit;
-      cursor: pointer;
-      min-height: 44px !important;
-      height: 100% !important;
-    }
-    .focus-controls-card .ctrl-row select:focus { border-color: #e63946; outline: none; }
     .focus-controls-card .ctrl-btn {
       flex: 1;
       padding: 24px 8px;
@@ -393,6 +379,118 @@
     .focus-controls-card .ctrl-btn.restart { border-color: #f4a261; color: #f4a261; }
     .focus-controls-card .ctrl-btn.restart:hover { border-color: #e63946; color: #e63946; }
     .focus-controls-card .ctrl-btn:disabled { opacity: .4; cursor: default; }
+    
+    /* Modal Buttons (Mode/Rule) */
+    .focus-controls-card .ctrl-btn.mode-btn,
+    .focus-controls-card .ctrl-btn.rule-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 12px 8px;
+    }
+    .focus-controls-card .ctrl-btn .btn-label {
+      font-size: .5rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .focus-controls-card .ctrl-btn .btn-value {
+      font-size: .75rem;
+      font-weight: 700;
+      color: #f4a261;
+    }
+    
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .modal-overlay.show {
+      display: flex;
+      opacity: 1;
+    }
+    .modal-content {
+      background: #1a1a1a;
+      border: 2px solid #e63946;
+      border-radius: 16px;
+      padding: 20px;
+      min-width: 280px;
+      max-width: 90vw;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 0 40px rgba(230,57,70,.4);
+      transform: scale(0.9);
+      transition: transform 0.2s ease;
+    }
+    .modal-overlay.show .modal-content {
+      transform: scale(1);
+    }
+    .modal-content h4 {
+      color: #f4a261;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      text-align: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #333;
+    }
+    .modal-options {
+      display: grid;
+      gap: 8px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .modal-option {
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      padding: 16px 20px;
+      color: #f1f1f1;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: center;
+      touch-action: manipulation;
+    }
+    .modal-option:hover,
+    .modal-option:active {
+      background: #222;
+      border-color: #f4a261;
+      color: #f4a261;
+    }
+    .modal-option.selected {
+      background: #2a0a0a;
+      border-color: #e63946;
+      color: #e63946;
+    }
+    .modal-close {
+      width: 100%;
+      margin-top: 16px;
+      padding: 12px;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 8px;
+      color: #888;
+      font-size: .75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .modal-close:hover {
+      border-color: #f4a261;
+      color: #f4a261;
+    }
     .leg-list {
       width: 100%;
       display: grid;
@@ -702,17 +800,15 @@
       .focus-controls-card { display: none; height: 125px !important; }
     }
 
-    /* Tablet-Auflösungen – Selects & Buttons hoch genug */
+    /* Tablet-Auflösungen – Buttons hoch genug */
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) {
       .focus-controls-card { height: 125px !important; }
-      .focus-controls-card .ctrl-row select { padding: 12px 6px !important; min-height: 44px !important; height: 100% !important; }
       .focus-controls-card .ctrl-btn { padding: 24px 8px !important; min-height: 48px !important; height: 100% !important; }
     }
 
     /* Fallback für alle Touch-Geräte */
     @media (pointer: coarse) {
       .focus-controls-card { height: 125px !important; }
-      .focus-controls-card .ctrl-row select { min-height: 44px !important; padding: 12px 6px !important; height: 100% !important; }
       .focus-controls-card .ctrl-btn { min-height: 48px !important; padding: 24px 8px !important; height: 100% !important; }
     }
   </style>
@@ -889,25 +985,30 @@
       return '<div class="focus-controls-card">' +
         '<div class="ctrl-title">⚙ Steuerung</div>' +
         '<div class="ctrl-row">' +
-          '<select id="ctrlModeSelect" onchange="changeMode(this.value)" title="Spielmodus">' +
-            '<option value="501"' + (mode === '501' ? ' selected' : '') + '>501</option>' +
-            '<option value="301"' + (mode === '301' ? ' selected' : '') + '>301</option>' +
-            '<option value="701"' + (mode === '701' ? ' selected' : '') + '>701</option>' +
-            '<option value="cricket"' + (mode === 'cricket' ? ' selected' : '') + '>Cricket</option>' +
-            '<option value="elimination"' + (mode === 'elimination' ? ' selected' : '') + '>Elimination</option>' +
-            '<option value="shanghai"' + (mode === 'shanghai' ? ' selected' : '') + '>Shanghai</option>' +
-            '<option value="atc"' + (mode === 'atc' ? ' selected' : '') + '>ATC</option>' +
-            '<option value="split"' + (mode === 'split' ? ' selected' : '') + '>Split</option>' +
-          '</select>' +
-          '<select id="ctrlRuleSelect" onchange="changeCheckoutRule(this.value)" title="Finish-Regel">' +
-            '<option value="double"' + (rule === 'double' ? ' selected' : '') + '>Double Out</option>' +
-            '<option value="single"' + (rule === 'single' ? ' selected' : '') + '>Single Out</option>' +
-            '<option value="master"' + (rule === 'master' ? ' selected' : '') + '>Master Out</option>' +
-          '</select>' +
+          '<button class="ctrl-btn mode-btn" id="ctrlModeBtn" onclick="openModeModal()" title="Spielmodus ändern">' +
+            '<span class="btn-label">Modus</span><span class="btn-value">' + modeLabel + '</span>' +
+          '</button>' +
+          '<button class="ctrl-btn rule-btn" id="ctrlRuleBtn" onclick="openRuleModal()" title="Finish-Regel ändern">' +
+            '<span class="btn-label">Finish</span><span class="btn-value">' + ruleLabel + '</span>' +
+          '</button>' +
         '</div>' +
         '<div class="ctrl-row">' +
           '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
           '<button class="ctrl-btn restart" id="focusRestartBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>' +
+        '</div>' +
+        '<div class="modal-overlay" id="modeModal" onclick="closeModal(this, event)">' +
+          '<div class="modal-content" onclick="event.stopPropagation()">' +
+            '<h4>Spielmodus wählen</h4>' +
+            '<div class="modal-options" id="modeOptions"></div>' +
+            '<button class="modal-close" onclick="closeModal(document.getElementById(\'modeModal\'))">Abbrechen</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-overlay" id="ruleModal" onclick="closeModal(this, event)">' +
+          '<div class="modal-content" onclick="event.stopPropagation()">' +
+            '<h4>Finish-Regel wählen</h4>' +
+            '<div class="modal-options" id="ruleOptions"></div>' +
+            '<button class="modal-close" onclick="closeModal(document.getElementById(\'ruleModal\'))">Abbrechen</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
     }
@@ -1021,11 +1122,13 @@
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
 
-      // ── Sync selectors (Control-Kachel) ──
-      const ctrlModeSel = document.getElementById('ctrlModeSelect');
-      const ctrlRuleSel = document.getElementById('ctrlRuleSelect');
-      if (ctrlModeSel && ctrlModeSel.value !== state.game.mode) ctrlModeSel.value = state.game.mode;
-      if (ctrlRuleSel && ctrlRuleSel.value !== state.game.checkoutRule) ctrlRuleSel.value = state.game.checkoutRule;
+      // ── Sync buttons (Control-Kachel) ──
+      const modeBtn = document.getElementById('ctrlModeBtn');
+      const ruleBtn = document.getElementById('ctrlRuleBtn');
+      const modeLabel = mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? 'Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode;
+      const ruleLabel = state.game.checkoutRule === 'single' ? 'Single Out' : state.game.checkoutRule === 'double' ? 'Double Out' : state.game.checkoutRule === 'master' ? 'Master Out' : state.game.checkoutRule;
+      if (modeBtn) modeBtn.querySelector('.btn-value').textContent = modeLabel;
+      if (ruleBtn) ruleBtn.querySelector('.btn-value').textContent = ruleLabel;
 
       // ── Bust detection ──
       const lastThrow = state.lastAction;
@@ -1429,26 +1532,14 @@
           fetch('/api/game/checkout-rules'),
           fetch('/api/live/state')
         ]);
-        if (modesRes.ok) {
-          const modes = await modesRes.json();
-          const sel = document.getElementById('ctrlModeSelect');
-          sel.innerHTML = Object.entries(modes).map(([key, m]) =>
-            '<option value="' + key + '">' + m.label + '</option>'
-          ).join('');
-        }
-        if (rulesRes.ok) {
-          const rules = await rulesRes.json();
-          const sel = document.getElementById('ctrlRuleSelect');
-          sel.innerHTML = Object.entries(rules).map(([key, r]) =>
-            '<option value="' + key + '">' + r.label + '</option>'
-          ).join('');
-        }
         if (stateRes.ok) {
           const state = await stateRes.json();
-          const ctrlModeSel = document.getElementById('ctrlModeSelect');
-          const ctrlRuleSel = document.getElementById('ctrlRuleSelect');
-          if (ctrlModeSel && state.game.mode) ctrlModeSel.value = state.game.mode;
-          if (ctrlRuleSel && state.game.checkoutRule) ctrlRuleSel.value = state.game.checkoutRule;
+          const modeBtn = document.getElementById('ctrlModeBtn');
+          const ruleBtn = document.getElementById('ctrlRuleBtn');
+          const modeLabel = state.game.mode === '501' ? '501' : state.game.mode === '301' ? '301' : state.game.mode === '701' ? '701' : state.game.mode === 'cricket' ? 'Cricket' : state.game.mode === 'elimination' ? 'Elimination' : state.game.mode === 'shanghai' ? 'Shanghai' : state.game.mode === 'atc' ? 'ATC' : state.game.mode === 'split' ? 'Split' : state.game.mode;
+          const ruleLabel = state.game.checkoutRule === 'single' ? 'Single Out' : state.game.checkoutRule === 'double' ? 'Double Out' : state.game.checkoutRule === 'master' ? 'Master Out' : state.game.checkoutRule;
+          if (modeBtn) modeBtn.querySelector('.btn-value').textContent = modeLabel;
+          if (ruleBtn) ruleBtn.querySelector('.btn-value').textContent = ruleLabel;
         }
       } catch {}
     }
@@ -1477,6 +1568,52 @@
         renderState(liveState);
         showToast('Finish: ' + rule);
       } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    // ── Modal Functions ──
+    function openModeModal() {
+      const modal = document.getElementById('modeModal');
+      const options = document.getElementById('modeOptions');
+      if (!modal || !options) return;
+      const modes = {
+        '501': '501', '301': '301', '701': '701',
+        'cricket': 'Cricket', 'elimination': 'Elimination',
+        'shanghai': 'Shanghai', 'atc': 'ATC', 'split': 'Split'
+      };
+      const currentMode = liveState?.game?.mode || '501';
+      options.innerHTML = Object.entries(modes).map(([key, label]) =>
+        '<div class="modal-option' + (key === currentMode ? ' selected' : '') + '" onclick="selectMode(\'' + key + '\')">' + label + '</div>'
+      ).join('');
+      modal.classList.add('show');
+    }
+
+    function openRuleModal() {
+      const modal = document.getElementById('ruleModal');
+      const options = document.getElementById('ruleOptions');
+      if (!modal || !options) return;
+      const rules = {
+        'double': 'Double Out', 'single': 'Single Out', 'master': 'Master Out'
+      };
+      const currentRule = liveState?.game?.checkoutRule || 'double';
+      options.innerHTML = Object.entries(rules).map(([key, label]) =>
+        '<div class="modal-option' + (key === currentRule ? ' selected' : '') + '" onclick="selectRule(\'' + key + '\')">' + label + '</div>'
+      ).join('');
+      modal.classList.add('show');
+    }
+
+    function closeModal(modal, event) {
+      if (event && event.target !== modal) return;
+      modal.classList.remove('show');
+    }
+
+    function selectMode(mode) {
+      closeModal(document.getElementById('modeModal'));
+      changeMode(mode);
+    }
+
+    function selectRule(rule) {
+      closeModal(document.getElementById('ruleModal'));
+      changeCheckoutRule(rule);
     }
 
     function playBustSound() {
@@ -1521,10 +1658,6 @@
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
-        const ctrlModeSel = document.getElementById('ctrlModeSelect');
-        const ctrlRuleSel = document.getElementById('ctrlRuleSelect');
-        if (ctrlModeSel && ctrlModeSel.value !== state.game.mode) ctrlModeSel.value = state.game.mode;
-        if (ctrlRuleSel && ctrlRuleSel.value !== state.game.checkoutRule) ctrlRuleSel.value = state.game.checkoutRule;
         // Auto-Recovery NUR beim ersten Laden (nicht bei SSE-Updates)
         if (isFirstLoad && state.game.status === 'leg-finished') {
           isFirstLoad = false;
@@ -1537,10 +1670,12 @@
             if (resetRes.ok) {
               const freshState = await resetRes.json();
               liveState = freshState;
-              const ctrlModeSel2 = document.getElementById('ctrlModeSelect');
-              const ctrlRuleSel2 = document.getElementById('ctrlRuleSelect');
-              if (ctrlModeSel2 && ctrlModeSel2.value !== freshState.game.mode) ctrlModeSel2.value = freshState.game.mode;
-              if (ctrlRuleSel2 && ctrlRuleSel2.value !== freshState.game.checkoutRule) ctrlRuleSel2.value = freshState.game.checkoutRule;
+              const modeBtn2 = document.getElementById('ctrlModeBtn');
+              const ruleBtn2 = document.getElementById('ctrlRuleBtn');
+              const modeLabel2 = freshState.game.mode === '501' ? '501' : freshState.game.mode === '301' ? '301' : freshState.game.mode === '701' ? '701' : freshState.game.mode === 'cricket' ? 'Cricket' : freshState.game.mode === 'elimination' ? 'Elimination' : freshState.game.mode === 'shanghai' ? 'Shanghai' : freshState.game.mode === 'atc' ? 'ATC' : freshState.game.mode === 'split' ? 'Split' : freshState.game.mode;
+              const ruleLabel2 = freshState.game.checkoutRule === 'single' ? 'Single Out' : freshState.game.checkoutRule === 'double' ? 'Double Out' : freshState.game.checkoutRule === 'master' ? 'Master Out' : freshState.game.checkoutRule;
+              if (modeBtn2) modeBtn2.querySelector('.btn-value').textContent = modeLabel2;
+              if (ruleBtn2) ruleBtn2.querySelector('.btn-value').textContent = ruleLabel2;
               renderState(freshState);
               showToast('↻ Neues Leg automatisch gestartet');
               return;
