@@ -1175,10 +1175,15 @@
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         } else {
           // Fallback: Client-seitig prüfen ob alle Zahlen geschlossen
-          winner = state.players.find(p => {
-            const closed = p.cricketClosed || {};
-            return Object.keys(closed).length >= 7 && Object.values(closed).every(v => v === true);
-          });
+          // Nur wenn bereits Würfe gemacht wurden (mindestens 3 Würfe = 1 Aufnahme)
+          const throws = Array.isArray(active.throws) ? active.throws : [];
+          if (throws.length >= 3) {
+            winner = state.players.find(p => {
+              const closed = p.cricketClosed || {};
+              const keys = Object.keys(closed);
+              return keys.length >= 7 && keys.every(k => closed[k] === true);
+            });
+          }
         }
       } else {
         // x01 (501, 301, etc.): Winner hat remaining === 0
