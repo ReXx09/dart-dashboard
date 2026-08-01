@@ -1201,16 +1201,39 @@
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
-        // Sync selectors
         const modeSel = document.getElementById('gameModeSelect');
         const ruleSel = document.getElementById('checkoutRuleSelect');
         if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
         if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
-        renderState(state);
+        // Automatische Leg-Recovery: Wenn Spiel bereits beendet, neues Leg starten
+        if (state.game.status === 'leg-finished') {
+          try {
+            const resetRes = await fetch('/api/live/reset', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ carryLegs: true })
+            });
+            if (resetRes.ok) {
+              const freshState = await resetRes.json();
+              liveState = freshState;
+              const modeSel2 = document.getElementById('gameModeSelect');
+              const ruleSel2 = document.getElementById('checkoutRuleSelect');
+              if (modeSel2 && modeSel2.value !== freshState.game.mode) modeSel2.value = freshState.game.mode;
+              if (ruleSel2 && ruleSel2.value !== freshState.game.checkoutRule) ruleSel2.value = freshState.game.checkoutRule;
+              renderState(freshState);
+              showToast('↻ Neues Leg automatisch gestartet');
+            } else {
+              renderState(state);
+            }
+          } catch {
+            renderState(state);
+          }
+        } else {
+          renderState(state);
+        }
       } catch(e) {
         document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
       }
-      // Daily Highscore parallel laden
       loadDailyHighscore();
     }
 
