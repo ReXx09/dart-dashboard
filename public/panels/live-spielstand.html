@@ -1803,16 +1803,46 @@
     loadGameModes();
 
     (function() {
-      const sse = new EventSource('/api/events');
+      let sse = null;
+      let reconnectAttempts = 0;
+      const maxReconnectAttempts = 10;
+      const baseReconnectDelay = 1000;
+
+      function connectSSE() {
+        sse = new EventSource('/api/events');
+        
+        sse.onopen = () => {
+          console.log('[SSE] Connected');
+          reconnectAttempts = 0;
+        };
+
+        sse.addEventListener('reload', () => {
+          if (reloadQueued) return;
+          reloadQueued = true;
+          setTimeout(() => {
+            reloadQueued = false;
+            loadAll().catch(() => {});
+          }, 120);
+        });
+
+        sse.onerror = (err) => {
+          console.error('[SSE] Error:', err);
+          sse.close();
+          
+          if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts - 1) + Math.random() * 1000;
+            console.log(`[SSE] Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+            setTimeout(connectSSE, delay);
+          } else {
+            console.error('[SSE] Max reconnect attempts reached. Reloading page...');
+            setTimeout(() => location.reload(), 5000);
+          }
+        };
+      }
+
       let reloadQueued = false;
-      sse.addEventListener('reload', () => {
-        if (reloadQueued) return;
-        reloadQueued = true;
-        setTimeout(() => {
-          reloadQueued = false;
-          loadAll().catch(() => {});
-        }, 120);
-      });
+      connectSSE();
     })();
 
     loadAll();
