@@ -825,6 +825,28 @@ function pointsToSegment(points) {
   return null;
 }
 
+function pointsToCricketNumber(points) {
+  // Extrahiert die zugrundeliegende Zahl für Cricket aus dem Punktewert
+  // T20=60 → 20, D20=40 → 20, S20=20 → 20, DBULL=50 → 25, S25=25 → 25
+  if (points <= 0) return null;
+  if (points === 50) return 25;
+  if (points === 25) return 25;
+  for (let i = 1; i <= 20; i++) {
+    if (points === i * 3 || points === i * 2 || points === i) return i;
+  }
+  return null;
+}
+
+function getThrowHitCount(value) {
+  // Single=1, Double=2, Triple=3, DBULL=2
+  if (value === 50) return 2;
+  for (let i = 1; i <= 20; i++) {
+    if (value === i * 3) return 3;
+    if (value === i * 2) return 2;
+  }
+  return 1;
+}
+
 function clearPendingArduinoThrow() {
   if (pendingArduinoThrowTimer) clearTimeout(pendingArduinoThrowTimer);
   pendingArduinoThrowTimer = null;
@@ -1008,12 +1030,16 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
 
   let bust = false;
   if (isCricket) {
+    const cricketNum = pointsToCricketNumber(value);
     const nums = getCricketNumbersForMode(mode);
-    if (nums && nums.includes(value)) {
+    if (nums && cricketNum !== null && nums.includes(cricketNum)) {
       if (!player.cricketHits) player.cricketHits = {};
       if (!player.cricketClosed) player.cricketClosed = {};
-      player.cricketHits[value] = Math.min(3, (player.cricketHits[value] || 0) + 1);
-      if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
+      const hitCount = getThrowHitCount(value);
+      const oldHits = player.cricketHits[cricketNum] || 0;
+      const newHits = oldHits + hitCount; // ALLE Treffer zählen (auch über 3 für Punkte)
+      player.cricketHits[cricketNum] = newHits;
+      if (newHits >= 3) player.cricketClosed[cricketNum] = true;
     }
     player.cricketPoints = calculateCricketPoints(player, state.players);
     player.totalScored = player.cricketPoints;
@@ -1310,12 +1336,16 @@ async function applyArduinoThrowFromMatrix(hit) {
 
   let bust = false;
   if (isCricket) {
+    const cricketNum = pointsToCricketNumber(value);
     const nums = getCricketNumbersForMode(mode);
-    if (nums && nums.includes(value)) {
+    if (nums && cricketNum !== null && nums.includes(cricketNum)) {
       if (!player.cricketHits) player.cricketHits = {};
       if (!player.cricketClosed) player.cricketClosed = {};
-      player.cricketHits[value] = Math.min(3, (player.cricketHits[value] || 0) + 1);
-      if (player.cricketHits[value] >= 3) player.cricketClosed[value] = true;
+      const hitCount = getThrowHitCount(value);
+      const oldHits = player.cricketHits[cricketNum] || 0;
+      const newHits = oldHits + hitCount; // ALLE Treffer zählen (auch über 3 für Punkte)
+      player.cricketHits[cricketNum] = newHits;
+      if (newHits >= 3) player.cricketClosed[cricketNum] = true;
     }
     player.cricketPoints = calculateCricketPoints(player, state.players);
     player.totalScored = player.cricketPoints;
