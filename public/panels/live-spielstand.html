@@ -314,8 +314,8 @@
       gap: 4px;
       overflow: hidden;
       flex-shrink: 0;
-      /* Feste Höhe: h4 (~18px) + gap (4px) + leg-list (347px) + padding (10px) = ~379px */
-      height: 380px;
+      /* Höhe: h4 (~18px) + gap (4px) + leg-list max-height (380px) + padding (10px) = ~412px */
+      height: 412px;
     }
     .focus-leg-card h4 {
       color: #777;
@@ -352,7 +352,7 @@
     .focus-controls-card .ctrl-row {
       display: flex;
       gap: 4px;
-      align-items: center;
+      align-items: stretch;
     }
     .focus-controls-card .ctrl-row select {
       flex: 1;
@@ -364,7 +364,8 @@
       font-size: .65rem;
       font-family: inherit;
       cursor: pointer;
-      min-height: 44px; /* Mindesthöhe für Touch */
+      min-height: 44px;
+      height: 100%;
     }
     .focus-controls-card .ctrl-row select:focus { border-color: #e63946; outline: none; }
     .focus-controls-card .ctrl-btn {
@@ -392,8 +393,8 @@
       display: grid;
       gap: 3px;
       overflow: auto;
-      /* Feste Höhe für genau 10 Einträge: 10 * 32px = 320px + 9 * 3px gap = 347px */
-      height: 347px;
+      /* Wie im TV: max-height statt fester Höhe auf Items */
+      max-height: 380px;
     }
     .leg-item { 
       display: grid;
@@ -405,13 +406,10 @@
       padding: 4px 8px;
       font-size: .65rem;
       gap: 8px;
-      /* Feste Höhe pro Aufnahme */
-      height: 32px;
     }
     .leg-item > * {
       display: flex;
       align-items: center;
-      height: 100%;
     }
     .leg-item .idx {
       color: #777;
@@ -694,20 +692,20 @@
         font-size: 0.4rem;
       }
       .focus-controls-card .ctrl-title { font-size: .42rem; }
-      .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 8px 4px; }
+      .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 8px 4px; height: 100%; }
       .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 16px 6px; }
       .focus-controls-card { display: none; }
     }
 
     /* Tablet-Auflösungen – Selects & Buttons hoch genug */
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) {
-      .focus-controls-card .ctrl-row select { padding: 12px 6px !important; min-height: 44px; }
+      .focus-controls-card .ctrl-row select { padding: 12px 6px !important; min-height: 44px; height: 100%; }
       .focus-controls-card .ctrl-btn { padding: 24px 8px !important; }
     }
 
     /* Fallback für alle Touch-Geräte */
     @media (pointer: coarse) {
-      .focus-controls-card .ctrl-row select { min-height: 44px; padding: 12px 6px !important; }
+      .focus-controls-card .ctrl-row select { min-height: 44px; padding: 12px 6px !important; height: 100%; }
       .focus-controls-card .ctrl-btn { min-height: 48px; padding: 24px 8px !important; }
     }
   </style>
