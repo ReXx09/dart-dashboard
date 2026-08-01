@@ -348,8 +348,8 @@
       flex-direction: column;
       gap: 5px;
       flex-shrink: 0;
-      /* Feste Höhe: title (~12px) + button-row (48px) + gap (5px) + button-row (48px) + padding (12px) = ~125px */
-      height: 125px !important;
+      /* Höhe: title (~14px) + gap (5px) + row1 (52px) + gap (5px) + row2 (52px) + padding (12px) = ~140px */
+      height: 140px !important;
     }
     .focus-controls-card .ctrl-title {
       color: #777;
@@ -366,19 +366,24 @@
     }
     .focus-controls-card .ctrl-btn {
       flex: 1;
-      padding: 32px 8px;
+      padding: 24px 8px;
       border-radius: 8px;
       border: 1px solid #2a2a2a;
       background: #1a1a1a;
       color: #f1f1f1;
-      font-size: .72rem;
+      font-size: .82rem;
       font-weight: 700;
       font-family: inherit;
       cursor: pointer;
       transition: all .15s;
       text-align: center;
-      min-height: 48px !important;
+      min-height: 52px !important;
       height: 100% !important;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
     }
     .focus-controls-card .ctrl-btn:hover { border-color: #f4a261; color: #f4a261; }
     .focus-controls-card .ctrl-btn.miss { border-color: #e63946; background: #8b0000; }
@@ -387,15 +392,10 @@
     .focus-controls-card .ctrl-btn.restart:hover { border-color: #e63946; color: #e63946; }
     .focus-controls-card .ctrl-btn:disabled { opacity: .4; cursor: default; }
     
-    /* Modal Buttons (Mode/Rule) */
+    /* Mode/Rule Buttons - gleiche Höhe, nur Label/Value Styling */
     .focus-controls-card .ctrl-btn.mode-btn,
     .focus-controls-card .ctrl-btn.rule-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      padding: 12px 8px;
+      padding: 24px 8px;
     }
     .focus-controls-card .ctrl-btn .btn-label {
       font-size: .5rem;
@@ -802,20 +802,20 @@
         font-size: 0.4rem;
       }
       .focus-controls-card .ctrl-title { font-size: .42rem; }
-      .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 16px 6px; }
-      .focus-controls-card { display: none; height: 125px !important; }
+      .focus-controls-card .ctrl-btn { font-size: .65rem; padding: 16px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+      .focus-controls-card { display: none; height: 140px !important; }
     }
 
     /* Tablet-Auflösungen – Buttons hoch genug */
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) {
-      .focus-controls-card { height: 125px !important; }
-      .focus-controls-card .ctrl-btn { padding: 24px 8px !important; min-height: 48px !important; height: 100% !important; }
+      .focus-controls-card { height: 140px !important; }
+      .focus-controls-card .ctrl-btn { padding: 24px 8px !important; min-height: 52px !important; height: 100% !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .82rem; }
     }
 
     /* Fallback für alle Touch-Geräte */
     @media (pointer: coarse) {
-      .focus-controls-card { height: 125px !important; }
-      .focus-controls-card .ctrl-btn { min-height: 48px !important; padding: 24px 8px !important; height: 100% !important; }
+      .focus-controls-card { height: 140px !important; }
+      .focus-controls-card .ctrl-btn { min-height: 52px !important; padding: 24px 8px !important; height: 100% !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .82rem; }
     }
   </style>
 </head>
@@ -831,8 +831,6 @@
     <h2>🎯 Live-Spielstand</h2>
     <div class="clock" id="clockDisplay">--:--:--</div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
-    <button class="miss-btn" id="missBtn" onclick="skipPlayer()" title="Fehlwurf – zum nächsten Spieler wechseln">✖ Fehlwurf</button>
-    <button class="restart-btn" id="restartLegBtn" onclick="restartLeg()" title="Leg zurücksetzen – alle Punkte auf Startwert">↻ Leg-Neustart</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
 
@@ -1432,6 +1430,7 @@
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
       const isAndroid = /Android/.test(navigator.userAgent);
       const isTablet = isIOS || isAndroid || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+      const isBrave = navigator.brave !== undefined || /brave/i.test(navigator.userAgent);
 
       console.log('[Fullscreen] Toggle called', {
         fullscreenElement: !!doc.fullscreenElement,
@@ -1440,15 +1439,25 @@
         msFullscreenElement: !!doc.msFullscreenElement,
         isSecureContext: window.isSecureContext,
         location: window.location.href,
+        protocol: window.location.protocol,
         isIOS,
         isAndroid,
         isTablet,
-        standalone: window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches
+        isBrave,
+        standalone: window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches,
+        userAgent: navigator.userAgent
       });
 
       // Bereits im Standalone-Modus (PWA) → nichts tun
       if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
         showToast('Bereits im Vollbild-Modus (PWA)', false);
+        return;
+      }
+
+      // Brave-spezifische Prüfung
+      if (isBrave && !window.isSecureContext) {
+        console.error('[Fullscreen] Brave: Not secure context (HTTP) - Fullscreen blocked');
+        showToast('Brave: Fullscreen braucht HTTPS (oder localhost)', true);
         return;
       }
 
@@ -1472,8 +1481,18 @@
           }).catch(function(err) {
             console.error('[Fullscreen] Error:', err.name, err.message);
             
+            // Brave-spezifische Fehlerbehandlung
+            if (isBrave) {
+              if (err.name === 'SecurityError') {
+                showToast('Brave: Shields blockiert Fullscreen → Shields deaktivieren (Löwe-Icon)', true);
+              } else if (err.name === 'TypeError') {
+                showToast('Brave: Fullscreen API nicht verfügbar (HTTPS prüfen)', true);
+              } else {
+                showToast('Brave Fullscreen-Fehler: ' + err.message, true);
+              }
+            }
             // Tablet-spezifische Fehlerbehandlung
-            if (isTablet) {
+            else if (isTablet) {
               if (err.name === 'TypeError' || err.name === 'SecurityError') {
                 showToast('Tablet: "Zum Startbildschirm hinzufügen" für Vollbild nutzen', true);
               } else {
