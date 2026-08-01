@@ -1947,6 +1947,14 @@ async function getLiveState() {
 
 async function saveLiveState(state) {
   const safe = { ...state, game: { ...(state.game || {}), updatedAt: Date.now() } };
+  // throws[] begrenzen, damit State nicht unendlich wächst (max 150 Würfe pro Spieler)
+  if (Array.isArray(safe.players)) {
+    safe.players.forEach(p => {
+      if (Array.isArray(p.throws) && p.throws.length > 150) {
+        p.throws = p.throws.slice(-150);
+      }
+    });
+  }
   await dataStore.saveLiveState(safe);
   return safe;
 }
