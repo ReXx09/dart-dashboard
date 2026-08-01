@@ -359,7 +359,7 @@
       background: #0d0d0d;
       border: 1px solid #2a2a2a;
       color: #f1f1f1;
-      padding: 12px 6px;
+      padding: 12px 6px !important;
       border-radius: 6px;
       font-size: .65rem;
       font-family: inherit;
@@ -695,6 +695,13 @@
       .focus-controls-card .ctrl-title { font-size: .42rem; }
       .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 8px 4px; }
       .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 16px 6px; }
+      .focus-controls-card { display: none; }
+    }
+
+    /* Tablet-Auflösungen – Selects & Buttons hoch genug */
+    @media (min-width: 768px) and (max-width: 1366px) and (min-height: 768px) and (max-height: 1024px) {
+      .focus-controls-card .ctrl-row select { padding: 12px 6px !important; }
+      .focus-controls-card .ctrl-btn { padding: 24px 8px !important; }
     }
   </style>
 </head>
@@ -708,8 +715,6 @@
   <div class="topbar">
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
-    <label>Modus <select id="gameModeSelect" onchange="changeMode(this.value)"></select></label>
-    <label>Finish <select id="checkoutRuleSelect" onchange="changeCheckoutRule(this.value)"></select></label>
     <div class="clock" id="clockDisplay">--:--:--</div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <button class="miss-btn" id="missBtn" onclick="skipPlayer()" title="Fehlwurf – zum nächsten Spieler wechseln">✖ Fehlwurf</button>
@@ -1004,13 +1009,9 @@
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
 
-      // ── Sync selectors (Topbar + Control-Kachel) ──
-      const modeSel = document.getElementById('gameModeSelect');
-      const ruleSel = document.getElementById('checkoutRuleSelect');
+      // ── Sync selectors (Control-Kachel) ──
       const ctrlModeSel = document.getElementById('ctrlModeSelect');
       const ctrlRuleSel = document.getElementById('ctrlRuleSelect');
-      if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
-      if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
       if (ctrlModeSel && ctrlModeSel.value !== state.game.mode) ctrlModeSel.value = state.game.mode;
       if (ctrlRuleSel && ctrlRuleSel.value !== state.game.checkoutRule) ctrlRuleSel.value = state.game.checkoutRule;
 
@@ -1418,24 +1419,24 @@
         ]);
         if (modesRes.ok) {
           const modes = await modesRes.json();
-          const sel = document.getElementById('gameModeSelect');
+          const sel = document.getElementById('ctrlModeSelect');
           sel.innerHTML = Object.entries(modes).map(([key, m]) =>
             '<option value="' + key + '">' + m.label + '</option>'
           ).join('');
         }
         if (rulesRes.ok) {
           const rules = await rulesRes.json();
-          const sel = document.getElementById('checkoutRuleSelect');
+          const sel = document.getElementById('ctrlRuleSelect');
           sel.innerHTML = Object.entries(rules).map(([key, r]) =>
             '<option value="' + key + '">' + r.label + '</option>'
           ).join('');
         }
         if (stateRes.ok) {
           const state = await stateRes.json();
-          const modeSel = document.getElementById('gameModeSelect');
-          const ruleSel = document.getElementById('checkoutRuleSelect');
-          if (modeSel && state.game.mode) modeSel.value = state.game.mode;
-          if (ruleSel && state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
+          const ctrlModeSel = document.getElementById('ctrlModeSelect');
+          const ctrlRuleSel = document.getElementById('ctrlRuleSelect');
+          if (ctrlModeSel && state.game.mode) ctrlModeSel.value = state.game.mode;
+          if (ctrlRuleSel && state.game.checkoutRule) ctrlRuleSel.value = state.game.checkoutRule;
         }
       } catch {}
     }
@@ -1508,12 +1509,8 @@
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
-        const modeSel = document.getElementById('gameModeSelect');
-        const ruleSel = document.getElementById('checkoutRuleSelect');
         const ctrlModeSel = document.getElementById('ctrlModeSelect');
         const ctrlRuleSel = document.getElementById('ctrlRuleSelect');
-        if (modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
-        if (ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
         if (ctrlModeSel && ctrlModeSel.value !== state.game.mode) ctrlModeSel.value = state.game.mode;
         if (ctrlRuleSel && ctrlRuleSel.value !== state.game.checkoutRule) ctrlRuleSel.value = state.game.checkoutRule;
         // Auto-Recovery NUR beim ersten Laden (nicht bei SSE-Updates)
@@ -1528,12 +1525,8 @@
             if (resetRes.ok) {
               const freshState = await resetRes.json();
               liveState = freshState;
-              const modeSel2 = document.getElementById('gameModeSelect');
-              const ruleSel2 = document.getElementById('checkoutRuleSelect');
               const ctrlModeSel2 = document.getElementById('ctrlModeSelect');
               const ctrlRuleSel2 = document.getElementById('ctrlRuleSelect');
-              if (modeSel2.value !== freshState.game.mode) modeSel2.value = freshState.game.mode;
-              if (ruleSel2.value !== freshState.game.checkoutRule) ruleSel2.value = freshState.game.checkoutRule;
               if (ctrlModeSel2 && ctrlModeSel2.value !== freshState.game.mode) ctrlModeSel2.value = freshState.game.mode;
               if (ctrlRuleSel2 && ctrlRuleSel2.value !== freshState.game.checkoutRule) ctrlRuleSel2.value = freshState.game.checkoutRule;
               renderState(freshState);
