@@ -359,7 +359,7 @@
       background: #0d0d0d;
       border: 1px solid #2a2a2a;
       color: #f1f1f1;
-      padding: 6px 6px;
+      padding: 12px 6px;
       border-radius: 6px;
       font-size: .65rem;
       font-family: inherit;
@@ -368,7 +368,7 @@
     .focus-controls-card .ctrl-row select:focus { border-color: #e63946; outline: none; }
     .focus-controls-card .ctrl-btn {
       flex: 1;
-      padding: 12px 8px;
+      padding: 24px 8px;
       border-radius: 8px;
       border: 1px solid #2a2a2a;
       background: #1a1a1a;
@@ -407,17 +407,20 @@
       /* Feste Höhe pro Aufnahme */
       height: 32px;
     }
+    .leg-item > * {
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
     .leg-item .idx {
       color: #777;
       font-weight: 600;
-      text-align: right;
+      justify-content: flex-end;
       padding-right: 8px;
       border-right: 1px solid #333;
     }
     .leg-item .throws {
-      display: flex;
       justify-content: center;
-      align-items: center;
       gap: 6px;
       color: #ddd;
       font-family: 'Segoe UI', system-ui, sans-serif;
@@ -430,7 +433,7 @@
       color: #f4a261;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
-      text-align: right;
+      justify-content: flex-end;
       font-family: 'Segoe UI', system-ui, sans-serif;
     }
 
@@ -690,8 +693,8 @@
         font-size: 0.4rem;
       }
       .focus-controls-card .ctrl-title { font-size: .42rem; }
-      .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 4px 4px; }
-      .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 8px 6px; }
+      .focus-controls-card .ctrl-row select { font-size: .5rem; padding: 8px 4px; }
+      .focus-controls-card .ctrl-btn { font-size: .55rem; padding: 16px 6px; }
     }
   </style>
 </head>
