@@ -643,6 +643,10 @@
 
     /* Tablet-Auflösungen – Selects in Topbar hoch genug */
     @media (min-width: 768px) and (max-width: 1366px) and (min-height: 768px) and (max-height: 1024px) {
+      .focus-player.single { grid-template-rows: minmax(0, 1fr); }
+      .focus-card { min-height: 0; padding: 6px; }
+      .focus-name { font-size: 1.5rem; }
+      .focus-big-score { font-size: clamp(5rem, 8vw, 8rem); }
       .topbar select { padding: 12px 8px !important; }
     }
   </style>

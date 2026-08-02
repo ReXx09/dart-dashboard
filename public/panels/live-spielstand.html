@@ -911,8 +911,19 @@
 
     /* Fallback für alle Touch-Geräte */
     @media (pointer: coarse) {
+      .focus-player.single { grid-template-rows: minmax(0, 1fr) auto; }
+      .focus-card { min-height: 0; padding: 6px; }
+      .focus-name { font-size: 1.5rem; }
+      .focus-big-score { font-size: clamp(5rem, 8vw, 8rem); }
       .focus-controls-card { height: 205px !important; }
       .focus-controls-card .ctrl-btn { min-height: 52px !important; padding: 24px 8px !important; height: 100% !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .82rem; }
+    }
+
+    @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) and (max-height: 1024px) {
+      .focus-player.single { grid-template-rows: minmax(0, 1fr) auto; }
+      .focus-card { min-height: 0; padding: 6px; }
+      .focus-name { font-size: 1.5rem; }
+      .focus-big-score { font-size: clamp(5rem, 8vw, 8rem); }
     }
   </style>
 </head>
@@ -986,6 +997,20 @@
       return lastChunk.reduce((sum, t) => sum + (Number(t && t.points) || 0), 0);
     }
 
+    function getLiveLegStats(player) {
+      const throws = Array.isArray(player && player.throws) ? player.throws : [];
+      const darts = Number(player && player.turns) || throws.length;
+      const totalScored = Number(player && player.totalScored) || 0;
+      const legAverage = darts > 0 ? (totalScored / darts * 3).toFixed(1) : '-';
+      const firstNine = throws.slice(0, 9);
+      const firstNineScore = firstNine.reduce((sum, item) => sum + (item && item.bust ? 0 : (Number(item && item.points) || 0)), 0);
+      const firstNineAverage = firstNine.length >= 9 ? (firstNineScore / 9 * 3).toFixed(1) : '-';
+      const checkoutAttempts = Number(player && player.checkoutAttempts) || 0;
+      const checkoutSuccess = Number(player && player.checkoutSuccess) || 0;
+      const checkout = checkoutAttempts > 0 ? ((checkoutSuccess / checkoutAttempts) * 100).toFixed(1) + '%' : '-';
+      return { legAverage, firstNineAverage, checkout };
+    }
+
     function renderFocusPlayer(p, idx, state) {
       if (!p) return '';
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
@@ -994,8 +1019,7 @@
       const displayThrows = [...currentRound];
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
-      const turns = p.turns || 0;
-      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+      const legStats = getLiveLegStats(p);
       const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
       const isElimination = state.game.mode === 'elimination';
@@ -1043,9 +1067,9 @@
           '</div>' +
         '</div>' +
         '<div class="focus-summary">' +
-          '<div><span>Turns</span><strong>' + turns + '</strong></div>' +
-          '<div><span>Gesamt Punkte</span><strong>' + totalScored + '</strong></div>' +
-          '<div><span>Leg Average</span><strong>' + legAvg + '</strong></div>' +
+          '<div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div>' +
+          '<div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div>' +
+          '<div><span>Checkout</span><strong>' + legStats.checkout + '</strong></div>' +
         '</div>' +
       '</div>';
     }
@@ -1157,9 +1181,7 @@
         '</div>';
       }).join('');
       
-      const totalScored = p.totalScored || 0;
-      const turns = p.turns || 0;
-      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+      const legStats = getLiveLegStats(p);
       
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + ' · Cricket</span><span class="focus-switch-timer"></span></div>' +
@@ -1180,7 +1202,7 @@
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Gesamt</span><strong>' + totalScored + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
+        '<div class="focus-summary"><div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div><div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div><div><span>Checkout</span><strong>-</strong></div></div>' +
       '</div>';
     }
 

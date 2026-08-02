@@ -1040,6 +1040,8 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
   const isElimination = modeDef.type === 'elimination';
+  const checkoutAttempt = !isCricket && !isElimination && state.game.currentThrow === 0 && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
+  if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
   const checkoutSegment = evt.segment || codeToSegment(evt.code) || null;
 
   let bust = false;
@@ -1110,6 +1112,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
   if (!isCricket && player.remaining === 0) {
+    player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
     await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino' });
     state.game.status = 'leg-finished';
@@ -1352,6 +1355,8 @@ async function applyArduinoThrowFromMatrix(hit) {
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
   const isElimination = modeDef.type === 'elimination';
+  const checkoutAttempt = !isCricket && !isElimination && state.game.currentThrow === 0 && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
+  if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
 
   let bust = false;
   let eliminationAction = null;
@@ -1428,6 +1433,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
   if (!isCricket && player.remaining === 0) {
+    player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
     await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino-matrix' });
     state.game.status = 'leg-finished';
@@ -1914,7 +1920,9 @@ function sanitizePlayerState(player, fallback) {
   const cricketHits = player?.cricketHits || {};
   const cricketClosed = player?.cricketClosed || {};
   const cricketPoints = Number(player?.cricketPoints ?? player?.totalScored ?? 0);
-  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, cricketHits, cricketClosed, cricketPoints, turnScoreRecorded: !!player?.turnScoreRecorded };
+  const checkoutAttempts = Math.max(0, Number(player?.checkoutAttempts || base.checkoutAttempts || 0));
+  const checkoutSuccess = Math.max(0, Number(player?.checkoutSuccess || base.checkoutSuccess || 0));
+  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, checkoutAttempts, checkoutSuccess, cricketHits, cricketClosed, cricketPoints, turnScoreRecorded: !!player?.turnScoreRecorded };
 }
 
 function resetLiveState(carryLegs = false, modeOverride) {
@@ -1934,6 +1942,8 @@ function resetLiveState(carryLegs = false, modeOverride) {
     totalScored: 0,
     bestTurn: 0,
     average: 0,
+    checkoutAttempts: 0,
+    checkoutSuccess: 0,
     throws: [],
     currentRoundPoints: [],
     ...defaultPlayerCricketState(mode)
@@ -2252,6 +2262,8 @@ app.post('/api/live/throw', async (req, res) => {
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     const isCricket = modeDef.type === 'cricket';
     const isElimination = modeDef.type === 'elimination';
+    const checkoutAttempt = !isCricket && !isElimination && state.game.currentThrow === 0 && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
+    if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
 
     let bust = false;
     let eliminationAction = null;
@@ -2300,6 +2312,7 @@ app.post('/api/live/throw', async (req, res) => {
     if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
     if (!isCricket && player.remaining === 0) {
+      player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
       player.legs += 1;
       await addHighscore(player.name, points, { kind: 'checkout', legWin: true });
       state.game.status = 'leg-finished';
