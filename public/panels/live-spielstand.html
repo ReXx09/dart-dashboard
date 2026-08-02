@@ -918,6 +918,7 @@
 
     /* Fallback für alle Touch-Geräte */
     @media (pointer: coarse) {
+      .focus-player.has-others { max-height: none; }
       .focus-player.single { grid-template-rows: minmax(0, 1fr) auto; }
       .focus-card { min-height: 0; padding: 6px; }
       .focus-name { font-size: 1.5rem; }
@@ -927,6 +928,7 @@
     }
 
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) and (max-height: 1024px) {
+      .focus-player.has-others { max-height: none; }
       .focus-player.single { grid-template-rows: minmax(0, 1fr) auto; }
       .focus-card { min-height: 0; padding: 6px; }
       .focus-name { font-size: 1.5rem; }
