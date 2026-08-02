@@ -117,7 +117,25 @@
     .compact-players .score-card {
       flex: 1;
       min-width: 0;
+      align-items: center;
+      text-align: center;
     }
+    .compact-players .score-card .sc-last-throws,
+    .compact-players .score-card .cricket-grid { justify-content: center; }
+    .compact-cricket-status {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 2px 4px;
+      width: 100%;
+      margin: 2px 0;
+    }
+    .compact-cricket-status span {
+      color: #aaa;
+      font-size: .55rem;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .compact-cricket-status span.closed { color: #2a9d8f; font-weight: 700; }
 
     /* Countdown – immer mit fester Höhe, aber ausblendbar */
     #countdownDisplay {
@@ -832,6 +850,9 @@
       .compact-players .score-card .sc-stats { font-size: .45rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
       .compact-players .score-card .sc-throw-chip { font-size: .5rem; padding: 1px 3px; min-width: 14px; border-radius: 4px; }
+      .compact-players .score-card.compact-crowded { flex-direction: column; align-items: center; }
+      .compact-players .score-card.compact-crowded .sc-color-bar { width: 100%; height: 3px; }
+      .compact-players .score-card.compact-crowded .compact-cricket-status { font-size: .42rem; }
       /* Cricket-Grid für die kompakte Zeile */
       .compact-players .score-card .cricket-grid {
         gap: 4px 6px;
@@ -1155,7 +1176,7 @@
     }
 
     // === VERBESSERTE kompakte Kachel für Cricket ===
-    function renderCompactPlayer(p, mode) {
+    function renderCompactPlayer(p, mode, crowded) {
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
       const displayThrows = (Array.isArray(p.currentRoundPoints) && p.currentRoundPoints.length > 0) ? [...p.currentRoundPoints] : lastThrows;
@@ -1171,7 +1192,17 @@
       const playerColor = escapeAttr(p.color || '#f4a261');
       
       let cricketGridHtml = '';
-      if (isCricket) {
+      let compactCricketHtml = '';
+      if (isCricket && crowded) {
+        const cricketHits = p.cricketHits || {};
+        const cricketClosed = p.cricketClosed || {};
+        const nums = [15, 16, 17, 18, 19, 20, 25];
+        compactCricketHtml = '<div class="compact-cricket-status" aria-label="Cricket Status">' + nums.map(n => {
+          const hits = cricketHits[n] || 0;
+          const closed = !!cricketClosed[n];
+          return '<span class="' + (closed ? 'closed' : '') + '">' + n + ':' + (closed ? 'X' : hits) + '</span>';
+        }).join('') + '</div>';
+      } else if (isCricket) {
         const cricketHits = p.cricketHits || {};
         const cricketClosed = p.cricketClosed || {};
         const nums = [15,16,17,18,19,20,25];
@@ -1195,11 +1226,11 @@
         cricketGridHtml = '<div class="cricket-grid">' + gridItems + '</div>';
       }
 
-      return '<div class="score-card" data-tv style="--pc:' + playerColor + '">' +
+      return '<div class="score-card' + (crowded && isCricket ? ' compact-crowded' : '') + '" data-tv style="--pc:' + playerColor + '">' +
         '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
         '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
-        (isCricket ? cricketGridHtml : '') +
+        (compactCricketHtml || (isCricket ? cricketGridHtml : '')) +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
     }
@@ -1346,7 +1377,7 @@
           .filter((_p, idx) => idx !== activePlayer)
           .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
         compactPlayers.innerHTML = compactOrder
-          .map((p) => renderCompactPlayer(p, mode)).join('');
+          .map((p) => renderCompactPlayer(p, mode, state.players.length >= 5)).join('');
       } else {
         compactPlayers.innerHTML = '';
       }
