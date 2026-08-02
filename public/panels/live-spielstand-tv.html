@@ -736,6 +736,20 @@
       return lastChunk.reduce((sum, t) => sum + (Number(t && t.points) || 0), 0);
     }
 
+    function getLiveLegStats(player) {
+      const throws = Array.isArray(player && player.throws) ? player.throws : [];
+      const darts = Number(player && player.turns) || throws.length;
+      const totalScored = Number(player && player.totalScored) || 0;
+      const legAverage = darts > 0 ? (totalScored / darts * 3).toFixed(1) : '-';
+      const firstNine = throws.slice(0, 9);
+      const firstNineScore = firstNine.reduce((sum, item) => sum + (item && item.bust ? 0 : (Number(item && item.points) || 0)), 0);
+      const firstNineAverage = firstNine.length >= 9 ? (firstNineScore / 9 * 3).toFixed(1) : '-';
+      const checkoutAttempts = Number(player && player.checkoutAttempts) || 0;
+      const checkoutSuccess = Number(player && player.checkoutSuccess) || 0;
+      const checkout = checkoutAttempts > 0 ? ((checkoutSuccess / checkoutAttempts) * 100).toFixed(1) + '%' : '-';
+      return { legAverage, firstNineAverage, checkout };
+    }
+
     function renderFocusPlayer(p, idx, state) {
       if (!p) return '';
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
@@ -746,18 +760,15 @@
       const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
-      const turns = p.turns || 0;
-      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+      const legStats = getLiveLegStats(p);
+      const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
       const isElimination = state.game.mode === 'elimination';
       
-      // Würfe für die linke Kachel (vertikal): Punkte oben (rot/groß), Segment unten (grau/klein)
-      // Wir nutzen die letzten 3 Würfe aus dem throws Array für die Segmente
       const throwsHtml = displayThrows.map((pt, ti) => {
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
-        // Segment aus dem throws Array holen (falls vorhanden)
-        const throwData = lastThrows[ti];
-        const segmentLabel = (throwData && throwData.segment) ? throwData.segment : (pt === null ? '-' : String(pt));
+        const throwData = Array.isArray(p.currentRoundPoints) ? throws.slice(-currentRound.length)[ti] : lastThrows[ti];
+        const segmentLabel = throwData && throwData.segment ? throwData.segment : (pt === null ? '-' : String(pt));
         return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
           '<div class="seg">' + segmentLabel + '</div>' +
@@ -770,26 +781,28 @@
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</span><span class="focus-switch-timer"></span></div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
-            '<h4>Aktuelle Würfe</h4>' +
+            '<h4>Aktuelle Würfe / Zahlen</h4>' +
             '<div class="throw-segments">' + throwsHtml + '</div>' +
+            '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<div>' +
-              '<h4>' + bigScoreLabel + '</h4>' +
+              '<h4>' + (isElimination ? 'Punkte' : 'Rest') + '</h4>' +
               '<div class="focus-big-score">' + bigScoreValue + '</div>' +
             '</div>' +
             '<div>' +
-              '<h4>Punkte pro Aufnahme</h4>' +
+              '<h4>pro Aufnahme</h4>' +
               '<div class="focus-big-score">' + aufnahmeScore + '</div>' +
             '</div>' +
           '</div>' +
         '</div>' +
         '<div class="focus-summary">' +
-          '<div><span>Turns</span><strong>' + turns + '</strong></div>' +
-          '<div><span>Gesamt Punkte</span><strong>' + totalScored + '</strong></div>' +
-          '<div><span>Leg Average</span><strong>' + legAvg + '</strong></div>' +
+          '<div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div>' +
+          '<div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div>' +
+          '<div><span>Checkout</span><strong>' + legStats.checkout + '</strong></div>' +
         '</div>' +
       '</div>';
     }
@@ -833,22 +846,10 @@
       const cricketClosed = p.cricketClosed || {};
       const cricketPoints = p.cricketPoints || 0;
       const nums = [15,16,17,18,19,20,25];
-      
-      // Punkte-Aufschlüsselung pro Zahl
-      const pointsBreakdown = nums.map(n => {
-        const hits = cricketHits[n] || 0;
-        const closed = !!cricketClosed[n];
-        const pointsOnNum = closed && hits > 3 ? (hits - 3) * n : 0;
-        return { num: n, hits, closed, points: pointsOnNum };
-      });
-      
-      // Visual Hit Markers Grid
+
       const gridHtml = nums.map(n => {
         const hits = cricketHits[n] || 0;
         const closed = !!cricketClosed[n];
-        const pointsOnNum = closed && hits > 3 ? (hits - 3) * n : 0;
-        
-        // Hit markers: 3 circles showing hit status
         const markers = [1, 2, 3].map(h => {
           let cls = 'hit-marker';
           if (closed) cls += ' closed';
@@ -859,26 +860,24 @@
         return '<div class="cricket-num' + (closed ? ' closed' : '') + '">' +
           '<div class="num-label">' + n + '</div>' +
           '<div class="cricket-hits">' + markers + '</div>' +
-          (pointsOnNum > 0 ? '<div class="points">+' + pointsOnNum + '</div>' : '') +
         '</div>';
       }).join('');
-      
-      // Punkte-Kachel HTML
-      const pointsHtml = pointsBreakdown.filter(x => x.closed).map(x => 
-        '<div class="cp-row"><span class="cp-num">' + x.num + '</span><span class="cp-hits">' + x.hits + '/3</span><span class="cp-pts">' + (x.points > 0 ? '+' + x.points : '—') + '</span></div>'
-      ).join('') || '<div class="cp-empty">Noch keine Zahlen geschlossen</div>';
-      
-      const totalScored = p.totalScored || 0;
-      const turns = p.turns || 0;
-      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+
+      const throwsHtml = displayThrows.map((points, index) => {
+        const throwData = currentRoundThrows[index];
+        const pointsLabel = points === null ? 'offen' : (points === 0 ? '0' : '+' + points);
+        const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
+        return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>';
+      }).join('');
+      const legStats = getLiveLegStats(p);
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + ' · Cricket</span><span class="focus-switch-timer"></span></div>' +
-        '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr 1fr">' +
-          '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid">' + gridHtml + '</div></div>' +
-          '<div class="focus-kachel"><h4>Punkte pro Zahl</h4><div class="cricket-points">' + pointsHtml + '</div></div>' +
-          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + displayThrows.map((points, index) => { const throwData = currentRoundThrows[index]; const pointsLabel = points === null ? 'offen' : (points === 0 ? '0' : '+' + points); const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points)); return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>'; }).join('') + '</div></div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+        '<div class="focus-kacheln">' +
+          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + throwsHtml + '</div></div>' +
+          '<div class="focus-kachel"><div><h4>Cricket Punkte</h4><div class="focus-big-score">' + cricketPoints + '</div></div><div><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div></div>' +
         '</div>' +
-        '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Cricket Punkte</span><strong>' + cricketPoints + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
+        '<div class="focus-summary"><div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div><div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div><div><span>Checkout</span><strong>-</strong></div></div>' +
       '</div>';
     }
 
@@ -1017,8 +1016,8 @@
       }
 
       if (isCricket) {
-        focusPlayer.classList.add('single');
-        focusPlayer.innerHTML = renderCricketView(active, state);
+        focusPlayer.classList.remove('single');
+        focusPlayer.innerHTML = renderCricketView(active, state) + renderFocusLegCard(active);
       } else {
         focusPlayer.classList.remove('single');
         focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
