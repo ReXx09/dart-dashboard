@@ -601,7 +601,13 @@
       .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
       .compact-players .score-card .sc-throw-chip { font-size: .55rem; padding: 1px 3px; min-width: 16px; border-radius: 4px; }
       .compact-players .score-card.compact-crowded { flex-direction: column; align-items: center; }
-      .compact-players .score-card.compact-crowded .sc-color-bar { width: 100%; height: 3px; }
+      .compact-players .score-card.compact-crowded {
+        justify-content: flex-start;
+        gap: 2px;
+        padding: 4px 8px 3px;
+      }
+      .compact-players .score-card.compact-crowded .sc-color-bar { width: 100%; height: 3px; margin-bottom: 2px; }
+      .compact-players .score-card.compact-crowded .sc-score { line-height: .9; }
       .compact-players .score-card.compact-crowded .compact-cricket-status { font-size: .42rem; }
       .compact-players .score-card .cricket-grid {
         gap: 4px 6px;
