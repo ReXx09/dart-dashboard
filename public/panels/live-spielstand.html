@@ -109,8 +109,8 @@
     .compact-players {
       display: flex;
       gap: 4px;
-      flex-shrink: 0;
-      max-height: 28%;
+      flex: 1 1 0;
+      max-height: 30%;
       min-height: 0;
     }
     .compact-players:empty { display: none; }
@@ -122,11 +122,11 @@
     /* Countdown – immer mit fester Höhe, aber ausblendbar */
     #countdownDisplay {
       flex-shrink: 0;
-      height: 30px;
+      height: 0;
       text-align: center;
-      padding: 4px 0;
-      background: #1a1a1a;
-      border: 1px solid #e63946;
+      padding: 0;
+      background: transparent;
+      border: 0;
       border-radius: 10px;
       color: #f4a261;
       font-weight: 700;
@@ -135,8 +135,13 @@
       transition: opacity 0.3s ease;
       pointer-events: none;
       line-height: 20px;
+      overflow: hidden;
     }
     #countdownDisplay.visible {
+      height: 30px;
+      padding: 4px 0;
+      background: #1a1a1a;
+      border: 1px solid #e63946;
       opacity: 1;
       pointer-events: auto;
     }

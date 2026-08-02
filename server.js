@@ -1326,12 +1326,15 @@ function handleChannelActiveEvent(evt) {
 }
 
 async function applyArduinoThrowFromMatrix(hit) {
-  const rawCode = Number(hit.points || 0);
-  if (!Number.isFinite(rawCode) || rawCode < 0 || rawCode > 999) return { ok: false, reason: 'invalid-points', hit };
-  
-  // Matrix-Code (z.B. 115, 215, 315) in Punkte dekodieren
-  const value = codeToPoints(rawCode);
-  if (value === 0 && rawCode !== 0) return { ok: false, reason: 'invalid-points', hit };
+  const rawCode = Number(hit && hit.code);
+  const rawPoints = Number(hit && hit.points);
+  const hasCode = Number.isFinite(rawCode) && rawCode >= 0 && rawCode <= 999;
+  const hasPoints = Number.isFinite(rawPoints) && rawPoints >= 0 && rawPoints <= 180;
+  const decodedCodeValue = hasCode ? codeToPoints(rawCode) : null;
+  const value = decodedCodeValue !== null && (decodedCodeValue > 0 || rawCode === 0)
+    ? decodedCodeValue
+    : (hasPoints ? rawPoints : null);
+  if (value === null) return { ok: false, reason: 'invalid-points', hit };
   
   const state = await getLiveState();
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
@@ -1349,10 +1352,10 @@ async function applyArduinoThrowFromMatrix(hit) {
   let bust = false;
   let cricketPointsAwarded = 0;
   if (isCricket) {
-    const cricketNum = pointsToCricketNumber(value);
+    const cricketNum = hasCode ? codeToCricketNumber(rawCode) : pointsToCricketNumber(value);
     const nums = getCricketNumbersForMode(mode);
     if (nums && cricketNum !== null && nums.includes(cricketNum)) {
-      const hitCount = getThrowHitCount(value);
+      const hitCount = hasCode ? codeToCricketHitCount(rawCode) : getThrowHitCount(value);
       cricketPointsAwarded = applyCricketHit(player, state.players, cricketNum, hitCount);
     }
   } else {
