@@ -761,7 +761,6 @@
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
       const legStats = getLiveLegStats(p);
-      const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
       const isElimination = state.game.mode === 'elimination';
       
@@ -781,12 +780,10 @@
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</span><span class="focus-switch-timer"></span></div>' +
-        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe</h4>' +
             '<div class="throw-segments">' + throwsHtml + '</div>' +
-            '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<div>' +
@@ -872,7 +869,6 @@
       const legStats = getLiveLegStats(p);
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + ' · Cricket</span><span class="focus-switch-timer"></span></div>' +
-        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + throwsHtml + '</div></div>' +
           '<div class="focus-kachel"><div><h4>Cricket Punkte</h4><div class="focus-big-score">' + cricketPoints + '</div></div><div><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div></div>' +
