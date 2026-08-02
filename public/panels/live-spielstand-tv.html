@@ -138,7 +138,9 @@
       pointer-events: none;
     }
     .focus-card > * { position: relative; }
-    .focus-name { font-size: 2rem; font-weight: 800; margin-bottom: 2px; }
+    .focus-name { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 2rem; font-weight: 800; margin-bottom: 2px; }
+    .focus-switch-timer { display: none; flex: 0 0 auto; color: #f4a261; background: rgba(244,162,97,.1); border: 1px solid rgba(244,162,97,.45); border-radius: 8px; padding: 6px 12px; font-size: .72rem; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
+    .focus-switch-timer.visible { display: inline-flex; align-items: center; }
     .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; }
     .focus-kacheln {
       display: grid;
@@ -649,8 +651,8 @@
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
       const action = state && state.lastAction;
       if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) {
-        const el = document.getElementById('countdownDisplay');
-        if (el) el.style.display = 'none';
+        const el = document.querySelector('.focus-switch-timer') || document.getElementById('countdownDisplay');
+        if (el) { el.classList.remove('visible'); el.style.display = 'none'; el.textContent = ''; }
         return;
       }
       const startedAt = action.autoAdvanceStartedAt || Date.now();
@@ -658,14 +660,15 @@
       countdownTimer = setInterval(() => {
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, delayMs - elapsed);
-        const el = document.getElementById('countdownDisplay');
+        const el = document.querySelector('.focus-switch-timer') || document.getElementById('countdownDisplay');
         if (remaining <= 0) {
-          if (el) el.style.display = 'none';
+          if (el) { el.classList.remove('visible'); el.style.display = 'none'; el.textContent = ''; }
           if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
           return;
         }
         if (el) {
           el.style.display = '';
+          el.classList.add('visible');
           el.textContent = 'Nächster Spieler in ' + Math.ceil(remaining / 1000) + 's';
         }
       }, 200);
@@ -722,7 +725,7 @@
       const bigScoreValue = isElimination ? totalScored : p.remaining;
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</div>' +
+        '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe</h4>' +
@@ -778,7 +781,10 @@
     function renderCricketView(p, state) {
       if (!p) return '';
       const throws = Array.isArray(p.throws) ? p.throws : [];
-      const lastThrows = throws.slice(-3);
+      const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
+      const currentRoundThrows = throws.slice(-currentRound.length);
+      const displayThrows = [...currentRound];
+      while (displayThrows.length < 3) displayThrows.push(null);
       const cricketHits = p.cricketHits || {};
       const cricketClosed = p.cricketClosed || {};
       const cricketPoints = p.cricketPoints || 0;
@@ -822,11 +828,11 @@
       const turns = p.turns || 0;
       const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
+        '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + ' · Cricket</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr 1fr">' +
           '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid">' + gridHtml + '</div></div>' +
           '<div class="focus-kachel"><h4>Punkte pro Zahl</h4><div class="cricket-points">' + pointsHtml + '</div></div>' +
-          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
+          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + displayThrows.map((points, index) => { const throwData = currentRoundThrows[index]; const pointsLabel = points === null ? 'offen' : (points === 0 ? '0' : '+' + points); const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points)); return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>'; }).join('') + '</div></div>' +
         '</div>' +
         '<div class="focus-summary"><div><span>Turns</span><strong>' + turns + '</strong></div><div><span>Cricket Punkte</span><strong>' + cricketPoints + '</strong></div><div><span>Leg Average</span><strong>' + legAvg + '</strong></div></div>' +
       '</div>';
@@ -956,7 +962,8 @@
       if (isElimination) {
         // Bei Elimination: Kein Check auf remaining === 0 (alle starten bei 0!)
         if (isLegFinished) {
-          winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+          winner = state.players.find(p => p.slot === state.lastAction?.winnerSlot) ||
+            state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         }
       } else {
         if (isCricket) {
@@ -966,7 +973,10 @@
             : null;
         } else {
           // x01: Winner hat remaining === 0
-          winner = isLegFinished ? state.players.find(p => p.remaining === 0) : null;
+          winner = state.players.find(p => Number(p.remaining) === 0);
+          if (!winner && isLegFinished) {
+            winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+          }
         }
       }
 
@@ -1343,7 +1353,29 @@
       animation.className = 'cricket-score-animation';
       animation.textContent = '+' + points;
       document.body.appendChild(animation);
+      playCricketScoreSound();
       setTimeout(() => animation.remove(), 1200);
+    }
+
+    function playCricketScoreSound() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const ctx = new AudioContextClass();
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(660, ctx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.16);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.24);
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.25);
+        oscillator.addEventListener('ended', () => ctx.close());
+      } catch {}
     }
 
     function playBustSound() {

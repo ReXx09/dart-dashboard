@@ -266,9 +266,12 @@ function calculateEliminationPoints(player) {
 function checkEliminationWin(state) {
   const modeDef = GAME_MODES[state.game.mode];
   if (!modeDef || modeDef.type !== 'elimination') return false;
-  
-  // Spiel endet nach 10 Aufnahmen (throwRound > 10)
-  return state.game.throwRound > 10;
+
+  // Nach dem dritten Wurf des letzten Spielers ist die zehnte Aufnahme komplett.
+  const lastPlayerIndex = Math.max(0, state.players.length - 1);
+  return Number(state.game.throwRound || 0) >= 10
+    && Number(state.game.currentThrow || 0) >= 3
+    && Number(state.game.activePlayer || 0) === lastPlayerIndex;
 }
 
 function getEliminationWinner(state) {
@@ -1040,6 +1043,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const isElimination = modeDef.type === 'elimination';
 
   let bust = false;
+  let eliminationAction = null;
   let cricketPointsAwarded = 0;
   if (isCricket) {
     const cricketNum = codeToCricketNumber(rawCode);
@@ -1054,9 +1058,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
       player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
       // Prüfen auf Elimination
       const eliminated = applyEliminationHit(state, player, value);
-      if (eliminated) {
-        state.lastAction.type = 'elimination';
-      }
+      if (eliminated) eliminationAction = state.lastAction;
     } else {
       const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
       const nextRemaining = player.remaining - value;
@@ -1102,8 +1104,10 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     remaining: player.remaining,
     roundThrow: state.game.currentThrow,
     ts: Date.now(),
-    mode
+    mode,
+    cricketPointsAwarded
   };
+  if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
   if (!isCricket && player.remaining === 0) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
@@ -1350,6 +1354,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   const isElimination = modeDef.type === 'elimination';
 
   let bust = false;
+  let eliminationAction = null;
   let cricketPointsAwarded = 0;
   if (isCricket) {
     const cricketNum = hasCode ? codeToCricketNumber(rawCode) : pointsToCricketNumber(value);
@@ -1364,9 +1369,7 @@ async function applyArduinoThrowFromMatrix(hit) {
       player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
       // Prüfen auf Elimination
       const eliminated = applyEliminationHit(state, player, value);
-      if (eliminated) {
-        state.lastAction.type = 'elimination';
-      }
+      if (eliminated) eliminationAction = state.lastAction;
     } else {
       const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
       const nextRemaining = player.remaining - value;
@@ -1418,8 +1421,10 @@ async function applyArduinoThrowFromMatrix(hit) {
     remaining: player.remaining,
     roundThrow: state.game.currentThrow,
     ts: Date.now(),
-    mode
+    mode,
+    cricketPointsAwarded
   };
+  if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
   if (!isCricket && player.remaining === 0) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
@@ -2248,6 +2253,7 @@ app.post('/api/live/throw', async (req, res) => {
     const isElimination = modeDef.type === 'elimination';
 
     let bust = false;
+    let eliminationAction = null;
     let cricketPointsAwarded = 0;
     if (isCricket) {
       const dartNumber = Number(req.body?.number || points);
@@ -2261,9 +2267,7 @@ app.post('/api/live/throw', async (req, res) => {
         player.totalScored = Math.max(0, Number(player.totalScored || 0)) + points;
         // Prüfen auf Elimination
         const eliminated = applyEliminationHit(state, player, points);
-        if (eliminated) {
-          state.lastAction.type = 'elimination';
-        }
+        if (eliminated) eliminationAction = state.lastAction;
       } else {
         const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
         const nextRemaining = player.remaining - points;
@@ -2289,6 +2293,7 @@ app.post('/api/live/throw', async (req, res) => {
       points, bust, remaining: player.remaining, roundThrow: state.game.currentThrow, ts: Date.now(), mode,
       cricketPointsAwarded
     };
+    if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
     if (!isCricket && player.remaining === 0) {
       player.legs += 1;

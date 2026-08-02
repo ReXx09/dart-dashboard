@@ -167,7 +167,9 @@
       pointer-events: none;
     }
     .focus-card > * { position: relative; }
-    .focus-name { font-size: 2rem; font-weight: 800; margin-bottom: 2px; flex-shrink: 0; }
+    .focus-name { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 2rem; font-weight: 800; margin-bottom: 2px; flex-shrink: 0; }
+    .focus-switch-timer { display: none; flex: 0 0 auto; color: #f4a261; background: rgba(244,162,97,.1); border: 1px solid rgba(244,162,97,.45); border-radius: 8px; padding: 6px 12px; font-size: .72rem; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
+    .focus-switch-timer.visible { display: inline-flex; align-items: center; }
     .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; flex-shrink: 0; }
     .focus-kacheln {
       display: grid;
@@ -910,9 +912,9 @@
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
       const action = state && state.lastAction;
-      const el = document.getElementById('countdownDisplay');
+      const el = document.querySelector('.focus-switch-timer') || document.getElementById('countdownDisplay');
       if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) {
-        if (el) el.classList.remove('visible');
+        if (el) { el.classList.remove('visible'); el.textContent = ''; }
         return;
       }
       const startedAt = action.autoAdvanceStartedAt || Date.now();
@@ -921,7 +923,7 @@
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, delayMs - elapsed);
         if (remaining <= 0) {
-          if (el) el.classList.remove('visible');
+          if (el) { el.classList.remove('visible'); el.textContent = ''; }
           if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
           return;
         }
@@ -952,8 +954,8 @@
       if (!p) return '';
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const throws = Array.isArray(p.throws) ? p.throws : [];
-      const lastThrows = throws.slice(-3);
-      const displayThrows = (currentRound.length > 0) ? [...currentRound] : lastThrows.map(t => t.points);
+      const currentRoundThrows = throws.slice(-currentRound.length);
+      const displayThrows = [...currentRound];
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
@@ -967,7 +969,7 @@
         // Segment aus dem passenden Wurf-Eintrag holen
         let segmentLabel = '-';
         if (pt !== null) {
-          const throwData = lastThrows[ti];
+          const throwData = currentRoundThrows[ti];
           if (throwData && throwData.segment) {
             segmentLabel = throwData.segment;
           } else {
@@ -985,7 +987,7 @@
       const bigScoreValue = isElimination ? totalScored : p.remaining;
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</div>' +
+        '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
@@ -1106,19 +1108,22 @@
       }).join('');
       
       // Letzte Würfe
-      const throwsHtml = lastThrows.map(t => 
-        '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '">' +
-          '<div class="pts">' + (t.points || 0) + '</div>' +
-          '<div class="seg">' + (t.segment || (t.points || 0)) + '</div>' +
-        '</div>'
-      ).join('');
+      const throwsHtml = displayThrows.map((points, index) => {
+        const throwData = currentRoundThrows[index];
+        const pointsLabel = points === null ? 'offen' : (points === 0 ? '0' : '+' + points);
+        const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
+        return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '">' +
+          '<div class="pts">' + pointsLabel + '</div>' +
+          '<div class="seg">' + segmentLabel + '</div>' +
+        '</div>';
+      }).join('');
       
       const totalScored = p.totalScored || 0;
       const turns = p.turns || 0;
       const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
       
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
+        '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + ' · Cricket</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
@@ -1289,10 +1294,11 @@
       let winner = null;
       if (isElimination) {
         // Bei Elimination: Kein Check auf remaining === 0 (alle starten bei 0!)
-        // Gewinner wird serverseitig bei throwRound > 10 ermittelt
+        // Gewinner wird serverseitig nach der zehnten vollständigen Aufnahme ermittelt
         if (state.game.status === 'leg-finished') {
           console.log('[Winner-Check] Elimination: leg-finished triggered');
-          winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
+          winner = state.players.find(p => p.slot === state.lastAction?.winnerSlot) ||
+            state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         }
       } else if (isCricket) {
         // Cricket: Server-Sieger bevorzugen, sonst nur bei geschlossenem Spiel und korrektem Punktevergleich.
@@ -1515,7 +1521,29 @@
       animation.className = 'cricket-score-animation';
       animation.textContent = '+' + points;
       document.body.appendChild(animation);
+      playCricketScoreSound();
       setTimeout(() => animation.remove(), 1200);
+    }
+
+    function playCricketScoreSound() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const ctx = new AudioContextClass();
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(660, ctx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.16);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.24);
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.25);
+        oscillator.addEventListener('ended', () => ctx.close());
+      } catch {}
     }
 
     function createConfetti() {
