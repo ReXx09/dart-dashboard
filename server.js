@@ -160,7 +160,7 @@ function getCricketNumbersForMode(mode) {
   return def && def.type === 'cricket' ? [...def.cricketNumbers] : null;
 }
 
-function isValidCheckout(remaining, points, rule) {
+function isValidCheckout(remaining, points, rule, segment = null) {
   // remaining = what's left BEFORE this throw
   // points = what was thrown
   const nextRemaining = remaining - points;
@@ -169,14 +169,13 @@ function isValidCheckout(remaining, points, rule) {
     // Checkout attempt – validate the finishing dart
     if (rule === 'single') return true; // any dart can finish
     if (rule === 'double') {
-      // Must be a double: even number, and the dart value must be a double
-      // For manual throws we don't know S/D/T, so we check if points is even
-      // For matrix throws we check the multiplier
-      return points % 2 === 0;
+      // Prefer the real segment; point-only requests retain legacy parity behavior.
+      return segment ? (/^D\d+$/.test(segment) || segment === 'DBULL') : points % 2 === 0;
     }
     if (rule === 'master') {
-      // Double or Triple: points must be even OR divisible by 3 with multiplier info
-      return points % 2 === 0 || points % 3 === 0;
+      return segment
+        ? (/^[DT]\d+$/.test(segment) || segment === 'DBULL')
+        : points % 2 === 0 || points % 3 === 0;
     }
     return true;
   }
@@ -1041,6 +1040,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
   const isElimination = modeDef.type === 'elimination';
+  const checkoutSegment = evt.segment || codeToSegment(evt.code) || null;
 
   let bust = false;
   let eliminationAction = null;
@@ -1062,7 +1062,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     } else {
       const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
       const nextRemaining = player.remaining - value;
-      bust = !isValidCheckout(player.remaining, value, checkoutRule);
+      bust = !isValidCheckout(player.remaining, value, checkoutRule, checkoutSegment);
       if (!bust) {
         player.remaining = nextRemaining;
         player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
@@ -1373,7 +1373,8 @@ async function applyArduinoThrowFromMatrix(hit) {
     } else {
       const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
       const nextRemaining = player.remaining - value;
-      bust = !isValidCheckout(player.remaining, value, checkoutRule);
+      const checkoutSegment = codeToSegment(hit.code) || null;
+      bust = !isValidCheckout(player.remaining, value, checkoutRule, checkoutSegment);
       if (!bust) {
         player.remaining = nextRemaining;
         player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
@@ -2271,7 +2272,8 @@ app.post('/api/live/throw', async (req, res) => {
       } else {
         const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
         const nextRemaining = player.remaining - points;
-        bust = !isValidCheckout(player.remaining, points, checkoutRule);
+        const checkoutSegment = typeof req.body?.segment === 'string' ? req.body.segment.toUpperCase() : null;
+        bust = !isValidCheckout(player.remaining, points, checkoutRule, checkoutSegment);
         if (!bust) { player.remaining = nextRemaining; player.totalScored += points; }
       }
     }
@@ -2283,7 +2285,8 @@ app.post('/api/live/throw', async (req, res) => {
     player.currentRoundPoints.push(points);
 
     if (!Array.isArray(player.throws)) player.throws = [];
-    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: pointsToSegment(points) });
+    const throwSegment = typeof req.body?.segment === 'string' ? req.body.segment.toUpperCase() : pointsToSegment(points);
+    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment });
 
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
@@ -2291,6 +2294,7 @@ app.post('/api/live/throw', async (req, res) => {
     state.lastAction = {
       type: 'throw', playerIndex: targetIndex, playerSlot: player.slot, player: player.name,
       points, bust, remaining: player.remaining, roundThrow: state.game.currentThrow, ts: Date.now(), mode,
+      segment: throwSegment,
       cricketPointsAwarded
     };
     if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
