@@ -198,9 +198,14 @@
       border: 1px solid #2a2a2a;
       border-radius: 10px;
       min-height: 0;
+      position: relative;
     }
     .focus-kachel:nth-child(2) h4 {
-      margin: 0 0 8px 0;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      margin: 0;
       font-size: .6rem;
       color: #888;
       text-transform: uppercase;
@@ -219,8 +224,9 @@
       justify-content: center;
       text-align: center;
       overflow: hidden;
+      position: relative;
     }
-    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; flex-shrink: 0; }
+    .focus-kachel > h4 { position: absolute; top: 10px; left: 8px; right: 8px; color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin: 0; flex-shrink: 0; }
     .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; flex-shrink: 0; }
     .throw-segments {
       display: flex;
@@ -288,10 +294,28 @@
     @keyframes elimination-flash { 0% { opacity: 0; transform: scale(0.8); } 15% { opacity: 1; transform: scale(1.05); } 85% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
     @keyframes elimination-pulse { from { transform: scale(1); box-shadow: 0 0 80px rgba(255,0,0,.8), 0 0 160px rgba(139,0,0,.6); } to { transform: scale(1.1); box-shadow: 0 0 120px rgba(255,0,0,1), 0 0 240px rgba(139,0,0,.8); } }
 
-    .focus-big-score {
-      font-size: clamp(7rem, 8vw, 8.5rem);
+    .cricket-score-animation {
+      position: fixed;
+      top: 42%;
+      left: 50%;
+      z-index: 9998;
+      color: #f4a261;
+      font-size: clamp(2rem, 5vw, 4rem);
       font-weight: 900;
-      line-height: 1.2;
+      text-shadow: 0 0 20px rgba(244,162,97,.8);
+      pointer-events: none;
+      animation: cricket-score-pop 1.1s ease-out forwards;
+    }
+    @keyframes cricket-score-pop {
+      0% { opacity: 0; transform: translate(-50%, 20px) scale(.7); }
+      20% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+      100% { opacity: 0; transform: translate(-50%, -70px) scale(1); }
+    }
+
+    .focus-big-score {
+      font-size: clamp(8rem, 9vw, 9.5rem);
+      font-weight: 900;
+      line-height: 1.05;
       color: var(--pc, #f4a261);
       font-variant-numeric: tabular-nums;
       overflow: hidden;
@@ -344,12 +368,12 @@
       border-radius: 14px;
       padding: 6px 10px;
       border: 2px solid #1e1e1e;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       gap: 5px;
       flex-shrink: 0;
-      /* Höhe: title (~14px) + gap (5px) + row1 (52px) + gap (5px) + row2 (52px) + padding (12px) = ~140px + Puffer */
-      height: 155px !important;
+      height: 205px !important;
     }
     .focus-controls-card .ctrl-title {
       color: #777;
@@ -364,9 +388,13 @@
       align-items: stretch;
       flex: 1;
     }
+    .focus-controls-card .ctrl-row.action-row {
+      flex: 0 0 88px;
+    }
     .focus-controls-card .ctrl-btn {
       flex: 1;
       padding: 24px 8px;
+      box-sizing: border-box;
       border-radius: 8px;
       border: 1px solid #2a2a2a;
       background: #1a1a1a;
@@ -782,7 +810,7 @@
       .throw-seg { min-height: 30px; }
       .throw-seg .pts { font-size: .9rem; }
       .throw-seg .seg { font-size: .65rem; }
-      .focus-big-score { font-size: clamp(4.5rem, 10vw, 7rem); }
+      .focus-big-score { font-size: clamp(5rem, 11vw, 7.8rem); }
       .focus-summary { margin-top: 2px; }
       .focus-summary div { padding: 3px; }
       .focus-summary span { font-size: .4rem; }
@@ -829,18 +857,18 @@
       }
       .focus-controls-card .ctrl-title { font-size: .42rem; }
       .focus-controls-card .ctrl-btn { font-size: .65rem; padding: 16px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-      .focus-controls-card { display: none; height: 155px !important; }
+      .focus-controls-card { display: none; height: 205px !important; }
     }
 
     /* Tablet-Auflösungen – Buttons hoch genug */
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) {
-      .focus-controls-card { height: 155px !important; }
+      .focus-controls-card { height: 205px !important; }
       .focus-controls-card .ctrl-btn { padding: 24px 8px !important; min-height: 52px !important; height: 100% !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .82rem; }
     }
 
     /* Fallback für alle Touch-Geräte */
     @media (pointer: coarse) {
-      .focus-controls-card { height: 155px !important; }
+      .focus-controls-card { height: 205px !important; }
       .focus-controls-card .ctrl-btn { min-height: 52px !important; padding: 24px 8px !important; height: 100% !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .82rem; }
     }
   </style>
@@ -872,6 +900,7 @@
     let countdownTimer = null;
     let pendingWinner = null;
     let isFirstLoad = true;
+    let lastCricketAnimationKey = '';
 
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
@@ -1022,7 +1051,7 @@
             '<span class="btn-label">Finish</span><span class="btn-value">' + ruleLabel + '</span>' +
           '</button>' +
         '</div>' +
-        '<div class="ctrl-row">' +
+        '<div class="ctrl-row action-row">' +
           '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
           '<button class="ctrl-btn restart" id="focusRestartBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>' +
         '</div>' +
@@ -1158,11 +1187,25 @@
 
       return '<div class="score-card" data-tv style="--pc:' + playerColor + '">' +
         '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
-        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + (isElimination ? ' · Elim' : '') + '</div>' +
+        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
         (isCricket ? cricketGridHtml : '') +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
+    }
+
+    function calculateClientCricketPoints(player, allPlayers) {
+      return Number(player.cricketPoints || player.totalScored || 0);
+    }
+
+    function isClientCricketWinner(player, allPlayers) {
+      const closed = player.cricketClosed || {};
+      const allClosed = [15, 16, 17, 18, 19, 20, 25].every(number => closed[number] === true);
+      if (!allClosed) return false;
+      const playerPoints = calculateClientCricketPoints(player, allPlayers);
+      return allPlayers.every(opponent =>
+        opponent.slot === player.slot || calculateClientCricketPoints(opponent, allPlayers) <= playerPoints
+      );
     }
 
     function renderState(state) {
@@ -1183,6 +1226,13 @@
 
       // ── Bust detection ──
       const lastThrow = state.lastAction;
+      if (state.game.mode === 'cricket' && lastThrow && Number(lastThrow.cricketPointsAwarded) > 0) {
+        const animationKey = [lastThrow.ts, lastThrow.playerSlot, lastThrow.cricketPointsAwarded].join(':');
+        if (animationKey !== lastCricketAnimationKey) {
+          lastCricketAnimationKey = animationKey;
+          showCricketScoreAnimation(lastThrow.cricketPointsAwarded);
+        }
+      }
       if (lastThrow && lastThrow.bust) {
         showBustOverlay(active);
         playBustSound();
@@ -1227,6 +1277,10 @@
       });
 
       // Winner-Erkennung
+      if (state.game.status !== 'leg-finished') {
+        pendingWinner = null;
+        hideWinnerOverlay();
+      }
       let winner = null;
       if (isElimination) {
         // Bei Elimination: Kein Check auf remaining === 0 (alle starten bei 0!)
@@ -1236,28 +1290,10 @@
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         }
       } else if (isCricket) {
-        // Cricket: Gewinner hat alle Zahlen geschlossen ODER Zielscore erreicht
-        // Prüfe serverseitigen Status oder Client-seitig: alle 7 Zahlen geschlossen
+        // Cricket: Server-Sieger bevorzugen, sonst nur bei geschlossenem Spiel und korrektem Punktevergleich.
         if (state.game.status === 'leg-finished') {
-          console.log('[Winner-Check] Cricket: leg-finished triggered (SERVER)');
-          winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
-        } else {
-          // Fallback: Client-seitig prüfen ob alle Zahlen geschlossen
-          // NUR wenn: Server-Status NICHT 'leg-finished' UND mind. 7 Würfe gesamt (1 volle Runde)
-          const totalThrows = state.players.reduce((sum, p) => sum + (Array.isArray(p.throws) ? p.throws.length : 0), 0);
-          if (totalThrows >= 7) {
-            console.log('[Winner-Check] Cricket: Fallback check triggered (totalThrows:', totalThrows, ')');
-            winner = state.players.find(p => {
-              const closed = p.cricketClosed || {};
-              const required = [15, 16, 17, 18, 19, 20, 25];
-              // ALLE 7 Zahlen müssen geschlossen sein
-              const allClosed = required.every(n => closed[n] === true);
-              if (!allClosed) return false;
-              // Punkte-Vergleich bleibt Server-logik vorbehalten
-              return true;
-            });
-            if (winner) console.log('[Winner-Check] Cricket: Fallback winner found:', winner.name);
-          }
+          winner = state.players.find(p => p.slot === state.lastAction?.winnerSlot) ||
+            state.players.find(p => isClientCricketWinner(p, state.players));
         }
       } else {
         // x01 (501, 301, etc.): Winner hat remaining === 0
@@ -1268,7 +1304,7 @@
         }
       }
 
-      if (winner) {
+      if (winner && state.game.status === 'leg-finished') {
         pendingWinner = winner;
         showWinnerOverlay(winner, state);
       } else if (pendingWinner) {
@@ -1467,6 +1503,14 @@
     function hideEliminationOverlay() {
       const overlay = document.getElementById('eliminationOverlay');
       if (overlay) overlay.remove();
+    }
+
+    function showCricketScoreAnimation(points) {
+      const animation = document.createElement('div');
+      animation.className = 'cricket-score-animation';
+      animation.textContent = '+' + points;
+      document.body.appendChild(animation);
+      setTimeout(() => animation.remove(), 1200);
     }
 
     function createConfetti() {

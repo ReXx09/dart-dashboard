@@ -206,35 +206,34 @@ function defaultPlayerCricketState(mode) {
   if (!nums) return {};
   const hits = {};
   nums.forEach(n => { hits[n] = 0; });
-  return { cricketHits: hits, cricketClosed: {} };
+  return { cricketHits: hits, cricketClosed: {}, cricketPoints: 0 };
 }
 
 // ── Cricket Scoring ──────────────────────────────────
 function calculateCricketPoints(player, allPlayers) {
-  if (!player.cricketHits || !player.cricketClosed) return 0;
-  const nums = Object.keys(player.cricketHits).map(Number);
-  let points = 0;
-  
-  for (const num of nums) {
-    const hits = player.cricketHits[num] || 0;
-    const closed = player.cricketClosed[num] || false;
-    
-    if (closed && hits > 3) {
-      // Punkte nur auf geschlossenen Zahlen, die Gegner NICHT geschlossen haben
-      let opponentHasClosed = false;
-      for (const opp of allPlayers) {
-        if (opp.slot === player.slot) continue;
-        if (opp.cricketClosed && opp.cricketClosed[num]) {
-          opponentHasClosed = true;
-          break;
-        }
-      }
-      if (!opponentHasClosed) {
-        points += (hits - 3) * num;
-      }
-    }
-  }
-  return points;
+  return Number(player.cricketPoints ?? player.totalScored ?? 0);
+}
+
+function applyCricketHit(player, allPlayers, number, hitCount) {
+  if (!player.cricketHits) player.cricketHits = {};
+  if (!player.cricketClosed) player.cricketClosed = {};
+
+  const oldHits = Number(player.cricketHits[number] || 0);
+  const newHits = oldHits + hitCount;
+  const opponentHasClosed = allPlayers.some(opponent =>
+    opponent.slot !== player.slot && opponent.cricketClosed && opponent.cricketClosed[number]
+  );
+
+  player.cricketHits[number] = newHits;
+  if (newHits >= 3) player.cricketClosed[number] = true;
+
+  const newlyScoringHits = opponentHasClosed
+    ? 0
+    : Math.max(0, newHits - 3) - Math.max(0, oldHits - 3);
+  const awardedPoints = newlyScoringHits * number;
+  player.cricketPoints = Number(player.cricketPoints ?? player.totalScored ?? 0) + awardedPoints;
+  player.totalScored = player.cricketPoints;
+  return awardedPoints;
 }
 
 function checkCricketWin(player, allPlayers) {
@@ -807,6 +806,18 @@ function codeToSegment(code) {
   return null;
 }
 
+function codeToCricketNumber(code) {
+  if (code === 125 || code === 225) return 25;
+  const base = Number(code) % 100;
+  return base >= 1 && base <= 20 ? base : null;
+}
+
+function codeToCricketHitCount(code) {
+  if (code === 225) return 2;
+  const multiplier = Math.floor(Number(code) / 100);
+  return multiplier >= 1 && multiplier <= 3 ? multiplier : 0;
+}
+
 function pointsToSegment(points) {
   // Bestmögliche Segment-Bezeichnung für manuelle Würfe ermitteln
   if (points <= 0) return null;
@@ -1029,20 +1040,14 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const isElimination = modeDef.type === 'elimination';
 
   let bust = false;
+  let cricketPointsAwarded = 0;
   if (isCricket) {
-    const cricketNum = pointsToCricketNumber(value);
+    const cricketNum = codeToCricketNumber(rawCode);
     const nums = getCricketNumbersForMode(mode);
     if (nums && cricketNum !== null && nums.includes(cricketNum)) {
-      if (!player.cricketHits) player.cricketHits = {};
-      if (!player.cricketClosed) player.cricketClosed = {};
-      const hitCount = getThrowHitCount(value);
-      const oldHits = player.cricketHits[cricketNum] || 0;
-      const newHits = oldHits + hitCount; // ALLE Treffer zählen (auch über 3 für Punkte)
-      player.cricketHits[cricketNum] = newHits;
-      if (newHits >= 3) player.cricketClosed[cricketNum] = true;
+      const hitCount = codeToCricketHitCount(rawCode);
+      cricketPointsAwarded = applyCricketHit(player, state.players, cricketNum, hitCount);
     }
-    player.cricketPoints = calculateCricketPoints(player, state.players);
-    player.totalScored = player.cricketPoints;
   } else {
     if (isElimination) {
       // Elimination: Punkte addieren von 0 aufwärts
@@ -1072,6 +1077,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   if (!Array.isArray(player.throws)) player.throws = [];
   player.throws.push({
     points: value,
+    cricketPointsAwarded,
     remaining: player.remaining,
     bust,
     ts: Date.now(),
@@ -1111,6 +1117,8 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino' });
     state.game.status = 'leg-finished';
     state.lastAction.cricketWin = true;
+    state.lastAction.winner = player.name;
+    state.lastAction.winnerSlot = player.slot;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
   } else if (isElimination && checkEliminationWin(state)) {
@@ -1318,9 +1326,13 @@ function handleChannelActiveEvent(evt) {
 }
 
 async function applyArduinoThrowFromMatrix(hit) {
-  const value = Number(hit.points || 0);
-  if (!Number.isFinite(value) || value < 0 || value > 180) return { ok: false, reason: 'invalid-points', hit };
-
+  const rawCode = Number(hit.points || 0);
+  if (!Number.isFinite(rawCode) || rawCode < 0 || rawCode > 999) return { ok: false, reason: 'invalid-points', hit };
+  
+  // Matrix-Code (z.B. 115, 215, 315) in Punkte dekodieren
+  const value = codeToPoints(rawCode);
+  if (value === 0 && rawCode !== 0) return { ok: false, reason: 'invalid-points', hit };
+  
   const state = await getLiveState();
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
   if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
@@ -1335,20 +1347,14 @@ async function applyArduinoThrowFromMatrix(hit) {
   const isElimination = modeDef.type === 'elimination';
 
   let bust = false;
+  let cricketPointsAwarded = 0;
   if (isCricket) {
     const cricketNum = pointsToCricketNumber(value);
     const nums = getCricketNumbersForMode(mode);
     if (nums && cricketNum !== null && nums.includes(cricketNum)) {
-      if (!player.cricketHits) player.cricketHits = {};
-      if (!player.cricketClosed) player.cricketClosed = {};
       const hitCount = getThrowHitCount(value);
-      const oldHits = player.cricketHits[cricketNum] || 0;
-      const newHits = oldHits + hitCount; // ALLE Treffer zählen (auch über 3 für Punkte)
-      player.cricketHits[cricketNum] = newHits;
-      if (newHits >= 3) player.cricketClosed[cricketNum] = true;
+      cricketPointsAwarded = applyCricketHit(player, state.players, cricketNum, hitCount);
     }
-    player.cricketPoints = calculateCricketPoints(player, state.players);
-    player.totalScored = player.cricketPoints;
   } else {
     if (isElimination) {
       // Elimination: Punkte addieren von 0 aufwärts
@@ -1378,6 +1384,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   if (!Array.isArray(player.throws)) player.throws = [];
   player.throws.push({
     points: value,
+    cricketPointsAwarded,
     remaining: player.remaining,
     bust,
     ts: Date.now(),
@@ -1423,6 +1430,8 @@ async function applyArduinoThrowFromMatrix(hit) {
     await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix' });
     state.game.status = 'leg-finished';
     state.lastAction.cricketWin = true;
+    state.lastAction.winner = player.name;
+    state.lastAction.winnerSlot = player.slot;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
   } else if (isElimination && checkEliminationWin(state)) {
@@ -1895,7 +1904,8 @@ function sanitizePlayerState(player, fallback) {
   const average = calculateCurrentRoundAverage({ currentRoundPoints });
   const cricketHits = player?.cricketHits || {};
   const cricketClosed = player?.cricketClosed || {};
-  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, cricketHits, cricketClosed, turnScoreRecorded: !!player?.turnScoreRecorded };
+  const cricketPoints = Number(player?.cricketPoints ?? player?.totalScored ?? 0);
+  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, cricketHits, cricketClosed, cricketPoints, turnScoreRecorded: !!player?.turnScoreRecorded };
 }
 
 function resetLiveState(carryLegs = false, modeOverride) {
@@ -2235,18 +2245,13 @@ app.post('/api/live/throw', async (req, res) => {
     const isElimination = modeDef.type === 'elimination';
 
     let bust = false;
+    let cricketPointsAwarded = 0;
     if (isCricket) {
       const dartNumber = Number(req.body?.number || points);
       const multiplier = Number(req.body?.multiplier || 1);
-      if (!player.cricketHits) player.cricketHits = {};
-      if (!player.cricketClosed) player.cricketClosed = {};
       if ([15,16,17,18,19,20,25].includes(dartNumber)) {
-        player.cricketHits[dartNumber] = Math.min(3, (player.cricketHits[dartNumber] || 0) + multiplier);
-        if (player.cricketHits[dartNumber] >= 3) player.cricketClosed[dartNumber] = true;
+        cricketPointsAwarded = applyCricketHit(player, state.players, dartNumber, multiplier);
       }
-      // Cricket-Punkte neu berechnen
-      player.cricketPoints = calculateCricketPoints(player, state.players);
-      player.totalScored = player.cricketPoints;
     } else {
       if (isElimination) {
         // Elimination: Punkte addieren von 0 aufwärts
@@ -2278,7 +2283,8 @@ app.post('/api/live/throw', async (req, res) => {
 
     state.lastAction = {
       type: 'throw', playerIndex: targetIndex, playerSlot: player.slot, player: player.name,
-      points, bust, remaining: player.remaining, roundThrow: state.game.currentThrow, ts: Date.now(), mode
+      points, bust, remaining: player.remaining, roundThrow: state.game.currentThrow, ts: Date.now(), mode,
+      cricketPointsAwarded
     };
 
     if (!isCricket && player.remaining === 0) {
@@ -2292,6 +2298,8 @@ app.post('/api/live/throw', async (req, res) => {
       await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true });
       state.game.status = 'leg-finished';
       state.lastAction.cricketWin = true;
+      state.lastAction.winner = player.name;
+      state.lastAction.winnerSlot = player.slot;
       // Record stats after leg finish
       await recordPlayerLegStats(player, state);
     } else if (isElimination && checkEliminationWin(state)) {
