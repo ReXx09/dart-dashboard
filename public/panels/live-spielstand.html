@@ -371,7 +371,7 @@
     .focus-summary {
       margin-top: 4px;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 3px;
       flex-shrink: 0;
     }
@@ -1033,7 +1033,6 @@
       while (displayThrows.length < 3) displayThrows.push(null);
       const totalScored = p.totalScored || 0;
       const legStats = getLiveLegStats(p);
-      const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
       const isElimination = state.game.mode === 'elimination';
       
@@ -1061,12 +1060,10 @@
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</span><span class="focus-switch-timer"></span></div>' +
-        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe / Zahlen</h4>' +
             '<div class="throw-segments">' + throwsHtml + '</div>' +
-            '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
             '<div>' +
@@ -1083,7 +1080,6 @@
           '<div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div>' +
           '<div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div>' +
           '<div><span>Checkout</span><strong>' + legStats.checkout + '</strong></div>' +
-          '<div><span>Leg-AVG</span><strong>' + legStats.legAverage + '</strong></div>' +
         '</div>' +
       '</div>';
     }
@@ -1199,7 +1195,6 @@
       
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
         '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + ' · Cricket</span><span class="focus-switch-timer"></span></div>' +
-        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Letzte Würfe</h4>' +
@@ -1216,7 +1211,7 @@
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="focus-summary"><div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div><div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div><div><span>Checkout</span><strong>-</strong></div><div><span>Leg-AVG</span><strong>' + legStats.legAverage + '</strong></div></div>' +
+        '<div class="focus-summary"><div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div><div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div><div><span>Checkout</span><strong>-</strong></div></div>' +
       '</div>';
     }
 
