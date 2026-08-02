@@ -139,15 +139,19 @@
     .compact-players .score-card .cricket-grid { justify-content: center; }
     .compact-cricket-status {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 2px 4px;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 2px;
       width: 100%;
-      margin: 2px 0;
+      margin: 1px 0;
     }
     .compact-cricket-status span {
       color: #aaa;
-      font-size: .55rem;
-      line-height: 1.2;
+      background: #1b1b1b;
+      border-radius: 4px;
+      padding: 2px 0;
+      font-size: .5rem;
+      line-height: 1;
+      text-align: center;
       white-space: nowrap;
     }
     .compact-cricket-status span.closed { color: #2a9d8f; font-weight: 700; }
@@ -1242,37 +1246,16 @@
       
       let cricketGridHtml = '';
       let compactCricketHtml = '';
-      if (isCricket && crowded) {
+      if (isCricket) {
         const cricketHits = p.cricketHits || {};
         const cricketClosed = p.cricketClosed || {};
         const nums = [15, 16, 17, 18, 19, 20, 25];
         compactCricketHtml = '<div class="compact-cricket-status" aria-label="Cricket Status">' + nums.map(n => {
           const hits = cricketHits[n] || 0;
           const closed = !!cricketClosed[n];
-          return '<span class="' + (closed ? 'closed' : '') + '">' + n + ':' + (closed ? 'X' : hits) + '</span>';
+          const label = n === 25 ? 'B' : n;
+          return '<span class="' + (closed ? 'closed' : '') + '">' + label + ':' + (closed ? 'X' : hits) + '</span>';
         }).join('') + '</div>';
-      } else if (isCricket) {
-        const cricketHits = p.cricketHits || {};
-        const cricketClosed = p.cricketClosed || {};
-        const nums = [15,16,17,18,19,20,25];
-        const gridItems = nums.map(n => {
-          const hits = cricketHits[n] || 0;
-          const closed = !!cricketClosed[n];
-          
-          // Hit markers: 3 Kreise für Hit-Status (wie TV)
-          const markers = [1, 2, 3].map(h => {
-            let cls = 'hit-marker';
-            if (closed) cls += ' closed';
-            else if (hits >= h) cls += ' hit-' + h;
-            return '<div class="' + cls + '"></div>';
-          }).join('');
-          
-          return '<div class="cricket-num' + (closed ? ' closed' : '') + '">' +
-            '<div class="num-label">' + n + '</div>' +
-            '<div class="cricket-hits">' + markers + '</div>' +
-          '</div>';
-        }).join('');
-        cricketGridHtml = '<div class="cricket-grid">' + gridItems + '</div>';
       }
 
       return '<div class="score-card' + (crowded && isCricket ? ' compact-crowded' : '') + '" data-tv style="--pc:' + playerColor + '">' +
