@@ -1444,7 +1444,7 @@
       } catch {}
     }
 
-    async function loadAll() {
+    async function loadAll(retryAttempt = 0) {
       try {
         const stateRes = await fetch('/api/live/state');
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
@@ -1479,7 +1479,13 @@
         isFirstLoad = false;
         renderState(state);
       } catch(e) {
-        document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
+        console.error('[Live-State] Laden fehlgeschlagen', e);
+        if (retryAttempt < 3) {
+          document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#f4a261">Verbinde mit Live-State … (' + (retryAttempt + 1) + '/3)</div>';
+          setTimeout(() => loadAll(retryAttempt + 1), 1000);
+          return;
+        }
+        document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar<br><small>Bitte Verbindung oder Dashboard-Server prüfen.</small></div>';
       }
       loadDailyHighscore();
     }
