@@ -13,8 +13,10 @@
       background: #0a0a0a;
       color: #f1f1f1;
       font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
+      height: 100vh;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     .topbar {
       background: #111;
@@ -95,7 +97,8 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      height: calc(100vh - 42px);
+      flex: 1;
+      min-height: 0;
     }
     .focus-player {
       flex: 1;
