@@ -604,10 +604,10 @@
       .focus-summary span { font-size: .45rem; }
       .focus-summary strong { font-size: .7rem; }
       .focus-player.has-others { flex: 1; }
-      .focus-leg-card { display: none; } /* Leg-Historie ausblenden auf TV */
+      .focus-leg-card { display: flex; }
       .compact-players { gap: 3px; max-height: 19%; }
-      .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
-      .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
+      .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: column; align-items: center; border-radius: 6px; }
+      .compact-players .score-card .sc-color-bar { display: none !important; }
       .compact-players .score-card .sc-name { font-size: .65rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-score { font-size: 1.1rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-stats { font-size: .5rem; white-space: nowrap; flex-shrink: 0; }
