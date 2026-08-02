@@ -109,17 +109,25 @@
     .compact-players {
       display: flex;
       gap: 4px;
-      flex: 1 1 0;
-      max-height: 30%;
+      flex: 0 0 clamp(112px, 16vh, 140px);
+      height: clamp(112px, 16vh, 140px);
+      max-height: none;
       min-height: 0;
     }
     .compact-players:empty { display: none; }
     .compact-players .score-card {
       flex: 1;
       min-width: 0;
+      justify-content: flex-start;
+      gap: 4px;
+      padding: 8px 10px 6px;
       align-items: center;
       text-align: center;
     }
+    .compact-players .score-card .sc-color-bar { margin-bottom: 3px; }
+    .compact-players .score-card .sc-name { font-size: .78rem; }
+    .compact-players .score-card .sc-score { font-size: 2rem; }
+    .compact-players .score-card .sc-last-throws { margin-top: 1px; }
     .compact-players .score-card .sc-last-throws,
     .compact-players .score-card .cricket-grid { justify-content: center; }
     .compact-cricket-status {
@@ -842,7 +850,7 @@
       .focus-summary strong { font-size: .65rem; }
       .focus-player.has-others { flex: 1; }
       .focus-leg-card { display: none; }
-      .compact-players { gap: 3px; max-height: 20%; }
+      .compact-players { gap: 3px; flex-basis: 128px; height: 128px; max-height: none; }
       .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
       .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
       .compact-players .score-card .sc-name { font-size: .6rem; white-space: nowrap; flex-shrink: 0; }
