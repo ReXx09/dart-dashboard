@@ -389,6 +389,17 @@
     function removeProfile(idx) {
       const removed = profiles.splice(idx, 1)[0];
       profilesDirty = true;
+      if (removed) {
+        const removedName = String(removed.name || '').trim().toLowerCase();
+        players.forEach(player => {
+          if (String(player.name || '').trim().toLowerCase() === removedName) {
+            player.name = '';
+            player.active = false;
+          }
+        });
+        dirty = true;
+        document.getElementById('saveBtn').disabled = false;
+      }
       renderProfiles();
       renderSlots();
       if (removed) showToast('Profil "' + removed.name + '" entfernt');

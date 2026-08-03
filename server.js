@@ -911,6 +911,7 @@ function clearPendingArduinoThrow() {
 
 async function recordPlayerLegStats(player, state) {
   try {
+    await recordDuelLegIfActive(state, player);
     // Ensure player has stats entry
     await dataStore.initPlayerStats(player.slot);
 
@@ -988,6 +989,46 @@ async function recordPlayerLegStats(player, state) {
   } catch (err) {
     console.error('[Stats] Error recording player leg stats:', err);
   }
+}
+
+async function recordDuelLegIfActive(state, winner) {
+  const duelId = Number(state.game?.duelId || 0);
+  const mode = String(state.game?.mode || '');
+  if (!duelId || !['501', '301', '701'].includes(mode)) return;
+  const profiles = await dataStore.getProfiles();
+  const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
+  const players = (Array.isArray(state.players) ? state.players : []).map(player => {
+    const throws = Array.isArray(player.throws) ? player.throws : [];
+    const turnScores = [];
+    for (let index = 0; index < throws.length; index += 3) {
+      const turn = throws.slice(index, index + 3);
+      if (turn.length < 3) continue;
+      turnScores.push(turn.reduce((sum, item) => sum + (item.bust ? 0 : Number(item.points || 0)), 0));
+    }
+    return {
+      slot: player.slot,
+      profileId: profileByName.get(String(player.name || '').trim().toLowerCase()) || null,
+      name: player.name,
+      turns: player.turns,
+      totalScored: player.totalScored,
+      average: Number(player.turns || 0) > 0 ? roundAverage(Number(player.totalScored || 0) / Number(player.turns) * 3) : 0,
+      bestTurn: player.bestTurn,
+      count100plus: turnScores.filter(score => score >= 100).length,
+      count140plus: turnScores.filter(score => score >= 140).length,
+      count180: turnScores.filter(score => score === 180).length,
+      checkoutAttempts: player.checkoutAttempts,
+      checkoutSuccess: player.checkoutSuccess,
+      lastCheckoutValue: player.lastCheckoutValue,
+      busts: throws.filter(item => item.bust).length
+    };
+  });
+  await dataStore.recordDuelLeg({
+    duelId,
+    mode,
+    winnerSlot: winner.slot,
+    startedAt: Number(state.game.startedAt || Date.now()),
+    players
+  });
 }
 
 async function advanceAfterBust(state, player, source) {
@@ -1923,7 +1964,7 @@ async function defaultLiveState(mode) {
   const startScore = getStartScoreForMode(m);
 
   return {
-    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0 },
+    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0, duelId: null },
     players: fallbackPlayers.map(p => ({ ...p, remaining: startScore, legs: 0, turns: 0, totalScored: 0, bestTurn: 0, average: 0, throws: [], currentRoundPoints: [], ...defaultPlayerCricketState(m) })),
     lastAction: null,
     arduino: { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
@@ -2041,6 +2082,7 @@ function resetLiveState(carryLegs = false, modeOverride) {
       activePlayer: 0,
       throwRound: 1,
       currentThrow: 0
+      ,duelId: null
     },
     players,
     lastAction: null,
@@ -2086,6 +2128,7 @@ async function getLiveState() {
       activePlayer: Math.min(Number(saved.game?.activePlayer || 0), mergedPlayers.length - 1),
       throwRound: Number(saved.game?.throwRound || 1),
       currentThrow: Number(saved.game?.currentThrow || 0)
+      ,duelId: Number(saved.game?.duelId || 0) || null
     },
     players: mergedPlayers,
     lastAction: saved.lastAction || null,
@@ -2311,11 +2354,126 @@ app.get('/api/live/state', async (_req, res) => {
   catch (err) { res.status(500).json({ error: 'Live-State konnte nicht geladen werden: ' + err.message }); }
 });
 
+app.get('/api/duels', async (req, res) => {
+  try { res.json(await dataStore.listDuels(req.query.limit || 20)); }
+  catch (err) { res.status(500).json({ error: 'Begegnungen konnten nicht geladen werden: ' + err.message }); }
+});
+
+app.get('/api/duels/current', async (_req, res) => {
+  try {
+    const state = await getLiveState();
+    const duel = state.game.duelId ? await dataStore.getDuel(state.game.duelId) : null;
+    res.json(duel || null);
+  } catch (err) { res.status(500).json({ error: 'Aktuelle Begegnung konnte nicht geladen werden: ' + err.message }); }
+});
+
+app.get('/api/duels/top', async (req, res) => {
+  try {
+    const duels = await dataStore.listDuels(100);
+    const top = duels
+      .filter(duel => ['501', '301', '701'].includes(String(duel.mode)))
+      .sort((a, b) => Number(b.total_legs || 0) - Number(a.total_legs || 0) || Number(b.participant_count || 0) - Number(a.participant_count || 0))
+      .slice(0, 20);
+    res.json(top);
+  } catch (err) { res.status(500).json({ error: 'Top-Begegnungen konnten nicht geladen werden: ' + err.message }); }
+});
+
+app.get('/api/duel-stats', async (req, res) => {
+  const slots = String(req.query.playerSlots || '').split(',').map(Number).filter(Number.isInteger).filter(slot => slot > 0).sort((a, b) => a - b);
+  if (!slots.length || slots.length > 8) return res.status(400).json({ error: 'playerSlots muss 1 bis 8 Slots enthalten.' });
+  const exactGroup = String(req.query.exact || 'false').toLowerCase() === 'true';
+  try {
+    const duels = await dataStore.listDuels(100);
+    const wanted = slots.join('-');
+    const matching = duels.filter(duel => {
+      const participantSlots = (duel.players || []).map(player => Number(player.player_slot)).sort((a, b) => a - b);
+      const key = participantSlots.join('-');
+      return exactGroup ? key === wanted : slots.every(slot => participantSlots.includes(slot));
+    });
+    const aggregate = new Map();
+    let totalLegs = 0;
+    for (const duel of matching) {
+      for (const leg of duel.legs || []) {
+        totalLegs += 1;
+        for (const player of leg.players || []) {
+          if (!slots.includes(Number(player.player_slot))) continue;
+          const key = Number(player.player_slot);
+          const current = aggregate.get(key) || { slot: key, name: player.player_name, legs: 0, wins: 0, darts: 0, scored: 0, average: 0, bestTurn: 0, count100plus: 0, count140plus: 0, count180: 0, checkoutAttempts: 0, checkoutSuccess: 0, busts: 0 };
+          current.legs += 1;
+          current.wins += Number(player.won || 0);
+          current.darts += Number(player.darts || 0);
+          current.scored += Number(player.scored || 0);
+          current.bestTurn = Math.max(current.bestTurn, Number(player.best_turn || 0));
+          current.count100plus += Number(player.count_100plus || 0);
+          current.count140plus += Number(player.count_140plus || 0);
+          current.count180 += Number(player.count_180 || 0);
+          current.checkoutAttempts += Number(player.checkout_attempts || 0);
+          current.checkoutSuccess += Number(player.checkout_success || 0);
+          current.busts += Number(player.busts || 0);
+          current.average = current.darts > 0 ? roundAverage(current.scored / current.darts * 3) : 0;
+          aggregate.set(key, current);
+        }
+      }
+    }
+    res.json({ playerSlots: slots, exactGroup, duels: matching.length, legs: totalLegs, players: Array.from(aggregate.values()) });
+  } catch (err) { res.status(500).json({ error: 'Duellstatistik konnte nicht geladen werden: ' + err.message }); }
+});
+
+app.get('/api/duels/:id', async (req, res) => {
+  try {
+    const duel = await dataStore.getDuel(req.params.id);
+    if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
+    res.json(duel);
+  } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht geladen werden: ' + err.message }); }
+});
+
+app.post('/api/duels/start', async (req, res) => {
+  const mode = String(req.body?.mode || '').trim();
+  if (!['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'Begegnungen sind zunächst nur für 501, 301 und 701 verfügbar.' });
+  try {
+    const state = await getLiveState();
+    if (state.game.duelId) return res.status(409).json({ error: 'Es läuft bereits eine Begegnung.', duel: await dataStore.getDuel(state.game.duelId) });
+    const requestedSlots = Array.isArray(req.body?.playerSlots) ? req.body.playerSlots.map(Number).filter(Number.isInteger) : [];
+    const sourcePlayers = state.players.filter(player => requestedSlots.length === 0 || requestedSlots.includes(Number(player.slot)));
+    const participants = sourcePlayers.filter(player => player.name && player.slot).slice(0, 8);
+    if (participants.length < 1) return res.status(400).json({ error: 'Mindestens ein Spieler wird benötigt.' });
+    const profiles = await dataStore.getProfiles();
+    const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
+    const duel = await dataStore.createDuel({
+      mode,
+      players: participants.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null }))
+    });
+    state.game.duelId = duel.id;
+    state.game.mode = mode;
+    state.game.startedAt = Date.now();
+    await saveLiveState(state);
+    broadcastReload();
+    res.json(duel);
+  } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gestartet werden: ' + err.message }); }
+});
+
+app.post('/api/duels/:id/finish', async (req, res) => {
+  try {
+    const state = await getLiveState();
+    if (Number(state.game.duelId) !== Number(req.params.id)) return res.status(409).json({ error: 'Diese Begegnung ist nicht aktiv.' });
+    const duel = await dataStore.finishDuel(req.params.id, Number(req.body?.winnerSlot || 0) || null);
+    state.game.duelId = null;
+    await saveLiveState(state);
+    broadcastReload();
+    res.json(duel);
+  } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht beendet werden: ' + err.message }); }
+});
+
 app.post('/api/live/reset', async (req, res) => {
   const carryLegs = !!(req.body && req.body.carryLegs);
   try {
     const mode = savedLiveMode || DEFAULT_MODE;
+    const current = await getLiveState();
     const fresh = resetLiveState(carryLegs, mode);
+    const duel = current.game.duelId ? await dataStore.getDuel(current.game.duelId) : null;
+    const currentSlots = current.players.map(player => Number(player.slot)).sort((a, b) => a - b).join('-');
+    const duelSlots = duel ? duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-') : '';
+    fresh.game.duelId = duel && currentSlots === duelSlots ? duel.id : null;
     const saved = await saveLiveState(fresh);
     broadcastReload();
     res.json(saved);
@@ -2546,6 +2704,19 @@ app.delete('/api/highscores/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht gelöscht werden: ' + err.message }); }
 });
 
+app.put('/api/highscores/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  const player = String(req.body?.player || '').trim();
+  const score = Number(req.body?.score);
+  if (!Number.isFinite(id) || id <= 0 || !player || !Number.isFinite(score) || score <= 0) {
+    return res.status(400).json({ error: 'Gültige ID, Spieler und positiver Score erforderlich.' });
+  }
+  try {
+    await dataStore.updateHighscore(id, player, score);
+    res.json({ ok: true, highscores: await getHighscores() });
+  } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht bearbeitet werden: ' + err.message }); }
+});
+
 app.delete('/api/highscores', async (_req, res) => {
   try {
     await dataStore.clearAllHighscores();
@@ -2569,9 +2740,13 @@ app.get('/api/highscores/daily', async (_req, res) => {
 app.get('/api/highscores/overview', async (_req, res) => {
   try {
     const players = await dataStore.getPlayers();
+    const profiles = await dataStore.getProfiles();
+    const profileNames = new Set(profiles.map(profile => String(profile.name || '').trim().toLowerCase()).filter(Boolean));
     const entries = [];
     for (const player of players) {
       if (!player.name) continue;
+      if (!player.active) continue;
+      if (profileNames.size > 0 && !profileNames.has(String(player.name).trim().toLowerCase())) continue;
       const stats = await dataStore.getPlayerStats(player.slot) || {};
       const darts = Number(stats.total_darts || 0);
       const totalScored = Number(stats.total_scored || 0);
@@ -2636,6 +2811,51 @@ app.get('/api/players/:id/stats', async (req, res) => {
     res.json(stats);
   } catch (err) {
     res.status(500).json({ error: 'Stats konnten nicht geladen werden: ' + err.message });
+  }
+});
+
+const EDITABLE_PLAYER_STAT_FIELDS = [
+  'games_played', 'games_won', 'legs_played', 'legs_won', 'total_darts', 'total_scored',
+  'highest_leg_avg', 'avg_first9', 'checkout_attempts', 'checkout_success', 'highest_checkout',
+  'checkout_single_attempts', 'checkout_single_success', 'checkout_single_highest',
+  'checkout_double_attempts', 'checkout_double_success', 'checkout_double_highest',
+  'checkout_master_attempts', 'checkout_master_success', 'checkout_master_highest',
+  'checkout_100plus', 'checkout_120plus', 'checkout_160plus', 'count_180', 'count_171plus',
+  'count_140plus', 'count_100plus', 'max_score', 'cricket_legs', 'cricket_won', 'cricket_mpr'
+];
+
+app.put('/api/players/:id/stats', async (req, res) => {
+  const playerId = Number(req.params.id);
+  if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
+  try {
+    await dataStore.initPlayerStats(playerId);
+    const updates = {};
+    for (const field of EDITABLE_PLAYER_STAT_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, field)) {
+        const value = Number(req.body[field]);
+        if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: `Ungültiger Wert für ${field}` });
+        updates[field] = value;
+      }
+    }
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Keine Statistikfelder angegeben' });
+    await dataStore.updatePlayerStats(playerId, updates);
+    res.json(await dataStore.getPlayerStats(playerId));
+  } catch (err) {
+    res.status(500).json({ error: 'Statistik konnte nicht gespeichert werden: ' + err.message });
+  }
+});
+
+app.post('/api/players/:id/stats/reset', async (req, res) => {
+  const playerId = Number(req.params.id);
+  if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
+  try {
+    await dataStore.initPlayerStats(playerId);
+    const reset = Object.fromEntries(EDITABLE_PLAYER_STAT_FIELDS.map(field => [field, 0]));
+    await dataStore.updatePlayerStats(playerId, reset);
+    await dataStore.deletePlayerLegHistory(playerId);
+    res.json(await dataStore.getPlayerStats(playerId));
+  } catch (err) {
+    res.status(500).json({ error: 'Statistik konnte nicht zurückgesetzt werden: ' + err.message });
   }
 });
 

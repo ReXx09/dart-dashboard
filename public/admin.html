@@ -32,10 +32,24 @@
     textarea.mapping-json:focus{border-color:#e63946;outline:none}
     .mapping-hint{font-size:.72rem;color:#444;margin-top:8px;line-height:1.45}
     .field-inline{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .hs-filters{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(150px,1fr) minmax(150px,1fr);gap:8px;margin-bottom:10px}
+    .hs-filters{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(170px,1fr) minmax(150px,1fr) minmax(150px,1fr);gap:8px;margin-bottom:10px}
     .hs-filters input,.hs-filters select{width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font-size:.82rem;font-family:inherit}
     .hs-filters input:focus,.hs-filters select:focus{border-color:#e63946;outline:none}
-    @media (max-width:600px){.hs-filters{grid-template-columns:1fr}}
+    .stats-editor{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+    .stats-editor label{display:grid;gap:5px;color:#777;font-size:.7rem;text-transform:uppercase;letter-spacing:.7px}
+    .stats-editor input{width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit}
+    .stats-editor input:focus{border-color:#e63946;outline:none}
+    .admin-player-tools{display:grid;grid-template-columns:1fr 1.5fr;gap:8px}
+    .admin-player-tools input,.admin-player-tools select{width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit}
+    .duel-player-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:12px}
+    .duel-player-list label{display:flex;align-items:center;gap:7px;background:#0d0d0d;border:1px solid #252525;border-radius:8px;padding:8px;color:#bbb;font-size:.8rem;cursor:pointer}
+    .duel-player-list input{accent-color:#e63946}
+    .duel-current{margin-top:12px;padding:10px 12px;border:1px solid #2a9d8f;background:#0d1918;border-radius:8px;color:#b9e8df;font-size:.8rem;line-height:1.5}
+    .duel-list{display:grid;gap:6px;margin-top:12px}
+    .duel-row{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#0d0d0d;border:1px solid #202020;border-radius:8px;padding:8px 10px;color:#bbb;font-size:.78rem}
+    .duel-row strong{color:#f4a261}
+    @media (max-width:600px){.stats-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-player-tools{grid-template-columns:1fr}}
+    @media (max-width:600px){.hs-filters{grid-template-columns:1fr}.duel-player-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
     .btn-save{background:#e63946;border:none;color:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:background .2s}
     .btn-save:hover{background:#c1121f}
     .btn-save:disabled{background:#333;color:#555;cursor:default}
@@ -59,6 +73,19 @@
   <a href="/" class="back-link">← Zurück</a>
 </header>
 <main>
+  <div class="section">
+    <div class="sec-hd"><span class="sec-title">Duell-Erfassung</span><div class="sec-line"></div></div>
+    <fieldset>
+      <div class="admin-player-tools">
+        <select id="duelMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option></select>
+        <div class="field-inline"><button class="btn-save" id="startDuelBtn">Begegnung starten</button><button class="btn-save" id="finishDuelBtn" disabled style="background:#8b0000">Begegnung beenden</button></div>
+      </div>
+      <div class="duel-player-list" id="duelPlayerList"><span style="color:#555;font-size:.8rem">Spieler werden geladen...</span></div>
+      <div class="duel-current" id="duelCurrent">Keine aktive Begegnung.</div>
+      <div class="duel-list" id="duelList"></div>
+    </fieldset>
+  </div>
+
   <div class="section">
     <div class="sec-hd"><span class="sec-title">Server-Status</span><div class="sec-line"></div></div>
     <div class="status-info" id="serverInfo">
@@ -156,6 +183,7 @@
       </div>
       <div class="hs-filters">
         <input id="hsPlayerSearch" type="search" placeholder="Spieler suchen, z. B. Test-Player" aria-label="Spieler suchen" />
+        <select id="hsPlayerSelect" aria-label="Spieler oder Profil auswählen"><option value="">Alle Spieler</option></select>
         <select id="hsMonthFilter" aria-label="Monat filtern">
           <option value="">Alle Monate</option>
         </select>
@@ -181,6 +209,34 @@
             <tr><td colspan="6" style="padding:30px;text-align:center;color:#555">Lade Highscores...</td></tr>
           </tbody>
         </table>
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="section">
+    <div class="sec-hd"><span class="sec-title">Statistik-Verwaltung</span><div class="sec-line"></div></div>
+    <fieldset>
+      <div class="admin-player-tools">
+        <input id="adminPlayerSearch" type="search" placeholder="Spieler oder Profil suchen" aria-label="Spieler oder Profil suchen" />
+        <select id="adminPlayerSelect" aria-label="Spieler oder Profil auswählen"><option value="">Spieler auswählen</option></select>
+      </div>
+      <div class="stats-editor" id="statsEditor" hidden>
+        <label>Spiele<input data-stat="games_played" type="number" min="0"></label>
+        <label>Gewonnen<input data-stat="games_won" type="number" min="0"></label>
+        <label>Legs gespielt<input data-stat="legs_played" type="number" min="0"></label>
+        <label>Legs gewonnen<input data-stat="legs_won" type="number" min="0"></label>
+        <label>3-Dart Darts<input data-stat="total_darts" type="number" min="0"></label>
+        <label>3-Dart Punkte<input data-stat="total_scored" type="number" min="0"></label>
+        <label>Highest Leg Avg<input data-stat="highest_leg_avg" type="number" min="0" step="0.01"></label>
+        <label>First 9 Avg<input data-stat="avg_first9" type="number" min="0" step="0.01"></label>
+        <label>180er<input data-stat="count_180" type="number" min="0"></label>
+        <label>Max Score<input data-stat="max_score" type="number" min="0"></label>
+        <label>Checkout Versuche<input data-stat="checkout_attempts" type="number" min="0"></label>
+        <label>Checkout Erfolge<input data-stat="checkout_success" type="number" min="0"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn-save" id="saveStatsBtn" disabled>Statistik speichern</button>
+        <button class="btn-save" id="resetStatsBtn" disabled style="background:#8b0000">Statistik zurücksetzen</button>
       </div>
     </fieldset>
   </div>
@@ -315,6 +371,7 @@
   // ── Highscore-Verwaltung ──
   let hsData = [];
   let hsFilteredData = [];
+  let hsPlayers = [];
 
   async function loadHighscores() {
     try {
@@ -326,6 +383,29 @@
     } catch(e) {
       document.getElementById('hsTableBody').innerHTML = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#e63946">Fehler beim Laden: ' + e.message + '</td></tr>';
     }
+  }
+
+  async function loadHighscorePlayers() {
+    try {
+      const [playersResponse, profilesResponse] = await Promise.all([
+        fetch('/api/players', { cache: 'no-store' }),
+        fetch('/api/profiles', { cache: 'no-store' })
+      ]);
+      const players = playersResponse.ok ? await playersResponse.json() : [];
+      const profiles = profilesResponse.ok ? await profilesResponse.json() : [];
+      hsPlayers = Array.from(new Set([
+        ...players.map(player => String(player.name || '').trim()),
+        ...profiles.map(profile => String(profile.name || '').trim())
+      ].filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
+      renderHighscorePlayerFilter();
+    } catch (err) { showToast('Spielerfilter konnte nicht geladen werden: ' + err.message, true); }
+  }
+
+  function renderHighscorePlayerFilter() {
+    const select = document.getElementById('hsPlayerSelect');
+    const oldValue = select.value;
+    select.innerHTML = '<option value="">Alle Spieler</option>' + hsPlayers.map(name => '<option value="' + escapeAttr(name) + '">' + escapeHtml(name) + '</option>').join('');
+    if (hsPlayers.includes(oldValue)) select.value = oldValue;
   }
 
   function formatHSTime(ts) {
@@ -357,10 +437,12 @@
 
   function getFilteredHighscores() {
     const search = document.getElementById('hsPlayerSearch').value.trim().toLocaleLowerCase('de-DE');
+    const selectedPlayer = document.getElementById('hsPlayerSelect').value;
     const month = document.getElementById('hsMonthFilter').value;
     const sort = document.getElementById('hsSort').value;
     hsFilteredData = hsData
       .filter(entry => !search || String(entry.player || '').toLocaleLowerCase('de-DE').includes(search))
+      .filter(entry => !selectedPlayer || String(entry.player || '') === selectedPlayer)
       .filter(entry => !month || monthKey(entry.ts) === month)
       .sort((a, b) => {
         if (sort === 'oldest') return Number(a.ts || 0) - Number(b.ts || 0);
@@ -387,6 +469,7 @@
         '<td style="padding:8px 10px;color:#888;font-size:.72rem">' + escapeHtml(kind) + (entry.legWin ? ' / LegWin' : '') + '</td>' +
         '<td style="padding:8px 10px;color:#666;font-size:.72rem">' + formatHSTime(entry.ts) + '</td>' +
         '<td style="padding:8px 10px;text-align:center">' +
+          '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-edit-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">Bearbeiten</button>' +
           '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>' +
         '</td>' +
         '</tr>';
@@ -403,6 +486,31 @@
         }
       });
     });
+    body.querySelectorAll('[data-hs-edit-id]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const player = prompt('Spielername:', this.dataset.hsName);
+        if (player === null) return;
+        const score = prompt('Score:', this.dataset.hsScore);
+        if (score === null) return;
+        editHighscore(Number(this.dataset.hsEditId), player, Number(score));
+      });
+    });
+  }
+
+  async function editHighscore(id, player, score) {
+    if (!player.trim() || !Number.isFinite(score) || score <= 0) {
+      showToast('Spielername und positiver Score erforderlich.', true);
+      return;
+    }
+    try {
+      const response = await fetch('/api/highscores/' + id, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player: player.trim(), score })
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      await loadHighscores();
+      showToast('Highscore bearbeitet ✓');
+    } catch (err) { showToast('Fehler beim Bearbeiten: ' + err.message, true); }
   }
 
   async function deleteHighscore(id) {
@@ -428,6 +536,7 @@
 
   document.getElementById('refreshHsBtn').addEventListener('click', loadHighscores);
   document.getElementById('hsPlayerSearch').addEventListener('input', renderHighscores);
+  document.getElementById('hsPlayerSelect').addEventListener('change', renderHighscores);
   document.getElementById('hsMonthFilter').addEventListener('change', renderHighscores);
   document.getElementById('hsSort').addEventListener('change', renderHighscores);
   document.getElementById('clearAllHsBtn').addEventListener('click', async function() {
@@ -449,6 +558,163 @@
 
   // Highscores automatisch laden
   loadHighscores();
+  loadHighscorePlayers();
+
+  let adminPlayers = [];
+  let adminProfiles = [];
+  let selectedAdminPlayer = null;
+
+  async function loadAdminPlayers() {
+    try {
+      const [playersResponse, profilesResponse] = await Promise.all([
+        fetch('/api/players', { cache: 'no-store' }),
+        fetch('/api/profiles', { cache: 'no-store' })
+      ]);
+      adminPlayers = await playersResponse.json();
+      adminProfiles = profilesResponse.ok ? await profilesResponse.json() : [];
+      renderAdminPlayerOptions();
+    } catch (err) {
+      showToast('Spieler konnten nicht geladen werden: ' + err.message, true);
+    }
+  }
+
+  function renderAdminPlayerOptions() {
+    const select = document.getElementById('adminPlayerSelect');
+    const search = document.getElementById('adminPlayerSearch').value.trim().toLocaleLowerCase('de-DE');
+    const namedPlayers = adminPlayers
+      .filter(player => player.name && String(player.name).toLocaleLowerCase('de-DE').includes(search))
+      .map(player => ({ id: Number(player.slot), label: 'S' + player.slot + ' · ' + player.name, name: player.name }));
+    const assignedNames = new Set(namedPlayers.map(player => String(player.name).toLocaleLowerCase('de-DE')));
+    const unassignedProfiles = adminProfiles
+      .filter(profile => profile.name && String(profile.name).toLocaleLowerCase('de-DE').includes(search))
+      .filter(profile => !assignedNames.has(String(profile.name).toLocaleLowerCase('de-DE')));
+    select.innerHTML = '<option value="">Spieler auswählen</option>' +
+      namedPlayers.map(player => '<option value="' + player.id + '">' + escapeHtml(player.label) + '</option>').join('') +
+      (unassignedProfiles.length ? '<optgroup label="Profile ohne Slot">' + unassignedProfiles.map(profile => '<option disabled>' + escapeHtml(profile.name) + ' · kein Slot</option>').join('') + '</optgroup>' : '');
+    if (selectedAdminPlayer && namedPlayers.some(player => player.id === selectedAdminPlayer)) select.value = String(selectedAdminPlayer);
+  }
+
+  async function loadAdminStats(playerId) {
+    selectedAdminPlayer = Number(playerId) || null;
+    const editor = document.getElementById('statsEditor');
+    const saveButton = document.getElementById('saveStatsBtn');
+    const resetButton = document.getElementById('resetStatsBtn');
+    if (!selectedAdminPlayer) {
+      editor.hidden = true;
+      saveButton.disabled = true;
+      resetButton.disabled = true;
+      return;
+    }
+    try {
+      const response = await fetch('/api/players/' + selectedAdminPlayer + '/stats', { cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const stats = await response.json();
+      editor.querySelectorAll('[data-stat]').forEach(input => { input.value = Number(stats[input.dataset.stat] || 0); });
+      editor.hidden = false;
+      saveButton.disabled = false;
+      resetButton.disabled = false;
+    } catch (err) {
+      showToast('Statistik konnte nicht geladen werden: ' + err.message, true);
+    }
+  }
+
+  async function saveAdminStats() {
+    if (!selectedAdminPlayer) return;
+    const payload = {};
+    document.querySelectorAll('#statsEditor [data-stat]').forEach(input => { payload[input.dataset.stat] = Number(input.value || 0); });
+    try {
+      const response = await fetch('/api/players/' + selectedAdminPlayer + '/stats', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      await loadAdminStats(selectedAdminPlayer);
+      showToast('Statistik gespeichert ✓');
+    } catch (err) { showToast('Fehler beim Speichern: ' + err.message, true); }
+  }
+
+  async function resetAdminStats() {
+    if (!selectedAdminPlayer || !confirm('Statistik und Leg-History dieses Spielers wirklich zurücksetzen?')) return;
+    try {
+      const response = await fetch('/api/players/' + selectedAdminPlayer + '/stats/reset', { method: 'POST' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      await loadAdminStats(selectedAdminPlayer);
+      showToast('Statistik zurückgesetzt ✓');
+    } catch (err) { showToast('Fehler beim Zurücksetzen: ' + err.message, true); }
+  }
+
+  document.getElementById('adminPlayerSearch').addEventListener('input', renderAdminPlayerOptions);
+  document.getElementById('adminPlayerSelect').addEventListener('change', event => loadAdminStats(event.target.value));
+  document.getElementById('saveStatsBtn').addEventListener('click', saveAdminStats);
+  document.getElementById('resetStatsBtn').addEventListener('click', resetAdminStats);
+  loadAdminPlayers();
+
+  async function loadDuelAdmin() {
+    try {
+      const [playersResponse, currentResponse, listResponse] = await Promise.all([
+        fetch('/api/players', { cache: 'no-store' }),
+        fetch('/api/duels/current', { cache: 'no-store' }),
+        fetch('/api/duels?limit=20', { cache: 'no-store' })
+      ]);
+      const players = playersResponse.ok ? await playersResponse.json() : [];
+      const current = currentResponse.ok ? await currentResponse.json() : null;
+      const duels = listResponse.ok ? await listResponse.json() : [];
+      const list = document.getElementById('duelPlayerList');
+      list.innerHTML = players.filter(player => player.name).slice(0, 8).map(player =>
+        '<label><input type="checkbox" value="' + Number(player.slot) + '"' + (player.active ? ' checked' : '') + '>S' + Number(player.slot) + ' · ' + escapeHtml(player.name) + '</label>'
+      ).join('') || '<span style="color:#555;font-size:.8rem">Keine benannten Spieler vorhanden.</span>';
+      renderDuelCurrent(current);
+      document.getElementById('duelList').innerHTML = duels.map(duel =>
+        '<div class="duel-row"><span><strong>#' + Number(duel.id) + '</strong> · ' + escapeHtml(duel.mode) + ' · ' + (duel.players || []).map(player => escapeHtml(player.player_name)).join(', ') + '</span><span>' + Number(duel.total_legs || 0) + ' Legs · ' + escapeHtml(duel.status) + '</span></div>'
+      ).join('') || '<span style="color:#555;font-size:.8rem">Noch keine Begegnungen gespeichert.</span>';
+    } catch (err) { showToast('Begegnungen konnten nicht geladen werden: ' + err.message, true); }
+  }
+
+  function renderDuelCurrent(duel) {
+    const current = document.getElementById('duelCurrent');
+    const finishButton = document.getElementById('finishDuelBtn');
+    if (!duel) {
+      current.textContent = 'Keine aktive Begegnung.';
+      finishButton.disabled = true;
+      return;
+    }
+    current.innerHTML = '<strong>Aktiv: #' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + '</strong><br>' +
+      (duel.players || []).map(player => 'S' + Number(player.player_slot) + ' · ' + escapeHtml(player.player_name)).join(' · ') +
+      '<br>' + Number(duel.total_legs || 0) + ' Legs gespeichert';
+    finishButton.disabled = false;
+  }
+
+  document.getElementById('startDuelBtn').addEventListener('click', async function() {
+    const playerSlots = Array.from(document.querySelectorAll('#duelPlayerList input:checked')).map(input => Number(input.value));
+    if (!playerSlots.length) { showToast('Bitte mindestens einen Spieler auswählen.', true); return; }
+    this.disabled = true;
+    try {
+      const response = await fetch('/api/duels/start', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: document.getElementById('duelMode').value, playerSlots })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));
+      showToast('Begegnung gestartet ✓');
+      await loadDuelAdmin();
+    } catch (err) { showToast('Fehler beim Starten: ' + err.message, true); }
+    this.disabled = false;
+  });
+
+  document.getElementById('finishDuelBtn').addEventListener('click', async function() {
+    const currentResponse = await fetch('/api/duels/current', { cache: 'no-store' });
+    const current = currentResponse.ok ? await currentResponse.json() : null;
+    if (!current || !confirm('Aktive Begegnung #' + current.id + ' beenden?')) return;
+    this.disabled = true;
+    try {
+      const response = await fetch('/api/duels/' + Number(current.id) + '/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      showToast('Begegnung beendet ✓');
+      await loadDuelAdmin();
+    } catch (err) { showToast('Fehler beim Beenden: ' + err.message, true); }
+    this.disabled = false;
+  });
+
+  loadDuelAdmin();
 </script>
 </body>
 </html>
