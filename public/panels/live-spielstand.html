@@ -483,17 +483,21 @@
     .focus-controls-card .ctrl-btn.mode-btn,
     .focus-controls-card .ctrl-btn.rule-btn {
       padding: 24px 8px;
+      justify-content: flex-start;
     }
     .focus-controls-card .ctrl-btn .btn-label {
       font-size: .5rem;
       color: #888;
       text-transform: uppercase;
       letter-spacing: 1px;
+      margin-top: 2px;
     }
     .focus-controls-card .ctrl-btn .btn-value {
-      font-size: .75rem;
+      font-size: 1.5rem;
       font-weight: 700;
       color: #f4a261;
+      margin-top: auto;
+      margin-bottom: auto;
     }
     
     /* Modal Overlay */
@@ -1809,6 +1813,7 @@
     // ── Letzten Wurf zurücksetzen ──
     async function undoLastThrow() {
       const btn = document.getElementById('focusUndoBtn');
+      if (!window.confirm('Den letzten Wurf wirklich zurücksetzen?')) return;
       if (btn) btn.disabled = true;
       try {
         const r = await fetch('/api/live/undo', { method: 'POST' });
