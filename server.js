@@ -1076,7 +1076,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   player.bestTurn = Math.max(Number(player.bestTurn || 0), value);
 
   if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
-  player.currentRoundPoints.push(bust ? 0 : value);
+  player.currentRoundPoints.push(value);
 
   if (!Array.isArray(player.throws)) player.throws = [];
   player.throws.push({
@@ -1088,8 +1088,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     source: 'arduino',
     segment: pointsToSegment(value),
     channel: formatChannel(channel),
-    raw: evt.line || null,
-    turnRound: Number(state.game.throwRound || 1)
+    raw: evt.line || null
   });
 
   player.average = calculateCurrentRoundAverage(player);
@@ -1392,7 +1391,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   player.bestTurn = Math.max(Number(player.bestTurn || 0), value);
 
   if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
-  player.currentRoundPoints.push(bust ? 0 : value);
+  player.currentRoundPoints.push(value);
 
   if (!Array.isArray(player.throws)) player.throws = [];
   player.throws.push({
@@ -1407,8 +1406,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     column: hit.column,
     code: hit.code,
     channel: hit.key,
-    raw: hit.line || null,
-    turnRound: Number(state.game.throwRound || 1)
+    raw: hit.line || null
   });
 
   player.average = calculateCurrentRoundAverage(player);
@@ -2296,11 +2294,11 @@ app.post('/api/live/throw', async (req, res) => {
     player.bestTurn = Math.max(player.bestTurn, points);
 
     if (!Array.isArray(player.currentRoundPoints)) player.currentRoundPoints = [];
-    player.currentRoundPoints.push(bust ? 0 : points);
+    player.currentRoundPoints.push(points);
 
     if (!Array.isArray(player.throws)) player.throws = [];
     const throwSegment = typeof req.body?.segment === 'string' ? req.body.segment.toUpperCase() : pointsToSegment(points);
-    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment, turnRound: Number(state.game.throwRound || 1) });
+    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment });
 
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
