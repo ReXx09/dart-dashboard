@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const http = require('http');
+const crypto = require('crypto');
 const { DataStore } = require('./db');
 
 let SerialPortCtor = null;
@@ -36,6 +37,9 @@ function getLocalIP() {
 const app = express();
 const BROWSER_PORT = Number(process.env.BROWSER_PORT || process.env.PORT || 3100);
 const FIRETV_PORT = Number(process.env.FIRETV_PORT || 3200);
+const ADMIN_SESSION_TTL_MS = Number(process.env.ADMIN_SESSION_TTL_MS || 15 * 60 * 1000);
+const ADMIN_BACKUP_DIR = path.join(__dirname, 'data', 'backups');
+const adminSessions = new Map();
 
 const DATA_DIR       = path.join(__dirname, 'data');
 const SETTINGS_FILE  = path.join(DATA_DIR, 'settings.json');
@@ -43,6 +47,14 @@ const PLAYERS_FILE   = path.join(DATA_DIR, 'players.json');
 const LIVE_STATE_FILE = path.join(DATA_DIR, 'live-state.json');
 const HIGHSCORES_FILE = path.join(DATA_DIR, 'highscores.json');
 const MATRIX_MAPPING_FILE = path.join(DATA_DIR, 'matrix-mapping.json');
+const ADMIN_BACKUP_SOURCES = {
+  database: null,
+  players: PLAYERS_FILE,
+  liveState: LIVE_STATE_FILE,
+  highscores: HIGHSCORES_FILE,
+  settings: SETTINGS_FILE,
+  matrixMapping: MATRIX_MAPPING_FILE
+};
 
 const DART_VALUE_BY_CHANNEL = {
   '01': 20,
@@ -379,6 +391,94 @@ const dataStore = new DataStore();
 // ──────────────────────────────────────────────
 // Hilfsfunktionen
 // ──────────────────────────────────────────────
+function getAdminPinHash() {
+  return String(process.env.ADMIN_PIN_HASH || '').trim();
+}
+
+function verifyAdminPin(pin) {
+  const stored = getAdminPinHash();
+  const [salt, expectedHex] = stored.split(':');
+  if (!salt || !expectedHex || !/^\d{6,}$/.test(String(pin || '')) || !/^[a-f0-9]{64}$/i.test(expectedHex)) return false;
+  const actual = crypto.scryptSync(String(pin), salt, 32);
+  const expected = Buffer.from(expectedHex, 'hex');
+  return expected.length === actual.length && crypto.timingSafeEqual(actual, expected);
+}
+
+function isLocalOrPrivateAddress(address) {
+  const normalized = String(address || '').replace(/^::ffff:/i, '').split('%')[0];
+  if (normalized === '::1' || normalized === 'localhost' || normalized === '127.0.0.1') return true;
+  const octets = normalized.split('.').map(Number);
+  if (octets.length !== 4 || octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) return false;
+  return octets[0] === 10 || octets[0] === 127 || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
+    || (octets[0] === 192 && octets[1] === 168);
+}
+
+function createAdminSession() {
+  const token = crypto.randomBytes(32).toString('hex');
+  adminSessions.set(token, Date.now() + ADMIN_SESSION_TTL_MS);
+  return token;
+}
+
+function getAdminSession(req) {
+  const token = String(req.get('x-admin-token') || req.headers.cookie || '').replace(/^admin_session=/, '').split(';')[0].trim();
+  const expiresAt = adminSessions.get(token);
+  if (!token || !expiresAt) return null;
+  if (expiresAt <= Date.now()) {
+    adminSessions.delete(token);
+    return null;
+  }
+  adminSessions.set(token, Date.now() + ADMIN_SESSION_TTL_MS);
+  return token;
+}
+
+function requireAdmin(req, res, next) {
+  if (!isLocalOrPrivateAddress(req.socket.remoteAddress)) return res.status(403).json({ error: 'Admin-Zugriff nur aus dem lokalen Netz.' });
+  if (!getAdminSession(req)) return res.status(401).json({ error: 'Admin-Anmeldung erforderlich.' });
+  next();
+}
+
+function normalizeBackupAreas(areas) {
+  const requested = Array.isArray(areas) ? areas : Object.keys(ADMIN_BACKUP_SOURCES);
+  return [...new Set(requested.map(value => String(value || '').trim()))].filter(value => Object.hasOwn(ADMIN_BACKUP_SOURCES, value));
+}
+
+async function createAdminBackup(areas) {
+  const selectedAreas = normalizeBackupAreas(areas);
+  if (!selectedAreas.length) throw new Error('Keine gültigen Backup-Bereiche ausgewählt.');
+  if (selectedAreas.includes('database') && !dataStore.isSQLite()) {
+    throw new Error('Der Datenbank-Backup ist aktuell nur für SQLite verfügbar.');
+  }
+  const backupId = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const backupDir = path.join(ADMIN_BACKUP_DIR, backupId);
+  fs.mkdirSync(backupDir, { recursive: true });
+  const files = [];
+  for (const area of selectedAreas) {
+    const source = ADMIN_BACKUP_SOURCES[area];
+    if (!source) continue;
+    if (!fs.existsSync(source)) continue;
+    const targetName = path.basename(source);
+    fs.copyFileSync(source, path.join(backupDir, targetName));
+    files.push({ area, file: targetName, bytes: fs.statSync(source).size });
+  }
+  if (selectedAreas.includes('database') && dataStore.isSQLite() && dataStore.sqliteFile && fs.existsSync(dataStore.sqliteFile)) {
+    await dataStore.sqlite.exec('PRAGMA wal_checkpoint(FULL);');
+    const targetName = path.basename(dataStore.sqliteFile);
+    fs.copyFileSync(dataStore.sqliteFile, path.join(backupDir, targetName));
+    files.push({ area: 'database', file: targetName, bytes: fs.statSync(dataStore.sqliteFile).size });
+  }
+  const manifest = { id: backupId, createdAt: new Date().toISOString(), areas: selectedAreas, files };
+  fs.writeFileSync(path.join(backupDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+  return manifest;
+}
+
+function listAdminBackups() {
+  if (!fs.existsSync(ADMIN_BACKUP_DIR)) return [];
+  return fs.readdirSync(ADMIN_BACKUP_DIR, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => {
+    const manifestPath = path.join(ADMIN_BACKUP_DIR, entry.name, 'manifest.json');
+    return readJson(manifestPath, { id: entry.name, createdAt: null, areas: [], files: [] });
+  }).sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
+}
+
 function readJson(file, fallback) {
   try { if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
   return fallback;
@@ -2174,6 +2274,54 @@ app.use(express.json());
 // ──────────────────────────────────────────────
 // API-Routen
 // ──────────────────────────────────────────────
+
+// ── Geschützte Admin-Betriebsfunktionen ──
+app.get('/api/admin/auth/status', (req, res) => {
+  res.json({
+    configured: Boolean(getAdminPinHash()),
+    localNetwork: isLocalOrPrivateAddress(req.socket.remoteAddress),
+    authenticated: Boolean(getAdminSession(req)),
+    sessionTtlMs: ADMIN_SESSION_TTL_MS
+  });
+});
+
+app.post('/api/admin/auth/login', (req, res) => {
+  if (!isLocalOrPrivateAddress(req.socket.remoteAddress)) return res.status(403).json({ error: 'Admin-Anmeldung nur aus dem lokalen Netz.' });
+  if (!getAdminPinHash()) return res.status(503).json({ error: 'ADMIN_PIN_HASH ist auf dem Server noch nicht konfiguriert.' });
+  if (!verifyAdminPin(req.body?.pin)) return res.status(401).json({ error: 'PIN ist ungültig.' });
+  const token = createAdminSession();
+  res.setHeader('Set-Cookie', `admin_session=${token}; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(ADMIN_SESSION_TTL_MS / 1000)}; Path=/`);
+  res.json({ authenticated: true, expiresInMs: ADMIN_SESSION_TTL_MS });
+});
+
+app.post('/api/admin/auth/logout', (req, res) => {
+  const token = getAdminSession(req);
+  if (token) adminSessions.delete(token);
+  res.setHeader('Set-Cookie', 'admin_session=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/');
+  res.json({ authenticated: false });
+});
+
+app.get('/api/admin/backups', requireAdmin, (_req, res) => {
+  res.json({ areas: Object.keys(ADMIN_BACKUP_SOURCES), backups: listAdminBackups() });
+});
+
+app.post('/api/admin/backups', requireAdmin, async (req, res) => {
+  try {
+    const manifest = await createAdminBackup(req.body?.areas);
+    res.status(201).json(manifest);
+  } catch (err) {
+    res.status(400).json({ error: 'Backup konnte nicht erstellt werden: ' + err.message });
+  }
+});
+
+app.get('/api/admin/backups/:id/:file', requireAdmin, (req, res) => {
+  const backupId = String(req.params.id || '');
+  const fileName = path.basename(String(req.params.file || ''));
+  if (!/^[0-9TZ]+$/.test(backupId) || !fileName || fileName !== req.params.file) return res.status(400).json({ error: 'Ungültiger Backup-Pfad.' });
+  const manifest = readJson(path.join(ADMIN_BACKUP_DIR, backupId, 'manifest.json'), null);
+  if (!manifest || !manifest.files.some(file => file.file === fileName)) return res.status(404).json({ error: 'Backup-Datei nicht gefunden.' });
+  res.sendFile(path.join(ADMIN_BACKUP_DIR, backupId, fileName));
+});
 
 // ── Spielmodi ──
 app.get('/api/game/modes', (_req, res) => {

@@ -260,9 +260,21 @@
 
   <div class="section" data-admin-panel="system">
     <div class="sec-hd"><span class="sec-title">Backups &amp; System</span><div class="sec-line"></div></div>
-    <div class="admin-coming-soon">
-      <strong>Systempflege wird vorbereitet</strong>
-      Backups, Git-Pull, Docker-Verwaltung und Raspi-Update werden hier über geschützte Admin-Aktionen ergänzt. Die Oberfläche ist bereits getrennt; ausführbare Systembefehle werden erst nach Authentifizierung und Sicherheitsprüfung freigeschaltet.
+    <div class="admin-coming-soon" id="adminAuthPanel">
+      <strong>Admin-Schutz</strong>
+      <div class="field-row"><label for="adminPin">PIN</label><input id="adminPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="Admin-PIN" /></div>
+      <div class="field-inline"><button class="btn-save" id="adminLoginBtn">Anmelden</button><button class="btn-save" id="adminLogoutBtn" style="background:#1e1e1e;border:1px solid #2a2a2a">Abmelden</button><span id="adminAuthStatus" style="font-size:.8rem;color:#888">Nicht angemeldet</span></div>
+    </div>
+    <div class="admin-coming-soon" id="adminBackupPanel" hidden style="margin-top:12px;border-left-color:#2a9d8f">
+      <strong style="color:#2a9d8f">Backup erstellen</strong>
+      <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="database" checked /> SQLite-Datenbank</label></div>
+      <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="players" checked /> Spieler</label></div>
+      <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="liveState" /> Live-Spielstand</label></div>
+      <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="highscores" checked /> Highscores</label></div>
+      <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="settings" checked /> Einstellungen</label></div>
+      <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="matrixMapping" checked /> Matrix-Mapping</label></div>
+      <button class="btn-save" id="createBackupBtn">Ausgewählte Bereiche sichern</button>
+      <div id="backupList" style="margin-top:12px;color:#888;font-size:.8rem">Noch keine Backups geladen.</div>
     </div>
   </div>
 
@@ -288,6 +300,54 @@
     toast.className = 'toast show' + (isError ? ' err' : '');
     setTimeout(() => toast.className = 'toast', 2500);
   }
+
+  async function refreshAdminAuth() {
+    const response = await fetch('/api/admin/auth/status');
+    const status = await response.json();
+    const authenticated = status.authenticated === true;
+    document.getElementById('adminAuthStatus').textContent = authenticated ? 'Angemeldet (Session aktiv)' : (status.configured ? 'Nicht angemeldet' : 'PIN nicht konfiguriert');
+    document.getElementById('adminBackupPanel').hidden = !authenticated;
+    if (authenticated) await loadAdminBackups();
+  }
+
+  async function loadAdminBackups() {
+    const response = await fetch('/api/admin/backups');
+    if (!response.ok) return;
+    const data = await response.json();
+    const target = document.getElementById('backupList');
+    target.innerHTML = data.backups.length ? data.backups.map(backup => `<div>${backup.createdAt || backup.id} · ${backup.areas.join(', ')}</div>`).join('') : 'Noch keine Backups vorhanden.';
+  }
+
+  document.getElementById('adminLoginBtn').addEventListener('click', async () => {
+    const pin = document.getElementById('adminPin').value;
+    try {
+      const response = await fetch('/api/admin/auth/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ pin }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Anmeldung fehlgeschlagen');
+      document.getElementById('adminPin').value = '';
+      showToast('Admin-Session aktiviert.');
+      await refreshAdminAuth();
+    } catch (error) { showToast(error.message, true); }
+  });
+
+  document.getElementById('adminLogoutBtn').addEventListener('click', async () => {
+    await fetch('/api/admin/auth/logout', { method: 'POST' });
+    await refreshAdminAuth();
+    showToast('Admin-Session beendet.');
+  });
+
+  document.getElementById('createBackupBtn').addEventListener('click', async function() {
+    this.disabled = true;
+    const areas = Array.from(document.querySelectorAll('.admin-backup-area:checked')).map(input => input.value);
+    try {
+      const response = await fetch('/api/admin/backups', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ areas }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Backup fehlgeschlagen');
+      showToast('Backup erstellt: ' + result.id);
+      await loadAdminBackups();
+    } catch (error) { showToast(error.message, true); }
+    this.disabled = false;
+  });
 
   async function load() {
     try {
@@ -403,6 +463,7 @@
   });
 
   load();
+  refreshAdminAuth().catch(() => {});
 </script>
 
 <script>
