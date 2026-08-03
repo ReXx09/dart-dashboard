@@ -455,6 +455,22 @@
       align-items: stretch;
       flex: 1;
     }
+    .focus-controls-card .ctrl-choice {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: stretch;
+    }
+    .focus-controls-card .ctrl-choice-label {
+      flex: 0 0 auto;
+      color: #888;
+      font-size: .5rem;
+      letter-spacing: 1px;
+      text-align: center;
+      text-transform: uppercase;
+    }
     .focus-controls-card .ctrl-row.action-row {
       flex: 0 0 88px;
     }
@@ -500,17 +516,10 @@
     /* Mode/Rule Buttons - gleiche Höhe, nur Label/Value Styling */
     .focus-controls-card .ctrl-btn.mode-btn,
     .focus-controls-card .ctrl-btn.rule-btn {
-      padding: 24px 8px;
+      width: 100%;
+      padding: 14px 8px;
       justify-content: center;
-      height: 80% !important;
-      align-self: center;
-    }
-    .focus-controls-card .ctrl-btn .btn-label {
-      font-size: .5rem;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-top: 2px;
+      height: 100% !important;
     }
     .focus-controls-card .ctrl-btn .btn-value {
       font-size: 1.5rem;
@@ -1173,12 +1182,18 @@
       return '<div class="focus-controls-card">' +
         '<div class="ctrl-title">⚙ Steuerung</div>' +
         '<div class="ctrl-row">' +
-          '<button class="ctrl-btn mode-btn" id="ctrlModeBtn" onclick="openModeModal()" title="Spielmodus ändern">' +
-            '<span class="btn-label">Modus</span><span class="btn-value">' + modeLabel + '</span>' +
-          '</button>' +
-          '<button class="ctrl-btn rule-btn rule-' + rule + '" id="ctrlRuleBtn" onclick="openRuleModal()" title="Finish-Regel ändern">' +
-            '<span class="btn-label">Finish</span><span class="btn-value">' + ruleLabel + '</span>' +
-          '</button>' +
+          '<div class="ctrl-choice">' +
+            '<span class="ctrl-choice-label">Modus</span>' +
+            '<button class="ctrl-btn mode-btn" id="ctrlModeBtn" onclick="openModeModal()" title="Spielmodus ändern">' +
+              '<span class="btn-value">' + modeLabel + '</span>' +
+            '</button>' +
+          '</div>' +
+          '<div class="ctrl-choice">' +
+            '<span class="ctrl-choice-label">Finish</span>' +
+            '<button class="ctrl-btn rule-btn rule-' + rule + '" id="ctrlRuleBtn" onclick="openRuleModal()" title="Finish-Regel ändern">' +
+              '<span class="btn-value">' + ruleLabel + '</span>' +
+            '</button>' +
+          '</div>' +
         '</div>' +
         '<div class="ctrl-row action-row">' +
           '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
