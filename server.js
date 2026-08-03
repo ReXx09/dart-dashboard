@@ -2364,6 +2364,16 @@ app.post('/api/live/next-player', async (req, res) => {
       while (currentPlayer.currentRoundPoints.length < 3) {
         currentPlayer.currentRoundPoints.push(0);
         currentPlayer.turns += 1;
+        if (!Array.isArray(currentPlayer.throws)) currentPlayer.throws = [];
+        currentPlayer.throws.push({
+          points: 0,
+          remaining: currentPlayer.remaining,
+          bust: false,
+          segment: 'MISS',
+          source: 'manual-miss',
+          ts: Date.now(),
+          mode: state.game.mode
+        });
       }
     }
     const nextIndex = (state.game.activePlayer + 1) % state.players.length;
