@@ -491,6 +491,7 @@
     }
     .winner-stats {
       display: flex;
+      flex-wrap: wrap;
       gap: 32px;
       justify-content: center;
       margin-top: 24px;
@@ -1084,78 +1085,30 @@
     function showWinnerOverlay(winner, state) {
       const overlay = document.getElementById('winnerOverlay');
       if (!overlay) return;
-
-      const isCricket = state.game.mode === 'cricket';
+      const mode = state.game.mode;
+      const isCricket = mode === 'cricket';
+      const isElimination = mode === 'elimination';
+      const stats = getLiveLegStats(winner);
       const throws = Array.isArray(winner.throws) ? winner.throws : [];
-      
-      if (isCricket) {
-        // Cricket-spezifisches Overlay
-        const closedCount = winner.cricketClosed ? Object.values(winner.cricketClosed).filter(v => v).length : 0;
-        const cricketPoints = winner.cricketPoints || 0;
-        const dartsThrown = throws.length;
-        const avg = (winner.turns && winner.turns > 0)
-          ? ((winner.totalScored || 0) / winner.turns * 3).toFixed(1)
-          : '-';
+      const dartsThrown = Number(winner.turns) || throws.length;
+      const checkoutValue = !isCricket && !isElimination ? (Number(winner.lastCheckoutValue) || 0) : 0;
+      const title = isCricket ? 'CRICKET GEWONNEN' : isElimination ? 'ELIMINATION GEWONNEN' : 'LEG GEWONNEN';
+      const subtitle = isCricket ? 'Cricket Punkte: ' + (winner.cricketPoints || 0) : isElimination ? 'Punkte: ' + (winner.totalScored || 0) : 'Checkout: ' + (checkoutValue || '-') + ' Punkte';
+      const modeStats = isCricket
+        ? '<div class="winner-stat"><div class="winner-stat-label">Geschlossene Zahlen</div><div class="winner-stat-value">' + (winner.cricketClosed ? Object.values(winner.cricketClosed).filter(Boolean).length : 0) + '/7</div></div>'
+        : isElimination
+          ? '<div class="winner-stat"><div class="winner-stat-label">Aufnahmen</div><div class="winner-stat-value">' + Math.ceil(dartsThrown / 3) + '</div></div>'
+          : '<div class="winner-stat"><div class="winner-stat-label">Checkout-Quote</div><div class="winner-stat-value">' + stats.checkout + '</div></div>';
 
-        overlay.innerHTML = `
-          <div class="confetti-container" id="confettiContainer"></div>
-          <div class="winner-card">
-            <div class="winner-icon">🏆</div>
-            <div class="winner-subtitle">CRICKET GEWONNEN</div>
-            <div class="winner-name">${escapeHtml(winner.name)}</div>
-            <div class="winner-subtitle">Cricket Punkte: ${cricketPoints}</div>
-            <div class="winner-stats">
-              <div class="winner-stat">
-                <div class="winner-stat-label">Geschlossene Zahlen</div>
-                <div class="winner-stat-value">${closedCount}/7</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Darts</div>
-                <div class="winner-stat-value">${dartsThrown}</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Leg Average</div>
-                <div class="winner-stat-value">${avg}</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Legs</div>
-                <div class="winner-stat-value">${winner.legs || 0}</div>
-              </div>
-            </div>
-            <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
-          </div>
-        `;
-      } else {
-        // x01 (501, 301, etc.) Overlay
-        const checkout = state.lastAction?.points || 0;
-        const dartsThrown = winner.turns * 3 - (3 - (state.game.currentThrow || 0));
-        const avg = winner.turns > 0 ? (winner.totalScored / winner.turns * 3).toFixed(1) : '-';
-
-        overlay.innerHTML = `
-          <div class="confetti-container" id="confettiContainer"></div>
-          <div class="winner-card">
-            <div class="winner-icon">🏆</div>
-            <div class="winner-subtitle">LEG GEWONNEN</div>
-            <div class="winner-name">${escapeHtml(winner.name)}</div>
-            <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
-            <div class="winner-stats">
-              <div class="winner-stat">
-                <div class="winner-stat-label">Darts</div>
-                <div class="winner-stat-value">${dartsThrown}</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Leg Average</div>
-                <div class="winner-stat-value">${avg}</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Legs</div>
-                <div class="winner-stat-value">${winner.legs || 0}</div>
-              </div>
-            </div>
-            <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
-          </div>
-        `;
-      }
+      overlay.innerHTML = '<div class="confetti-container" id="confettiContainer"></div><div class="winner-card">' +
+        '<div class="winner-icon">🏆</div><div class="winner-subtitle">' + title + '</div>' +
+        '<div class="winner-name">' + escapeHtml(winner.name) + '</div><div class="winner-subtitle">' + subtitle + '</div>' +
+        '<div class="winner-stats">' + modeStats +
+          '<div class="winner-stat"><div class="winner-stat-label">Darts</div><div class="winner-stat-value">' + dartsThrown + '</div></div>' +
+          '<div class="winner-stat"><div class="winner-stat-label">Schnitt</div><div class="winner-stat-value">' + stats.legAverage + '</div></div>' +
+          '<div class="winner-stat"><div class="winner-stat-label">Erster-9-AVG</div><div class="winner-stat-value">' + stats.firstNineAverage + '</div></div>' +
+          '<div class="winner-stat"><div class="winner-stat-label">Legs</div><div class="winner-stat-value">' + (winner.legs || 0) + '</div></div>' +
+        '</div><button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button></div>';
 
       overlay.classList.add('show');
       overlay.style.display = 'flex';
