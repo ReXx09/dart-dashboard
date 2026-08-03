@@ -142,10 +142,13 @@ class DataStore {
           points INTEGER NOT NULL DEFAULT 0,
           mode TEXT,
           bust INTEGER NOT NULL DEFAULT 0,
-          thrown_at INTEGER NOT NULL
+          thrown_at INTEGER NOT NULL,
+          duel_id INTEGER
         );
         CREATE INDEX IF NOT EXISTS idx_throw_segments_player ON player_throw_segments (player_slot, thrown_at);
       `);
+      try { await this.sqlite.run('ALTER TABLE player_throw_segments ADD COLUMN duel_id INTEGER'); } catch (_err) { }
+      await this.sqlite.exec('CREATE INDEX IF NOT EXISTS idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at);');
       return;
     }
     const query = this.isPostgres()
@@ -156,7 +159,8 @@ class DataStore {
           points INTEGER NOT NULL DEFAULT 0,
           mode TEXT,
           bust INTEGER NOT NULL DEFAULT 0,
-          thrown_at BIGINT NOT NULL
+          thrown_at BIGINT NOT NULL,
+          duel_id INTEGER
         );
         CREATE INDEX IF NOT EXISTS idx_throw_segments_player ON player_throw_segments (player_slot, thrown_at);`
       : `CREATE TABLE IF NOT EXISTS player_throw_segments (
@@ -167,10 +171,19 @@ class DataStore {
           mode VARCHAR(64) NULL,
           bust TINYINT NOT NULL DEFAULT 0,
           thrown_at BIGINT NOT NULL,
-          INDEX idx_throw_segments_player (player_slot, thrown_at)
+          duel_id BIGINT NULL,
+          INDEX idx_throw_segments_player (player_slot, thrown_at),
+          INDEX idx_throw_segments_duel (duel_id, player_slot, thrown_at)
         );`;
     if (this.isPostgres()) await this.pg.query(query);
     else await this.my.query(query);
+    if (this.isPostgres()) {
+      try { await this.pg.query('ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS duel_id INTEGER'); } catch (_err) { }
+      await this.pg.query('CREATE INDEX IF NOT EXISTS idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at)');
+    } else {
+      try { await this.my.query('ALTER TABLE player_throw_segments ADD COLUMN duel_id BIGINT NULL'); } catch (_err) { }
+      try { await this.my.query('CREATE INDEX idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at)'); } catch (_err) { }
+    }
   }
 
   async ensureDuelSchema() {
@@ -879,27 +892,28 @@ class DataStore {
     return Promise.all(rows.map(row => this.getDuel(row.id)));
   }
 
-  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now()) {
-    const values = [Number(playerSlot), String(segment || 'MISS').toUpperCase(), Number(points || 0), mode ? String(mode) : null, bust ? 1 : 0, Number(thrownAt) || Date.now()];
-    if (this.isSQLite()) await this.sqlite.run('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at) VALUES (?, ?, ?, ?, ?, ?)', values);
-    else if (this.isPostgres()) await this.pg.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at) VALUES ($1, $2, $3, $4, $5, $6)', values);
-    else await this.my.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at) VALUES (?, ?, ?, ?, ?, ?)', values);
+  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now(), duelId = null) {
+    const values = [Number(playerSlot), String(segment || 'MISS').toUpperCase(), Number(points || 0), mode ? String(mode) : null, bust ? 1 : 0, Number(thrownAt) || Date.now(), Number(duelId) > 0 ? Number(duelId) : null];
+    if (this.isSQLite()) await this.sqlite.run('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id) VALUES (?, ?, ?, ?, ?, ?, ?)', values);
+    else if (this.isPostgres()) await this.pg.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', values);
+    else await this.my.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id) VALUES (?, ?, ?, ?, ?, ?, ?)', values);
   }
 
-  async getSegmentAnalysis(playerSlot, mode = '') {
+  async getSegmentAnalysis(playerSlot, mode = '', duelId = null) {
     const slot = Number(playerSlot);
+    const encounterId = Number(duelId) > 0 ? Number(duelId) : null;
     let rows;
     if (this.isSQLite()) rows = await this.sqlite.all(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND (? = \'\' OR mode = ?) ORDER BY thrown_at ASC',
-      [slot, String(mode || ''), String(mode || '')]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) ORDER BY thrown_at ASC',
+      [slot, String(mode || ''), String(mode || ''), encounterId, encounterId]
     );
     else if (this.isPostgres()) rows = (await this.pg.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND ($2 = \'\' OR mode = $2) ORDER BY thrown_at ASC',
-      [slot, String(mode || '')]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND ($2 = \'\' OR mode = $2) AND ($3 IS NULL OR duel_id = $3) ORDER BY thrown_at ASC',
+      [slot, String(mode || ''), encounterId]
     )).rows;
     else rows = (await this.my.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND (? = \'\' OR mode = ?) ORDER BY thrown_at ASC',
-      [slot, String(mode || ''), String(mode || '')]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) ORDER BY thrown_at ASC',
+      [slot, String(mode || ''), String(mode || ''), encounterId, encounterId]
     ))[0];
 
     const bySegment = new Map();
@@ -929,7 +943,7 @@ class DataStore {
       categories[key].points += item.points;
       categories[key].busts += item.busts;
     }
-    return { playerSlot: slot, mode: String(mode || ''), totalThrows: rows.length, segments, categories: Object.values(categories) };
+    return { playerSlot: slot, mode: String(mode || ''), duelId: encounterId, totalThrows: rows.length, segments, categories: Object.values(categories) };
   }
 
   async finishDuel(id, winnerSlot = null, endedAt = Date.now()) {

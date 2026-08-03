@@ -923,6 +923,71 @@
       font-weight: 700;
       cursor: pointer;
     }
+    .duel-view-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin: 0 auto 18px;
+    }
+    .duel-view-tab,
+    .heatmap-metric {
+      border: 1px solid #596168;
+      background: #24282b;
+      color: #d7e0e5;
+      border-radius: 7px;
+      padding: 8px 13px;
+      font: inherit;
+      font-size: .78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .duel-view-tab.active,
+    .heatmap-metric.active {
+      border-color: #9cff57;
+      color: #9cff57;
+      box-shadow: 0 0 12px rgba(156, 255, 87, .16);
+    }
+    .duel-view-panel[hidden] { display: none; }
+    .heatmap-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .heatmap-metrics { display: flex; gap: 5px; }
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: #aeb7bd;
+      font-size: .7rem;
+    }
+    .heatmap-legend-bar {
+      width: 100px;
+      height: 8px;
+      border-radius: 5px;
+      background: linear-gradient(90deg, #263238, #31c48d, #e8ed55, #ff6b35);
+    }
+    .heatmap-boards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .heatmap-player { min-width: 0; text-align: center; }
+    .heatmap-player-name { color: #f4c542; font-weight: 800; margin-bottom: 4px; }
+    .heatmap-player.second .heatmap-player-name { color: #d7e0e5; }
+    .dartboard-svg { display: block; width: min(100%, 310px); margin: 0 auto; }
+    .dartboard-zone { stroke: #bbc4c7; stroke-width: .7; cursor: pointer; transition: filter .15s, stroke-width .15s; }
+    .dartboard-zone:hover, .dartboard-zone.selected { filter: brightness(1.3); stroke: #fff; stroke-width: 2; }
+    .dartboard-number { fill: #f1f1f1; font-size: 11px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+    .heatmap-detail { min-height: 34px; color: #d7e0e5; font-size: .8rem; text-align: center; }
+    .heatmap-empty { color: #777; text-align: center; padding: 30px 10px; }
+    @media (max-width: 600px) {
+      .heatmap-toolbar { align-items: flex-start; flex-direction: column; }
+      .heatmap-boards { grid-template-columns: 1fr; }
+      .heatmap-player.second { border-top: 1px solid #394147; padding-top: 10px; }
+    }
     @media (max-width: 600px) {
       .duel-stats-overlay { padding: 10px; }
       .duel-stats-card { padding: 12px 8px; }
@@ -1249,14 +1314,87 @@
         ['140+', stats[0].count140plus, stats[1].count140plus],
         ['180', stats[0].count180, stats[1].count180]
       ];
-      overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">Statistiken für alle Legs</div>' +
+      overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">Begegnung · ' + escapeHtml(duel.id) + '</div>' +
         '<div class="duel-stats-score">501 · ' + stats[0].wins + ':' + stats[1].wins + '</div>' +
-        '<div class="duel-stats-grid"><div class="duel-stats-cell label"> </div>' +
+        '<div class="duel-view-tabs"><button class="duel-view-tab active" data-duel-view="stats">Duellstatistik</button><button class="duel-view-tab" data-duel-view="heatmap">Heatmap</button></div>' +
+        '<div class="duel-view-panel" data-duel-panel="stats"><div class="duel-stats-grid"><div class="duel-stats-cell label"> </div>' +
         '<div class="duel-stats-cell player">' + escapeHtml(stats[0].name) + '</div>' +
         '<div class="duel-stats-cell player second">' + escapeHtml(stats[1].name) + '</div>' +
         labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div><div class="duel-stats-cell value">' + row[1] + '</div><div class="duel-stats-cell value">' + row[2] + '</div>').join('') +
-        '</div><button class="duel-stats-close" onclick="hideDuelStatsOverlay()">Schließen</button></div>';
+        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><button class="duel-stats-close" onclick="hideDuelStatsOverlay()">Schließen</button></div>';
       overlay.style.display = 'flex';
+      overlay.querySelectorAll('[data-duel-view]').forEach(button => button.addEventListener('click', () => {
+        const view = button.dataset.duelView;
+        overlay.querySelectorAll('[data-duel-view]').forEach(item => item.classList.toggle('active', item === button));
+        overlay.querySelectorAll('[data-duel-panel]').forEach(panel => { panel.hidden = panel.dataset.duelPanel !== view; });
+        if (view === 'heatmap') loadDuelHeatmap(duel.id, state);
+      }));
+    }
+
+    let heatmapMetric = localStorage.getItem('duelHeatmapMetric') || 'accuracy';
+    const DARTBOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+
+    function heatmapColor(value, max) {
+      const ratio = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+      const hue = 205 - ratio * 180;
+      return 'hsl(' + hue.toFixed(0) + ' 78% ' + (24 + ratio * 35).toFixed(0) + '%)';
+    }
+
+    function ringPath(inner, outer, start, end, center = 180) {
+      const point = (radius, angle) => {
+        const radians = (angle - 90) * Math.PI / 180;
+        return [center + radius * Math.cos(radians), center + radius * Math.sin(radians)];
+      };
+      const a = point(outer, start); const b = point(outer, end);
+      const c = point(inner, end); const d = point(inner, start);
+      const large = end - start > 180 ? 1 : 0;
+      return 'M ' + a.join(' ') + ' A ' + outer + ' ' + outer + ' 0 ' + large + ' 1 ' + b.join(' ') + ' L ' + c.join(' ') + ' A ' + inner + ' ' + inner + ' 0 ' + large + ' 0 ' + d.join(' ') + ' Z';
+    }
+
+    function renderDartboard(player, metric) {
+      const items = new Map((player.analysis && player.analysis.segments || []).map(item => [String(item.segment).toUpperCase(), item]));
+      const values = Array.from(items.values()).map(item => metric === 'accuracy'
+        ? (Number(item.throws) > 0 ? Number(item.hits) / Number(item.throws) : 0)
+        : Number(item.throws || 0));
+      const max = Math.max(1, ...values);
+      const zone = (segment, inner, outer, start, end) => {
+        const item = items.get(segment) || { throws: 0, hits: 0, points: 0, average: 0, busts: 0 };
+        const value = metric === 'accuracy' ? (item.throws ? item.hits / item.throws : 0) : Number(item.throws || 0);
+        return '<path class="dartboard-zone" data-segment="' + segment + '" d="' + ringPath(inner, outer, start, end) + '" fill="' + heatmapColor(value, max) + '" />';
+      };
+      let svg = '<svg class="dartboard-svg" viewBox="0 0 360 360" role="img" aria-label="Dartboard-Heatmap für ' + escapeAttr(player.name) + '">';
+      DARTBOARD_ORDER.forEach((number, index) => {
+        const start = index * 18 + 0.7; const end = (index + 1) * 18 - 0.7;
+        svg += zone('S' + number, 32, 142, start, end);
+        svg += zone('T' + number, 78, 92, start, end);
+        svg += zone('D' + number, 142, 156, start, end);
+        const angle = (start + end) / 2; const radians = (angle - 90) * Math.PI / 180;
+        svg += '<text class="dartboard-number" x="' + (180 + 169 * Math.cos(radians)).toFixed(1) + '" y="' + (180 + 169 * Math.sin(radians)).toFixed(1) + '">' + number + '</text>';
+      });
+      const bull = items.get('SBULL') || { throws: 0, hits: 0, points: 0, average: 0, busts: 0 };
+      const dbull = items.get('DBULL') || { throws: 0, hits: 0, points: 0, average: 0, busts: 0 };
+      const bullValue = item => metric === 'accuracy' ? (item.throws ? item.hits / item.throws : 0) : Number(item.throws || 0);
+      svg += '<circle class="dartboard-zone" data-segment="SBULL" cx="180" cy="180" r="30" fill="' + heatmapColor(bullValue(bull), max) + '" /><circle class="dartboard-zone" data-segment="DBULL" cx="180" cy="180" r="14" fill="' + heatmapColor(bullValue(dbull), max) + '" /><circle cx="180" cy="180" r="156" fill="none" stroke="#d7e0e5" stroke-width="1.5" /></svg>';
+      return svg;
+    }
+
+    function loadDuelHeatmap(duelId, state) {
+      const content = document.getElementById('duelHeatmapContent');
+      if (!content) return;
+      fetch('/api/duels/' + encodeURIComponent(duelId) + '/segment-analysis?mode=' + encodeURIComponent(state.game.mode || '501'), { cache: 'no-store' })
+        .then(response => { if (!response.ok) throw new Error('Heatmap konnte nicht geladen werden'); return response.json(); })
+        .then(data => {
+          const players = Array.isArray(data.players) ? data.players.slice(0, 2) : [];
+          if (!players.length) { content.innerHTML = '<div class="heatmap-empty">Für diese Begegnung sind noch keine Wurfsegmente gespeichert.</div>'; return; }
+          content.innerHTML = '<div class="heatmap-toolbar"><div class="heatmap-metrics"><button class="heatmap-metric ' + (heatmapMetric === 'accuracy' ? 'active' : '') + '" data-metric="accuracy">Trefferquote</button><button class="heatmap-metric ' + (heatmapMetric === 'frequency' ? 'active' : '') + '" data-metric="frequency">Wurfhäufigkeit</button></div><div class="heatmap-legend"><span>niedrig</span><span class="heatmap-legend-bar"></span><span>hoch</span></div></div><div class="heatmap-boards">' + players.map((player, index) => '<div class="heatmap-player' + (index ? ' second' : '') + '"><div class="heatmap-player-name">' + escapeHtml(player.name) + '</div><div class="heatmap-board-wrap">' + renderDartboard(player, heatmapMetric) + '</div><div class="heatmap-detail" data-detail-for="' + player.slot + '">Segment auswählen</div></div>').join('') + '</div>';
+          content.querySelectorAll('[data-metric]').forEach(button => button.addEventListener('click', () => { heatmapMetric = button.dataset.metric; localStorage.setItem('duelHeatmapMetric', heatmapMetric); loadDuelHeatmap(duelId, state); }));
+          content.querySelectorAll('.heatmap-player').forEach((board, index) => board.querySelectorAll('[data-segment]').forEach(zoneElement => zoneElement.addEventListener('click', () => {
+            board.querySelectorAll('.selected').forEach(item => item.classList.remove('selected')); zoneElement.classList.add('selected');
+            const player = players[index]; const item = (player.analysis.segments || []).find(segment => String(segment.segment).toUpperCase() === zoneElement.dataset.segment) || { throws: 0, hits: 0, points: 0, average: 0 };
+            const quote = item.throws ? (item.hits / item.throws * 100).toFixed(1) : '0.0';
+            board.querySelector('.heatmap-detail').textContent = zoneElement.dataset.segment + ': ' + item.throws + ' Würfe · ' + quote + '% Treffer · ' + item.points + ' Punkte';
+          })));
+        }).catch(() => { content.innerHTML = '<div class="heatmap-empty">Heatmap-Daten konnten nicht geladen werden.</div>'; });
     }
 
     async function showDuelStatsAfterWinner(state) {

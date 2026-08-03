@@ -1461,7 +1461,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     channel: formatChannel(channel),
     raw: evt.line || null
   });
-  await dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust);
+  await dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust, Date.now(), state.game.duelId);
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -1546,7 +1546,7 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
   player.currentRoundPoints.push(0);
 
   if (!Array.isArray(player.throws)) player.throws = [];
-  const throwSegment = codeToSegment(hit.code) || pointsToSegment(value) || 'MISS';
+  const throwSegment = 'MISS';
   player.throws.push({
     points: 0,
     remaining: player.remaining,
@@ -1555,8 +1555,10 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
     source: 'arduino-miss',
     reason,
     channel: evt.channel ? formatChannel(evt.channel) : null,
+    segment: throwSegment,
     raw: evt.line || null
   });
+  await dataStore.recordThrowSegment(player.slot, throwSegment, 0, state.game.mode, false, Date.now(), state.game.duelId);
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -1734,6 +1736,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   const isCricket = modeDef.type === 'cricket';
   const isElimination = modeDef.type === 'elimination';
   const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
+  const throwSegment = codeToSegment(hit.code) || pointsToSegment(value) || 'MISS';
   const checkoutSegment = codeToSegment(hit.code) || pointsToSegment(value);
   const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, checkoutSegment, checkoutRule);
   if (checkoutAttempt) {
@@ -1789,7 +1792,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     channel: hit.key,
     raw: hit.line || null
   });
-  await dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust);
+  await dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust, Date.now(), state.game.duelId);
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -2889,7 +2892,7 @@ app.post('/api/live/throw', async (req, res) => {
     if (!Array.isArray(player.throws)) player.throws = [];
     const throwSegment = incomingSegment;
     player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment });
-    await dataStore.recordThrowSegment(player.slot, throwSegment, points, mode, bust);
+    await dataStore.recordThrowSegment(player.slot, throwSegment, points, mode, bust, Date.now(), state.game.duelId);
 
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
@@ -3165,9 +3168,28 @@ app.get('/api/players/:id/segment-analysis', async (req, res) => {
     const playerId = Number(req.params.id);
     if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
     const mode = String(req.query.mode || '').trim();
-    res.json(await dataStore.getSegmentAnalysis(playerId, mode));
+    const duelId = Number(req.query.duelId || 0) || null;
+    res.json(await dataStore.getSegmentAnalysis(playerId, mode, duelId));
   } catch (err) {
     res.status(500).json({ error: 'Segmentanalyse konnte nicht geladen werden: ' + err.message });
+  }
+});
+
+app.get('/api/duels/:id/segment-analysis', async (req, res) => {
+  try {
+    const duelId = Number(req.params.id);
+    if (!Number.isInteger(duelId) || duelId < 1) return res.status(400).json({ error: 'Invalid duel ID' });
+    const duel = await dataStore.getDuel(duelId);
+    if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden' });
+    const mode = String(req.query.mode || duel.mode || '').trim();
+    const players = await Promise.all((duel.players || []).map(async player => ({
+      slot: Number(player.player_slot),
+      name: player.player_name || 'Spieler',
+      analysis: await dataStore.getSegmentAnalysis(Number(player.player_slot), mode, duelId)
+    })));
+    res.json({ duelId, mode, players });
+  } catch (err) {
+    res.status(500).json({ error: 'Heatmap-Daten konnten nicht geladen werden: ' + err.message });
   }
 });
 
