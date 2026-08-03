@@ -253,8 +253,8 @@
     .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; }
     .throw-segments { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 150px; }
     .throw-seg {
-      background: #1b1b1b;
-      border: 1px solid #2b2b2b;
+      background: #164b3a;
+      border: 1px solid #2a9d8f;
       border-radius: 10px;
       min-height: 60px;
       display: flex;
@@ -262,6 +262,12 @@
       justify-content: center;
       align-items: center;
       font-weight: 800;
+      transition: background .25s ease, border-color .25s ease, box-shadow .25s ease;
+    }
+    .throw-seg.thrown {
+      background: transparent;
+      border-color: #2b2b2b;
+      box-shadow: none;
     }
     .throw-seg .pts { font-size: 1.4rem; color: var(--pc, #e63946); }
     .throw-seg .seg { font-size: .85rem; color: #555; margin-top: 2px; }
@@ -789,7 +795,7 @@
         const isBust = !!(throwData && throwData.bust);
         const pointsLabel = isBust ? 'BUST' : (pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt));
         const segmentLabel = throwData && throwData.segment ? throwData.segment : (pt === null ? '-' : String(pt));
-        return '<div class="throw-seg' + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+        return '<div class="throw-seg' + (pt === null ? ' open' : ' thrown') + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
           '<div class="seg">' + segmentLabel + '</div>' +
         '</div>';

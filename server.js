@@ -1268,6 +1268,13 @@ async function recordDuelLegIfActive(state, winner) {
 
 async function advanceAfterBust(state, player, source) {
   if (state.game.status === 'leg-finished') return;
+  const modeDef = GAME_MODES[state.game.mode] || GAME_MODES[DEFAULT_MODE];
+  if (modeDef.type !== 'cricket' && modeDef.type !== 'elimination') {
+    const turnPoints = Array.isArray(player.currentRoundPoints) ? player.currentRoundPoints : [];
+    const committedPoints = turnPoints.slice(0, -1).reduce((sum, points) => sum + (Number(points) || 0), 0);
+    player.remaining = Math.max(0, Number(player.remaining || 0) + committedPoints);
+    player.totalScored = Math.max(0, Number(player.totalScored || 0) - committedPoints);
+  }
   const playersInLeg = Array.isArray(state.players) ? state.players.length : 0;
   const isSinglePlayerLeg = playersInLeg <= 1;
   const delayMs = isSinglePlayerLeg
@@ -1477,7 +1484,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     }
   }
 
-  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino');
+  if (!bust) await addTurnScoreHighscoreIfNeeded(player, state, 'arduino');
 
   if (bust && state.game.status !== 'leg-finished') {
     await advanceAfterBust(state, player, 'arduino');
@@ -1805,7 +1812,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     }
   }
 
-  await addTurnScoreHighscoreIfNeeded(player, state, 'arduino-matrix');
+  if (!bust) await addTurnScoreHighscoreIfNeeded(player, state, 'arduino-matrix');
 
   if (bust && state.game.status !== 'leg-finished') {
     await advanceAfterBust(state, player, 'arduino-matrix');
@@ -2905,7 +2912,7 @@ app.post('/api/live/throw', async (req, res) => {
       }
     }
 
-    await addTurnScoreHighscoreIfNeeded(player, state, 'manual');
+    if (!bust) await addTurnScoreHighscoreIfNeeded(player, state, 'manual');
 
     if (bust && state.game.status !== 'leg-finished') {
       await advanceAfterBust(state, player, 'manual');

@@ -305,8 +305,8 @@
       justify-content: center;
     }
     .throw-seg {
-      background: #1b1b1b;
-      border: 1px solid #2b2b2b;
+      background: #164b3a;
+      border: 1px solid #2a9d8f;
       border-radius: 10px;
       min-height: 155px;
       display: flex;
@@ -315,6 +315,12 @@
       align-items: center;
       font-weight: 800;
       padding: 2px 0;
+      transition: background .25s ease, border-color .25s ease, box-shadow .25s ease;
+    }
+    .throw-seg.thrown {
+      background: transparent;
+      border-color: #2b2b2b;
+      box-shadow: none;
     }
     .throw-seg .pts { font-size: 2.7rem; color: var(--pc, #e63946); }
     .throw-seg .seg { font-size: .95rem; color: #555; margin-top: 1px; }
@@ -1102,7 +1108,7 @@
             segmentLabel = String(pt);
           }
         }
-        return '<div class="throw-seg' + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+        return '<div class="throw-seg' + (pt === null ? ' open' : ' thrown') + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
           '<div class="seg">' + segmentLabel + '</div>' +
         '</div>';
