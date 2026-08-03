@@ -8,152 +8,56 @@
   <meta http-equiv="Expires" content="0" />
   <title>Live-Spielstand TV</title>
   <style>
-    html { height: 100%; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: #0a0a0a;
       color: #f1f1f1;
       font-family: 'Segoe UI', system-ui, sans-serif;
-      height: 100vh;
-      height: -webkit-fill-available;
-      height: 100dvh;
+      min-height: 100vh;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
     }
     .topbar {
       background: #111;
       border-bottom: 3px solid #e63946;
-      padding: 7px 14px;
+      padding: 8px 14px;
       display: flex;
       align-items: center;
       gap: 10px;
     }
-    .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
-    .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
-    .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
-    .topbar select { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 12px 8px !important; border-radius: 8px; cursor: pointer; font-size: .72rem; font-family: inherit; }
-    .topbar select:hover { border-color: #f4a261; }
-    .topbar label { font-size: .68rem; color: #888; display: flex; align-items: center; gap: 4px; }
-    .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
-    .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
-    .topbar .fs-btn.active { border-color: #f4a261; color: #f4a261; }
-    .topbar .miss-btn {
-      background: #8b0000;
-      border: 1px solid #e63946;
-      color: #f1f1f1;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .miss-btn:hover { background: #a00; border-color: #f4a261; color: #f4a261; }
-    .topbar .miss-btn:disabled { opacity: .4; cursor: default; }
-    .daily-hs {
-      font-size: .72rem;
-      color: #f4a261;
-      background: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 8px;
-      padding: 3px 10px;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
-    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
-    .topbar .restart-btn {
-      background: #1a1a1a;
-      border: 1px solid #f4a261;
-      color: #f4a261;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .restart-btn:hover { background: #252525; border-color: #e63946; color: #e63946; }
-    .topbar .restart-btn {
-      background: #1a1a1a;
-      border: 1px solid #f4a261;
-      color: #f4a261;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .restart-btn:hover { background: #252525; border-color: #e63946; color: #e63946; }
+    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; }
+    .live-badge { background: #e63946; color: #fff; font-size: .58rem; padding: 3px 8px; border-radius: 20px; font-weight: 700; letter-spacing: .5px; }
     main {
-      padding: 6px;
+      padding: 10px;
       max-width: none;
-      margin: 0;
-      width: 100%;
+      margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      flex: 1;
-      min-height: 0;
+      gap: 8px;
+      height: calc(100vh - 44px);
     }
     .focus-player {
       flex: 1;
       display: grid;
       grid-template-columns: 1.35fr .65fr;
-      gap: 4px;
+      gap: 8px;
       align-items: stretch;
       min-height: 0;
     }
     .focus-player.single { grid-template-columns: 1fr; }
-    .focus-player.has-others { flex: 1; max-height: 70%; min-height: 0; }
+    .focus-player.has-others { flex: 0 0 auto; max-height: 62%; }
     .compact-players {
-      display: flex;
-      gap: 4px;
-      flex-shrink: 0;
-      max-height: 26.6%;
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
       min-height: 0;
+      align-content: start;
     }
     .compact-players:empty { display: none; }
-    .compact-players .score-card {
-      flex: 1;
-      min-width: 0;
-      border-color: var(--pc, #1e1e1e);
-      align-items: center;
-      text-align: center;
-    }
-    .compact-players .score-card .sc-color-bar { display: none; }
-    .compact-players .score-card .sc-last-throws,
-    .compact-players .score-card .cricket-grid { justify-content: center; }
-    .compact-cricket-status {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 2px;
-      width: 100%;
-      margin: 1px 0;
-    }
-    .compact-cricket-status span {
-      color: #aaa;
-      background: #1b1b1b;
-      border-radius: 4px;
-      padding: 2px 0;
-      font-size: .5rem;
-      line-height: 1;
-      text-align: center;
-      white-space: nowrap;
-    }
-    .compact-cricket-status span.closed { color: #2a9d8f; font-weight: 700; }
     .focus-card {
       background: linear-gradient(135deg, #191111, #141414);
       border-radius: 14px;
-      padding: 10px;
+      padding: 12px;
       border: 2px solid var(--pc, #e63946);
       box-shadow: 0 0 30px rgba(230,57,70,.16);
       position: relative;
@@ -169,516 +73,95 @@
       pointer-events: none;
     }
     .focus-card > * { position: relative; }
-    .focus-name { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 2rem; font-weight: 800; margin-bottom: 2px; }
-    .focus-switch-timer { display: none; flex: 0 0 auto; color: #f4a261; background: rgba(244,162,97,.1); border: 1px solid rgba(244,162,97,.45); border-radius: 8px; padding: 6px 12px; font-size: .72rem; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
-    .focus-switch-timer.visible { display: inline-flex; align-items: center; }
-    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; }
+    .focus-name { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
+    .focus-meta { color: #777; font-size: .68rem; margin-bottom: 8px; }
     .focus-kacheln {
       display: grid;
-      grid-template-columns: 0.7fr 1.8fr;
-      gap: 4px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
       flex: 1;
-    }
-    .focus-kachel:nth-child(1) {
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      min-height: 220px;
-    }
-    .focus-kachel:nth-child(2) {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-height: 220px;
-      padding: 12px 16px;
-    }
-    .focus-kachel:nth-child(2) > div {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      width: 100%;
-      padding: 10px;
-      background: #141414;
-      border: 1px solid #2a2a2a;
-      border-radius: 10px;
-      position: relative;
-    }
-    .focus-kachel:nth-child(2) h4 {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      margin: 0;
-      font-size: .6rem;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
     }
     .focus-kachel {
       background: #0f0f0f;
       border: 1px solid #262626;
       border-radius: 11px;
       padding: 8px;
-      min-height: 135px;
+      min-height: 108px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      position: relative;
     }
-    .focus-kachel > h4 { position: absolute; top: 10px; left: 8px; right: 8px; color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin: 0; }
-    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 2px; }
-    .throw-segments { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 150px; }
+    .focus-kachel h4 { color: #777; font-size: .6rem; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 7px; }
+    .focus-kachel .subline { color: #555; font-size: .62rem; margin-top: 6px; }
+    .throw-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
     .throw-seg {
       background: #1b1b1b;
       border: 1px solid #2b2b2b;
       border-radius: 10px;
-      min-height: 60px;
+      min-height: 48px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       font-weight: 800;
     }
-    .throw-seg .pts { font-size: 1.4rem; color: var(--pc, #e63946); }
-    .throw-seg .seg { font-size: .85rem; color: #555; margin-top: 2px; }
-    .focus-big-score { font-size: 4.2rem; font-weight: 900; line-height: .95; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
-    .focus-summary { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
-    .focus-summary div { background: #141414; border-radius: 10px; padding: 4px; text-align: center; }
-    .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
-    .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
+    .throw-seg .seg { font-size: 1rem; color: var(--pc, #e63946); }
+    .throw-seg .pts { font-size: .66rem; color: #555; margin-top: 2px; }
+    .focus-big-score { font-size: 3.05rem; font-weight: 900; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
+    .focus-summary { margin-top: 7px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .focus-summary div { background: #141414; border-radius: 10px; padding: 7px; text-align: center; }
+    .focus-summary span { display: block; color: #666; font-size: .58rem; text-transform: uppercase; letter-spacing: 1px; }
+    .focus-summary strong { display: block; color: #f1f1f1; font-size: .86rem; margin-top: 2px; }
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
-      padding: 5px;
+      padding: 10px;
       border: 2px solid #1e1e1e;
       display: flex;
       flex-direction: column;
-      gap: 4px;
-    }
-    .focus-leg-card h4 { color: #777; font-size: .56rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
-    .leg-list { width: 100%; display: grid; gap: 3px; max-height: 380px; overflow: auto; }
-    .leg-item { 
-      display: grid; 
-      grid-template-columns: 80px 1fr 80px; 
-      align-items: center; 
-      background: #1b1b1b; 
-      border: 1px solid #2b2b2b; 
-      border-radius: 8px; 
-      padding: 4px 8px; 
-      font-size: .65rem; 
       gap: 8px;
     }
-    .leg-item .idx { 
-      color: #777; 
-      font-weight: 600;
-      text-align: right;
-      padding-right: 8px;
-      border-right: 1px solid #333;
-    }
-    .leg-item .throws { 
-      display: flex; 
-      justify-content: center; 
-      align-items: center; 
-      gap: 6px; 
-      color: #ddd;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-    }
-    .leg-item .throws .sep { 
-      color: #555; 
-      font-weight: 300; 
-    }
-    .leg-item .score { 
-      color: #f4a261; 
-      font-weight: 700; 
-      font-variant-numeric: tabular-nums; 
-      text-align: right;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-    }
+    .focus-leg-card h4 { color: #777; font-size: .62rem; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; }
+    .leg-list { width: 100%; display: grid; gap: 5px; max-height: 250px; overflow: auto; }
+    .leg-item { display: flex; justify-content: space-between; align-items: center; background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 8px; padding: 5px 7px; font-size: .68rem; }
+    .leg-item .idx { color: #777; }
+    .leg-item .score { color: #f4a261; font-weight: 700; font-variant-numeric: tabular-nums; }
 
     .score-card {
       background: #141414;
       border-radius: 12px;
-      padding: 14px;
+      padding: 12px;
       border: 2px solid #1e1e1e;
       position: relative;
       overflow: hidden;
       display: flex;
-      flex: 1;
-      min-width: 0;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
-    .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; margin-bottom: 10px; flex-shrink: 0; }
-    .score-card .sc-name { font-size: .9rem; font-weight: 700; }
-    .score-card .sc-score { font-size: 2.4rem; font-weight: 800; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
-    .score-card .sc-stats { font-size: .72rem; color: #666; line-height: 1.6; }
-    .score-card .sc-stats span { color: #aaa; font-weight: 600; }
-    .score-card .sc-last-throws { display: flex; gap: 4px; margin-top: 4px; }
-    .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 3px 8px; font-size: .78rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
-    .score-card .sc-throw-chip.empty { color: #333; }
-
-    /* Cricket Grid - Visual Hit Indicators */
-    .cricket-grid {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px 12px;
-      margin: 8px 0;
-    }
-    .cricket-num {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      min-width: 50px;
-    }
-    .cricket-num .num-label {
-      font-weight: 700;
-      font-size: .7rem;
-      color: #f1f1f1;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .cricket-hits {
-      display: flex;
-      gap: 3px;
-    }
-    .hit-marker {
-      width: 18px;
-      height: 18px;
-      border-radius: 4px;
-      border: 2px solid #333;
-      background: #1a1a1a;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-    .hit-marker.hit-1,
-    .hit-marker.hit-2,
-    .hit-marker.hit-3 {
-      background: #2a9d8f;
-      border-color: #2a9d8f;
-    }
-    .hit-marker.closed {
-      background: #1a1a1a;
-      border-color: #2a9d8f;
-    }
-    .hit-marker.closed::after {
-      content: '✕';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #2a9d8f;
-      font-size: 14px;
-      font-weight: 900;
-      line-height: 1;
-      pointer-events: none;
-    }
-    .cricket-num .points {
-      font-size: .55rem;
-      color: #f4a261;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    /* Cricket Punkte-Aufschlüsselung */
-    .cricket-points {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      font-size: .65rem;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    .cp-row {
-      display: grid;
-      grid-template-columns: 30px 40px 1fr;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 4px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 4px;
-    }
-    .cp-num { font-weight: 700; color: #f4a261; text-align: center; }
-    .cp-hits { color: #888; font-size: .6rem; text-align: center; }
-    .cp-pts { color: #f4a261; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-    .cp-empty { color: #555; font-size: .65rem; text-align: center; padding: 20px; }
-
-    /* Winner Overlay */
-    .winner-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-    .winner-overlay.show {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .winner-card {
-      background: linear-gradient(135deg, #1a1a2e, #16213e);
-      border: 3px solid #f4a261;
-      border-radius: 24px;
-      padding: 40px 60px;
-      text-align: center;
-      box-shadow: 0 0 60px rgba(244, 162, 97, 0.4), 0 20px 40px rgba(0,0,0,0.5);
-      transform: scale(0.9);
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    .winner-overlay.show .winner-card {
-      transform: scale(1);
-    }
-    .winner-icon {
-      font-size: 4rem;
-      margin-bottom: 16px;
-      animation: bounce 1s ease infinite;
-    }
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
-    .winner-title {
-      font-size: 2.5rem;
-      font-weight: 800;
-      color: #f4a261;
-      margin-bottom: 8px;
-      text-shadow: 0 0 20px rgba(244, 162, 97, 0.5);
-    }
-    .winner-name {
-      font-size: 3rem;
-      font-weight: 900;
-      color: #f4a261;
-      margin-bottom: 16px;
-      text-shadow: 0 0 30px rgba(244, 162, 97, 0.6);
-    }
-    .winner-stats {
-      display: flex;
-      gap: 32px;
-      justify-content: center;
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid rgba(244, 162, 97, 0.3);
-    }
-    .winner-stat {
-      text-align: center;
-    }
-    .winner-stat-label {
-      font-size: 0.8rem;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-    }
-    .winner-stat-value {
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: #f4a261;
-    }
-    .winner-btn {
-      background: linear-gradient(135deg, #f4a261, #e63946);
-      border: none;
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      padding: 16px 48px;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .winner-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
-    }
-    .confetti-container {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      overflow: hidden;
-      z-index: 10001;
-    }
-    .confetti {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      top: -10px;
-      animation: confetti-fall 3s linear forwards;
-    }
-    @keyframes confetti-fall {
-      to {
-        transform: translateY(100vh) rotate(720deg);
-        opacity: 0;
-      }
-    }
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
+    .score-card .sc-color-bar { width: 100%; height: 3px; background: var(--pc, #e63946); border-radius: 3px; }
+    .score-card .sc-name { font-size: .86rem; font-weight: 700; }
+    .score-card .sc-score { font-size: 2.2rem; font-weight: 800; line-height: 1; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
     .score-card .sc-stats { font-size: .68rem; color: #666; line-height: 1.5; }
     .score-card .sc-stats span { color: #aaa; font-weight: 600; }
     .score-card .sc-last-throws { display: flex; gap: 3px; }
     .score-card .sc-throw-chip { background: #1e1e1e; border-radius: 5px; padding: 2px 6px; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 24px; text-align: center; }
     .score-card .sc-throw-chip.empty { color: #333; }
 
-    /* Bust-Overlay */
-    .bust-overlay {
-      position: fixed; inset: 0; z-index: 9999;
-      background: rgba(230,57,70,.15);
-      display: flex; align-items: center; justify-content: center;
-      pointer-events: none;
-      animation: bust-flash 0.6s ease-out;
-    }
-    .bust-overlay .bust-text {
-      background: #e63946; color: #fff;
-      font-size: 3rem; font-weight: 900;
-      padding: 20px 50px; border-radius: 20px;
-      text-transform: uppercase; letter-spacing: 4px;
-      box-shadow: 0 0 60px rgba(230,57,70,.6);
-      animation: bust-pulse 0.8s ease-in-out infinite alternate;
-    }
-    @keyframes bust-flash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
-    @keyframes bust-pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
-
-    /* Elimination-Overlay */
-    .elimination-overlay {
-      position: fixed; inset: 0; z-index: 9999;
-      background: rgba(139,0,0,.25);
-      display: flex; align-items: center; justify-content: center;
-      pointer-events: none;
-      animation: elimination-flash 0.8s ease-out;
-    }
-    .elimination-overlay .elimination-text {
-      background: linear-gradient(135deg, #8b0000, #ff0000); color: #fff;
-      font-size: 3.5rem; font-weight: 900;
-      padding: 30px 60px; border-radius: 25px;
-      text-transform: uppercase; letter-spacing: 6px;
-      box-shadow: 0 0 80px rgba(255,0,0,.8), 0 0 160px rgba(139,0,0,.6);
-      animation: elimination-pulse 0.6s ease-in-out infinite alternate;
-      text-shadow: 0 0 20px rgba(255,255,255,.5);
-    }
-    @keyframes elimination-flash { 0% { opacity: 0; transform: scale(0.8); } 15% { opacity: 1; transform: scale(1.05); } 85% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
-    @keyframes elimination-pulse { from { transform: scale(1); box-shadow: 0 0 80px rgba(255,0,0,.8), 0 0 160px rgba(139,0,0,.6); } to { transform: scale(1.1); box-shadow: 0 0 120px rgba(255,0,0,1), 0 0 240px rgba(139,0,0,.8); } }
-
-    .cricket-score-animation {
-      position: fixed;
-      top: 42%;
-      left: 50%;
-      z-index: 9998;
-      color: #f4a261;
-      font-size: clamp(2rem, 5vw, 4rem);
-      font-weight: 900;
-      text-shadow: 0 0 20px rgba(244,162,97,.8);
-      pointer-events: none;
-      animation: cricket-score-pop 1.1s ease-out forwards;
-    }
-    @keyframes cricket-score-pop {
-      0% { opacity: 0; transform: translate(-50%, 20px) scale(.7); }
-      20% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
-      100% { opacity: 0; transform: translate(-50%, -70px) scale(1); }
-    }
-
-    /* Winner Overlay */
-
     @media (width: 1024px) and (height: 860px) {
-      .focus-kacheln { grid-template-columns: 0.7fr 1.8fr; }
-      .focus-kachel { min-height: 175px; padding: 6px; }
-      .focus-kachel h4 { font-size: .55rem; }
-      .throw-seg { min-height: 48px; }
-      .throw-seg .pts { font-size: 1rem; }
-      .focus-big-score { font-size: 4.8rem; }
-      .focus-summary { margin-top: 2px; }
-      .focus-summary div { padding: 3px; }
-      .focus-summary span { font-size: .45rem; }
-      .focus-summary strong { font-size: .7rem; }
-      .focus-player.has-others { flex: 1; }
-      .focus-leg-card { display: flex; }
-      .compact-players { gap: 3px; max-height: 19%; }
-      .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: column; align-items: center; border-radius: 6px; }
-      .compact-players .score-card .sc-color-bar { display: none !important; }
-      .compact-players .score-card .sc-name { font-size: .65rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-score { font-size: 1.1rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-stats { font-size: .5rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
-      .compact-players .score-card .sc-throw-chip { font-size: .55rem; padding: 1px 3px; min-width: 16px; border-radius: 4px; }
-      .compact-players .score-card.compact-crowded { flex-direction: column; align-items: center; }
-      .compact-players .score-card.compact-crowded {
-        justify-content: flex-start;
-        gap: 2px;
-        padding: 4px 8px 3px;
-      }
-      .compact-players .score-card.compact-crowded .sc-color-bar { width: 100%; height: 3px; margin-bottom: 2px; }
-      .compact-players .score-card.compact-crowded .sc-score { line-height: .9; }
-      .compact-players .score-card.compact-crowded .compact-cricket-status { font-size: .42rem; }
-      .compact-players .score-card .cricket-grid {
-        gap: 4px 6px;
-        margin: 4px 0;
-      }
-      .compact-players .score-card .cricket-num {
-        min-width: 40px;
-        gap: 2px;
-      }
-      .compact-players .score-card .num-label {
-        font-size: .55rem;
-      }
-      .compact-players .score-card .hit-marker {
-        width: 14px;
-        height: 14px;
-      }
-      .compact-players .score-card .hit-marker.hit-1,
-      .compact-players .score-card .hit-marker.hit-2,
-      .compact-players .score-card .hit-marker.hit-3 {
-        background: #2a9d8f;
-        border-color: #2a9d8f;
-      }
-      .compact-players .score-card .hit-marker.closed {
-        background: #1a1a1a;
-        border-color: #2a9d8f;
-      }
-      .compact-players .score-card .hit-marker.closed::after {
-        font-size: 10px;
-        color: #2a9d8f;
-      }
-      .topbar select { padding: 8px 8px !important; }
-    }
-
-    /* Tablet-Auflösungen – Selects in Topbar hoch genug */
-    @media (min-width: 768px) and (max-width: 1366px) and (min-height: 768px) and (max-height: 1024px) {
-      .focus-player.single { grid-template-rows: minmax(0, 1fr); }
-      .focus-card { min-height: 0; padding: 6px; }
-      .focus-name { font-size: 1.5rem; }
-      .focus-big-score { font-size: clamp(5rem, 8vw, 8rem); }
-      .topbar select { padding: 12px 8px !important; }
+      .focus-kacheln { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .focus-kachel { min-height: 124px; }
+      .focus-big-score { font-size: 3.35rem; }
+      .focus-player.has-others { max-height: 56%; }
+      .compact-players { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; }
     }
   </style>
 </head>
 <body>
-  <!-- Winner Overlay -->
-  <div class="winner-overlay" id="winnerOverlay"></div>
-  
-  <!-- Toast -->
-  <div class="toast" id="toast"></div>
-  
   <div class="topbar">
-    <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
-    <label>Modus <select id="gameModeSelect" onchange="changeMode(this.value)"></select></label>
-    <label>Finish <select id="checkoutRuleSelect" onchange="changeCheckoutRule(this.value)"></select></label>
-    <div class="clock" id="clockDisplay">--:--:--</div>
-    <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
-    <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
+    <span class="live-badge">LIVE</span>
   </div>
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
@@ -688,15 +171,13 @@
   <script>
     let liveState = null;
     let countdownTimer = null;
-    let isFirstLoad = true;
-    let lastCricketAnimationKey = '';
 
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
       const action = state && state.lastAction;
       if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) {
-        const el = document.querySelector('.focus-switch-timer') || document.getElementById('countdownDisplay');
-        if (el) { el.classList.remove('visible'); el.style.display = 'none'; el.textContent = ''; }
+        const el = document.getElementById('countdownDisplay');
+        if (el) el.style.display = 'none';
         return;
       }
       const startedAt = action.autoAdvanceStartedAt || Date.now();
@@ -704,15 +185,14 @@
       countdownTimer = setInterval(() => {
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, delayMs - elapsed);
-        const el = document.querySelector('.focus-switch-timer') || document.getElementById('countdownDisplay');
+        const el = document.getElementById('countdownDisplay');
         if (remaining <= 0) {
-          if (el) { el.classList.remove('visible'); el.style.display = 'none'; el.textContent = ''; }
+          if (el) el.style.display = 'none';
           if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
           return;
         }
         if (el) {
           el.style.display = '';
-          el.classList.add('visible');
           el.textContent = 'Nächster Spieler in ' + Math.ceil(remaining / 1000) + 's';
         }
       }, 200);
@@ -723,9 +203,7 @@
 
     function getPointsPerAufnahme(player) {
       const currentRound = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
-      // Wenn currentRoundPoints existiert (auch wenn leer), ist das die aktuelle Aufnahme
-      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> 0 Punkte
-      if (currentRound.length >= 0) {
+      if (currentRound.length > 0) {
         return currentRound.reduce((sum, pt) => sum + (Number(pt) || 0), 0);
       }
       const throws = Array.isArray(player && player.throws) ? player.throws : [];
@@ -736,70 +214,50 @@
       return lastChunk.reduce((sum, t) => sum + (Number(t && t.points) || 0), 0);
     }
 
-    function getLiveLegStats(player) {
-      const throws = Array.isArray(player && player.throws) ? player.throws : [];
-      const darts = Number(player && player.turns) || throws.length;
-      const totalScored = Number(player && player.totalScored) || 0;
-      const legAverage = darts > 0 ? (totalScored / darts * 3).toFixed(1) : '-';
-      const firstNine = throws.slice(0, 9);
-      const firstNineScore = firstNine.reduce((sum, item) => sum + (item && item.bust ? 0 : (Number(item && item.points) || 0)), 0);
-      const firstNineAverage = firstNine.length >= 9 ? (firstNineScore / 9 * 3).toFixed(1) : '-';
-      const checkoutAttempts = Number(player && player.checkoutAttempts) || 0;
-      const checkoutSuccess = Number(player && player.checkoutSuccess) || 0;
-      const checkout = checkoutAttempts > 0 ? ((checkoutSuccess / checkoutAttempts) * 100).toFixed(1) + '%' : '-';
-      return { legAverage, firstNineAverage, checkout };
-    }
-
     function renderFocusPlayer(p, idx, state) {
       if (!p) return '';
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const lastThrows = throws.slice(-3);
-      // Wenn currentRoundPoints existiert (auch leer), das für Anzeige nutzen
-      // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> leere Slots anzeigen
-      const displayThrows = Array.isArray(p.currentRoundPoints) ? [...p.currentRoundPoints] : lastThrows.map(t => t.points);
+      const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows.map(t => t.points);
       while (displayThrows.length < 3) displayThrows.push(null);
+      const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const totalScored = p.totalScored || 0;
-      const legStats = getLiveLegStats(p);
+      const currentRoundScore = displayThrows.reduce((sum, pt) => sum + (pt === null ? 0 : (Number(pt) || 0)), 0);
       const aufnahmeScore = getPointsPerAufnahme(p);
-      const isElimination = state.game.mode === 'elimination';
-      
       const throwsHtml = displayThrows.map((pt, ti) => {
+        const label = pt === null ? '-' : String(pt);
         const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
-        const throwData = Array.isArray(p.currentRoundPoints) ? throws.slice(-currentRound.length)[ti] : lastThrows[ti];
-        const segmentLabel = throwData && throwData.segment ? throwData.segment : (pt === null ? '-' : String(pt));
         return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+          '<div class="seg">' + label + '</div>' +
           '<div class="pts">' + pointsLabel + '</div>' +
-          '<div class="seg">' + segmentLabel + '</div>' +
         '</div>';
       }).join('');
 
-      // Elimination: Punkte statt Rest anzeigen
-      const bigScoreLabel = isElimination ? 'Punkte' : 'Gesamt / Rest';
-      const bigScoreValue = isElimination ? totalScored : p.remaining;
-
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + (isElimination ? ' · Elimination' : '') + '</span><span class="focus-switch-timer"></span></div>' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + '</div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
-            '<h4>Aktuelle Würfe</h4>' +
+            '<h4>Aktuelle Würfe / Zahlen</h4>' +
             '<div class="throw-segments">' + throwsHtml + '</div>' +
+            '<div class="subline">Runden-Punkte: <strong>' + currentRoundScore + '</strong></div>' +
           '</div>' +
           '<div class="focus-kachel">' +
-            '<div>' +
-              '<h4>' + (isElimination ? 'Punkte' : 'Rest') + '</h4>' +
-              '<div class="focus-big-score">' + bigScoreValue + '</div>' +
-            '</div>' +
-            '<div>' +
-              '<h4>pro Aufnahme</h4>' +
-              '<div class="focus-big-score">' + aufnahmeScore + '</div>' +
-            '</div>' +
+            '<h4>Punkte pro Aufnahme</h4>' +
+            '<div class="focus-big-score" style="font-size:4.2rem">' + aufnahmeScore + '</div>' +
+            '<div style="color:#777;font-size:.82rem">Aktuelle Aufnahme</div>' +
+          '</div>' +
+          '<div class="focus-kachel">' +
+            '<h4>Gesamt / Rest</h4>' +
+            '<div class="focus-big-score">' + p.remaining + '</div>' +
+            '<div style="color:#777;font-size:.82rem">Restpunkte</div>' +
           '</div>' +
         '</div>' +
         '<div class="focus-summary">' +
-          '<div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div>' +
-          '<div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div>' +
-          '<div><span>Checkout</span><strong>' + legStats.checkout + '</strong></div>' +
+          '<div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div>' +
+          '<div><span>Gesamt Punkte</span><strong>' + totalScored + '</strong></div>' +
+          '<div><span>Ø 3-Dart</span><strong>' + avgStr + '</strong></div>' +
         '</div>' +
       '</div>';
     }
@@ -811,19 +269,12 @@
       for (let i = 0; i < throws.length; i += 3) {
         const chunk = throws.slice(i, i + 3);
         const score = chunk.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
-        turnScores.push({ score, throws: chunk.map(t => t.segment || t.points) });
+        turnScores.push(score);
       }
       const legListHtml = turnScores.length
-        ? turnScores.slice(-20).reverse().map((turn, orderIdx) => {
+        ? turnScores.slice(-20).reverse().map((score, orderIdx) => {
             const turnIdx = turnScores.length - orderIdx;
-            const throwsHtml = turn.throws.map((seg, si) => 
-              '<span>' + escapeHtml(seg) + '</span>' + (si < turn.throws.length - 1 ? '<span class="sep">|</span>' : '')
-            ).join('');
-            return '<div class="leg-item">' +
-              '<span class="idx">Aufnahme ' + turnIdx + '</span>' +
-              '<span class="throws">' + throwsHtml + '</span>' +
-              '<span class="score">' + turn.score + '</span>' +
-            '</div>';
+            return '<div class="leg-item"><span class="idx">Aufnahme ' + turnIdx + '</span><span class="score">' + score + '</span></div>';
           }).join('')
         : '<div class="subline">Noch keine Aufnahmen erfasst</div>';
       return '<aside class="focus-leg-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
@@ -835,45 +286,23 @@
     function renderCricketView(p, state) {
       if (!p) return '';
       const throws = Array.isArray(p.throws) ? p.throws : [];
-      const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
-      const currentRoundThrows = throws.slice(-currentRound.length);
-      const displayThrows = [...currentRound];
-      while (displayThrows.length < 3) displayThrows.push(null);
+      const lastThrows = throws.slice(-3);
       const cricketHits = p.cricketHits || {};
       const cricketClosed = p.cricketClosed || {};
-      const cricketPoints = p.cricketPoints || 0;
       const nums = [15,16,17,18,19,20,25];
-
       const gridHtml = nums.map(n => {
         const hits = cricketHits[n] || 0;
         const closed = !!cricketClosed[n];
-        const markers = [1, 2, 3].map(h => {
-          let cls = 'hit-marker';
-          if (closed) cls += ' closed';
-          else if (hits >= h) cls += ' hit-' + h;
-          return '<div class="' + cls + '"></div>';
-        }).join('');
-        
-        return '<div class="cricket-num' + (closed ? ' closed' : '') + '">' +
-          '<div class="num-label">' + n + '</div>' +
-          '<div class="cricket-hits">' + markers + '</div>' +
-        '</div>';
+        return '<div class="c-num' + (closed ? ' closed' : '') + '"><div class="num">' + n + '</div><div class="hits">' + (closed ? '✔' : hits + '/3') + '</div></div>';
       }).join('');
-
-      const throwsHtml = displayThrows.map((points, index) => {
-        const throwData = currentRoundThrows[index];
-        const pointsLabel = points === null ? 'offen' : (points === 0 ? '0' : '+' + points);
-        const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
-        return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>';
-      }).join('');
-      const legStats = getLiveLegStats(p);
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name"><span>🎯 ' + escapeHtml(p.name) + ' · Cricket</span><span class="focus-switch-timer"></span></div>' +
-        '<div class="focus-kacheln">' +
-          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + throwsHtml + '</div></div>' +
-          '<div class="focus-kachel"><div><h4>Cricket Punkte</h4><div class="focus-big-score">' + cricketPoints + '</div></div><div><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div></div>' +
+        '<div class="focus-name">🎯 ' + escapeHtml(p.name) + ' · Cricket</div>' +
+        '<div class="focus-meta">Spieler ' + p.slot + ' wirft gerade &bull; Runde ' + (state.game.throwRound || 1) + ' &bull; Wurf ' + ((state.game.currentThrow || 0) + 1) + ' von 3</div>' +
+        '<div class="focus-kacheln" style="grid-template-columns:1fr 1fr">' +
+          '<div class="focus-kachel"><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div>' +
+          '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + lastThrows.map(t => '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="seg">' + (t.points || 0) + '</div></div>').join('') + '</div></div>' +
         '</div>' +
-        '<div class="focus-summary"><div><span>Schnitt</span><strong>' + legStats.legAverage + '</strong></div><div><span>Erster-9-AVG</span><strong>' + legStats.firstNineAverage + '</strong></div><div><span>Checkout</span><strong>-</strong></div></div>' +
+        '<div class="focus-summary"><div><span>Turns</span><strong>' + (p.turns || 0) + '</strong></div><div><span>Punkte</span><strong>' + (p.totalScored || 0) + '</strong></div><div><span>Ø 3-Dart</span><strong>' + ((p.average || 0) > 0 ? Number(p.average).toFixed(1) : '-') + '</strong></div></div>' +
       '</div>';
     }
 
@@ -886,57 +315,23 @@
       return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
     }
 
-    function renderCompactPlayer(p, mode, crowded) {
+    function renderCompactPlayer(p, mode) {
       const currentRound = Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [];
       const lastThrows = Array.isArray(p.throws) ? p.throws.slice(-3).map(t => t.points) : [];
-      // Wenn currentRoundPoints existiert UND Inhalt hat, das für Anzeige nutzen
-      const displayThrows = (Array.isArray(p.currentRoundPoints) && p.currentRoundPoints.length > 0) ? [...p.currentRoundPoints] : lastThrows;
+      const displayThrows = currentRound.length >= 1 ? [...currentRound] : lastThrows;
       while (displayThrows.length < 3) displayThrows.push('-');
-      const totalScored = p.totalScored || 0;
-      const turns = p.turns || 0;
-      const legAvg = turns > 0 ? (totalScored / turns * 3).toFixed(1) : '-';
+      const avgStr = (p.average || 0) > 0 ? Number(p.average || 0).toFixed(1) : '-';
       const isCricket = mode === 'cricket';
-      const isElimination = mode === 'elimination';
-      const displayScore = isCricket ? (p.totalScored || 0) : (isElimination ? (p.totalScored || 0) : p.remaining);
-      const shortName = (p.name || '').length > 8 ? (p.name || '').substring(0, 8) + '...' : (p.name || '');
+      const displayScore = isCricket ? (p.totalScored || 0) : p.remaining;
+      const scoreLabel = isCricket ? 'Punkte' : 'Rest';
 
-      const playerColor = escapeAttr(p.color || '#f4a261');
-      
-      let cricketGridHtml = '';
-      let compactCricketHtml = '';
-      if (isCricket) {
-        const cricketHits = p.cricketHits || {};
-        const cricketClosed = p.cricketClosed || {};
-        const nums = [15, 16, 17, 18, 19, 20, 25];
-        compactCricketHtml = '<div class="compact-cricket-status" aria-label="Cricket Status">' + nums.map(n => {
-          const hits = cricketHits[n] || 0;
-          const closed = !!cricketClosed[n];
-          const label = n === 25 ? 'B' : n;
-          return '<span class="' + (closed ? 'closed' : '') + '">' + label + ':' + (closed ? 'X' : hits) + '</span>';
-        }).join('') + '</div>';
-      }
-      
-      return '<div class="score-card' + (crowded && isCricket ? ' compact-crowded' : '') + '" data-tv style="--pc:' + playerColor + '">' +
-        '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
-        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
+      return '<div class="score-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+        '<div class="sc-color-bar"></div>' +
+        '<div class="sc-name">P' + p.slot + ' \u00b7 ' + escapeHtml(p.name) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
-        (compactCricketHtml || (isCricket ? cricketGridHtml : '')) +
+        '<div class="sc-stats">' + scoreLabel + ': <span>' + displayScore + '</span> | \u00d8: <span>' + avgStr + '</span> | Legs: <span>' + (p.legs || 0) + '</span></div>' +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
       '</div>';
-    }
-
-    function calculateClientCricketPoints(player, allPlayers) {
-      return Number(player.cricketPoints || player.totalScored || 0);
-    }
-
-    function isClientCricketWinner(player, allPlayers) {
-      const closed = player.cricketClosed || {};
-      const allClosed = [15, 16, 17, 18, 19, 20, 25].every(number => closed[number] === true);
-      if (!allClosed) return false;
-      const playerPoints = calculateClientCricketPoints(player, allPlayers);
-      return allPlayers.every(opponent =>
-        opponent.slot === player.slot || calculateClientCricketPoints(opponent, allPlayers) <= playerPoints
-      );
     }
 
     function renderState(state) {
@@ -947,73 +342,13 @@
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
 
-      // ── Sync selectors ──
-      const modeSel = document.getElementById('gameModeSelect');
-      const ruleSel = document.getElementById('checkoutRuleSelect');
-      if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
-      if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
-
-      // ── Bust detection ──
-      const lastThrow = state.lastAction;
-      if (state.game.mode === 'cricket' && lastThrow && Number(lastThrow.cricketPointsAwarded) > 0) {
-        const animationKey = [lastThrow.ts, lastThrow.playerSlot, lastThrow.cricketPointsAwarded].join(':');
-        if (animationKey !== lastCricketAnimationKey) {
-          lastCricketAnimationKey = animationKey;
-          showCricketScoreAnimation(lastThrow.cricketPointsAwarded);
-        }
-      }
-      if (lastThrow && lastThrow.bust) {
-        showBustOverlay(active);
-        playBustSound();
-      } else {
-        hideBustOverlay();
-      }
-
-      // ── Elimination detection ──
-      if (lastThrow && lastThrow.type === 'elimination') {
-        const eliminatedPlayer = state.players.find(p => p.slot === lastThrow.playerSlot);
-        const eliminatorPlayer = state.players.find(p => p.slot === lastThrow.eliminatedBySlot);
-        if (eliminatedPlayer && eliminatorPlayer) {
-          showEliminationOverlay(eliminatedPlayer, eliminatorPlayer);
-          playEliminationSound();
-        }
-      } else {
-        hideEliminationOverlay();
-      }
-
       const isCricket = mode === 'cricket';
-      const isElimination = mode === 'elimination';
       const hasOthers = state.players.length > 1;
       focusPlayer.classList.toggle('has-others', hasOthers);
 
-      // Check for leg finished (winner)
-      const isLegFinished = state.game.status === 'leg-finished';
-      if (!isLegFinished) hideWinnerOverlay();
-      let winner = null;
-      if (isElimination) {
-        // Bei Elimination: Kein Check auf remaining === 0 (alle starten bei 0!)
-        if (isLegFinished) {
-          winner = state.players.find(p => p.slot === state.lastAction?.winnerSlot) ||
-            state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
-        }
-      } else {
-        if (isCricket) {
-          winner = isLegFinished
-            ? state.players.find(p => p.slot === state.lastAction?.winnerSlot)
-              || state.players.find(p => isClientCricketWinner(p, state.players))
-            : null;
-        } else {
-          // x01: Winner hat remaining === 0
-          winner = state.players.find(p => Number(p.remaining) === 0);
-          if (!winner && isLegFinished) {
-            winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
-          }
-        }
-      }
-
       if (isCricket) {
-        focusPlayer.classList.remove('single');
-        focusPlayer.innerHTML = renderCricketView(active, state) + renderFocusLegCard(active);
+        focusPlayer.classList.add('single');
+        focusPlayer.innerHTML = renderCricketView(active, state);
       } else {
         focusPlayer.classList.remove('single');
         focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
@@ -1024,473 +359,24 @@
           .filter((_p, idx) => idx !== activePlayer)
           .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
         compactPlayers.innerHTML = compactOrder
-          .map((p) => renderCompactPlayer(p, mode, state.players.length >= 5)).join('');
+          .map((p) => renderCompactPlayer(p, mode)).join('');
       } else {
         compactPlayers.innerHTML = '';
       }
-
-      // Winner overlay
-      if (isLegFinished && winner) {
-        showWinnerOverlay(winner, state);
-      } else {
-        hideWinnerOverlay();
-      }
-
       startCountdown(state);
     }
 
-    // ── Winner Overlay ──
-    function showWinnerOverlay(winner, state) {
-      const overlay = document.getElementById('winnerOverlay');
-      if (!overlay) return;
-
-      const isCricket = state.game.mode === 'cricket';
-      const throws = Array.isArray(winner.throws) ? winner.throws : [];
-      
-      if (isCricket) {
-        // Cricket-spezifisches Overlay
-        const closedCount = winner.cricketClosed ? Object.values(winner.cricketClosed).filter(v => v).length : 0;
-        const cricketPoints = winner.cricketPoints || 0;
-        const dartsThrown = throws.length;
-        const avg = (winner.turns && winner.turns > 0)
-          ? ((winner.totalScored || 0) / winner.turns * 3).toFixed(1)
-          : '-';
-
-        overlay.innerHTML = `
-          <div class="confetti-container" id="confettiContainer"></div>
-          <div class="winner-card">
-            <div class="winner-icon">🏆</div>
-            <div class="winner-subtitle">CRICKET GEWONNEN</div>
-            <div class="winner-name">${escapeHtml(winner.name)}</div>
-            <div class="winner-subtitle">Cricket Punkte: ${cricketPoints}</div>
-            <div class="winner-stats">
-              <div class="winner-stat">
-                <div class="winner-stat-label">Geschlossene Zahlen</div>
-                <div class="winner-stat-value">${closedCount}/7</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Darts</div>
-                <div class="winner-stat-value">${dartsThrown}</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Leg Average</div>
-                <div class="winner-stat-value">${avg}</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Legs</div>
-                <div class="winner-stat-value">${winner.legs || 0}</div>
-              </div>
-            </div>
-            <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
-          </div>
-        `;
-      } else {
-        // x01 (501, 301, etc.) Overlay
-        const checkout = state.lastAction?.points || 0;
-        const dartsThrown = winner.turns * 3 - (3 - (state.game.currentThrow || 0));
-        const avg = winner.turns > 0 ? (winner.totalScored / winner.turns * 3).toFixed(1) : '-';
-
-        overlay.innerHTML = `
-          <div class="confetti-container" id="confettiContainer"></div>
-          <div class="winner-card">
-            <div class="winner-icon">🏆</div>
-            <div class="winner-subtitle">LEG GEWONNEN</div>
-            <div class="winner-name">${escapeHtml(winner.name)}</div>
-            <div class="winner-subtitle">Checkout: ${checkout} Punkte</div>
-            <div class="winner-stats">
-              <div class="winner-stat">
-                <div class="winner-stat-label">Darts</div>
-                <div class="winner-stat-value">${dartsThrown}</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Leg Average</div>
-                <div class="winner-stat-value">${avg}</div>
-              </div>
-              <div class="winner-stat">
-                <div class="winner-stat-label">Legs</div>
-                <div class="winner-stat-value">${winner.legs || 0}</div>
-              </div>
-            </div>
-            <button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button>
-          </div>
-        `;
-      }
-
-      overlay.classList.add('show');
-      overlay.style.display = 'flex';
-      createConfetti();
-    }
-
-    function hideWinnerOverlay() {
-      const overlay = document.getElementById('winnerOverlay');
-      if (overlay) {
-        overlay.classList.remove('show');
-        overlay.style.display = 'none';
-      }
-    }
-
-    function createConfetti() {
-      const container = document.getElementById('confettiContainer');
-      if (!container) return;
-      container.innerHTML = '';
-      const colors = ['#f4a261', '#e63946', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'];
-      for (let i = 0; i < 80; i++) {
-        const confetti = document.createElement('div');
-        confetti.className = 'confetti';
-        confetti.style.left = Math.random() * 100 + '%';
-        confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
-        confetti.style.animationDelay = (Math.random() * 2) + 's';
-        confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
-        container.appendChild(confetti);
-      }
-    }
-
-    // ── Next Leg ──
-    async function nextLeg() {
-      try {
-        var r = await fetch('/api/live/reset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ carryLegs: true })
-        });
-        if (!r.ok) { showToast('Fehler', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        hideWinnerOverlay();
-        showToast('Nächstes Leg gestartet');
-      } catch(e) { showToast('Netzwerkfehler', true); }
-    }
-
-    // ── Toast ──
-    function showToast(msg, isError) {
-      const t = document.getElementById('toast');
-      if (!t) return;
-      t.textContent = msg;
-      t.className = 'toast show' + (isError ? ' err' : '');
-      setTimeout(() => t.className = 'toast', 2500);
-    }
-
-    // ── Uhrzeit aktualisieren ──
-    function updateClock() {
-      const el = document.getElementById('clockDisplay');
-      if (el) el.textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // ── Vollbild ein-/ausschalten ──
-    function toggleFullscreen() {
-      const doc = document;
-      const docEl = doc.documentElement;
-
-      if (!doc.fullscreenElement && !doc.webkitFullscreenElement && 
-          !doc.mozFullScreenElement && !doc.msFullscreenElement) {
-        const request = docEl.requestFullscreen || 
-                        docEl.webkitRequestFullscreen || 
-                        docEl.mozRequestFullScreen || 
-                        docEl.msRequestFullscreen;
-        if (request) {
-          request.call(docEl).catch(function(err) {
-            showToast('Vollbild nicht möglich: ' + err.message, true);
-          });
-        } else {
-          showToast('Vollbild wird von diesem Browser nicht unterstützt', true);
-        }
-      } else {
-        const exit = doc.exitFullscreen || 
-                     doc.webkitExitFullscreen || 
-                     doc.mozCancelFullScreen || 
-                     doc.msExitFullscreen;
-        if (exit) exit.call(doc);
-      }
-    }
-
-    // ── Button-Icon anpassen bei Vollbild-Änderung ──
-    function updateFullscreenButton() {
-      const btn = document.getElementById('fsBtn');
-      if (!btn) return;
-      
-      const isFullscreen = !!(document.fullscreenElement || 
-                              document.webkitFullscreenElement || 
-                              document.mozFullScreenElement || 
-                              document.msFullscreenElement);
-      
-      btn.title = isFullscreen ? 'Vollbild beenden (ESC)' : 'Vollbild aktivieren';
-      
-      if (isFullscreen) {
-        btn.style.borderColor = '#f4a261';
-        btn.style.color = '#f4a261';
-      } else {
-        btn.style.borderColor = '#444';
-        btn.style.color = '#f1f1f1';
-      }
-    }
-
-    // ── Event-Listener für alle Browser ──
-    document.addEventListener('fullscreenchange', updateFullscreenButton);
-    document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
-    document.addEventListener('mozfullscreenchange', updateFullscreenButton);
-    document.addEventListener('MSFullscreenChange', updateFullscreenButton);
-
-    // ── Fehlwurf – nächster Spieler ──
-    async function skipPlayer() {
-      const btn = document.getElementById('missBtn');
-      if (btn) btn.disabled = true;
-      try {
-        const r = await fetch('/api/live/next-player', { method: 'POST' });
-        if (!r.ok) { showToast('Wechsel fehlgeschlagen', true); if (btn) btn.disabled = false; return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('➡ Fehlwurf – weiter mit ' + (liveState.players[liveState.game.activePlayer]?.name || 'nächstem Spieler'));
-      } catch(e) { showToast('Netzwerkfehler', true); }
-      if (btn) setTimeout(() => btn.disabled = false, 1000);
-    }
-
-    // ── Täglicher Höchstwert ──
-    let dailyHighscoreCache = null;
-    async function loadDailyHighscore() {
-      try {
-        const r = await fetch('/api/highscores/daily');
-        if (!r.ok) return;
-        const data = await r.json();
-        dailyHighscoreCache = data;
-        renderDailyHighscore(data);
-      } catch {}
-    }
-    function renderDailyHighscore(data) {
-      const el = document.getElementById('dailyHsDisplay');
-      if (!el) return;
-      if (data && data.best) {
-        el.querySelector('.hs-val').textContent = data.best.score + ' (' + data.best.player + ')';
-        el.title = 'Heute: ' + data.count + ' Einträge · Bester: ' + data.best.player + ' mit ' + data.best.score;
-      } else {
-        el.querySelector('.hs-val').textContent = '–';
-        el.title = data && data.count ? data.count + ' Einträge' : 'Keine Einträge heute';
-      }
-    }
-
-    // ── Leg-Neustart ──
-    async function restartLeg() {
-      const btn = document.getElementById('restartLegBtn');
-      if (btn) { btn.disabled = true; btn.textContent = '…'; }
-      try {
-        const r = await fetch('/api/live/reset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ carryLegs: false })
-        });
-        if (!r.ok) { showToast('Neustart fehlgeschlagen', true); if (btn) { btn.disabled = false; btn.textContent = '↻ Leg-Neustart'; } return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('↻ Leg zurückgesetzt');
-      } catch(e) { showToast('Netzwerkfehler', true); }
-      if (btn) { btn.disabled = false; btn.textContent = '↻ Leg-Neustart'; }
-    }
-
-    // ── Spielmodus / Checkout-Regel ──
-    async function loadGameModes() {
-      try {
-        const [modesRes, rulesRes, stateRes] = await Promise.all([
-          fetch('/api/game/modes'),
-          fetch('/api/game/checkout-rules'),
-          fetch('/api/live/state')
-        ]);
-        if (modesRes.ok) {
-          const modes = await modesRes.json();
-          const sel = document.getElementById('gameModeSelect');
-          sel.innerHTML = Object.entries(modes).map(([key, m]) =>
-            '<option value="' + key + '">' + m.label + '</option>'
-          ).join('');
-        }
-        if (rulesRes.ok) {
-          const rules = await rulesRes.json();
-          const sel = document.getElementById('checkoutRuleSelect');
-          sel.innerHTML = Object.entries(rules).map(([key, r]) =>
-            '<option value="' + key + '">' + r.label + '</option>'
-          ).join('');
-        }
-        if (stateRes.ok) {
-          const state = await stateRes.json();
-          const modeSel = document.getElementById('gameModeSelect');
-          const ruleSel = document.getElementById('checkoutRuleSelect');
-          if (modeSel && state.game.mode) modeSel.value = state.game.mode;
-          if (ruleSel && state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
-        }
-      } catch {}
-    }
-
-    async function changeMode(mode) {
-      try {
-        const r = await fetch('/api/game/mode', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode })
-        });
-        if (!r.ok) { showToast('Modus-Wechsel fehlgeschlagen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Modus: ' + mode);
-      } catch(e) { showToast('Netzwerkfehler', true); }
-    }
-
-    async function changeCheckoutRule(rule) {
-      try {
-        const r = await fetch('/api/game/checkout-rule', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rule })
-        });
-        if (!r.ok) { showToast('Regel-Wechsel fehlgeschlagen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Finish: ' + rule);
-      } catch(e) { showToast('Netzwerkfehler', true); }
-    }
-
-    // ── Bust / Audio ──
-    function showBustOverlay(player) {
-      let overlay = document.getElementById('bustOverlay');
-      if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'bustOverlay';
-        overlay.className = 'bust-overlay';
-        overlay.innerHTML = '<div class="bust-text">✖ ÜBERWORFEN</div>';
-        document.body.appendChild(overlay);
-        setTimeout(() => { if (overlay) overlay.remove(); }, 1500);
-      }
-    }
-    function hideBustOverlay() {
-      const overlay = document.getElementById('bustOverlay');
-      if (overlay) overlay.remove();
-    }
-
-    // ── Elimination Overlay ──
-    function showEliminationOverlay(eliminatedPlayer, eliminatorPlayer) {
-      let overlay = document.getElementById('eliminationOverlay');
-      if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'eliminationOverlay';
-        overlay.className = 'elimination-overlay';
-        overlay.innerHTML = '<div class="elimination-text">💀 ELIMINIERT! 💀</div>';
-        document.body.appendChild(overlay);
-        setTimeout(() => { if (overlay) overlay.remove(); }, 2000);
-      }
-    }
-    function hideEliminationOverlay() {
-      const overlay = document.getElementById('eliminationOverlay');
-      if (overlay) overlay.remove();
-    }
-
-    function showCricketScoreAnimation(points) {
-      const animation = document.createElement('div');
-      animation.className = 'cricket-score-animation';
-      animation.textContent = '+' + points;
-      document.body.appendChild(animation);
-      playCricketScoreSound();
-      setTimeout(() => animation.remove(), 1200);
-    }
-
-    function playCricketScoreSound() {
-      try {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) return;
-        const ctx = new AudioContextClass();
-        const oscillator = ctx.createOscillator();
-        const gain = ctx.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(660, ctx.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.16);
-        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.24);
-        oscillator.connect(gain);
-        gain.connect(ctx.destination);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 0.25);
-        oscillator.addEventListener('ended', () => ctx.close());
-      } catch {}
-    }
-
-    function playBustSound() {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(150, ctx.currentTime);
-        osc.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.3);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.4);
-      } catch {}
-    }
-
-    function playEliminationSound() {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        // Dramatischerer Sound für Elimination - tiefer, länger
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(100, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.8);
-        gain.gain.setValueAtTime(0.4, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.2);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 1.2);
-      } catch {}
-    }
-
-    async function loadAll(retryAttempt = 0) {
+    async function loadAll() {
       try {
         const stateRes = await fetch('/api/live/state');
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
-        const modeSel = document.getElementById('gameModeSelect');
-        const ruleSel = document.getElementById('checkoutRuleSelect');
-        if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
-        if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
-        // Auto-Recovery NUR beim ersten Laden (nicht bei SSE-Updates)
-        if (isFirstLoad && state.game.status === 'leg-finished') {
-          isFirstLoad = false;
-          try {
-            const resetRes = await fetch('/api/live/reset', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ carryLegs: true })
-            });
-            if (resetRes.ok) {
-              const freshState = await resetRes.json();
-              liveState = freshState;
-              const modeSel2 = document.getElementById('gameModeSelect');
-              const ruleSel2 = document.getElementById('checkoutRuleSelect');
-              if (modeSel2 && modeSel2.value !== freshState.game.mode) modeSel2.value = freshState.game.mode;
-              if (ruleSel2 && ruleSel2.value !== freshState.game.checkoutRule) ruleSel2.value = freshState.game.checkoutRule;
-              renderState(freshState);
-              showToast('↻ Neues Leg automatisch gestartet');
-              return;
-            }
-          } catch {}
-        }
-        isFirstLoad = false;
         renderState(state);
       } catch(e) {
-        console.error('[Live-State] Laden fehlgeschlagen', e);
-        if (retryAttempt < 3) {
-          document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#f4a261">Verbinde mit Live-State … (' + (retryAttempt + 1) + '/3)</div>';
-          setTimeout(() => loadAll(retryAttempt + 1), 1000);
-          return;
-        }
-        document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar<br><small>Bitte Verbindung oder Dashboard-Server prüfen.</small></div>';
+        document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar</div>';
       }
-      loadDailyHighscore();
     }
-
-    loadGameModes();
 
     (function() {
       const sse = new EventSource('/api/events');
