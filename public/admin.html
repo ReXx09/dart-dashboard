@@ -32,6 +32,10 @@
     textarea.mapping-json:focus{border-color:#e63946;outline:none}
     .mapping-hint{font-size:.72rem;color:#444;margin-top:8px;line-height:1.45}
     .field-inline{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .hs-filters{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(150px,1fr) minmax(150px,1fr);gap:8px;margin-bottom:10px}
+    .hs-filters input,.hs-filters select{width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font-size:.82rem;font-family:inherit}
+    .hs-filters input:focus,.hs-filters select:focus{border-color:#e63946;outline:none}
+    @media (max-width:600px){.hs-filters{grid-template-columns:1fr}}
     .btn-save{background:#e63946;border:none;color:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:background .2s}
     .btn-save:hover{background:#c1121f}
     .btn-save:disabled{background:#333;color:#555;cursor:default}
@@ -149,6 +153,17 @@
         <span style="font-size:.82rem;color:#888">Einträge: <strong id="hsCount" style="color:#f4a261">0</strong></span>
         <button class="btn-save" id="refreshHsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Aktualisieren</button>
         <button class="btn-save" id="clearAllHsBtn" style="background:#8b0000;border:none;padding:6px 14px;font-size:.78rem">🗑 Alle löschen</button>
+      </div>
+      <div class="hs-filters">
+        <input id="hsPlayerSearch" type="search" placeholder="Spieler suchen, z. B. Test-Player" aria-label="Spieler suchen" />
+        <select id="hsMonthFilter" aria-label="Monat filtern">
+          <option value="">Alle Monate</option>
+        </select>
+        <select id="hsSort" aria-label="Highscores sortieren">
+          <option value="newest">Neueste zuerst</option>
+          <option value="oldest">Älteste zuerst</option>
+          <option value="score">Höchster Score zuerst</option>
+        </select>
       </div>
       <div style="max-height:400px;overflow-y:auto;border:1px solid #1e1e1e;border-radius:8px">
         <table style="width:100%;border-collapse:collapse;font-size:.78rem">
@@ -299,12 +314,14 @@
 <script>
   // ── Highscore-Verwaltung ──
   let hsData = [];
+  let hsFilteredData = [];
 
   async function loadHighscores() {
     try {
-      const r = await fetch('/api/highscores');
+      const r = await fetch('/api/highscores?limit=500');
       if (!r.ok) throw new Error('HTTP ' + r.status);
       hsData = await r.json();
+      renderMonthFilter();
       renderHighscores();
     } catch(e) {
       document.getElementById('hsTableBody').innerHTML = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#e63946">Fehler beim Laden: ' + e.message + '</td></tr>';
@@ -318,14 +335,50 @@
     });
   }
 
+  function monthKey(ts) {
+    if (!ts) return '';
+    const date = new Date(Number(ts));
+    if (Number.isNaN(date.getTime())) return '';
+    return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+  }
+
+  function monthLabel(key) {
+    const [year, month] = key.split('-');
+    return new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' }).format(new Date(Number(year), Number(month) - 1, 1));
+  }
+
+  function renderMonthFilter() {
+    const select = document.getElementById('hsMonthFilter');
+    const oldValue = select.value;
+    const months = Array.from(new Set(hsData.map(entry => monthKey(entry.ts)).filter(Boolean))).sort().reverse();
+    select.innerHTML = '<option value="">Alle Monate</option>' + months.map(month => '<option value="' + month + '">' + monthLabel(month) + '</option>').join('');
+    if (months.includes(oldValue)) select.value = oldValue;
+  }
+
+  function getFilteredHighscores() {
+    const search = document.getElementById('hsPlayerSearch').value.trim().toLocaleLowerCase('de-DE');
+    const month = document.getElementById('hsMonthFilter').value;
+    const sort = document.getElementById('hsSort').value;
+    hsFilteredData = hsData
+      .filter(entry => !search || String(entry.player || '').toLocaleLowerCase('de-DE').includes(search))
+      .filter(entry => !month || monthKey(entry.ts) === month)
+      .sort((a, b) => {
+        if (sort === 'oldest') return Number(a.ts || 0) - Number(b.ts || 0);
+        if (sort === 'score') return Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0);
+        return Number(b.ts || 0) - Number(a.ts || 0);
+      });
+    return hsFilteredData;
+  }
+
   function renderHighscores() {
-    document.getElementById('hsCount').textContent = hsData.length;
+    const list = getFilteredHighscores();
+    document.getElementById('hsCount').textContent = list.length + ' / ' + hsData.length;
     const body = document.getElementById('hsTableBody');
-    if (!hsData.length) {
+    if (!list.length) {
       body.innerHTML = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#555">Keine Highscore-Einträge vorhanden.</td></tr>';
       return;
     }
-    body.innerHTML = hsData.map((entry, idx) => {
+    body.innerHTML = list.map((entry, idx) => {
       const kind = entry.kind || 'score';
       return '<tr>' +
         '<td style="padding:8px 10px;color:#666;font-weight:700">' + (idx + 1) + '</td>' +
@@ -374,6 +427,9 @@
   }
 
   document.getElementById('refreshHsBtn').addEventListener('click', loadHighscores);
+  document.getElementById('hsPlayerSearch').addEventListener('input', renderHighscores);
+  document.getElementById('hsMonthFilter').addEventListener('change', renderHighscores);
+  document.getElementById('hsSort').addEventListener('change', renderHighscores);
   document.getElementById('clearAllHsBtn').addEventListener('click', async function() {
     if (!confirm('ALLE Highscore-Einträge unwiderruflich löschen?')) return;
     if (!confirm('Wirklich ALLE ' + hsData.length + ' Einträge löschen?')) return;
