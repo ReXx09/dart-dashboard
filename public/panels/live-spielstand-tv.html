@@ -126,12 +126,17 @@
       flex: 1;
       min-width: 0;
       border-color: var(--pc, #1e1e1e);
+      justify-content: flex-start;
+      gap: 3px;
+      padding: 6px 10px 4px;
       align-items: center;
       text-align: center;
     }
     .compact-players .score-card .sc-color-bar { display: none; }
+    .compact-players .score-card .sc-last-throws { margin-top: 0; }
     .compact-players .score-card .sc-last-throws,
-    .compact-players .score-card .cricket-grid { justify-content: center; }
+    .compact-players .score-card .cricket-grid,
+    .compact-players .score-card .compact-cricket-status { justify-content: center; margin-top: 0; margin-bottom: 0; }
     .compact-cricket-status {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -606,7 +611,7 @@
       .focus-player.has-others { flex: 1; }
       .focus-leg-card { display: flex; }
       .compact-players { gap: 3px; max-height: 19%; }
-      .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: column; align-items: center; border-radius: 6px; }
+      .compact-players .score-card { padding: 4px 8px 3px; gap: 2px; flex-direction: column; align-items: center; border-radius: 6px; }
       .compact-players .score-card .sc-color-bar { display: none !important; }
       .compact-players .score-card .sc-name { font-size: .65rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-score { font-size: 1.1rem; white-space: nowrap; flex-shrink: 0; }
@@ -927,7 +932,7 @@
       
       return '<div class="score-card' + (crowded && isCricket ? ' compact-crowded' : '') + '" data-tv style="--pc:' + playerColor + '">' +
         '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
-        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
+        '<div class="sc-name">P' + p.slot + ' · ' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
         (compactCricketHtml || (isCricket ? cricketGridHtml : '')) +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
