@@ -47,6 +47,9 @@
     .stats-editor input:focus{border-color:#e63946;outline:none}
     .admin-player-tools{display:grid;grid-template-columns:1fr 1.5fr;gap:8px}
     .admin-player-tools input,.admin-player-tools select{width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit}
+    .diagnostic-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+    .diagnostic-columns .sec-hd{margin-top:24px}
+    .diagnostic-columns .status-info{height:100%}
     .duel-player-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:12px}
     .duel-player-list label{display:flex;align-items:center;gap:7px;background:#0d0d0d;border:1px solid #252525;border-radius:8px;padding:8px;color:#bbb;font-size:.8rem;cursor:pointer}
     .duel-player-list input{accent-color:#e63946}
@@ -54,6 +57,7 @@
     .duel-list{display:grid;gap:6px;margin-top:12px}
     .duel-row{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#0d0d0d;border:1px solid #202020;border-radius:8px;padding:8px 10px;color:#bbb;font-size:.78rem}
     .duel-row strong{color:#f4a261}
+    @media (max-width:700px){.diagnostic-columns{grid-template-columns:1fr}}
     @media (max-width:600px){.stats-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-player-tools{grid-template-columns:1fr}}
     @media (max-width:600px){.hs-filters{grid-template-columns:1fr}.duel-player-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
     .btn-save{background:#e63946;border:none;color:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:background .2s}
@@ -128,8 +132,10 @@
       <span class="label">Datenbank:</span><span class="value" id="si-db">-</span>
       <span class="label">Arduino:</span><span class="value" id="si-ard">-</span>
     </div>
-    <div class="sec-hd" style="margin-top:24px"><span class="sec-title">Raspberry-Pi-Diagnose</span><div class="sec-line"></div></div>
-    <div class="status-info" id="raspiDiagnostics">
+    <div class="diagnostic-columns">
+      <div>
+        <div class="sec-hd"><span class="sec-title">Raspberry-Pi-Diagnose</span><div class="sec-line"></div></div>
+        <div class="status-info" id="raspiDiagnostics">
       <span class="label">Host:</span><span class="value" id="rd-host">-</span>
       <span class="label">System:</span><span class="value" id="rd-system">-</span>
       <span class="label">CPU:</span><span class="value" id="rd-cpu">-</span>
@@ -139,9 +145,11 @@
       <span class="label">System-Uptime:</span><span class="value" id="rd-uptime">-</span>
       <span class="label">Prozess-Uptime:</span><span class="value" id="rd-process-uptime">-</span>
       <span class="label">Temperatur:</span><span class="value" id="rd-temperature">nicht verfügbar</span>
-    </div>
-    <div class="sec-hd" style="margin-top:24px"><span class="sec-title">Arduino-Telemetrie</span><div class="sec-line"></div></div>
-    <div class="status-info" id="arduinoTelemetry">
+        </div>
+      </div>
+      <div>
+        <div class="sec-hd"><span class="sec-title">Arduino-Telemetrie</span><div class="sec-line"></div></div>
+        <div class="status-info" id="arduinoTelemetry">
       <span class="label">Verbindung:</span><span class="value" id="at-connection">-</span>
       <span class="label">Aktive Kontakte:</span><span class="value" id="at-active">-</span>
       <span class="label">Uptime:</span><span class="value" id="at-uptime">-</span>
@@ -152,6 +160,8 @@
       <span class="label">Versorgung:</span><span class="value" id="at-voltage">nicht verfügbar</span>
       <span class="label">Strom:</span><span class="value" id="at-current">nicht verfügbar</span>
       <span class="label">Letzte serielle Zeile:</span><span class="value" id="at-line">-</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -317,6 +327,7 @@
       <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="highscores" checked /> Highscores</label></div>
       <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="settings" checked /> Einstellungen</label></div>
       <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="matrixMapping" checked /> Matrix-Mapping</label></div>
+      <div class="field-row"><label for="backupDestination">Ziel</label><select id="backupDestination"><option value="local">Pi-Speicher</option><option value="usb" disabled>USB (nicht konfiguriert)</option><option value="nextcloud" disabled>Nextcloud (nicht konfiguriert)</option></select></div>
       <button class="btn-save" id="createBackupBtn">Ausgewählte Bereiche sichern</button>
       <div id="backupList" style="margin-top:12px;color:#888;font-size:.8rem">Noch keine Backups geladen.</div>
     </div>
@@ -365,8 +376,20 @@
     const response = await fetch('/api/admin/backups');
     if (!response.ok) return;
     const data = await response.json();
+    const destinationSelect = document.getElementById('backupDestination');
+    const usbOption = destinationSelect.querySelector('option[value="usb"]');
+    const nextcloudOption = destinationSelect.querySelector('option[value="nextcloud"]');
+    usbOption.disabled = data.destinations?.usb !== true;
+    usbOption.textContent = data.destinations?.usb === true ? 'USB' : 'USB (nicht konfiguriert)';
+    nextcloudOption.disabled = data.destinations?.nextcloud !== true;
+    nextcloudOption.textContent = data.destinations?.nextcloud === true ? 'Nextcloud' : 'Nextcloud (nicht konfiguriert)';
+    if (destinationSelect.selectedOptions[0]?.disabled) destinationSelect.value = 'local';
     const target = document.getElementById('backupList');
-    target.innerHTML = data.backups.length ? data.backups.map(backup => `<div>${backup.createdAt || backup.id} · ${backup.areas.join(', ')}</div>`).join('') : 'Noch keine Backups vorhanden.';
+    target.innerHTML = data.backups.length ? data.backups.map(backup => {
+      const links = (backup.files || []).map(file => '<a href="/api/admin/backups/' + encodeURIComponent(backup.id) + '/' + encodeURIComponent(file.file) + '" download>' + escapeHtml(file.file) + '</a>').join(' · ');
+      const destination = backup.destination?.provider ? ' · ' + escapeHtml(backup.destination.provider) : '';
+      return '<div style="margin-bottom:8px">' + escapeHtml(backup.createdAt || backup.id) + destination + '<br><span style="color:#666">' + escapeHtml((backup.areas || []).join(', ')) + '</span><br>' + links + '</div>';
+    }).join('') : 'Noch keine Backups vorhanden.';
   }
 
   document.getElementById('adminLoginBtn').addEventListener('click', async () => {
@@ -426,8 +449,9 @@
   document.getElementById('createBackupBtn').addEventListener('click', async function() {
     this.disabled = true;
     const areas = Array.from(document.querySelectorAll('.admin-backup-area:checked')).map(input => input.value);
+    const destination = document.getElementById('backupDestination').value;
     try {
-      const response = await fetch('/api/admin/backups', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ areas }) });
+      const response = await fetch('/api/admin/backups', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ areas, destination }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Backup fehlgeschlagen');
       showToast('Backup erstellt: ' + result.id);

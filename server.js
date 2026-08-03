@@ -91,6 +91,11 @@ const BROWSER_PORT = Number(process.env.BROWSER_PORT || process.env.PORT || 3100
 const FIRETV_PORT = Number(process.env.FIRETV_PORT || 3200);
 const ADMIN_SESSION_TTL_MS = Number(process.env.ADMIN_SESSION_TTL_MS || 15 * 60 * 1000);
 const ADMIN_BACKUP_DIR = path.join(__dirname, 'data', 'backups');
+const BACKUP_USB_PATH = String(process.env.BACKUP_USB_PATH || '').trim();
+const NEXTCLOUD_WEBDAV_URL = String(process.env.NEXTCLOUD_WEBDAV_URL || '').trim();
+const NEXTCLOUD_USER = String(process.env.NEXTCLOUD_USER || '').trim();
+const NEXTCLOUD_PASSWORD = String(process.env.NEXTCLOUD_PASSWORD || '');
+const NEXTCLOUD_BACKUP_PATH = String(process.env.NEXTCLOUD_BACKUP_PATH || 'Dart-Dashboard-Backups').replace(/^\/+|\/+$/g, '');
 const adminSessions = new Map();
 let adminAuthEnabled = String(process.env.ADMIN_AUTH_ENABLED || 'true').toLowerCase() !== 'false';
 
@@ -502,8 +507,54 @@ function normalizeBackupAreas(areas) {
   return [...new Set(requested.map(value => String(value || '').trim()))].filter(value => Object.hasOwn(ADMIN_BACKUP_SOURCES, value));
 }
 
-async function createAdminBackup(areas) {
+function normalizeBackupDestination(destination) {
+  const value = String(destination || 'local').trim().toLowerCase();
+  return ['local', 'usb', 'nextcloud'].includes(value) ? value : 'local';
+}
+
+function copyDirectoryContents(sourceDir, targetDir) {
+  fs.mkdirSync(targetDir, { recursive: true });
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    const source = path.join(sourceDir, entry.name);
+    const target = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) copyDirectoryContents(source, target);
+    else fs.copyFileSync(source, target);
+  }
+}
+
+async function uploadBackupToNextcloud(backupId, backupDir, files) {
+  if (!NEXTCLOUD_WEBDAV_URL || !NEXTCLOUD_USER || !NEXTCLOUD_PASSWORD) {
+    throw new Error('Nextcloud ist nicht konfiguriert. NEXTCLOUD_WEBDAV_URL, NEXTCLOUD_USER und NEXTCLOUD_PASSWORD setzen.');
+  }
+  const baseUrl = new URL(NEXTCLOUD_WEBDAV_URL.endsWith('/') ? NEXTCLOUD_WEBDAV_URL : NEXTCLOUD_WEBDAV_URL + '/');
+  const remoteParts = [NEXTCLOUD_BACKUP_PATH, backupId].filter(Boolean).join('/').split('/').map(encodeURIComponent).join('/');
+  const authHeader = 'Basic ' + Buffer.from(NEXTCLOUD_USER + ':' + NEXTCLOUD_PASSWORD).toString('base64');
+  const remoteSegments = remoteParts.split('/');
+  for (let index = 0; index < remoteSegments.length; index += 1) {
+    const directoryUrl = new URL(remoteSegments.slice(0, index + 1).join('/') + '/', baseUrl);
+    const directoryResponse = await fetch(directoryUrl, { method: 'MKCOL', headers: { Authorization: authHeader } });
+    if (!directoryResponse.ok && directoryResponse.status !== 405) {
+      throw new Error('Nextcloud-Ordner konnte nicht angelegt werden (HTTP ' + directoryResponse.status + ').');
+    }
+  }
+  for (const file of files) {
+    const fileUrl = new URL(remoteParts + '/' + encodeURIComponent(file.file), baseUrl);
+    const response = await fetch(fileUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/octet-stream'
+      },
+      body: fs.readFileSync(path.join(backupDir, file.file))
+    });
+    if (!response.ok) throw new Error('Nextcloud-Upload fehlgeschlagen (HTTP ' + response.status + ').');
+  }
+  return { provider: 'nextcloud', path: remoteParts };
+}
+
+async function createAdminBackup(areas, destination = 'local') {
   const selectedAreas = normalizeBackupAreas(areas);
+  const selectedDestination = normalizeBackupDestination(destination);
   if (!selectedAreas.length) throw new Error('Keine gültigen Backup-Bereiche ausgewählt.');
   if (selectedAreas.includes('database') && !dataStore.isSQLite()) {
     throw new Error('Der Datenbank-Backup ist aktuell nur für SQLite verfügbar.');
@@ -528,6 +579,23 @@ async function createAdminBackup(areas) {
   }
   const manifest = { id: backupId, createdAt: new Date().toISOString(), areas: selectedAreas, files };
   fs.writeFileSync(path.join(backupDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+  let delivery = { provider: 'local', path: backupDir };
+  if (selectedDestination === 'usb') {
+    if (!BACKUP_USB_PATH) throw new Error('USB-Ziel ist nicht konfiguriert. BACKUP_USB_PATH setzen.');
+    const targetDir = path.join(BACKUP_USB_PATH, backupId);
+    copyDirectoryContents(backupDir, targetDir);
+    delivery = { provider: 'usb', path: targetDir };
+  }
+  manifest.destination = delivery;
+  fs.writeFileSync(path.join(backupDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+  if (selectedDestination === 'nextcloud') {
+    delivery = await uploadBackupToNextcloud(backupId, backupDir, [...files, { file: 'manifest.json' }]);
+    manifest.destination = delivery;
+    fs.writeFileSync(path.join(backupDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+    await uploadBackupToNextcloud(backupId, backupDir, [...files, { file: 'manifest.json' }]);
+  } else if (selectedDestination === 'usb') {
+    copyDirectoryContents(backupDir, path.join(BACKUP_USB_PATH, backupId));
+  }
   return manifest;
 }
 
@@ -2383,12 +2451,20 @@ app.put('/api/admin/auth/config', requireAdminPinChange, (req, res) => {
 });
 
 app.get('/api/admin/backups', requireAdmin, (_req, res) => {
-  res.json({ areas: Object.keys(ADMIN_BACKUP_SOURCES), backups: listAdminBackups() });
+  res.json({
+    areas: Object.keys(ADMIN_BACKUP_SOURCES),
+    destinations: {
+      local: true,
+      usb: Boolean(BACKUP_USB_PATH),
+      nextcloud: Boolean(NEXTCLOUD_WEBDAV_URL && NEXTCLOUD_USER && NEXTCLOUD_PASSWORD)
+    },
+    backups: listAdminBackups()
+  });
 });
 
 app.post('/api/admin/backups', requireAdmin, async (req, res) => {
   try {
-    const manifest = await createAdminBackup(req.body?.areas);
+    const manifest = await createAdminBackup(req.body?.areas, req.body?.destination);
     res.status(201).json(manifest);
   } catch (err) {
     res.status(400).json({ error: 'Backup konnte nicht erstellt werden: ' + err.message });
@@ -2401,7 +2477,7 @@ app.get('/api/admin/backups/:id/:file', requireAdmin, (req, res) => {
   if (!/^[0-9TZ]+$/.test(backupId) || !fileName || fileName !== req.params.file) return res.status(400).json({ error: 'Ungültiger Backup-Pfad.' });
   const manifest = readJson(path.join(ADMIN_BACKUP_DIR, backupId, 'manifest.json'), null);
   if (!manifest || !manifest.files.some(file => file.file === fileName)) return res.status(404).json({ error: 'Backup-Datei nicht gefunden.' });
-  res.sendFile(path.join(ADMIN_BACKUP_DIR, backupId, fileName));
+  res.download(path.join(ADMIN_BACKUP_DIR, backupId, fileName), fileName);
 });
 
 // ── Spielmodi ──
