@@ -95,7 +95,23 @@ class DataStore {
       throw new Error(`Unbekannter DB_CLIENT: ${this.client}`);
     }
 
+    await this.ensureHighscoreModeColumn();
     await this.seedFromLegacyJson();
+  }
+
+  async ensureHighscoreModeColumn() {
+    const query = this.isSQLite()
+      ? 'ALTER TABLE highscores ADD COLUMN game_mode TEXT'
+      : this.isPostgres()
+        ? 'ALTER TABLE highscores ADD COLUMN IF NOT EXISTS game_mode TEXT'
+        : 'ALTER TABLE highscores ADD COLUMN game_mode VARCHAR(64) NULL';
+    try {
+      if (this.isSQLite()) await this.sqlite.run(query);
+      else if (this.isPostgres()) await this.pg.query(query);
+      else await this.my.query(query);
+    } catch (err) {
+      if (!/duplicate|already exists/i.test(String(err.message || ''))) throw err;
+    }
   }
 
   async createSchemaSQLite() {
@@ -118,6 +134,7 @@ class DataStore {
         player TEXT NOT NULL,
         score INTEGER NOT NULL,
         kind TEXT,
+        game_mode TEXT,
         leg_win INTEGER NOT NULL DEFAULT 0,
         ts INTEGER NOT NULL
       );
@@ -190,6 +207,7 @@ class DataStore {
         player TEXT NOT NULL,
         score INTEGER NOT NULL,
         kind TEXT,
+        game_mode TEXT,
         leg_win BOOLEAN NOT NULL DEFAULT FALSE,
         ts BIGINT NOT NULL
       );
@@ -266,6 +284,7 @@ class DataStore {
         player VARCHAR(255) NOT NULL,
         score INT NOT NULL,
         kind VARCHAR(64) NULL,
+        game_mode VARCHAR(64) NULL,
         leg_win TINYINT(1) NOT NULL DEFAULT 0,
         ts BIGINT NOT NULL
       );
@@ -573,25 +592,26 @@ class DataStore {
     );
   }
 
-  async getHighscores(limit = 100) {
+  async getHighscores(limit = 100, gameMode = '') {
     const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+    const safeMode = String(gameMode || '').trim();
     let rows = [];
 
     if (this.isSQLite()) {
       rows = await this.sqlite.all(
-        'SELECT id, player, score, kind, leg_win AS legWin, ts FROM highscores ORDER BY score DESC, ts DESC LIMIT ?',
-        [safeLimit]
+        'SELECT id, player, score, kind, game_mode AS gameMode, leg_win AS legWin, ts FROM highscores ' + (safeMode ? 'WHERE game_mode = ? ' : '') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
     } else if (this.isPostgres()) {
       const result = await this.pg.query(
-        'SELECT id, player, score, kind, leg_win AS "legWin", ts FROM highscores ORDER BY score DESC, ts DESC LIMIT $1',
-        [safeLimit]
+        'SELECT id, player, score, kind, game_mode AS "gameMode", leg_win AS "legWin", ts FROM highscores ' + (safeMode ? 'WHERE game_mode = $1 ' : '') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
+        safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result.rows;
     } else {
       const result = await this.my.query(
-        'SELECT id, player, score, kind, leg_win AS legWin, ts FROM highscores ORDER BY score DESC, ts DESC LIMIT ?',
-        [safeLimit]
+        'SELECT id, player, score, kind, game_mode AS gameMode, leg_win AS legWin, ts FROM highscores ' + (safeMode ? 'WHERE game_mode = ? ' : '') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result[0];
     }
@@ -601,6 +621,7 @@ class DataStore {
       player: String(r.player || ''),
       score: Number(r.score || 0),
       kind: r.kind || null,
+      gameMode: r.gameMode || null,
       legWin: toBool(r.legWin),
       ts: Number(r.ts || 0)
     }));
@@ -614,28 +635,29 @@ class DataStore {
     }
 
     const kind = entry && entry.kind ? String(entry.kind) : null;
+    const gameMode = entry && entry.gameMode ? String(entry.gameMode) : null;
     const legWin = toBool(entry && entry.legWin);
     const ts = Number(entry && entry.ts ? entry.ts : Date.now());
 
     if (this.isSQLite()) {
       await this.sqlite.run(
-        'INSERT INTO highscores (player, score, kind, leg_win, ts) VALUES (?, ?, ?, ?, ?)',
-        [player, score, kind, legWin ? 1 : 0, ts]
+        'INSERT INTO highscores (player, score, kind, game_mode, leg_win, ts) VALUES (?, ?, ?, ?, ?, ?)',
+        [player, score, kind, gameMode, legWin ? 1 : 0, ts]
       );
       return;
     }
 
     if (this.isPostgres()) {
       await this.pg.query(
-        'INSERT INTO highscores (player, score, kind, leg_win, ts) VALUES ($1, $2, $3, $4, $5)',
-        [player, score, kind, legWin, ts]
+        'INSERT INTO highscores (player, score, kind, game_mode, leg_win, ts) VALUES ($1, $2, $3, $4, $5, $6)',
+        [player, score, kind, gameMode, legWin, ts]
       );
       return;
     }
 
     await this.my.query(
-      'INSERT INTO highscores (player, score, kind, leg_win, ts) VALUES (?, ?, ?, ?, ?)',
-      [player, score, kind, legWin ? 1 : 0, ts]
+      'INSERT INTO highscores (player, score, kind, game_mode, leg_win, ts) VALUES (?, ?, ?, ?, ?, ?)',
+      [player, score, kind, gameMode, legWin ? 1 : 0, ts]
     );
   }
 

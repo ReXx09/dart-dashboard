@@ -1116,14 +1116,14 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   if (!isCricket && player.remaining === 0) {
     player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino' });
+    await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
   } else if (isCricket && checkCricketWin(player, state.players)) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino' });
+    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino', gameMode: mode });
     state.game.status = 'leg-finished';
     state.lastAction.cricketWin = true;
     state.lastAction.winner = player.name;
@@ -1134,7 +1134,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     const winner = getEliminationWinner(state);
     if (winner) {
       winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
-      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino' });
+      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino', gameMode: mode });
       state.game.status = 'leg-finished';
       state.lastAction.eliminationWin = true;
       state.lastAction.winner = winner.name;
@@ -1437,14 +1437,14 @@ async function applyArduinoThrowFromMatrix(hit) {
   if (!isCricket && player.remaining === 0) {
     player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino-matrix' });
+    await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
   } else if (isCricket && checkCricketWin(player, state.players)) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix' });
+    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix', gameMode: mode });
     state.game.status = 'leg-finished';
     state.lastAction.cricketWin = true;
     state.lastAction.winner = player.name;
@@ -1455,7 +1455,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     const winner = getEliminationWinner(state);
     if (winner) {
       winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
-      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino-matrix' });
+      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino-matrix', gameMode: mode });
       state.game.status = 'leg-finished';
       state.lastAction.eliminationWin = true;
       state.lastAction.winner = winner.name;
@@ -1902,7 +1902,7 @@ async function addTurnScoreHighscoreIfNeeded(player, state, source = 'live') {
   const kind = getTurnScoreHighscoreKind(turnScore);
   if (!kind) return;
 
-  await addHighscore(player.name, turnScore, { kind, source });
+  await addHighscore(player.name, turnScore, { kind, source, gameMode: state.game.mode });
   player.turnScoreRecorded = true;
 }
 
@@ -2029,13 +2029,13 @@ async function saveLiveState(state) {
   return safe;
 }
 
-async function getHighscores() { return dataStore.getHighscores(100); }
+async function getHighscores(gameMode = '') { return dataStore.getHighscores(500, gameMode); }
 
 async function addHighscore(playerName, score, meta = {}) {
   const safeName = String(playerName || '').trim();
   const safeScore = Number(score || 0);
   if (!safeName || !Number.isFinite(safeScore) || safeScore <= 0) return;
-  await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, ...meta });
+  await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, gameMode: meta.gameMode || meta.mode || null, ...meta });
 }
 
 // ──────────────────────────────────────────────
@@ -2316,13 +2316,13 @@ app.post('/api/live/throw', async (req, res) => {
     if (!isCricket && player.remaining === 0) {
       player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
       player.legs += 1;
-      await addHighscore(player.name, points, { kind: 'checkout', legWin: true });
+      await addHighscore(player.name, points, { kind: 'checkout', legWin: true, gameMode: mode });
       state.game.status = 'leg-finished';
       // Record stats after leg finish
       await recordPlayerLegStats(player, state);
     } else if (isCricket && checkCricketWin(player, state.players)) {
       player.legs += 1;
-      await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true });
+      await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, gameMode: mode });
       state.game.status = 'leg-finished';
       state.lastAction.cricketWin = true;
       state.lastAction.winner = player.name;
@@ -2333,7 +2333,7 @@ app.post('/api/live/throw', async (req, res) => {
       const winner = getEliminationWinner(state);
       if (winner) {
         winner.legs += 1;
-        await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true });
+        await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, gameMode: mode });
         state.game.status = 'leg-finished';
         state.lastAction.eliminationWin = true;
         state.lastAction.winner = winner.name;
@@ -2437,7 +2437,7 @@ app.post('/api/live/undo', async (req, res) => {
 
 // ── Highscores ──
 app.get('/api/highscores', async (_req, res) => {
-  try { res.json(await getHighscores()); }
+  try { res.json(await getHighscores(_req.query.gameMode)); }
   catch (err) { res.status(500).json({ error: 'Highscores konnten nicht geladen werden: ' + err.message }); }
 });
 

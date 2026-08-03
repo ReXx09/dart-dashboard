@@ -124,6 +124,17 @@
     .metric-player { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .metric-value { color: var(--accent); font-weight: 900; font-variant-numeric: tabular-nums; }
     .metric-empty { color: #555; padding: 12px 0; font-size: .75rem; }
+    .games-section { margin-top: 18px; }
+    .game-highscore-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .game-card { background: #141414; border: 1px solid #1e1e1e; border-radius: 14px; overflow: hidden; }
+    .game-card h3 { padding: 12px 14px; color: #f4a261; font-size: .78rem; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid #1e1e1e; }
+    .game-card ol { list-style: none; padding: 4px 14px 10px; }
+    .game-card li { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; padding: 8px 0; border-bottom: 1px solid #1e1e1e; font-size: .8rem; }
+    .game-card li:last-child { border-bottom: 0; }
+    .game-card .rank { color: #666; }
+    .game-card .player { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .game-card .score { color: #f4a261; font-weight: 900; }
+    @media (max-width: 1100px) { .game-highscore-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     @media (max-width: 1100px) { .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     .tables-grid {
       display: grid;
@@ -259,6 +270,7 @@
     }
     @media (max-width: 900px) {
       .toolbar, .tables-grid, .summary-grid { grid-template-columns: 1fr; }
+      .game-highscore-grid, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .toolbar { display: flex; flex-direction: column; }
       th, td { padding: 9px 8px; font-size: .78rem; }
     }
@@ -303,6 +315,20 @@
         </select>
       </div>
       <div>
+        <label for="gameModeFilter">Spiel</label>
+        <select id="gameModeFilter">
+          <option value="">Alle Spiele</option>
+          <option value="501">501</option>
+          <option value="301">301</option>
+          <option value="701">701</option>
+          <option value="cricket">Cricket</option>
+          <option value="elimination">Elimination</option>
+          <option value="shanghai">Shanghai</option>
+          <option value="atc">Around the Clock</option>
+          <option value="split">Split</option>
+        </select>
+      </div>
+      <div>
         <label for="playerFilter">Spieler filtern</label>
         <select id="playerFilter">
           <option value="">Alle Spieler</option>
@@ -343,6 +369,13 @@
         <select id="overviewMode" aria-label="Spielmodus für Übersicht"><option value="gesamt">Gesamt</option></select>
       </div>
       <div class="metric-grid" id="metricGrid"></div>
+    </section>
+
+    <section class="games-section">
+      <div class="overview-header">
+        <div><h2>Highscores nach Spiel</h2><p>Die besten gespeicherten Werte je Spielmodus</p></div>
+      </div>
+      <div class="game-highscore-grid" id="gameHighscoreGrid"></div>
     </section>
 
     <div class="tables-grid">
@@ -400,6 +433,7 @@
   <script>
     let allScores = [];
     let selectedFilter = 'all';
+    let selectedGameMode = '';
     let overviewData = null;
 
     const LIST_LABELS = {
@@ -501,9 +535,22 @@
     function filterScores() {
       const player = document.getElementById('playerFilter').value;
       return allScores
+        .filter(entry => !selectedGameMode || String(entry.gameMode || '').toLowerCase() === selectedGameMode)
         .filter(entry => scoreMatchesFilter(entry, selectedFilter))
         .filter(entry => !player || String(entry.player) === player)
         .sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0));
+    }
+
+    function renderGameHighscores() {
+      const grid = document.getElementById('gameHighscoreGrid');
+      const modes = ['501', '301', '701', 'cricket', 'elimination', 'shanghai', 'atc', 'split'];
+      const labels = { cricket: 'Cricket', elimination: 'Elimination', shanghai: 'Shanghai', atc: 'Around the Clock', split: 'Split' };
+      grid.innerHTML = modes.map(mode => {
+        const rows = allScores.filter(entry => String(entry.gameMode || '').toLowerCase() === mode).sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 5);
+        return '<article class="game-card"><h3>' + (labels[mode] || mode) + '</h3><ol>' +
+          (rows.length ? rows.map((entry, index) => '<li><span class="rank">' + (index + 1) + '</span><span class="player">' + escapeHtml(entry.player) + '</span><span class="score">' + entry.score + '</span></li>').join('') : '<li class="metric-empty">Noch keine Daten</li>') +
+          '</ol></article>';
+      }).join('');
     }
 
     function buildBestByPlayer(list) {
@@ -609,6 +656,7 @@
         const response = await fetch('/api/highscores');
         if (!response.ok) throw new Error('HTTP ' + response.status);
         allScores = await response.json();
+        renderGameHighscores();
         render();
       } catch (err) {
         showToast('Highscores konnten nicht geladen werden.', true);
@@ -625,6 +673,10 @@
 
     document.getElementById('scoreSelect').addEventListener('change', event => {
       selectedFilter = event.target.value;
+      render();
+    });
+    document.getElementById('gameModeFilter').addEventListener('change', event => {
+      selectedGameMode = event.target.value;
       render();
     });
     document.getElementById('overviewMode').addEventListener('change', renderOverview);
