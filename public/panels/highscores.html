@@ -115,6 +115,32 @@
     .overview-header h2 { font-size: 1rem; }
     .overview-header p { color: #666; font-size: .75rem; margin-top: 4px; }
     .overview-header select { width: auto; min-width: 160px; }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 0;
+      background: #0f0f0f;
+      border-radius: 8px;
+      padding: 4px;
+    }
+    .tab {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #777;
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 700;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .tab:hover { color: #ddd; }
+    .tab.active { background: #e63946; color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
     .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
     .metric-card { background: #141414; border: 1px solid #1e1e1e; border-radius: 14px; overflow: hidden; min-width: 0; }
     .metric-card h3 { padding: 12px 14px; font-size: .68rem; color: #aaa; text-transform: uppercase; letter-spacing: 1.2px; border-top: 3px solid var(--accent); }
@@ -273,6 +299,8 @@
       .toolbar, .tables-grid, .summary-grid { grid-template-columns: 1fr; }
       .game-highscore-grid, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .toolbar { display: flex; flex-direction: column; }
+      .tabs { overflow-x: auto; }
+      .tab { flex: 0 0 auto; }
       th, td { padding: 9px 8px; font-size: .78rem; }
     }
   </style>
@@ -368,68 +396,73 @@
       </div>
     </div>
 
-    <section>
-      <div class="overview-header">
-        <div><h2>Top 3 pro Kennzahl</h2><p id="overviewStatus">Gesamtwerte aus dem aktiven Statistik-Tracking</p></div>
-        <select id="overviewMode" aria-label="Spielmodus für Übersicht"><option value="gesamt">Gesamt</option></select>
-      </div>
-      <div class="metric-grid" id="metricGrid"></div>
-    </section>
+    <div class="tabs" role="tablist" aria-label="Highscore-Bereiche">
+      <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="overview">Übersicht</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="games">Spielmodi</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="players">Spieler</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="scores">Alle Scores</button>
+    </div>
 
-    <section class="games-section">
-      <div class="overview-header">
-        <div><h2>Highscores nach Spiel</h2><p>Die besten gespeicherten Werte je Spielmodus</p></div>
-      </div>
-      <div class="game-highscore-grid" id="gameHighscoreGrid"></div>
-    </section>
-
-    <div class="tables-grid">
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title" id="listTitle">Best Off</div>
-            <div class="panel-subtitle" id="listSubtitle">Alle gespeicherten Scores</div>
-          </div>
-          <div class="legend" id="legend"></div>
+    <div class="tab-panel active" id="tab-overview" role="tabpanel">
+      <section>
+        <div class="overview-header">
+          <div><h2>Top 3 pro Kennzahl</h2><p id="overviewStatus">Gesamtwerte aus dem aktiven Statistik-Tracking</p></div>
+          <select id="overviewMode" aria-label="Spielmodus für Übersicht"><option value="gesamt">Gesamt</option></select>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th class="rank">#</th>
-              <th>Spieler</th>
-              <th>Score</th>
-              <th>Typ</th>
-              <th>Zeit</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="scoreBody">
-            <tr><td colspan="5" class="empty">Lade Highscores...</td></tr>
-          </tbody>
-        </table>
+        <div class="metric-grid" id="metricGrid"></div>
       </section>
+    </div>
 
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">Best Off</div>
-            <div class="panel-subtitle">Beste Einträge pro Spieler</div>
-          </div>
+    <div class="tab-panel" id="tab-games" role="tabpanel">
+      <section class="games-section">
+        <div class="overview-header">
+          <div><h2>Highscores nach Spiel</h2><p>Die besten gespeicherten Werte je Spielmodus</p></div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th class="rank">#</th>
-              <th>Spieler</th>
-              <th>Best</th>
-              <th>Einträge</th>
-            </tr>
-          </thead>
-          <tbody id="bestByPlayerBody">
-            <tr><td colspan="4" class="empty">Lade Best-Off...</td></tr>
-          </tbody>
-        </table>
+        <div class="game-highscore-grid" id="gameHighscoreGrid"></div>
       </section>
+    </div>
+
+    <div class="tab-panel" id="tab-players" role="tabpanel">
+      <div class="tables-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Best Off</div>
+              <div class="panel-subtitle">Beste Einträge pro Spieler</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr><th class="rank">#</th><th>Spieler</th><th>Best</th><th>Einträge</th></tr>
+            </thead>
+            <tbody id="bestByPlayerBody">
+              <tr><td colspan="4" class="empty">Lade Best-Off...</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-scores" role="tabpanel">
+      <div class="tables-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title" id="listTitle">Best Off</div>
+              <div class="panel-subtitle" id="listSubtitle">Alle gespeicherten Scores</div>
+            </div>
+            <div class="legend" id="legend"></div>
+          </div>
+          <table>
+            <thead>
+              <tr><th class="rank">#</th><th>Spieler</th><th>Score</th><th>Typ</th><th>Zeit</th><th></th></tr>
+            </thead>
+            <tbody id="scoreBody">
+              <tr><td colspan="6" class="empty">Lade Highscores...</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
     </div>
   </main>
 
@@ -485,6 +518,19 @@
       ['highestCheckout', 'Höchster Checkout', '#9b5de5', value => value],
       ['gamesWon', 'Gewonnene Spiele', '#457b9d', value => value]
     ];
+
+    document.querySelectorAll('.tab').forEach(button => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(tab => {
+          const active = tab === button;
+          tab.classList.toggle('active', active);
+          tab.setAttribute('aria-selected', String(active));
+        });
+        document.querySelectorAll('.tab-panel').forEach(panel => {
+          panel.classList.toggle('active', panel.id === 'tab-' + button.dataset.tab);
+        });
+      });
+    });
 
     function renderOverview() {
       const grid = document.getElementById('metricGrid');
