@@ -238,6 +238,39 @@
     .tab.active { background: #e63946; color: #fff; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .encounter-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .encounter-toolbar select { width: auto; min-width: 190px; }
+    .encounter-grid { display: grid; gap: 10px; }
+    .encounter-card {
+      background: #0f0f0f;
+      border: 1px solid #262626;
+      border-left: 3px solid #f4a261;
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .encounter-card-head,
+    .encounter-card-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    .encounter-card-head strong { color: #f1f1f1; }
+    .encounter-card-head span,
+    .encounter-card-meta { color: #777; font-size: .72rem; }
+    .encounter-card-players { color: #bbb; font-size: .8rem; margin: 8px 0; }
+    .encounter-empty { color: #555; text-align: center; padding: 24px 12px; }
+    @media (max-width: 768px) {
+      .encounter-toolbar { align-items: stretch; flex-direction: column; }
+      .encounter-toolbar select { width: 100%; }
+      .encounter-card-head, .encounter-card-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+    }
     @media (max-width: 768px) {
       .toolbar { grid-template-columns: 1fr; }
       .summary-grid { grid-template-columns: 1fr 1fr; }
@@ -285,6 +318,7 @@
       <button class="tab" data-tab="scoring">Scoring</button>
       <button class="tab" data-tab="checkout">Checkout</button>
       <button class="tab" data-tab="history">Leg-History</button>
+      <button class="tab" data-tab="encounters">Begegnungen</button>
     </div>
 
     <div class="tab-panel active" id="tab-overview">
@@ -346,11 +380,33 @@
         </div>
       </div>
     </div>
+
+    <div class="tab-panel" id="tab-encounters">
+      <div class="section">
+        <div class="encounter-toolbar">
+          <div>
+            <h2 class="section-title" style="margin-bottom:0">Duelle und Gruppen-Begegnungen</h2>
+            <p class="stat-sub" id="encounterPlayerStatus">Wähle einen Spieler für seine Begegnungswerte.</p>
+          </div>
+          <select id="encounterCategory" aria-label="Begegnungskategorie">
+            <option value="all">Alle Begegnungen</option>
+            <option value="duel">2-Player-Duelle</option>
+            <option value="group">Gruppen mit 3–8 Spielern</option>
+          </select>
+        </div>
+        <div class="stats-grid" id="encounterStats"></div>
+        <div class="encounter-grid" id="encounterList">
+          <div class="encounter-empty">Begegnungen werden geladen...</div>
+        </div>
+      </div>
+    </div>
   </main>
   <script>
     const API_BASE = '/api';
     let currentPlayerId = null;
     let currentSeason = '2026';
+    let encounters = [];
+    let selectedEncounterCategory = 'all';
 
     // DOM Elements
     const playerSelect = document.getElementById('playerSelect');
@@ -435,8 +491,60 @@
         renderScoring(stats);
         renderCheckout(stats);
         renderHistory(history);
+        loadEncounterStats();
       } catch (e) {
         console.error('Failed to load stats:', e);
+      }
+    }
+
+    function renderEncounterStats(data) {
+      const container = document.getElementById('encounterStats');
+      if (!currentPlayerId || !data || !data.legs) {
+        container.innerHTML = '<div class="stat-item"><div class="stat-label">Begegnungswerte</div><div class="stat-value">-</div><div class="stat-sub">Spieler auswählen</div></div>';
+        document.getElementById('encounterPlayerStatus').textContent = 'Wähle einen Spieler für seine Begegnungswerte.';
+        return;
+      }
+      const player = (data.players || [])[0] || {};
+      const winRate = data.legs > 0 ? ((Number(player.wins || 0) / Number(data.legs)) * 100).toFixed(1) : '0.0';
+      container.innerHTML = `
+        <div class="stat-item"><div class="stat-label">Begegnungen</div><div class="stat-value">${data.duels || 0}</div><div class="stat-sub">${data.legs || 0} Legs</div></div>
+        <div class="stat-item"><div class="stat-label">Begegnungs-Average</div><div class="stat-value">${Number(player.average || 0).toFixed(2)}</div><div class="stat-sub">3-Dart</div></div>
+        <div class="stat-item"><div class="stat-label">Siege</div><div class="stat-value">${Number(player.wins || 0)}</div><div class="stat-sub">${winRate}% der Legs</div></div>
+        <div class="stat-item"><div class="stat-label">180er</div><div class="stat-value">${Number(player.count180 || 0)}</div><div class="stat-sub">in Begegnungen</div></div>
+      `;
+      document.getElementById('encounterPlayerStatus').textContent = 'Aggregierte Werte des ausgewählten Spielers aus Duellen und Gruppen.';
+    }
+
+    async function loadEncounterStats() {
+      if (!currentPlayerId) { renderEncounterStats(null); return; }
+      try {
+        const response = await fetch(`${API_BASE}/duel-stats?playerSlots=${currentPlayerId}&category=${selectedEncounterCategory}`, { cache: 'no-store' });
+        renderEncounterStats(response.ok ? await response.json() : null);
+      } catch (_error) { renderEncounterStats(null); }
+    }
+
+    function renderEncounters() {
+      const list = document.getElementById('encounterList');
+      const visible = encounters.filter(encounter => selectedEncounterCategory === 'all' || encounter.category === selectedEncounterCategory);
+      if (!visible.length) {
+        list.innerHTML = '<div class="encounter-empty">Noch keine Begegnungen in dieser Kategorie.</div>';
+        return;
+      }
+      list.innerHTML = visible.map(encounter => {
+        const players = (encounter.players || []).map(player => player.player_name).join(' · ');
+        const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
+        return `<article class="encounter-card"><div class="encounter-card-head"><strong>${escapeHtml(encounter.categoryLabel || 'Begegnung')} · ${escapeHtml(encounter.mode)}</strong><span>#${Number(encounter.id)}</span></div><div class="encounter-card-players">${escapeHtml(players)}</div><div class="encounter-card-meta"><span>${Number(encounter.total_legs || 0)} Legs · ${escapeHtml(encounter.status || '')}</span><span>${winner ? 'Sieger: ' + escapeHtml(winner.player_name) : 'Sieger wird noch ermittelt'}</span></div></article>`;
+      }).join('');
+    }
+
+    async function loadEncounters() {
+      try {
+        const response = await fetch(API_BASE + '/duels?limit=100', { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        encounters = await response.json();
+        renderEncounters();
+      } catch (_error) {
+        document.getElementById('encounterList').innerHTML = '<div class="encounter-empty">Begegnungen konnten nicht geladen werden.</div>';
       }
     }
 
@@ -585,7 +693,14 @@
       loadStats();
     });
 
+    document.getElementById('encounterCategory').addEventListener('change', event => {
+      selectedEncounterCategory = event.target.value;
+      renderEncounters();
+      loadEncounterStats();
+    });
+
     refreshBtn.addEventListener('click', loadStats);
+    loadEncounters();
 
     // Init
     loadPlayers().then(() => {

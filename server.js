@@ -3058,13 +3058,10 @@ app.get('/api/highscores/daily', async (_req, res) => {
 app.get('/api/highscores/overview', async (_req, res) => {
   try {
     const players = await dataStore.getPlayers();
-    const profiles = await dataStore.getProfiles();
-    const profileNames = new Set(profiles.map(profile => String(profile.name || '').trim().toLowerCase()).filter(Boolean));
     const entries = [];
     for (const player of players) {
       if (!player.name) continue;
       if (!player.active) continue;
-      if (profileNames.size > 0 && !profileNames.has(String(player.name).trim().toLowerCase())) continue;
       const stats = await dataStore.getPlayerStats(player.slot) || {};
       const darts = Number(stats.total_darts || 0);
       const totalScored = Number(stats.total_scored || 0);

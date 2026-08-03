@@ -141,6 +141,30 @@
     .tab.active { background: #e63946; color: #fff; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .encounter-score-grid { display: grid; gap: 12px; }
+    .encounter-score-card {
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-left: 3px solid #9b5de5;
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .encounter-score-head,
+    .encounter-score-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .encounter-score-head strong { color: #f1f1f1; }
+    .encounter-score-head span,
+    .encounter-score-meta { color: #777; font-size: .72rem; }
+    .encounter-score-players { color: #bbb; font-size: .8rem; margin: 8px 0 12px; }
+    .encounter-score-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .encounter-score-stat { background: #0f0f0f; border: 1px solid #262626; border-radius: 8px; padding: 8px; }
+    .encounter-score-stat small { display: block; color: #666; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
+    .encounter-score-stat strong { display: block; color: #f4a261; font-size: 1.05rem; margin-top: 3px; }
+    .encounter-empty { color: #555; text-align: center; padding: 30px 16px; }
     .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
     .metric-card { background: #141414; border: 1px solid #1e1e1e; border-radius: 14px; overflow: hidden; min-width: 0; }
     .metric-card h3 { padding: 12px 14px; font-size: .68rem; color: #aaa; text-transform: uppercase; letter-spacing: 1.2px; border-top: 3px solid var(--accent); }
@@ -301,6 +325,8 @@
       .toolbar { display: flex; flex-direction: column; }
       .tabs { overflow-x: auto; }
       .tab { flex: 0 0 auto; }
+      .encounter-score-head, .encounter-score-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+      .encounter-score-stats { grid-template-columns: 1fr; }
       th, td { padding: 9px 8px; font-size: .78rem; }
     }
   </style>
@@ -401,6 +427,7 @@
       <button class="tab" type="button" role="tab" aria-selected="false" data-tab="games">Spielmodi</button>
       <button class="tab" type="button" role="tab" aria-selected="false" data-tab="players">Spieler</button>
       <button class="tab" type="button" role="tab" aria-selected="false" data-tab="scores">Alle Scores</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="encounters">Begegnungen</button>
     </div>
 
     <div class="tab-panel active" id="tab-overview" role="tabpanel">
@@ -419,6 +446,17 @@
           <div><h2>Highscores nach Spiel</h2><p>Die besten gespeicherten Werte je Spielmodus</p></div>
         </div>
         <div class="game-highscore-grid" id="gameHighscoreGrid"></div>
+      </section>
+    </div>
+
+    <div class="tab-panel" id="tab-encounters" role="tabpanel">
+      <section>
+        <div class="overview-header">
+          <div><h2>Begegnungs-Highscores</h2><p>Bestwerte aus 2-Player-Duellen und Gruppen mit 3–8 Spielern</p></div>
+        </div>
+        <div class="encounter-score-grid" id="encounterScoreGrid">
+          <div class="encounter-empty">Begegnungen werden geladen...</div>
+        </div>
       </section>
     </div>
 
@@ -474,6 +512,7 @@
     let selectedFilter = 'all';
     let selectedGameMode = '';
     let overviewData = null;
+    let encounters = [];
 
     const LIST_LABELS = {
       all: 'Best Off – alle Scores',
@@ -559,6 +598,40 @@
       }
     }
 
+    function getEncounterBestValues(encounter) {
+      const players = (encounter.legs || []).flatMap(leg => leg.players || []);
+      return {
+        average: players.reduce((best, player) => Math.max(best, Number(player.average || 0)), 0),
+        bestTurn: players.reduce((best, player) => Math.max(best, Number(player.best_turn || 0)), 0),
+        count180: players.reduce((total, player) => total + Number(player.count_180 || 0), 0)
+      };
+    }
+
+    function renderEncounters() {
+      const grid = document.getElementById('encounterScoreGrid');
+      if (!encounters.length) {
+        grid.innerHTML = '<div class="encounter-empty">Noch keine Duelle oder Gruppen-Begegnungen gespeichert.</div>';
+        return;
+      }
+      grid.innerHTML = encounters.map(encounter => {
+        const best = getEncounterBestValues(encounter);
+        const participants = (encounter.players || []).map(player => player.player_name).join(' · ');
+        const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
+        return `<article class="encounter-score-card"><div class="encounter-score-head"><strong>${escapeHtml(encounter.categoryLabel || 'Begegnung')} · ${escapeHtml(encounter.mode)}</strong><span>#${Number(encounter.id)} · ${escapeHtml(encounter.status || '')}</span></div><div class="encounter-score-players">${escapeHtml(participants)}</div><div class="encounter-score-stats"><div class="encounter-score-stat"><small>Best 3-Dart Avg</small><strong>${best.average.toFixed(2)}</strong></div><div class="encounter-score-stat"><small>Best Turn</small><strong>${best.bestTurn}</strong></div><div class="encounter-score-stat"><small>180er gesamt</small><strong>${best.count180}</strong></div></div><div class="encounter-score-meta"><span>${Number(encounter.total_legs || 0)} Legs</span><span>${winner ? 'Sieger: ' + escapeHtml(winner.player_name) : 'Sieger wird noch ermittelt'}</span></div></article>`;
+      }).join('');
+    }
+
+    async function loadEncounters() {
+      try {
+        const response = await fetch('/api/duels?limit=100', { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        encounters = await response.json();
+        renderEncounters();
+      } catch (_error) {
+        document.getElementById('encounterScoreGrid').innerHTML = '<div class="encounter-empty">Begegnungen konnten nicht geladen werden.</div>';
+      }
+    }
+
     function formatTime(ts) {
       if (!ts) return '-';
       return new Date(ts).toLocaleString('de-DE', {
@@ -603,12 +676,21 @@
         .sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0));
     }
 
+    function isGameHighscoreEntry(entry, mode) {
+      const kind = normalizeKind(entry.kind);
+      const entryMode = String(entry.gameMode || '').toLowerCase();
+      if (entryMode !== mode) return false;
+      if (mode === 'cricket') return kind === 'cricket' || (!entry.legWin && kind !== 'manual' && kind !== 'checkout');
+      if (mode === 'elimination') return kind === 'elimination' || (!entry.legWin && kind !== 'manual' && kind !== 'checkout');
+      return Number(entry.score || 0) >= 100 && !entry.legWin && kind !== 'checkout' && kind !== 'manual' && kind !== 'cricket' && kind !== 'elimination';
+    }
+
     function renderGameHighscores() {
       const grid = document.getElementById('gameHighscoreGrid');
       const modes = ['501', '301', '701', 'cricket', 'elimination', 'shanghai', 'atc', 'split'];
       const labels = { cricket: 'Cricket', elimination: '301-Elimination', shanghai: 'Shanghai', atc: 'Around the Clock', split: 'Split' };
       grid.innerHTML = modes.map(mode => {
-        const rows = allScores.filter(entry => String(entry.gameMode || '').toLowerCase() === mode).sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 5);
+        const rows = allScores.filter(entry => isGameHighscoreEntry(entry, mode)).sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 5);
         return '<article class="game-card"><h3>' + (labels[mode] || mode) + '</h3><ol>' +
           (rows.length ? rows.map((entry, index) => '<li><span class="rank">' + (index + 1) + '</span><span class="player">' + escapeHtml(entry.player) + '</span><span class="score">' + entry.score + '</span></li>').join('') : '<li class="metric-empty">Noch keine Daten</li>') +
           '</ol></article>';
@@ -765,6 +847,7 @@
 
     loadScores();
     loadOverview();
+    loadEncounters();
   </script>
 </body>
 </html>
