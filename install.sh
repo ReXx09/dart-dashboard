@@ -15,6 +15,8 @@ run_action() {
   case "$action" in
     quickstart)     run_quickstart_wizard ;;
     check)          run_system_check_and_install ;;
+    pin-hash)       generate_admin_pin_hash ;;
+    raspi-update)   run_raspi_update ;;
     build-start)    build_and_start ;;
     start)          start_existing ;;
     stop)           stop_stack ;;
@@ -49,6 +51,8 @@ Actions:
   menu            Startet das eigenstaendige Menue (menu.sh)
   quickstart      Komplettassistent (Pruefen + Einrichten + Start + Tests)
   check           Systemcheck + Auto-Installation
+  pin-hash        Gefuehrter Admin-PIN-Assistent, Hash in .env speichern
+  raspi-update    Raspberry-Pi-Firmware aktualisieren (mit Bestaetigung)
   build-start     Install/Update + Build + Start
   start           Nur Start (ohne Build)
   stop            Container stoppen
@@ -88,7 +92,7 @@ if [[ $# -eq 0 || "${1:-}" == "menu" ]]; then
 fi
 
 case "${1:-}" in
-  quickstart|check|build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|arduino-status|arduino-connect|arduino-disconnect|help-guide)
+  quickstart|check|pin-hash|raspi-update|build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|arduino-status|arduino-connect|arduino-disconnect|help-guide)
     run_action "$1"
     ;;
   -h|--help|help)

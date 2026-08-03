@@ -69,3 +69,22 @@ run_system_check_and_install() {
   msg_ok 'Installation abgeschlossen.'
   msg_info 'Tipp: Nach der Installation einmal aus- und einloggen, damit die Docker-Gruppe aktiv wird.'
 }
+
+generate_admin_pin_hash() {
+  bash "$SCRIPT_DIR/scripts/generate-pin-hash.sh"
+}
+
+run_raspi_update() {
+  if ! command_exists raspi-update; then
+    msg_fail 'raspi-update wurde auf diesem System nicht gefunden.'
+    msg_info 'Diese Funktion ist nur für Raspberry Pi OS vorgesehen.'
+    return 1
+  fi
+  msg_warn 'raspi-update aktualisiert die Raspberry-Pi-Firmware und kann einen Neustart erfordern.'
+  if ! ask_yes_no 'Raspi-Update jetzt starten?' 'n'; then
+    msg_info 'Raspi-Update abgebrochen.'
+    return 0
+  fi
+  ensure_sudo
+  sudo raspi-update
+}

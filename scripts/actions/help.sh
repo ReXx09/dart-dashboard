@@ -65,6 +65,8 @@ show_beginner_help() {
   text+="  ./install.sh quickstart\n"
   text+="  ./install.sh health\n"
   text+="  ./install.sh test\n"
+  text+="  ./install.sh pin-hash\n"
+  text+="  ./install.sh raspi-update\n"
   text+="  ./install.sh docker-logs\n"
   show_textbox "Hilfe" "$(printf '%b' "$text")"
 }

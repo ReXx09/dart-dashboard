@@ -101,6 +101,8 @@ action_label() {
   case "$1" in
     quickstart)         printf 'Schnellstart-Assistent' ;;
     check)              printf 'Systemcheck + Auto-Installation' ;;
+    pin-hash)           printf 'Admin-PIN-Assistent' ;;
+    raspi-update)       printf 'Raspberry-Pi-Firmware aktualisieren' ;;
     build-start)        printf 'Install/Update + Build + Start' ;;
     start)              printf 'Container Start' ;;
     stop)               printf 'Container Stop' ;;
@@ -253,28 +255,61 @@ submenu_monitoring_text() {
   done
 }
 
+submenu_system_whiptail() {
+  while true; do
+    local choice
+    choice="$(whiptail --title "Loewen Dart | Systempflege" --menu "PIN-Schutz und Raspberry-Pi-Systempflege.\n\nPIN-Hash wird nur als Hash in .env gespeichert.\n\nENTER = ausfuehren   ESC = zurueck" 18 84 6 \
+      "1" "Admin-PIN-Assistent starten" \
+      "2" "Raspberry-Pi-Firmware aktualisieren" \
+      "0" "Zurueck" \
+      3>&1 1>&2 2>&3)" || return 0
+    case "$choice" in
+      1) execute_action pin-hash ;;
+      2) execute_action raspi-update 0 0 ;;
+      0|"") return 0 ;;
+    esac
+  done
+}
+
+submenu_system_text() {
+  while true; do
+    printf '\n-- Systempflege -------------------------------\n'
+    printf '1) Admin-PIN-Assistent starten\n'
+    printf '2) Raspberry-Pi-Firmware aktualisieren\n'
+    printf '0) Zurueck\n\n'
+    read -r -p 'Option [0-2]: ' c
+    case "$c" in
+      1) execute_action pin-hash ;;
+      2) execute_action raspi-update 0 0 ;;
+      0|"") return 0 ;;
+    esac
+  done
+}
+
 # ── Hauptmenü ──────────────────────────────────────────────────────────────
 
 main_menu_whiptail() {
   while true; do
     local choice status_line; status_line="$(menu_status_line)"
-    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 20 84 8 \
+    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 22 84 9 \
       "0" "Schnellstart-Assistent (komplette Einrichtung)" \
       "1" "Einrichtung >" \
       "2" "Status & Monitoring >" \
       "3" "Docker >" \
-      "4" "Repo in anderen Ordner klonen" \
-      "5" "Hilfe fuer Einsteiger" \
-      "6" "Beenden" \
+      "4" "Systempflege >" \
+      "5" "Repo in anderen Ordner klonen" \
+      "6" "Hilfe fuer Einsteiger" \
+      "7" "Beenden" \
       3>&1 1>&2 2>&3)" || exit 0
     case "$choice" in
       0) execute_action quickstart 1 0 ;;
       1) submenu_einrichtung_whiptail ;;
       2) submenu_monitoring_whiptail ;;
       3) submenu_docker_whiptail ;;
-      4) execute_action clone 1 0 ;;
-      5) execute_action help-guide ;;
-      6) printf 'Beendet.\n'; exit 0 ;;
+      4) submenu_system_whiptail ;;
+      5) execute_action clone 1 0 ;;
+      6) execute_action help-guide ;;
+      7) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
   done
@@ -288,18 +323,20 @@ main_menu_text() {
     printf ' 1) Einrichtung >\n'
     printf ' 2) Status & Monitoring >\n'
     printf ' 3) Docker >\n'
-    printf ' 4) Repo klonen\n'
-    printf ' 5) Hilfe fuer Einsteiger\n'
-    printf ' 6) Beenden\n\n'
-    read -r -p 'Option [0-6]: ' c
+    printf ' 4) Systempflege >\n'
+    printf ' 5) Repo klonen\n'
+    printf ' 6) Hilfe fuer Einsteiger\n'
+    printf ' 7) Beenden\n\n'
+    read -r -p 'Option [0-7]: ' c
     case "$c" in
       0) execute_action quickstart 1 0 ;;
       1) submenu_einrichtung_text ;;
       2) submenu_monitoring_text ;;
       3) submenu_docker_text ;;
-      4) execute_action clone 1 0 ;;
-      5) execute_action help-guide ;;
-      6) printf 'Beendet.\n'; exit 0 ;;
+      4) submenu_system_text ;;
+      5) execute_action clone 1 0 ;;
+      6) execute_action help-guide ;;
+      7) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n'; sleep 1 ;;
     esac
   done
