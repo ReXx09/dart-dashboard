@@ -140,17 +140,18 @@
       flex: 1;
       min-width: 0;
       justify-content: flex-start;
-      gap: 4px;
-      padding: 8px 10px 6px;
+      gap: 2px;
+      padding: 4px 10px 4px;
       align-items: center;
       text-align: center;
     }
-    .compact-players .score-card .sc-color-bar { margin-bottom: 3px; }
+    .compact-players .score-card .sc-color-bar { margin-bottom: 1px; }
     .compact-players .score-card .sc-name { font-size: .78rem; }
     .compact-players .score-card .sc-score { font-size: 2rem; }
-    .compact-players .score-card .sc-last-throws { margin-top: 1px; }
+    .compact-players .score-card .sc-last-throws { margin-top: 0; }
     .compact-players .score-card .sc-last-throws,
-    .compact-players .score-card .cricket-grid { justify-content: center; }
+    .compact-players .score-card .cricket-grid,
+    .compact-players .score-card .compact-cricket-status { justify-content: center; margin-top: 0; margin-bottom: 0; }
     .compact-cricket-status {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -1285,7 +1286,7 @@
 
       return '<div class="score-card' + (crowded && isCricket ? ' compact-crowded' : '') + '" data-tv style="--pc:' + playerColor + '">' +
         '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
-        '<div class="sc-name">P' + p.slot + '.' + escapeHtml(shortName) + '</div>' +
+        '<div class="sc-name">P' + p.slot + ' · ' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
         (compactCricketHtml || (isCricket ? cricketGridHtml : '')) +
         '<div class="sc-last-throws">' + displayThrows.map((pt) => '<span class="sc-throw-chip' + (pt === '-' ? ' empty' : '') + '">' + pt + '</span>').join('') + '</div>' +
