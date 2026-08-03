@@ -57,7 +57,7 @@
     .duel-list{display:grid;gap:6px;margin-top:12px}
     .duel-row{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#0d0d0d;border:1px solid #202020;border-radius:8px;padding:8px 10px;color:#bbb;font-size:.78rem}
     .duel-row strong{color:#f4a261}
-    @media (max-width:700px){.diagnostic-columns{grid-template-columns:1fr}}
+    @media (max-width:700px){.diagnostic-columns{grid-template-columns:1fr}.storage-status{grid-template-columns:1fr}}
     @media (max-width:600px){.stats-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-player-tools{grid-template-columns:1fr}}
     @media (max-width:600px){.hs-filters{grid-template-columns:1fr}.duel-player-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
     .btn-save{background:#e63946;border:none;color:#fff;padding:9px 24px;border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:background .2s}
@@ -71,6 +71,11 @@
     .status-info{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.82rem}
     .status-info .label{color:#555}
     .status-info .value{color:#ddd;text-align:right;font-family:monospace}
+    .storage-status{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+    .storage-status .status-info{display:block}
+    .storage-status .label{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:1px}
+    .storage-status .value{display:block;text-align:left;margin-top:5px;font-size:1rem;font-weight:700}
+    .storage-status .hint{grid-column:1/-1;color:#666;font-size:.72rem}
     .admin-coming-soon{background:#111;border:1px solid #292929;border-left:3px solid #f4a261;border-radius:10px;padding:16px;color:#aaa;font-size:.84rem;line-height:1.5}
     .admin-coming-soon strong{display:block;color:#f4a261;margin-bottom:5px}
     .admin-gate{position:fixed;inset:0;background:#0a0a0a;display:grid;place-items:center;padding:24px;z-index:1000}
@@ -331,6 +336,16 @@
       <button class="btn-save" id="createBackupBtn">Ausgewählte Bereiche sichern</button>
       <div id="backupList" style="margin-top:12px;color:#888;font-size:.8rem">Noch keine Backups geladen.</div>
     </div>
+    <fieldset>
+      <legend>Speicherstatus</legend>
+      <div class="storage-status">
+        <div class="status-info"><span class="label">Datenbank</span><span class="value" id="storageDatabase">-</span></div>
+        <div class="status-info"><span class="label">SQLite-WAL</span><span class="value" id="storageWal">-</span></div>
+        <div class="status-info"><span class="label">Freier Speicher</span><span class="value" id="storageFree">-</span></div>
+        <div class="hint" id="storageHint">Speicherstatus wird geladen...</div>
+      </div>
+      <div id="storageTables" style="margin-top:12px;color:#666;font-size:.72rem"></div>
+    </fieldset>
   </div>
 
 </main>
@@ -465,12 +480,13 @@
       const [info, settings, storage, diagnostics] = await Promise.all([
         fetch('/api/server-info').then(r => r.json()),
         fetch('/api/settings').then(r => r.json()),
-        fetch('/api/storage/info').then(r => r.json()),
+        fetch('/api/storage/status').then(r => r.json()),
         fetch('/api/system/diagnostics', { cache: 'no-store' }).then(r => r.json())
       ]);
       document.getElementById('si-ip').textContent = info.ip;
       document.getElementById('si-port').textContent = info.port;
       document.getElementById('si-db').textContent = storage.client + (storage.external ? ' (extern)' : ' (lokal)');
+      updateStorageStatus(storage);
       document.getElementById('ardEnabled').checked = settings.arduinoMonitorEnabled !== false;
       document.getElementById('ardPort').value = settings.arduinoPort || '';
       document.getElementById('ardBaud').value = String(settings.arduinoBaudRate || 115200);
@@ -500,6 +516,20 @@
     let scaled = value;
     while (scaled >= 1024 && index < units.length - 1) { scaled /= 1024; index += 1; }
     return scaled.toFixed(index === 0 ? 0 : 1) + ' ' + units[index];
+  }
+
+  function updateStorageStatus(data) {
+    const database = Number(data.databaseBytes);
+    const wal = Number(data.walBytes);
+    const free = data.disk && Number(data.disk.freeBytes);
+    document.getElementById('storageDatabase').textContent = Number.isFinite(database) ? formatBytes(database) : 'Externe Datenbank';
+    document.getElementById('storageWal').textContent = Number.isFinite(wal) ? formatBytes(wal) : '-';
+    document.getElementById('storageFree').textContent = Number.isFinite(free) ? formatBytes(free) : 'extern verwaltet';
+    document.getElementById('storageHint').textContent = Number.isFinite(Number(data.sqliteLimitBytes))
+      ? 'SQLite-Limit: ' + formatBytes(data.sqliteLimitBytes) + '. Praktisch begrenzt durch den freien Speicher des Datenträgers.'
+      : 'Die Größe und das Limit werden vom externen Datenbankserver verwaltet.';
+    const tableRows = data.tableRows || {};
+    document.getElementById('storageTables').textContent = Object.entries(tableRows).map(([name, count]) => name + ': ' + count).join(' · ');
   }
 
   function formatSystemUptime(seconds) {

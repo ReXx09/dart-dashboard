@@ -67,6 +67,28 @@ class DataStore {
     };
   }
 
+  async getStorageStatus() {
+    const info = this.getInfo();
+    if (!this.isSQLite()) return { ...info, databaseBytes: null, walBytes: null, tableRows: null, disk: null };
+
+    const databaseStats = fs.existsSync(this.sqliteFile) ? fs.statSync(this.sqliteFile) : null;
+    const walFile = this.sqliteFile + '-wal';
+    const walStats = fs.existsSync(walFile) ? fs.statSync(walFile) : null;
+    const tableRows = {};
+    const tables = await this.sqlite.all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
+    for (const table of tables) tableRows[table.name] = await this.countRows(table.name);
+
+    let disk = null;
+    if (typeof fs.statfsSync === 'function') {
+      const filesystem = fs.statfsSync(path.dirname(this.sqliteFile));
+      const totalBytes = Number(filesystem.blocks) * Number(filesystem.bsize);
+      const freeBytes = Number(filesystem.bavail) * Number(filesystem.bsize);
+      disk = { totalBytes, freeBytes, usedBytes: Math.max(0, totalBytes - freeBytes) };
+    }
+
+    return { ...info, databaseBytes: databaseStats ? databaseStats.size : 0, walBytes: walStats ? walStats.size : 0, sqliteLimitBytes: 281474976710656, tableRows, disk };
+  }
+
   async init(seedFiles) {
     this.seedFiles = seedFiles || {};
 

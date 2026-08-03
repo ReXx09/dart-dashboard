@@ -2558,6 +2558,10 @@ app.put('/api/profiles', requireAdmin, async (req, res) => {
 
 // ── Storage-Info ──
 app.get('/api/storage/info', (_req, res) => { res.json(dataStore.getInfo()); });
+app.get('/api/storage/status', async (_req, res) => {
+  try { res.json(await dataStore.getStorageStatus()); }
+  catch (err) { res.status(500).json({ error: 'Speicherstatus konnte nicht geladen werden: ' + err.message }); }
+});
 
 // ── Settings ──
 app.get('/api/settings', (_req, res) => res.json(getSettings()));
