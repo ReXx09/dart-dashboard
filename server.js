@@ -1048,10 +1048,12 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   let eliminationAction = null;
   let cricketPointsAwarded = 0;
   if (isCricket) {
-    const cricketNum = codeToCricketNumber(rawCode);
+    const rawCode = Number(evt.code);
+    const hasCode = Number.isFinite(rawCode) && rawCode >= 0 && rawCode <= 999;
+    const cricketNum = hasCode ? codeToCricketNumber(rawCode) : pointsToCricketNumber(value);
     const nums = getCricketNumbersForMode(mode);
     if (nums && cricketNum !== null && nums.includes(cricketNum)) {
-      const hitCount = codeToCricketHitCount(rawCode);
+      const hitCount = hasCode ? codeToCricketHitCount(rawCode) : getThrowHitCount(value);
       cricketPointsAwarded = applyCricketHit(player, state.players, cricketNum, hitCount);
     }
   } else {
@@ -2476,6 +2478,44 @@ app.get('/api/highscores/daily', async (_req, res) => {
     const best = today.length > 0 ? today[0] : null;
     res.json({ best, count: today.length, list: today });
   } catch (err) { res.status(500).json({ error: 'Daily-Highscore fehlgeschlagen: ' + err.message }); }
+});
+
+app.get('/api/highscores/overview', async (_req, res) => {
+  try {
+    const players = await dataStore.getPlayers();
+    const entries = [];
+    for (const player of players) {
+      if (!player.name) continue;
+      const stats = await dataStore.getPlayerStats(player.slot) || {};
+      const darts = Number(stats.total_darts || 0);
+      const totalScored = Number(stats.total_scored || 0);
+      const checkoutAttempts = Number(stats.checkout_attempts || 0);
+      const checkoutSuccess = Number(stats.checkout_success || 0);
+      entries.push({
+        profileId: Number(player.slot),
+        player: player.name,
+        mode: 'gesamt',
+        count180: Number(stats.count_180 || 0),
+        threeDartAverage: darts > 0 ? Number((totalScored / darts * 3).toFixed(1)) : 0,
+        checkoutRate: checkoutAttempts > 0 ? Number((checkoutSuccess / checkoutAttempts * 100).toFixed(1)) : 0,
+        checkoutAttempts,
+        checkoutSuccess,
+        highestCheckout: Number(stats.highest_checkout || 0),
+        gamesWon: Number(stats.games_won || 0),
+        legsWon: Number(stats.legs_won || 0),
+        trackingSince: stats.updated_at ? Number(stats.updated_at) : null
+      });
+    }
+    res.json({ trackingMode: 'gesamt', modes: ['gesamt'], metrics: {
+      count180: entries.slice().sort((a, b) => b.count180 - a.count180),
+      checkoutRate: entries.slice().sort((a, b) => b.checkoutRate - a.checkoutRate),
+      threeDartAverage: entries.slice().sort((a, b) => b.threeDartAverage - a.threeDartAverage),
+      highestCheckout: entries.slice().sort((a, b) => b.highestCheckout - a.highestCheckout),
+      gamesWon: entries.slice().sort((a, b) => b.gamesWon - a.gamesWon)
+    }});
+  } catch (err) {
+    res.status(500).json({ error: 'Highscore-Übersicht konnte nicht geladen werden: ' + err.message });
+  }
 });
 
 // ── Player Statistics ──
