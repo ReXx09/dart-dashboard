@@ -635,6 +635,7 @@ const arduinoState = {
   lastLine: '',
   lastEvent: null,
   lastHeartbeat: null,
+  lastTelemetry: null,
   lastTrigger: null,
   lastRawHit: null,
   pendingThrow: false,
@@ -644,6 +645,7 @@ const arduinoState = {
   playerSwitch: null,
   matrixSniffer: null,
   activeCount: null,
+  lastHeartbeatAt: null,
   lastUpdateMs: null,
   rawHistory: [],
   error: null,
@@ -877,6 +879,11 @@ function buildArduinoStateView() {
 
   const telemetry = {
     activeCount: Number(arduinoState.activeCount || 0),
+    uptimeMs: Number(arduinoState.lastHeartbeat?.ms || 0) || null,
+    hitCount: Number(arduinoState.lastHeartbeat?.hits || 0) || null,
+    isrCount: Number(arduinoState.lastHeartbeat?.isr || 0) || null,
+    heartbeatAgeMs: arduinoState.lastHeartbeatAt ? Math.max(0, Date.now() - arduinoState.lastHeartbeatAt) : null,
+    ...(arduinoState.lastTelemetry || {}),
     activeStateMode: arduinoState.activeStateMode,
     activeStateResolved: arduinoState.activeStateResolved,
     rawHistory: arduinoRawEventHistory.slice(0, 20),
@@ -1882,14 +1889,37 @@ function parseArduinoLine(line) {
     return;
   }
 
-  // HB,<ms>,active=<n>  (neuer 20CH-Sniffer + alter einfacher HB)
-  const hbMatch = clean.match(/^HB,(\d+),active=(\d+)$/i);
+  // TEL,key=value,...  (optionale Sensor- und Diagnosewerte)
+  const telemetryMatch = clean.match(/^TEL,(.+)$/i);
+  if (telemetryMatch) {
+    const values = { receivedAt: Date.now(), line: clean };
+    telemetryMatch[1].split(',').forEach((part) => {
+      const [key, value] = part.split('=');
+      if (!key || value == null || !/^[-+]?\d+(?:\.\d+)?$/.test(value)) return;
+      values[key.trim()] = Number(value);
+    });
+    normalizeArduinoStatePatch({ lastTelemetry: values });
+    return;
+  }
+
+  // HB,<ms>,<key=value>...  (alle Heartbeat-Varianten)
+  const hbMatch = clean.match(/^HB,(\d+),(.+)$/i);
   if (hbMatch) {
-    const activeCount = Number(hbMatch[2]);
-    maybeInferArduinoActiveState(activeCount, 20);
+    const heartbeat = { ms: Number(hbMatch[1]), line: clean };
+    hbMatch[2].split(',').forEach((part) => {
+      const [key, value] = part.split('=');
+      if (!key || value == null || !/^\d+(?:\.\d+)?$/.test(value)) return;
+      heartbeat[key.trim()] = Number(value);
+    });
+    const activeCount = Number.isFinite(heartbeat.active) ? heartbeat.active : null;
+    const rows = Number.isFinite(heartbeat.rows) ? heartbeat.rows : null;
+    const columns = Number.isFinite(heartbeat.columns) ? heartbeat.columns : null;
+    if (activeCount != null) maybeInferArduinoActiveState(activeCount, rows != null && columns != null ? Math.max(1, rows + columns) : 20);
+    heartbeat.receivedAt = Date.now();
     normalizeArduinoStatePatch({
       activeCount,
-      lastHeartbeat: { ms: Number(hbMatch[1]), activeCount, line: clean },
+      lastHeartbeatAt: heartbeat.receivedAt,
+      lastHeartbeat: heartbeat,
       matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit },
       activeStateMode: ARDUINO_EVENT_ACTIVE_STATE_MODE,
       activeStateResolved: arduinoResolvedActiveState
@@ -1898,23 +1928,6 @@ function parseArduinoLine(line) {
     channelAutoDetect.heartbeatCount++;
     channelAutoDetect.lastHeartbeatMs = Date.now();
     if (typeof runChannelAutoDetect === 'function') runChannelAutoDetect();
-    return;
-  }
-
-  // HB,<ms>,rows=...,columns=...,active=... (alter R/C-Sniffer)
-  const hbRcMatch = clean.match(/^HB,(\d+),rows=(\d+),columns=(\d+),active=(\d+)$/i);
-  if (hbRcMatch) {
-    const rows = Number(hbRcMatch[2]);
-    const columns = Number(hbRcMatch[3]);
-    const activeCount = Number(hbRcMatch[4]);
-    maybeInferArduinoActiveState(activeCount, Math.max(1, rows + columns));
-    normalizeArduinoStatePatch({
-      activeCount,
-      lastHeartbeat: { ms: Number(hbRcMatch[1]), rows, columns, activeCount, line: clean },
-      matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit },
-      activeStateMode: ARDUINO_EVENT_ACTIVE_STATE_MODE,
-      activeStateResolved: arduinoResolvedActiveState
-    });
     return;
   }
 

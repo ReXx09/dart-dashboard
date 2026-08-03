@@ -128,6 +128,19 @@
       <span class="label">Datenbank:</span><span class="value" id="si-db">-</span>
       <span class="label">Arduino:</span><span class="value" id="si-ard">-</span>
     </div>
+    <div class="sec-hd" style="margin-top:24px"><span class="sec-title">Arduino-Telemetrie</span><div class="sec-line"></div></div>
+    <div class="status-info" id="arduinoTelemetry">
+      <span class="label">Verbindung:</span><span class="value" id="at-connection">-</span>
+      <span class="label">Aktive Kontakte:</span><span class="value" id="at-active">-</span>
+      <span class="label">Uptime:</span><span class="value" id="at-uptime">-</span>
+      <span class="label">Heartbeat:</span><span class="value" id="at-heartbeat">-</span>
+      <span class="label">Trefferzähler:</span><span class="value" id="at-hits">-</span>
+      <span class="label">ISR-Zähler:</span><span class="value" id="at-isr">-</span>
+      <span class="label">Temperatur:</span><span class="value" id="at-temperature">nicht verfügbar</span>
+      <span class="label">Versorgung:</span><span class="value" id="at-voltage">nicht verfügbar</span>
+      <span class="label">Strom:</span><span class="value" id="at-current">nicht verfügbar</span>
+      <span class="label">Letzte serielle Zeile:</span><span class="value" id="at-line">-</span>
+    </div>
   </div>
 
   <div class="section" data-admin-panel="devices">
@@ -431,11 +444,7 @@
     } catch(e) {
       document.getElementById('si-ip').textContent = 'Offline';
     }
-    try {
-      const ard = await fetch('/api/arduino/state').then(r => r.json());
-      const connection = ard.connection || ard;
-      document.getElementById('si-ard').textContent = connection.connected ? 'Verbunden (' + (connection.port||'?') + ')' : 'Getrennt';
-    } catch(e) { document.getElementById('si-ard').textContent = '?'; }
+    await refreshArduinoOverview();
 
     try {
       const mapping = await fetch('/api/matrix-mapping').then(r => r.json());
@@ -444,6 +453,48 @@
       document.getElementById('matrixMappingJson').value = '{\n  "R3,C1": 104\n}';
     }
   }
+
+  function formatDuration(ms) {
+    const value = Number(ms);
+    if (!Number.isFinite(value) || value < 0) return '-';
+    const totalSeconds = Math.floor(value / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return (days ? days + 'd ' : '') + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+  }
+
+  function formatTelemetryValue(value, suffix) {
+    return Number.isFinite(Number(value)) ? Number(value).toFixed(2) + ' ' + suffix : 'nicht verfügbar';
+  }
+
+  async function refreshArduinoOverview() {
+    try {
+      const ard = await fetch('/api/arduino/state', { cache: 'no-store' }).then(r => r.json());
+      const connection = ard.connection || ard;
+      const telemetry = ard.telemetry || ard;
+      const latest = ard.latest || ard;
+      const heartbeat = latest.heartbeat || {};
+      const connected = connection.connected === true;
+      document.getElementById('si-ard').textContent = connected ? 'Verbunden (' + (connection.port || '?') + ')' : 'Getrennt';
+      document.getElementById('at-connection').textContent = connected ? 'Verbunden' : (connection.enabled ? 'Getrennt' : 'Deaktiviert');
+      document.getElementById('at-active').textContent = Number(telemetry.activeCount || 0) + ' aktiv';
+      document.getElementById('at-uptime').textContent = formatDuration(telemetry.uptimeMs);
+      document.getElementById('at-heartbeat').textContent = telemetry.heartbeatAgeMs == null ? '-' : telemetry.heartbeatAgeMs + ' ms alt';
+      document.getElementById('at-hits').textContent = telemetry.hitCount == null ? '-' : String(telemetry.hitCount);
+      document.getElementById('at-isr').textContent = telemetry.isrCount == null ? '-' : String(telemetry.isrCount);
+      document.getElementById('at-temperature').textContent = formatTelemetryValue(telemetry.temp ?? telemetry.temperature, '°C');
+      document.getElementById('at-voltage').textContent = formatTelemetryValue(telemetry.vcc ?? telemetry.voltage, 'V');
+      document.getElementById('at-current').textContent = formatTelemetryValue(telemetry.current ?? telemetry.currentMa, 'mA');
+      document.getElementById('at-line').textContent = latest.line || '-';
+    } catch(e) {
+      document.getElementById('si-ard').textContent = '?';
+      document.getElementById('at-connection').textContent = 'Nicht erreichbar';
+    }
+  }
+
+  setInterval(refreshArduinoOverview, 2000);
 
   document.getElementById('saveArdBtn').addEventListener('click', async function() {
     this.disabled = true;
