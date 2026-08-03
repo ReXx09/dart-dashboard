@@ -1049,7 +1049,7 @@
     }
 
     function getGameModeLabel(mode) {
-      return mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? 'Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode || '501';
+      return mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? '301-Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode || '501';
     }
 
     function renderFocusPlayer(p, idx, state) {
@@ -1158,7 +1158,7 @@
       if (!state) return '';
       const mode = state.game.mode || '501';
       const rule = state.game.checkoutRule || 'double';
-      const modeLabel = mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? 'Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode;
+      const modeLabel = mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? '301-Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode;
       const ruleLabel = rule === 'single' ? 'Single Out' : rule === 'double' ? 'Double Out' : rule === 'master' ? 'Master Out' : rule;
       return '<div class="focus-controls-card">' +
         '<div class="ctrl-title">⚙ Steuerung</div>' +

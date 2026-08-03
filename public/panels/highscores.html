@@ -312,6 +312,9 @@
           <option value="140">140+</option>
           <option value="100">100+</option>
           <option value="checkout">Checkouts</option>
+          <option value="checkout-single">Checkouts · Single-Out</option>
+          <option value="checkout-double">Checkouts · Double-Out</option>
+          <option value="checkout-master">Checkouts · Master-Out</option>
           <option value="finish">Finishes</option>
           <option value="manual">Manuelle Scores</option>
         </select>
@@ -324,7 +327,7 @@
           <option value="301">301</option>
           <option value="701">701</option>
           <option value="cricket">Cricket</option>
-          <option value="elimination">Elimination</option>
+          <option value="elimination">301-Elimination</option>
           <option value="shanghai">Shanghai</option>
           <option value="atc">Around the Clock</option>
           <option value="split">Split</option>
@@ -456,6 +459,9 @@
       '140': '140+',
       '100': '100+',
       checkout: 'Checkouts',
+      'checkout-single': 'Checkouts · Single-Out',
+      'checkout-double': 'Checkouts · Double-Out',
+      'checkout-master': 'Checkouts · Master-Out',
       finish: 'Finishes',
       manual: 'Manuelle Scores'
     };
@@ -472,7 +478,9 @@
 
     const METRICS = [
       ['count180', '180er', '#e63946', value => value],
-      ['checkoutRate', 'Checkoutquote', '#f4a261', value => value + '%'],
+      ['checkoutRateSingle', 'Single-Out-Quote', '#f4a261', value => value + '%'],
+      ['checkoutRateDouble', 'Double-Out-Quote', '#ff7f51', value => value + '%'],
+      ['checkoutRateMaster', 'Master-Out-Quote', '#e9c46a', value => value + '%'],
       ['threeDartAverage', '3-Dart-Average', '#2a9d8f', value => Number(value).toFixed(1)],
       ['highestCheckout', 'Höchster Checkout', '#9b5de5', value => value],
       ['gamesWon', 'Gewonnene Spiele', '#457b9d', value => value]
@@ -527,6 +535,9 @@
 
       if (filter === 'all') return true;
       if (filter === 'checkout') return kind === 'checkout';
+      if (filter === 'checkout-single') return kind === 'checkout' && entry.checkoutRule === 'single';
+      if (filter === 'checkout-double') return kind === 'checkout' && entry.checkoutRule === 'double';
+      if (filter === 'checkout-master') return kind === 'checkout' && entry.checkoutRule === 'master';
       if (filter === 'finish') return !!entry.legWin && kind !== 'checkout';
       if (filter === 'manual') return kind === 'manual';
       if (filter === '140') return score >= 140 && score <= 180;
@@ -621,7 +632,7 @@
           '<td class="rank">' + (idx + 1) + '</td>' +
           '<td class="player">' + escapeHtml(entry.player) + '</td>' +
           '<td class="score">' + entry.score + '</td>' +
-          '<td>' + escapeHtml(kind) + (entry.legWin ? ' / LegWin' : '') + '</td>' +
+          '<td>' + escapeHtml(kind) + (entry.checkoutRule ? ' / ' + escapeHtml(entry.checkoutRule) : '') + (entry.legWin ? ' / LegWin' : '') + '</td>' +
           '<td class="time">' + formatTime(entry.ts) + '</td>' +
           '<td><button class="btn delete" type="button" data-delete-id="' + Number(entry.id || 0) + '" title="Highscore löschen">Löschen</button></td>' +
         '</tr>';

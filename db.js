@@ -96,22 +96,66 @@ class DataStore {
     }
 
     await this.ensureHighscoreModeColumn();
+    await this.ensureCheckoutRuleColumns();
+    await this.ensureCheckoutStatsVersion();
     await this.seedFromLegacyJson();
   }
 
   async ensureHighscoreModeColumn() {
-    const query = this.isSQLite()
-      ? 'ALTER TABLE highscores ADD COLUMN game_mode TEXT'
+    const queries = this.isSQLite()
+      ? ['ALTER TABLE highscores ADD COLUMN game_mode TEXT', 'ALTER TABLE highscores ADD COLUMN checkout_rule TEXT']
       : this.isPostgres()
-        ? 'ALTER TABLE highscores ADD COLUMN IF NOT EXISTS game_mode TEXT'
-        : 'ALTER TABLE highscores ADD COLUMN game_mode VARCHAR(64) NULL';
+        ? ['ALTER TABLE highscores ADD COLUMN IF NOT EXISTS game_mode TEXT', 'ALTER TABLE highscores ADD COLUMN IF NOT EXISTS checkout_rule TEXT']
+        : ['ALTER TABLE highscores ADD COLUMN game_mode VARCHAR(64) NULL', 'ALTER TABLE highscores ADD COLUMN checkout_rule VARCHAR(16) NULL'];
+    for (const query of queries) {
+      try {
+        if (this.isSQLite()) await this.sqlite.run(query);
+        else if (this.isPostgres()) await this.pg.query(query);
+        else await this.my.query(query);
+      } catch (err) {
+        if (!/duplicate|already exists/i.test(String(err.message || ''))) throw err;
+      }
+    }
+  }
+
+  async ensureCheckoutRuleColumns() {
+    const names = ['single', 'double', 'master'];
+    for (const rule of names) {
+      const queries = this.isSQLite()
+        ? [`ALTER TABLE player_stats ADD COLUMN checkout_${rule}_attempts INTEGER DEFAULT 0`, `ALTER TABLE player_stats ADD COLUMN checkout_${rule}_success INTEGER DEFAULT 0`, `ALTER TABLE player_stats ADD COLUMN checkout_${rule}_highest INTEGER DEFAULT 0`]
+        : this.isPostgres()
+          ? [`ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS checkout_${rule}_attempts INTEGER DEFAULT 0`, `ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS checkout_${rule}_success INTEGER DEFAULT 0`, `ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS checkout_${rule}_highest INTEGER DEFAULT 0`]
+          : [`ALTER TABLE player_stats ADD COLUMN checkout_${rule}_attempts INT DEFAULT 0`, `ALTER TABLE player_stats ADD COLUMN checkout_${rule}_success INT DEFAULT 0`, `ALTER TABLE player_stats ADD COLUMN checkout_${rule}_highest INT DEFAULT 0`];
+      for (const query of queries) {
+        try {
+          if (this.isSQLite()) await this.sqlite.run(query);
+          else if (this.isPostgres()) await this.pg.query(query);
+          else await this.my.query(query);
+        } catch (err) {
+          if (!/duplicate|already exists/i.test(String(err.message || ''))) throw err;
+        }
+      }
+    }
+  }
+
+  async ensureCheckoutStatsVersion() {
+    const addColumn = this.isSQLite()
+      ? 'ALTER TABLE player_stats ADD COLUMN checkout_stats_version INTEGER DEFAULT 0'
+      : this.isPostgres()
+        ? 'ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS checkout_stats_version INTEGER DEFAULT 0'
+        : 'ALTER TABLE player_stats ADD COLUMN checkout_stats_version INT DEFAULT 0';
     try {
-      if (this.isSQLite()) await this.sqlite.run(query);
-      else if (this.isPostgres()) await this.pg.query(query);
-      else await this.my.query(query);
+      if (this.isSQLite()) await this.sqlite.run(addColumn);
+      else if (this.isPostgres()) await this.pg.query(addColumn);
+      else await this.my.query(addColumn);
     } catch (err) {
       if (!/duplicate|already exists/i.test(String(err.message || ''))) throw err;
     }
+
+    const reset = 'UPDATE player_stats SET checkout_attempts = 0, checkout_success = 0, highest_checkout = 0, checkout_100plus = 0, checkout_120plus = 0, checkout_160plus = 0, checkout_stats_version = 1 WHERE checkout_stats_version = 0';
+    if (this.isSQLite()) await this.sqlite.run(reset);
+    else if (this.isPostgres()) await this.pg.query(reset);
+    else await this.my.query(reset);
   }
 
   async createSchemaSQLite() {
@@ -135,6 +179,7 @@ class DataStore {
         score INTEGER NOT NULL,
         kind TEXT,
         game_mode TEXT,
+        checkout_rule TEXT,
         leg_win INTEGER NOT NULL DEFAULT 0,
         ts INTEGER NOT NULL
       );
@@ -159,6 +204,15 @@ class DataStore {
         checkout_attempts INTEGER DEFAULT 0,
         checkout_success INTEGER DEFAULT 0,
         highest_checkout INTEGER DEFAULT 0,
+        checkout_single_attempts INTEGER DEFAULT 0,
+        checkout_single_success INTEGER DEFAULT 0,
+        checkout_single_highest INTEGER DEFAULT 0,
+        checkout_double_attempts INTEGER DEFAULT 0,
+        checkout_double_success INTEGER DEFAULT 0,
+        checkout_double_highest INTEGER DEFAULT 0,
+        checkout_master_attempts INTEGER DEFAULT 0,
+        checkout_master_success INTEGER DEFAULT 0,
+        checkout_master_highest INTEGER DEFAULT 0,
         checkout_100plus INTEGER DEFAULT 0,
         checkout_120plus INTEGER DEFAULT 0,
         checkout_160plus INTEGER DEFAULT 0,
@@ -170,6 +224,7 @@ class DataStore {
         cricket_legs INTEGER DEFAULT 0,
         cricket_won INTEGER DEFAULT 0,
         cricket_mpr REAL DEFAULT 0,
+        checkout_stats_version INTEGER DEFAULT 1,
         updated_at INTEGER DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players(slot)
       );
@@ -208,6 +263,7 @@ class DataStore {
         score INTEGER NOT NULL,
         kind TEXT,
         game_mode TEXT,
+        checkout_rule TEXT,
         leg_win BOOLEAN NOT NULL DEFAULT FALSE,
         ts BIGINT NOT NULL
       );
@@ -232,6 +288,15 @@ class DataStore {
         checkout_attempts INTEGER DEFAULT 0,
         checkout_success INTEGER DEFAULT 0,
         highest_checkout INTEGER DEFAULT 0,
+        checkout_single_attempts INTEGER DEFAULT 0,
+        checkout_single_success INTEGER DEFAULT 0,
+        checkout_single_highest INTEGER DEFAULT 0,
+        checkout_double_attempts INTEGER DEFAULT 0,
+        checkout_double_success INTEGER DEFAULT 0,
+        checkout_double_highest INTEGER DEFAULT 0,
+        checkout_master_attempts INTEGER DEFAULT 0,
+        checkout_master_success INTEGER DEFAULT 0,
+        checkout_master_highest INTEGER DEFAULT 0,
         checkout_100plus INTEGER DEFAULT 0,
         checkout_120plus INTEGER DEFAULT 0,
         checkout_160plus INTEGER DEFAULT 0,
@@ -243,6 +308,7 @@ class DataStore {
         cricket_legs INTEGER DEFAULT 0,
         cricket_won INTEGER DEFAULT 0,
         cricket_mpr NUMERIC DEFAULT 0,
+        checkout_stats_version INTEGER DEFAULT 1,
         updated_at BIGINT DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players(slot)
       );
@@ -285,6 +351,7 @@ class DataStore {
         score INT NOT NULL,
         kind VARCHAR(64) NULL,
         game_mode VARCHAR(64) NULL,
+        checkout_rule VARCHAR(16) NULL,
         leg_win TINYINT(1) NOT NULL DEFAULT 0,
         ts BIGINT NOT NULL
       );
@@ -313,6 +380,15 @@ class DataStore {
         checkout_attempts INT DEFAULT 0,
         checkout_success INT DEFAULT 0,
         highest_checkout INT DEFAULT 0,
+        checkout_single_attempts INT DEFAULT 0,
+        checkout_single_success INT DEFAULT 0,
+        checkout_single_highest INT DEFAULT 0,
+        checkout_double_attempts INT DEFAULT 0,
+        checkout_double_success INT DEFAULT 0,
+        checkout_double_highest INT DEFAULT 0,
+        checkout_master_attempts INT DEFAULT 0,
+        checkout_master_success INT DEFAULT 0,
+        checkout_master_highest INT DEFAULT 0,
         checkout_100plus INT DEFAULT 0,
         checkout_120plus INT DEFAULT 0,
         checkout_160plus INT DEFAULT 0,
@@ -324,6 +400,7 @@ class DataStore {
         cricket_legs INT DEFAULT 0,
         cricket_won INT DEFAULT 0,
         cricket_mpr DECIMAL(6,2) DEFAULT 0,
+        checkout_stats_version INT DEFAULT 1,
         updated_at BIGINT DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players(slot)
       );
@@ -599,18 +676,18 @@ class DataStore {
 
     if (this.isSQLite()) {
       rows = await this.sqlite.all(
-        'SELECT id, player, score, kind, game_mode AS gameMode, leg_win AS legWin, ts FROM highscores ' + (safeMode ? 'WHERE game_mode = ? ' : '') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, score, kind, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts FROM highscores ' + (safeMode ? 'WHERE game_mode = ? ' : '') + 'ORDER BY score DESC, ts DESC LIMIT ?',
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
     } else if (this.isPostgres()) {
       const result = await this.pg.query(
-        'SELECT id, player, score, kind, game_mode AS "gameMode", leg_win AS "legWin", ts FROM highscores ' + (safeMode ? 'WHERE game_mode = $1 ' : '') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
+        'SELECT id, player, score, kind, game_mode AS "gameMode", checkout_rule AS "checkoutRule", leg_win AS "legWin", ts FROM highscores ' + (safeMode ? 'WHERE game_mode = $1 ' : '') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result.rows;
     } else {
       const result = await this.my.query(
-        'SELECT id, player, score, kind, game_mode AS gameMode, leg_win AS legWin, ts FROM highscores ' + (safeMode ? 'WHERE game_mode = ? ' : '') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, score, kind, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts FROM highscores ' + (safeMode ? 'WHERE game_mode = ? ' : '') + 'ORDER BY score DESC, ts DESC LIMIT ?',
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result[0];
@@ -622,6 +699,7 @@ class DataStore {
       score: Number(r.score || 0),
       kind: r.kind || null,
       gameMode: r.gameMode || null,
+      checkoutRule: r.checkoutRule || null,
       legWin: toBool(r.legWin),
       ts: Number(r.ts || 0)
     }));
@@ -636,28 +714,29 @@ class DataStore {
 
     const kind = entry && entry.kind ? String(entry.kind) : null;
     const gameMode = entry && entry.gameMode ? String(entry.gameMode) : null;
+    const checkoutRule = entry && entry.checkoutRule ? String(entry.checkoutRule) : null;
     const legWin = toBool(entry && entry.legWin);
     const ts = Number(entry && entry.ts ? entry.ts : Date.now());
 
     if (this.isSQLite()) {
       await this.sqlite.run(
-        'INSERT INTO highscores (player, score, kind, game_mode, leg_win, ts) VALUES (?, ?, ?, ?, ?, ?)',
-        [player, score, kind, gameMode, legWin ? 1 : 0, ts]
+        'INSERT INTO highscores (player, score, kind, game_mode, checkout_rule, leg_win, ts) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [player, score, kind, gameMode, checkoutRule, legWin ? 1 : 0, ts]
       );
       return;
     }
 
     if (this.isPostgres()) {
       await this.pg.query(
-        'INSERT INTO highscores (player, score, kind, game_mode, leg_win, ts) VALUES ($1, $2, $3, $4, $5, $6)',
-        [player, score, kind, gameMode, legWin, ts]
+        'INSERT INTO highscores (player, score, kind, game_mode, checkout_rule, leg_win, ts) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [player, score, kind, gameMode, checkoutRule, legWin, ts]
       );
       return;
     }
 
     await this.my.query(
-      'INSERT INTO highscores (player, score, kind, game_mode, leg_win, ts) VALUES (?, ?, ?, ?, ?, ?)',
-      [player, score, kind, gameMode, legWin ? 1 : 0, ts]
+      'INSERT INTO highscores (player, score, kind, game_mode, checkout_rule, leg_win, ts) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [player, score, kind, gameMode, checkoutRule, legWin ? 1 : 0, ts]
     );
   }
 

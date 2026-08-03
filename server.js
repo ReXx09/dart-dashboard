@@ -135,7 +135,7 @@ const GAME_MODES = {
   '301':   { label: '301',   type: 'x01',  startScore: 301,  cricketNumbers: null,   description: '301' },
   '701':   { label: '701',   type: 'x01',  startScore: 701,  cricketNumbers: null,   description: '701' },
   'cricket': { label: 'Cricket', type: 'cricket', startScore: 0, cricketNumbers: [15,16,17,18,19,20,25], description: 'Cricket' },
-  'elimination': { label: 'Elimination', type: 'elimination', startScore: 0, cricketNumbers: null, description: 'Elimination' },
+  'elimination': { label: '301-Elimination', type: 'elimination', startScore: 0, targetScore: 301, cricketNumbers: null, description: '301-Elimination: bis 301 oder maximal 10 Aufnahmen' },
   'shanghai': { label: 'Shanghai', type: 'shanghai', startScore: 0, cricketNumbers: null, description: 'Shanghai' },
   'atc':    { label: 'Around the Clock', type: 'atc', startScore: 0, cricketNumbers: null, description: 'Around the Clock' },
   'split':  { label: 'Split', type: 'split', startScore: 0, cricketNumbers: null, description: 'Split Score' }
@@ -180,6 +180,25 @@ function isValidCheckout(remaining, points, rule, segment = null) {
     return true;
   }
   return true; // not a checkout attempt, valid
+}
+
+function isCheckoutFinishSegment(segment, rule = DEFAULT_CHECKOUT_RULE) {
+  const normalized = String(segment || '').toUpperCase();
+  if (rule === 'single') return /^(?:S|D|T)(?:[1-9]|1[0-9]|20)$/.test(normalized) || normalized === 'S25' || normalized === 'DBULL';
+  if (rule === 'master') return /^(?:D|T)(?:[1-9]|1[0-9]|20)$/.test(normalized) || normalized === 'DBULL';
+  return /^D(?:[1-9]|1[0-9]|20)$/.test(normalized) || normalized === 'DBULL';
+}
+
+function isCheckoutAttempt(remaining, segment, rule = DEFAULT_CHECKOUT_RULE) {
+  const rest = Number(remaining);
+  return rest > 0 && rest <= 170 && isCheckoutFinishSegment(segment, rule);
+}
+
+function getCheckoutRuleStats(player, rule) {
+  const safeRule = ['single', 'double', 'master'].includes(rule) ? rule : DEFAULT_CHECKOUT_RULE;
+  if (!player.checkoutByRule || typeof player.checkoutByRule !== 'object') player.checkoutByRule = {};
+  if (!player.checkoutByRule[safeRule]) player.checkoutByRule[safeRule] = { attempts: 0, success: 0, highest: 0 };
+  return player.checkoutByRule[safeRule];
 }
 
 function isDoublePoints(points) {
@@ -258,13 +277,15 @@ function checkCricketWin(player, allPlayers) {
 
 // ── Elimination Scoring ──────────────────────────────────
 function calculateEliminationPoints(player) {
-  // In Elimination, points are simply accumulated from 0 upwards
-  return player.totalScored || 0;
+  return Math.max(0, Number(player.totalScored || 0));
 }
 
 function checkEliminationWin(state) {
   const modeDef = GAME_MODES[state.game.mode];
   if (!modeDef || modeDef.type !== 'elimination') return false;
+
+  const targetScore = Number(modeDef.targetScore || 301);
+  if (state.players.some(player => calculateEliminationPoints(player) >= targetScore)) return true;
 
   // Nach dem dritten Wurf des letzten Spielers ist die zehnte Aufnahme komplett.
   const lastPlayerIndex = Math.max(0, state.players.length - 1);
@@ -274,7 +295,7 @@ function checkEliminationWin(state) {
 }
 
 function getEliminationWinner(state) {
-  // Gewinner ist der Spieler mit den meisten Punkten nach 10 Aufnahmen
+  // Gewinner ist der erste Spieler bei 301, sonst der Punktbeste nach 10 Aufnahmen.
   let winner = null;
   let maxPoints = -1;
   for (const player of state.players) {
@@ -285,6 +306,28 @@ function getEliminationWinner(state) {
     }
   }
   return winner;
+}
+
+function applyEliminationThrow(state, player, value) {
+  const modeDef = GAME_MODES[state.game.mode] || GAME_MODES.elimination;
+  const targetScore = Number(modeDef.targetScore || 301);
+  const previousTurnPoints = Array.isArray(player.currentRoundPoints)
+    ? player.currentRoundPoints.reduce((sum, points) => sum + (Number(points) || 0), 0)
+    : 0;
+  const nextScore = calculateEliminationPoints(player) + value;
+
+  if (nextScore > targetScore) {
+    // Ein Überwurf macht die komplette laufende Aufnahme ungültig.
+    player.totalScored = Math.max(0, nextScore - previousTurnPoints - value);
+    return { bust: true, eliminationAction: null };
+  }
+
+  player.totalScored = nextScore;
+  const eliminated = applyEliminationHit(state, player, value);
+  return {
+    bust: false,
+    eliminationAction: eliminated ? state.lastAction : null
+  };
 }
 
 function applyEliminationHit(state, player, value) {
@@ -896,7 +939,7 @@ async function recordPlayerLegStats(player, state) {
     const isCricket = modeDef.type === 'cricket';
     const checkout = isCricket || player.remaining !== 0
       ? 0
-      : Number(Array.isArray(player.currentRoundPoints) ? player.currentRoundPoints[player.currentRoundPoints.length - 1] : 0);
+      : Math.min(170, Number(player.lastCheckoutValue || 0));
     
     // Record leg in history
     const won = player.remaining === 0 ? 1 : 0;
@@ -926,6 +969,12 @@ async function recordPlayerLegStats(player, state) {
         if (checkout >= 100) updates.checkout_100plus = (Number(currentStats.checkout_100plus || 0)) + 1;
         if (checkout >= 120) updates.checkout_120plus = (Number(currentStats.checkout_120plus || 0)) + 1;
         if (checkout >= 160) updates.checkout_160plus = (Number(currentStats.checkout_160plus || 0)) + 1;
+      }
+      for (const rule of ['single', 'double', 'master']) {
+        const ruleStats = getCheckoutRuleStats(player, rule);
+        updates[`checkout_${rule}_attempts`] = Number(currentStats[`checkout_${rule}_attempts`] || 0) + Number(ruleStats.attempts || 0);
+        updates[`checkout_${rule}_success`] = Number(currentStats[`checkout_${rule}_success`] || 0) + Number(ruleStats.success || 0);
+        updates[`checkout_${rule}_highest`] = Math.max(Number(currentStats[`checkout_${rule}_highest`] || 0), Math.min(170, Number(ruleStats.highest || 0)));
       }
     }
 
@@ -1042,9 +1091,14 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
   const isElimination = modeDef.type === 'elimination';
-  const checkoutAttempt = !isCricket && !isElimination && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
-  if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
+  const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
   const checkoutSegment = evt.segment || codeToSegment(evt.code) || null;
+  const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, checkoutSegment, checkoutRule);
+  if (checkoutAttempt) {
+    player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
+    getCheckoutRuleStats(player, checkoutRule).attempts += 1;
+  }
+  const remainingBeforeThrow = Number(player.remaining || 0);
 
   let bust = false;
   let eliminationAction = null;
@@ -1060,13 +1114,10 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     }
   } else {
     if (isElimination) {
-      // Elimination: Punkte addieren von 0 aufwärts
-      player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
-      // Prüfen auf Elimination
-      const eliminated = applyEliminationHit(state, player, value);
-      if (eliminated) eliminationAction = state.lastAction;
+      const eliminationThrow = applyEliminationThrow(state, player, value);
+      bust = eliminationThrow.bust;
+      eliminationAction = eliminationThrow.eliminationAction;
     } else {
-      const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
       const nextRemaining = player.remaining - value;
       bust = !isValidCheckout(player.remaining, value, checkoutRule, checkoutSegment);
       if (!bust) {
@@ -1115,10 +1166,14 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   };
   if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
-  if (!isCricket && player.remaining === 0) {
+  if (!isCricket && !isElimination && player.remaining === 0) {
+    player.lastCheckoutValue = remainingBeforeThrow;
     player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
+    const ruleStats = getCheckoutRuleStats(player, checkoutRule);
+    ruleStats.success += 1;
+    ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, remainingBeforeThrow));
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode });
+    await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode, checkoutRule });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
     // Record stats after leg finish
@@ -1359,8 +1414,14 @@ async function applyArduinoThrowFromMatrix(hit) {
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
   const isElimination = modeDef.type === 'elimination';
-  const checkoutAttempt = !isCricket && !isElimination && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
-  if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
+  const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
+  const checkoutSegment = codeToSegment(hit.code) || pointsToSegment(value);
+  const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, checkoutSegment, checkoutRule);
+  if (checkoutAttempt) {
+    player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
+    getCheckoutRuleStats(player, checkoutRule).attempts += 1;
+  }
+  const remainingBeforeThrow = Number(player.remaining || 0);
 
   let bust = false;
   let eliminationAction = null;
@@ -1374,15 +1435,12 @@ async function applyArduinoThrowFromMatrix(hit) {
     }
   } else {
     if (isElimination) {
-      // Elimination: Punkte addieren von 0 aufwärts
-      player.totalScored = Math.max(0, Number(player.totalScored || 0)) + value;
-      // Prüfen auf Elimination
-      const eliminated = applyEliminationHit(state, player, value);
-      if (eliminated) eliminationAction = state.lastAction;
+      const eliminationThrow = applyEliminationThrow(state, player, value);
+      bust = eliminationThrow.bust;
+      eliminationAction = eliminationThrow.eliminationAction;
     } else {
       const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
       const nextRemaining = player.remaining - value;
-      const checkoutSegment = codeToSegment(hit.code) || null;
       bust = !isValidCheckout(player.remaining, value, checkoutRule, checkoutSegment);
       if (!bust) {
         player.remaining = nextRemaining;
@@ -1436,10 +1494,14 @@ async function applyArduinoThrowFromMatrix(hit) {
   };
   if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
-  if (!isCricket && player.remaining === 0) {
+  if (!isCricket && !isElimination && player.remaining === 0) {
+    player.lastCheckoutValue = remainingBeforeThrow;
     player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
+    const ruleStats = getCheckoutRuleStats(player, checkoutRule);
+    ruleStats.success += 1;
+    ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, remainingBeforeThrow));
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, value, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode });
+    await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode, checkoutRule });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
     // Record stats after leg finish
@@ -1926,7 +1988,17 @@ function sanitizePlayerState(player, fallback) {
   const cricketPoints = Number(player?.cricketPoints ?? player?.totalScored ?? 0);
   const checkoutAttempts = Math.max(0, Number(player?.checkoutAttempts || base.checkoutAttempts || 0));
   const checkoutSuccess = Math.max(0, Number(player?.checkoutSuccess || base.checkoutSuccess || 0));
-  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, checkoutAttempts, checkoutSuccess, cricketHits, cricketClosed, cricketPoints, turnScoreRecorded: !!player?.turnScoreRecorded };
+  const lastCheckoutValue = Math.max(0, Math.min(170, Number(player?.lastCheckoutValue || base.lastCheckoutValue || 0)));
+  const checkoutByRule = {};
+  for (const rule of ['single', 'double', 'master']) {
+    const source = player?.checkoutByRule?.[rule] || base.checkoutByRule?.[rule] || {};
+    checkoutByRule[rule] = {
+      attempts: Math.max(0, Number(source.attempts || 0)),
+      success: Math.max(0, Number(source.success || 0)),
+      highest: Math.max(0, Math.min(170, Number(source.highest || 0)))
+    };
+  }
+  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, checkoutAttempts, checkoutSuccess, lastCheckoutValue, checkoutByRule, cricketHits, cricketClosed, cricketPoints, turnScoreRecorded: !!player?.turnScoreRecorded };
 }
 
 function resetLiveState(carryLegs = false, modeOverride) {
@@ -1948,6 +2020,12 @@ function resetLiveState(carryLegs = false, modeOverride) {
     average: 0,
     checkoutAttempts: 0,
     checkoutSuccess: 0,
+    lastCheckoutValue: 0,
+    checkoutByRule: {
+      single: { attempts: 0, success: 0, highest: 0 },
+      double: { attempts: 0, success: 0, highest: 0 },
+      master: { attempts: 0, success: 0, highest: 0 }
+    },
     throws: [],
     currentRoundPoints: [],
     ...defaultPlayerCricketState(mode)
@@ -2266,8 +2344,14 @@ app.post('/api/live/throw', async (req, res) => {
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     const isCricket = modeDef.type === 'cricket';
     const isElimination = modeDef.type === 'elimination';
-    const checkoutAttempt = !isCricket && !isElimination && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
-    if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
+    const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
+    const incomingSegment = typeof req.body?.segment === 'string' ? req.body.segment.toUpperCase() : pointsToSegment(points);
+    const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, incomingSegment, checkoutRule);
+    if (checkoutAttempt) {
+      player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
+      getCheckoutRuleStats(player, checkoutRule).attempts += 1;
+    }
+    const remainingBeforeThrow = Number(player.remaining || 0);
 
     let bust = false;
     let eliminationAction = null;
@@ -2280,16 +2364,12 @@ app.post('/api/live/throw', async (req, res) => {
       }
     } else {
       if (isElimination) {
-        // Elimination: Punkte addieren von 0 aufwärts
-        player.totalScored = Math.max(0, Number(player.totalScored || 0)) + points;
-        // Prüfen auf Elimination
-        const eliminated = applyEliminationHit(state, player, points);
-        if (eliminated) eliminationAction = state.lastAction;
+        const eliminationThrow = applyEliminationThrow(state, player, points);
+        bust = eliminationThrow.bust;
+        eliminationAction = eliminationThrow.eliminationAction;
       } else {
-        const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
         const nextRemaining = player.remaining - points;
-        const checkoutSegment = typeof req.body?.segment === 'string' ? req.body.segment.toUpperCase() : null;
-        bust = !isValidCheckout(player.remaining, points, checkoutRule, checkoutSegment);
+        bust = !isValidCheckout(player.remaining, points, checkoutRule, incomingSegment);
         if (!bust) { player.remaining = nextRemaining; player.totalScored += points; }
       }
     }
@@ -2301,7 +2381,7 @@ app.post('/api/live/throw', async (req, res) => {
     player.currentRoundPoints.push(points);
 
     if (!Array.isArray(player.throws)) player.throws = [];
-    const throwSegment = typeof req.body?.segment === 'string' ? req.body.segment.toUpperCase() : pointsToSegment(points);
+    const throwSegment = incomingSegment;
     player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment });
 
     player.average = calculateCurrentRoundAverage(player);
@@ -2315,10 +2395,14 @@ app.post('/api/live/throw', async (req, res) => {
     };
     if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
-    if (!isCricket && player.remaining === 0) {
+    if (!isCricket && !isElimination && player.remaining === 0) {
+      player.lastCheckoutValue = remainingBeforeThrow;
       player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
+      const ruleStats = getCheckoutRuleStats(player, checkoutRule);
+      ruleStats.success += 1;
+      ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, remainingBeforeThrow));
       player.legs += 1;
-      await addHighscore(player.name, points, { kind: 'checkout', legWin: true, gameMode: mode });
+      await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, gameMode: mode, checkoutRule });
       state.game.status = 'leg-finished';
       // Record stats after leg finish
       await recordPlayerLegStats(player, state);
@@ -2493,6 +2577,17 @@ app.get('/api/highscores/overview', async (_req, res) => {
       const totalScored = Number(stats.total_scored || 0);
       const checkoutAttempts = Number(stats.checkout_attempts || 0);
       const checkoutSuccess = Number(stats.checkout_success || 0);
+      const checkoutByRule = {};
+      for (const rule of ['single', 'double', 'master']) {
+        const attempts = Number(stats[`checkout_${rule}_attempts`] || 0);
+        const success = Number(stats[`checkout_${rule}_success`] || 0);
+        checkoutByRule[rule] = {
+          attempts,
+          success,
+          rate: attempts > 0 ? Number((success / attempts * 100).toFixed(1)) : 0,
+          highest: Math.min(170, Number(stats[`checkout_${rule}_highest`] || 0))
+        };
+      }
       entries.push({
         profileId: Number(player.slot),
         player: player.name,
@@ -2502,6 +2597,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
         checkoutRate: checkoutAttempts > 0 ? Number((checkoutSuccess / checkoutAttempts * 100).toFixed(1)) : 0,
         checkoutAttempts,
         checkoutSuccess,
+        checkoutByRule,
         highestCheckout: Number(stats.highest_checkout || 0),
         gamesWon: Number(stats.games_won || 0),
         legsWon: Number(stats.legs_won || 0),
@@ -2514,6 +2610,9 @@ app.get('/api/highscores/overview', async (_req, res) => {
     res.json({ trackingMode: 'gesamt', modes: ['gesamt'], metrics: {
       count180: ranked('count180'),
       checkoutRate: ranked('checkoutRate', (_value, entry) => entry.checkoutAttempts > 0),
+      checkoutRateSingle: entries.filter(entry => entry.checkoutByRule.single.attempts > 0).map(entry => ({ ...entry, checkoutRateSingle: entry.checkoutByRule.single.rate })).sort((a, b) => b.checkoutRateSingle - a.checkoutRateSingle),
+      checkoutRateDouble: entries.filter(entry => entry.checkoutByRule.double.attempts > 0).map(entry => ({ ...entry, checkoutRateDouble: entry.checkoutByRule.double.rate })).sort((a, b) => b.checkoutRateDouble - a.checkoutRateDouble),
+      checkoutRateMaster: entries.filter(entry => entry.checkoutByRule.master.attempts > 0).map(entry => ({ ...entry, checkoutRateMaster: entry.checkoutByRule.master.rate })).sort((a, b) => b.checkoutRateMaster - a.checkoutRateMaster),
       threeDartAverage: ranked('threeDartAverage'),
       highestCheckout: ranked('highestCheckout'),
       gamesWon: ranked('gamesWon')

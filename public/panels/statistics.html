@@ -464,16 +464,16 @@
           <div class="summary-sub">Max Score: ${Number(s.max_score || 0)}</div>
         </div>
         <div class="summary-card" style="--accent:#f4a261">
-          <div class="summary-label">Checkout-Quote</div>
-          <div class="summary-value">${checkoutPct(s)}%</div>
-          <div class="summary-sub">Highest: ${Number(s.highest_checkout || 0)}</div>
+          <div class="summary-label">Double-Out-Quote</div>
+          <div class="summary-value">${checkoutRulePct(s, 'double')}%</div>
+          <div class="summary-sub">Highest: ${Math.min(170, Number(s.checkout_double_highest || 0))}</div>
         </div>
       `;
     }
 
-    function checkoutPct(s) {
-      const attempts = Number(s.checkout_attempts || 0);
-      const success = Number(s.checkout_success || 0);
+    function checkoutRulePct(s, rule) {
+      const attempts = Number(s['checkout_' + rule + '_attempts'] || 0);
+      const success = Number(s['checkout_' + rule + '_success'] || 0);
       return attempts > 0 ? ((success / attempts) * 100).toFixed(1) : '0.0';
     }
 
@@ -532,15 +532,18 @@
     function renderCheckout(stats) {
       const s = stats || {};
       const checkoutContainer = document.getElementById('checkoutStats');
-      const attempts = Number(s.checkout_attempts || 0);
-      const success = Number(s.checkout_success || 0);
-      const pct = attempts > 0 ? ((success / attempts) * 100).toFixed(1) : '0.0';
-      checkoutContainer.innerHTML = `
-        <div class="stat-item"><div class="stat-label">Checkout-Quote</div><div class="stat-value">${pct}%</div><div class="stat-sub">${success} / ${attempts}</div></div>
-        <div class="stat-item"><div class="stat-label">Highest Checkout</div><div class="stat-value">${Number(s.highest_checkout || 0)}</div><div class="stat-sub">Bestes Finish</div></div>
-        <div class="stat-item"><div class="stat-label">Versuche</div><div class="stat-value">${attempts}</div><div class="stat-sub">Checkout-Attempts</div></div>
-        <div class="stat-item"><div class="stat-label">Erfolgreich</div><div class="stat-value">${success}</div><div class="stat-sub">Getroffene</div></div>
-      `;
+      const rules = [
+        ['single', 'Single-Out'],
+        ['double', 'Double-Out'],
+        ['master', 'Master-Out']
+      ];
+      checkoutContainer.innerHTML = rules.map(([rule, label]) => {
+        const attempts = Number(s['checkout_' + rule + '_attempts'] || 0);
+        const success = Number(s['checkout_' + rule + '_success'] || 0);
+        const highest = Math.min(170, Number(s['checkout_' + rule + '_highest'] || 0));
+        const pct = attempts > 0 ? ((success / attempts) * 100).toFixed(1) : '0.0';
+        return `<div class="stat-item"><div class="stat-label">${label} Quote</div><div class="stat-value">${pct}%</div><div class="stat-sub">${success} / ${attempts} · High: ${highest}</div></div>`;
+      }).join('');
 
       const rangeContainer = document.getElementById('checkoutRangeStats');
       rangeContainer.innerHTML = `
