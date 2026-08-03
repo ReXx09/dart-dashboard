@@ -379,18 +379,41 @@
     // Load players
     async function loadPlayers() {
       try {
-        const res = await fetch(API_BASE + '/live/state');
-        const state = await res.json();
-        if (state.players) {
-          playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
-          state.players.forEach(p => {
-            if (p.name) {
-              const opt = document.createElement('option');
-              opt.value = p.slot;
-              opt.textContent = `P${p.slot} · ${p.name}`;
-              playerSelect.appendChild(opt);
-            }
+        const [playersRes, profilesRes] = await Promise.all([
+          fetch(API_BASE + '/players'),
+          fetch(API_BASE + '/profiles').catch(() => null)
+        ]);
+        const players = await playersRes.json();
+        const profiles = profilesRes ? await profilesRes.json() : [];
+        const namedPlayers = Array.isArray(players) ? players.filter(p => String(p.name || '').trim()) : [];
+        const assignedNames = new Set(namedPlayers.map(p => String(p.name).trim().toLowerCase()));
+
+        playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
+        if (namedPlayers.length) {
+          const playerGroup = document.createElement('optgroup');
+          playerGroup.label = 'Spieler-Slots';
+          namedPlayers.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.slot;
+            opt.textContent = `P${p.slot} · ${p.name}`;
+            playerGroup.appendChild(opt);
           });
+          playerSelect.appendChild(playerGroup);
+        }
+
+        const unassignedProfiles = Array.isArray(profiles)
+          ? profiles.filter(profile => profile.name && !assignedNames.has(String(profile.name).trim().toLowerCase()))
+          : [];
+        if (unassignedProfiles.length) {
+          const profileGroup = document.createElement('optgroup');
+          profileGroup.label = 'Profile ohne Spielerslot';
+          unassignedProfiles.forEach(profile => {
+            const opt = document.createElement('option');
+            opt.disabled = true;
+            opt.textContent = `${profile.name} · zuerst einem Slot zuweisen`;
+            profileGroup.appendChild(opt);
+          });
+          playerSelect.appendChild(profileGroup);
         }
       } catch (e) {
         console.error('Failed to load players:', e);

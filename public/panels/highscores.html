@@ -84,6 +84,7 @@
     .btn:hover { background: #2a2a2a; border-color: #e63946; }
     .btn.primary { background: #e63946; border-color: #e63946; color: #fff; }
     .btn.primary:hover { background: #c1121f; }
+    .btn.delete { padding: 5px 8px; color: #ff8b8b; font-size: .72rem; }
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -396,6 +397,7 @@
               <th>Score</th>
               <th>Typ</th>
               <th>Zeit</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="scoreBody">
@@ -609,7 +611,7 @@
     function renderTable(list) {
       const body = document.getElementById('scoreBody');
       if (!list.length) {
-        body.innerHTML = '<tr><td colspan="5" class="empty">Keine Einträge für diese Auswahl.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" class="empty">Keine Einträge für diese Auswahl.</td></tr>';
         return;
       }
 
@@ -621,6 +623,7 @@
           '<td class="score">' + entry.score + '</td>' +
           '<td>' + escapeHtml(kind) + (entry.legWin ? ' / LegWin' : '') + '</td>' +
           '<td class="time">' + formatTime(entry.ts) + '</td>' +
+          '<td><button class="btn delete" type="button" data-delete-id="' + Number(entry.id || 0) + '" title="Highscore löschen">Löschen</button></td>' +
         '</tr>';
       }).join('');
     }
@@ -663,7 +666,19 @@
         render();
       } catch (err) {
         showToast('Highscores konnten nicht geladen werden.', true);
-        document.getElementById('scoreBody').innerHTML = '<tr><td colspan="5" class="empty">Fehler beim Laden der Highscores.</td></tr>';
+        document.getElementById('scoreBody').innerHTML = '<tr><td colspan="6" class="empty">Fehler beim Laden der Highscores.</td></tr>';
+      }
+    }
+
+    async function deleteHighscore(id) {
+      if (!id || !window.confirm('Diesen Highscore wirklich löschen?')) return;
+      try {
+        const response = await fetch('/api/highscores/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        await loadScores();
+        showToast('Highscore gelöscht.');
+      } catch (err) {
+        showToast('Highscore konnte nicht gelöscht werden.', true);
       }
     }
 
@@ -685,6 +700,10 @@
     document.getElementById('overviewMode').addEventListener('change', renderOverview);
 
     document.getElementById('playerFilter').addEventListener('change', render);
+    document.getElementById('scoreBody').addEventListener('click', event => {
+      const button = event.target.closest('[data-delete-id]');
+      if (button) deleteHighscore(button.dataset.deleteId);
+    });
     document.getElementById('refreshBtn').addEventListener('click', () => loadScores());
 
     loadScores();

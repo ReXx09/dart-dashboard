@@ -894,7 +894,9 @@ async function recordPlayerLegStats(player, state) {
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     const isCricket = modeDef.type === 'cricket';
-    const checkout = isCricket ? 0 : (modeDef.startScore - player.remaining);
+    const checkout = isCricket || player.remaining !== 0
+      ? 0
+      : Number(Array.isArray(player.currentRoundPoints) ? player.currentRoundPoints[player.currentRoundPoints.length - 1] : 0);
     
     // Record leg in history
     const won = player.remaining === 0 ? 1 : 0;
@@ -917,9 +919,9 @@ async function recordPlayerLegStats(player, state) {
 
     // Add checkout stats if not cricket
     if (!isCricket) {
-      updates.checkout_attempts = (Number(currentStats.checkout_attempts || 0)) + (dartsThrawn > 0 ? 1 : 0);
-      if (checkout > 0) {
-        updates.checkout_success = (Number(currentStats.checkout_success || 0)) + 1;
+      updates.checkout_attempts = (Number(currentStats.checkout_attempts || 0)) + Number(player.checkoutAttempts || 0);
+      if (Number(player.checkoutSuccess || 0) > 0 && checkout > 0) {
+        updates.checkout_success = (Number(currentStats.checkout_success || 0)) + Number(player.checkoutSuccess || 0);
         updates.highest_checkout = Math.max(Number(currentStats.highest_checkout || 0), checkout);
         if (checkout >= 100) updates.checkout_100plus = (Number(currentStats.checkout_100plus || 0)) + 1;
         if (checkout >= 120) updates.checkout_120plus = (Number(currentStats.checkout_120plus || 0)) + 1;
@@ -1040,7 +1042,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
   const isElimination = modeDef.type === 'elimination';
-  const checkoutAttempt = !isCricket && !isElimination && state.game.currentThrow === 0 && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
+  const checkoutAttempt = !isCricket && !isElimination && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
   if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
   const checkoutSegment = evt.segment || codeToSegment(evt.code) || null;
 
@@ -1357,7 +1359,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
   const isCricket = modeDef.type === 'cricket';
   const isElimination = modeDef.type === 'elimination';
-  const checkoutAttempt = !isCricket && !isElimination && state.game.currentThrow === 0 && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
+  const checkoutAttempt = !isCricket && !isElimination && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
   if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
 
   let bust = false;
@@ -2264,7 +2266,7 @@ app.post('/api/live/throw', async (req, res) => {
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     const isCricket = modeDef.type === 'cricket';
     const isElimination = modeDef.type === 'elimination';
-    const checkoutAttempt = !isCricket && !isElimination && state.game.currentThrow === 0 && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
+    const checkoutAttempt = !isCricket && !isElimination && Number(player.remaining) > 0 && Number(player.remaining) <= 170;
     if (checkoutAttempt) player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
 
     let bust = false;
@@ -2506,12 +2508,15 @@ app.get('/api/highscores/overview', async (_req, res) => {
         trackingSince: stats.updated_at ? Number(stats.updated_at) : null
       });
     }
+    const ranked = (field, predicate = value => value > 0) => entries
+      .filter(entry => predicate(entry[field], entry))
+      .sort((a, b) => b[field] - a[field]);
     res.json({ trackingMode: 'gesamt', modes: ['gesamt'], metrics: {
-      count180: entries.slice().sort((a, b) => b.count180 - a.count180),
-      checkoutRate: entries.slice().sort((a, b) => b.checkoutRate - a.checkoutRate),
-      threeDartAverage: entries.slice().sort((a, b) => b.threeDartAverage - a.threeDartAverage),
-      highestCheckout: entries.slice().sort((a, b) => b.highestCheckout - a.highestCheckout),
-      gamesWon: entries.slice().sort((a, b) => b.gamesWon - a.gamesWon)
+      count180: ranked('count180'),
+      checkoutRate: ranked('checkoutRate', (_value, entry) => entry.checkoutAttempts > 0),
+      threeDartAverage: ranked('threeDartAverage'),
+      highestCheckout: ranked('highestCheckout'),
+      gamesWon: ranked('gamesWon')
     }});
   } catch (err) {
     res.status(500).json({ error: 'Highscore-Übersicht konnte nicht geladen werden: ' + err.message });
