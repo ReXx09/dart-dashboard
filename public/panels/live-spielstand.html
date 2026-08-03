@@ -88,6 +88,20 @@
       white-space: nowrap;
     }
     .topbar .restart-btn:hover { background: #252525; border-color: #e63946; color: #e63946; }
+    .topbar .undo-btn {
+      background: #1a1a1a;
+      border: 1px solid #888;
+      color: #f1f1f1;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .78rem;
+      font-family: inherit;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .topbar .undo-btn:hover { border-color: #f4a261; color: #f4a261; }
+    .topbar .undo-btn:disabled { opacity: .4; cursor: default; }
 
     main {
       padding: 6px;
@@ -953,6 +967,7 @@
     <h2>🎯 Live-Spielstand</h2>
     <div class="clock" id="clockDisplay">--:--:--</div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
+    <button class="restart-btn" id="restartLegBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
 
@@ -1139,7 +1154,7 @@
         '</div>' +
         '<div class="ctrl-row action-row">' +
           '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
-          '<button class="ctrl-btn restart" id="focusRestartBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>' +
+          '<button class="ctrl-btn undo" id="focusUndoBtn" onclick="undoLastThrow()" title="Letzten Wurf zurücksetzen">↶ Letzten Wurf</button>' +
         '</div>' +
         '<div class="modal-overlay" id="modeModal" onclick="closeModal(this, event)">' +
           '<div class="modal-content" onclick="event.stopPropagation()">' +
@@ -1779,7 +1794,7 @@
 
     // ── Fehlwurf – nächster Spieler ──
     async function skipPlayer() {
-      const btn = document.getElementById('missBtn');
+      const btn = document.getElementById('focusMissBtn');
       if (btn) btn.disabled = true;
       try {
         const r = await fetch('/api/live/next-player', { method: 'POST' });
@@ -1787,6 +1802,24 @@
         liveState = await r.json();
         renderState(liveState);
         showToast('➡ Fehlwurf – weiter mit ' + (liveState.players[liveState.game.activePlayer]?.name || 'nächstem Spieler'));
+      } catch(e) { showToast('Netzwerkfehler', true); }
+      if (btn) setTimeout(() => btn.disabled = false, 1000);
+    }
+
+    // ── Letzten Wurf zurücksetzen ──
+    async function undoLastThrow() {
+      const btn = document.getElementById('focusUndoBtn');
+      if (btn) btn.disabled = true;
+      try {
+        const r = await fetch('/api/live/undo', { method: 'POST' });
+        if (!r.ok) {
+          showToast('Wurf konnte nicht zurückgesetzt werden', true);
+          if (btn) btn.disabled = false;
+          return;
+        }
+        liveState = await r.json();
+        renderState(liveState);
+        showToast('↶ Letzten Wurf zurückgesetzt');
       } catch(e) { showToast('Netzwerkfehler', true); }
       if (btn) setTimeout(() => btn.disabled = false, 1000);
     }
