@@ -681,6 +681,36 @@ function getSettings() {
 }
 function saveSettings(s) { writeJson(SETTINGS_FILE, s); }
 
+let automaticEncounterCreation = null;
+
+async function ensureAutomaticEncounter(state) {
+  if (!state || !state.game || state.game.duelId || state.game.status !== 'running') return state;
+  if (getSettings().automaticEncountersEnabled === false) return state;
+  if (!['501', '301', '701'].includes(String(state.game.mode || ''))) return state;
+  const participants = (Array.isArray(state.players) ? state.players : [])
+    .filter(player => Number(player.slot) > 0 && String(player.name || '').trim())
+    .slice(0, 8);
+  if (participants.length < 2) return state;
+
+  if (!automaticEncounterCreation) {
+    automaticEncounterCreation = (async () => {
+      const profiles = await dataStore.getProfiles();
+      const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
+      return dataStore.createDuel({
+        mode: state.game.mode,
+        players: participants.map(player => ({
+          slot: player.slot,
+          name: player.name,
+          profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null
+        }))
+      });
+    })().finally(() => { automaticEncounterCreation = null; });
+  }
+  const duel = await automaticEncounterCreation;
+  state.game.duelId = duel.id;
+  return state;
+}
+
 function clampNumber(value, fallback, min, max) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -1364,6 +1394,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   if (value == null) return { ok: false, reason: 'unknown-channel', channel: formatChannel(channel) };
 
   const state = await getLiveState();
+  await ensureAutomaticEncounter(state);
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
   if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
 
@@ -1500,6 +1531,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
 
 async function applyArduinoMiss(evt = {}, reason = 'timeout') {
   const state = await getLiveState();
+  await ensureAutomaticEncounter(state);
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
   if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
 
@@ -2503,6 +2535,7 @@ app.post('/api/game/mode', async (req, res) => {
   try {
     savedLiveMode = mode;
     const fresh = resetLiveState(false, mode);
+    await ensureAutomaticEncounter(fresh);
     const saved = await saveLiveState(fresh);
     broadcastReload();
     res.json(saved);
@@ -2758,28 +2791,7 @@ app.get('/api/duels/:id', async (req, res) => {
 });
 
 app.post('/api/duels/start', requireAdmin, async (req, res) => {
-  const mode = String(req.body?.mode || '').trim();
-  if (!['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'Begegnungen sind zunächst nur für 501, 301 und 701 verfügbar.' });
-  try {
-    const state = await getLiveState();
-    if (state.game.duelId) return res.status(409).json({ error: 'Es läuft bereits eine Begegnung.', duel: await dataStore.getDuel(state.game.duelId) });
-    const requestedSlots = Array.isArray(req.body?.playerSlots) ? req.body.playerSlots.map(Number).filter(Number.isInteger) : [];
-    const sourcePlayers = state.players.filter(player => requestedSlots.length === 0 || requestedSlots.includes(Number(player.slot)));
-    const participants = sourcePlayers.filter(player => player.name && player.slot).slice(0, 8);
-    if (participants.length < 2) return res.status(400).json({ error: 'Mindestens zwei Spieler werden für eine Begegnung benötigt.' });
-    const profiles = await dataStore.getProfiles();
-    const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
-    const duel = await dataStore.createDuel({
-      mode,
-      players: participants.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null }))
-    });
-    state.game.duelId = duel.id;
-    state.game.mode = mode;
-    state.game.startedAt = Date.now();
-    await saveLiveState(state);
-    broadcastReload();
-    res.json(duel);
-  } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gestartet werden: ' + err.message }); }
+  res.status(410).json({ error: 'Begegnungen werden automatisch erkannt und können nicht manuell gestartet werden.' });
 });
 
 app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
@@ -2804,6 +2816,7 @@ app.post('/api/live/reset', async (req, res) => {
     const currentSlots = current.players.map(player => Number(player.slot)).sort((a, b) => a - b).join('-');
     const duelSlots = duel ? duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-') : '';
     fresh.game.duelId = duel && currentSlots === duelSlots ? duel.id : null;
+    await ensureAutomaticEncounter(fresh);
     const saved = await saveLiveState(fresh);
     broadcastReload();
     res.json(saved);
@@ -2824,6 +2837,7 @@ app.post('/api/live/throw', async (req, res) => {
 
   try {
     const state = await getLiveState();
+    await ensureAutomaticEncounter(state);
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
     if (targetIndex >= state.players.length) return res.status(400).json({ error: 'Spieler nicht gefunden.' });
 

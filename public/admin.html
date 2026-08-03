@@ -100,7 +100,7 @@
 </header>
 <nav class="admin-nav" aria-label="Admin-Navigation">
   <button class="admin-tab is-active" type="button" data-admin-tab="overview">Übersicht</button>
-  <button class="admin-tab" type="button" data-admin-tab="game">Spiel &amp; Duelle</button>
+  <button class="admin-tab" type="button" data-admin-tab="game">Spiel &amp; Begegnungen</button>
   <button class="admin-tab" type="button" data-admin-tab="devices">Arduino &amp; Matrix</button>
   <button class="admin-tab" type="button" data-admin-tab="display">Fire-TV &amp; Dashboard</button>
   <button class="admin-tab" type="button" data-admin-tab="data">Highscores &amp; Statistik</button>
@@ -117,15 +117,14 @@
 </div>
 <main>
   <div class="section" data-admin-panel="game">
-    <div class="sec-hd"><span class="sec-title">Duell-Erfassung</span><div class="sec-line"></div></div>
+    <div class="sec-hd"><span class="sec-title">Erweiterte Spielfunktionen</span><div class="sec-line"></div></div>
     <fieldset>
-      <div class="admin-player-tools">
-        <select id="duelMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option></select>
-        <div class="field-inline"><button class="btn-save" id="startDuelBtn">Begegnung starten</button><button class="btn-save" id="finishDuelBtn" disabled style="background:#8b0000">Begegnung beenden</button></div>
+      <div class="field-row">
+        <label>Automatische Begegnungen</label>
+        <input type="checkbox" id="automaticEncountersEnabled" />
       </div>
-      <div class="duel-player-list" id="duelPlayerList"><span style="color:#555;font-size:.8rem">Spieler werden geladen...</span></div>
-      <div class="duel-current" id="duelCurrent">Keine aktive Begegnung.</div>
-      <div class="duel-list" id="duelList"></div>
+      <div class="field-hint">Bei mindestens zwei benannten Spielern wird für 301, 501 und 701 automatisch eine Begegnung angelegt und fortlaufend gespeichert.</div>
+      <button class="btn-save" id="saveEncounterSettingsBtn">Einstellungen speichern</button>
     </fieldset>
   </div>
 
@@ -494,6 +493,7 @@
       document.getElementById('firetvUiScale').value = String(settings.firetvUiScale || 100);
       document.getElementById('firetvShowClock').checked = settings.firetvShowClock !== false;
       document.getElementById('matrixAutoThrowEnabled').checked = settings.matrixAutoThrowEnabled !== false;
+      document.getElementById('automaticEncountersEnabled').checked = settings.automaticEncountersEnabled !== false;
       updateRaspiDiagnostics(diagnostics);
     } catch(e) {
       document.getElementById('si-ip').textContent = 'Offline';
@@ -970,73 +970,19 @@
   document.getElementById('resetStatsBtn').addEventListener('click', resetAdminStats);
   loadAdminPlayers();
 
-  async function loadDuelAdmin() {
-    try {
-      const [playersResponse, currentResponse, listResponse] = await Promise.all([
-        fetch('/api/players', { cache: 'no-store' }),
-        fetch('/api/duels/current', { cache: 'no-store' }),
-        fetch('/api/duels?limit=20', { cache: 'no-store' })
-      ]);
-      const players = playersResponse.ok ? await playersResponse.json() : [];
-      const current = currentResponse.ok ? await currentResponse.json() : null;
-      const duels = listResponse.ok ? await listResponse.json() : [];
-      const list = document.getElementById('duelPlayerList');
-      list.innerHTML = players.filter(player => player.name).slice(0, 8).map(player =>
-        '<label><input type="checkbox" value="' + Number(player.slot) + '"' + (player.active ? ' checked' : '') + '>S' + Number(player.slot) + ' · ' + escapeHtml(player.name) + '</label>'
-      ).join('') || '<span style="color:#555;font-size:.8rem">Keine benannten Spieler vorhanden.</span>';
-      renderDuelCurrent(current);
-      document.getElementById('duelList').innerHTML = duels.map(duel =>
-        '<div class="duel-row"><span><strong>#' + Number(duel.id) + '</strong> · ' + escapeHtml(duel.categoryLabel || (Number(duel.participant_count) === 2 ? '2-Player-Duell' : 'Gruppen-Begegnung')) + ' · ' + escapeHtml(duel.mode) + ' · ' + (duel.players || []).map(player => escapeHtml(player.player_name)).join(', ') + '</span><span>' + Number(duel.total_legs || 0) + ' Legs · ' + escapeHtml(duel.status) + '</span></div>'
-      ).join('') || '<span style="color:#555;font-size:.8rem">Noch keine Begegnungen gespeichert.</span>';
-    } catch (err) { showToast('Begegnungen konnten nicht geladen werden: ' + err.message, true); }
-  }
-
-  function renderDuelCurrent(duel) {
-    const current = document.getElementById('duelCurrent');
-    const finishButton = document.getElementById('finishDuelBtn');
-    if (!duel) {
-      current.textContent = 'Keine aktive Begegnung.';
-      finishButton.disabled = true;
-      return;
-    }
-    current.innerHTML = '<strong>Aktiv: #' + Number(duel.id) + ' · ' + escapeHtml(duel.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(duel.mode) + '</strong><br>' +
-      (duel.players || []).map(player => 'S' + Number(player.player_slot) + ' · ' + escapeHtml(player.player_name)).join(' · ') +
-      '<br>' + Number(duel.total_legs || 0) + ' Legs gespeichert';
-    finishButton.disabled = false;
-  }
-
-  document.getElementById('startDuelBtn').addEventListener('click', async function() {
-    const playerSlots = Array.from(document.querySelectorAll('#duelPlayerList input:checked')).map(input => Number(input.value));
-    if (!playerSlots.length) { showToast('Bitte mindestens einen Spieler auswählen.', true); return; }
+  document.getElementById('saveEncounterSettingsBtn').addEventListener('click', async function() {
     this.disabled = true;
     try {
-      const response = await fetch('/api/duels/start', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: document.getElementById('duelMode').value, playerSlots })
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ automaticEncountersEnabled: document.getElementById('automaticEncountersEnabled').checked })
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));
-      showToast('Begegnung gestartet ✓');
-      await loadDuelAdmin();
-    } catch (err) { showToast('Fehler beim Starten: ' + err.message, true); }
-    this.disabled = false;
-  });
-
-  document.getElementById('finishDuelBtn').addEventListener('click', async function() {
-    const currentResponse = await fetch('/api/duels/current', { cache: 'no-store' });
-    const current = currentResponse.ok ? await currentResponse.json() : null;
-    if (!current || !confirm('Aktive Begegnung #' + current.id + ' beenden?')) return;
-    this.disabled = true;
-    try {
-      const response = await fetch('/api/duels/' + Number(current.id) + '/finish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       if (!response.ok) throw new Error('HTTP ' + response.status);
-      showToast('Begegnung beendet ✓');
-      await loadDuelAdmin();
-    } catch (err) { showToast('Fehler beim Beenden: ' + err.message, true); }
+      showToast('Begegnungseinstellungen gespeichert.');
+    } catch (err) { showToast('Fehler: ' + err.message, true); }
     this.disabled = false;
   });
-
-  loadDuelAdmin();
 </script>
 </body>
 </html>
