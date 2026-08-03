@@ -158,20 +158,19 @@ ensure_docker_ready() {
 }
 
 show_network_hint() {
-  local port
+  local port ip_address count=0
   port="$(get_env_value PUBLIC_PORT 3100)"
   msg_info ''
   msg_info '=== Dashboard ist bereit ==='
   msg_info "Lokaler Zugriff: http://localhost:${port}"
 
   if command_exists ip; then
-    local ips
-    ips="$(ip -4 addr show | grep -oP 'inet \K[\d.]+' | grep -v '127.0.0.1' | head -3)"
-    if [[ -n "$ips" ]]; then
-      while IFS= read -r ip; do
-        msg_info "Netzwerk:       http://${ip}:${port}"
-      done <<< "$ips"
-    fi
+    while IFS= read -r ip_address; do
+      [[ -z "$ip_address" || "$ip_address" == 127.* ]] && continue
+      msg_info "Netzwerk:       http://${ip_address}:${port}"
+      count=$((count + 1))
+      [[ "$count" -ge 3 ]] && break
+    done < <(ip -4 -o addr show 2>/dev/null | awk '{split($4, address, "/"); print address[1]}')
   fi
   msg_info ''
 }

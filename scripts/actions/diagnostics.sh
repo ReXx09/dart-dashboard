@@ -126,7 +126,7 @@ disconnect_arduino_monitor() {
 }
 
 run_health_checks() {
-  local api_base port report="" api_ok=false storage_ok=false arduino_ok=false
+  local api_base port report="" api_ok=false storage_ok=false highscores_ok=false
   port="$(get_env_value PUBLIC_PORT 3100)"
   api_base="http://localhost:${port}"
 
@@ -166,7 +166,6 @@ run_health_checks() {
     else
       report+="[INFO] Arduino nicht verbunden (normal, wenn kein Arduino angeschlossen)\n"
     fi
-    arduino_ok=true
   else
     report+="[FAIL] Arduino-Status nicht erreichbar\n"
   fi
@@ -181,14 +180,19 @@ run_health_checks() {
   # Highscores
   if curl -fsS --max-time 3 "${api_base}/api/highscores" >/dev/null 2>&1; then
     report+="[OK] Highscores-API erreichbar\n"
+    highscores_ok=true
   else
     report+="[FAIL] Highscores-API nicht erreichbar\n"
   fi
 
   report+="\n--- Zusammenfassung ---\n"
   $api_ok && report+="Dashboard: OK\n" || report+="Dashboard: FEHLER\n"
+  $storage_ok && report+="Storage: OK\n" || report+="Storage: FEHLER\n"
+  $highscores_ok && report+="Highscores: OK\n" || report+="Highscores: FEHLER\n"
 
   show_textbox "Health-Check" "$(printf '%b' "$report")"
+  if $api_ok && $storage_ok && $highscores_ok; then return 0; fi
+  return 1
 }
 
 run_guided_tests() {
@@ -207,7 +211,7 @@ run_guided_tests() {
   state="$(curl -fsS --max-time 3 "${api_base}/api/live/state" 2>/dev/null || true)"
   if [[ -n "$state" ]]; then
     local player_count
-    player_count="$(printf '%s' "$state" | sed -n 's/.*"players"[[:space:]]*:\[\([^]]*\).*/\1/p' | grep -o '"name"' | wc -l)"
+    player_count="$(printf '%s' "$state" | grep -o '"name"[[:space:]]*:' | wc -l || true)"
     report+="  OK - ${player_count} Spieler geladen\n"
   else
     report+="  FAIL - Keine Antwort\n"; failures=$((failures + 1))
@@ -262,4 +266,5 @@ run_guided_tests() {
   fi
 
   show_textbox "Funktionstests" "$(printf '%b' "$report")"
+  [[ "$failures" -eq 0 ]]
 }

@@ -13,7 +13,10 @@ run_quickstart_wizard() {
   show_textbox "Schnellstart" "$(printf '%b' "$summary")"
   if ! ask_yes_no 'Schnellstart jetzt ausfuehren?' 'y'; then return; fi
 
-  run_system_check_and_install
+  if ! run_system_check_and_install; then
+    msg_warn 'Schnellstart nach fehlgeschlagenem oder abgebrochenem Systemcheck beendet.'
+    return 1
+  fi
   build_and_start
   run_health_checks
 
@@ -67,6 +70,6 @@ show_beginner_help() {
   text+="  ./install.sh test\n"
   text+="  ./install.sh pin-hash\n"
   text+="  ./install.sh raspi-update\n"
-  text+="  ./install.sh docker-logs\n"
+  text+="  ./install.sh logs\n"
   show_textbox "Hilfe" "$(printf '%b' "$text")"
 }

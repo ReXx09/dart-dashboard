@@ -57,12 +57,13 @@ run_system_check_and_install() {
   show_textbox "Systemcheck" "$initial_report"
 
   if ! ask_yes_no 'Fehlende Komponenten jetzt automatisch installieren?' 'y'; then
-    return
+    msg_warn 'Installation abgebrochen.'
+    return 2
   fi
 
   if ! command_exists apt-get; then
     msg_fail 'apt-get fehlt – bitte manuell Docker installieren: https://docs.docker.com/engine/install/'
-    return
+    return 1
   fi
 
   install_docker_stack_debian

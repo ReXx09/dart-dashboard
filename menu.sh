@@ -134,16 +134,29 @@ show_action_success() {
 }
 
 show_action_error() {
-  local action="$1" error_file="${2:-}" details='Keine weiteren Details vorhanden.'
+  local action="$1" error_file="${2:-}" exit_code="${3:-1}" details='Keine weiteren Details vorhanden.' action_command
   if [[ -n "$error_file" && -f "$error_file" ]]; then
-    details="$(tail -n 80 "$error_file" 2>/dev/null || true)"; [[ -z "$details" ]] && details='Keine weiteren Details.'
+    details="$(tail -n 120 "$error_file" 2>/dev/null || true)"
+    [[ -z "$details" ]] && details='Die Aktion hat keine Ausgabe erzeugt.'
   fi
+  action_command="./install.sh ${action}"
+  {
+    printf 'Aktion fehlgeschlagen: %s\n' "$(action_label "$action")"
+    printf 'Exit-Code: %s\n' "$exit_code"
+    printf 'Zeitpunkt: %s\n\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || printf 'unbekannt')"
+    printf 'Letzte Meldungen:\n%s\n\n' "$details"
+    printf 'Manuell wiederholen mit:\n%s\n' "$action_command"
+  } > "${error_file}.display" 2>/dev/null || true
+  local display_file="${error_file}.display"
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
-    local tmp; tmp="$(mktemp)"; { printf 'Aktion fehlgeschlagen: %s\n\nLetzte Meldungen:\n%s\n' "$action" "$details"; } > "$tmp"
-    whiptail --title "Fehler" --scrolltext --textbox "$tmp" 24 90; rm -f "$tmp"
+    whiptail --title "Fehlerdiagnose" --scrolltext --textbox "$display_file" 26 100
   else
-    msg_fail "Aktion fehlgeschlagen: ${action}"; printf '%s\n' "$details"; ui_pause
+    msg_fail "Aktion fehlgeschlagen: $(action_label "$action") (Exit-Code ${exit_code})"
+    printf '%s\n' "$details"
+    printf '\nManuell wiederholen mit: %s\n' "$action_command"
+    ui_pause
   fi
+  rm -f "$display_file" 2>/dev/null || true
 }
 
 execute_action() {
@@ -151,14 +164,43 @@ execute_action() {
   label="$(action_label "$action")"; msg_run "$label"
 
   if [[ "$capture_output" -eq 0 ]]; then
-    if ! run_action "$action"; then show_action_error "$action"; return 1; fi
+    local tmp action_status
+    tmp="$(mktemp)"
+    set +e
+    run_action "$action" 2>&1 | tee "$tmp"
+    action_status="${PIPESTATUS[0]}"
+    set -e
+    if [[ "$action_status" -ne 0 ]]; then
+      show_action_error "$action" "$tmp" "$action_status"
+      rm -f "$tmp"
+      return "$action_status"
+    fi
+    rm -f "$tmp"
   elif [[ "$capture_output" -eq 2 ]]; then
-    local tmp; tmp="$(mktemp)"
-    if ! run_action "$action" 2>&1 | tee "$tmp"; then show_action_error "$action" "$tmp"; rm -f "$tmp"; return 1; fi
+    local tmp action_status
+    tmp="$(mktemp)"
+    set +e
+    run_action "$action" 2>&1 | tee "$tmp"
+    action_status="${PIPESTATUS[0]}"
+    set -e
+    if [[ "$action_status" -ne 0 ]]; then
+      show_action_error "$action" "$tmp" "$action_status"
+      rm -f "$tmp"
+      return "$action_status"
+    fi
     rm -f "$tmp"
   else
-    local tmp; tmp="$(mktemp)"
-    if ! run_action "$action" >"$tmp" 2>&1; then show_action_error "$action" "$tmp"; rm -f "$tmp"; return 1; fi
+    local tmp action_status
+    tmp="$(mktemp)"
+    set +e
+    run_action "$action" >"$tmp" 2>&1
+    action_status="$?"
+    set -e
+    if [[ "$action_status" -ne 0 ]]; then
+      show_action_error "$action" "$tmp" "$action_status"
+      rm -f "$tmp"
+      return "$action_status"
+    fi
     rm -f "$tmp"
   fi
   [[ "$pause_after" -eq 1 ]] && show_action_success "$action"

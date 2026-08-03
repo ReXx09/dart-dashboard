@@ -31,10 +31,7 @@ start_existing() {
   ensure_docker_ready
   ensure_env_file
 
-  msg_run 'Ziehe aktuelles Image (falls verfuegbar)...'
-  $COMPOSE_CMD pull dart-dashboard 2>/dev/null || msg_warn 'Image-Pull fehlgeschlagen, starte mit lokalem Image.'
-
-  msg_run 'Starte Container...'
+  msg_run 'Starte vorhandenen lokalen Container...'
   $COMPOSE_CMD up -d
   $COMPOSE_CMD ps
   show_network_hint
@@ -49,7 +46,7 @@ stop_stack() {
 restart_stack() {
   ensure_docker_ready
   ensure_env_file
-  $COMPOSE_CMD pull dart-dashboard 2>/dev/null || msg_warn 'Image-Pull fehlgeschlagen.'
+  msg_run 'Starte Docker-Container neu...'
   $COMPOSE_CMD down
   $COMPOSE_CMD up -d
   $COMPOSE_CMD ps
@@ -92,7 +89,7 @@ uninstall_stack() {
   msg_info 'HINWEIS: .env und data/ bleiben erhalten.'
 
   if ! ask_yes_no 'Wirklich deinstallieren?' 'n'; then
-    msg_warn 'Abgebrochen.'; return
+    msg_warn 'Abgebrochen.'; return 2
   fi
 
   $COMPOSE_CMD down --remove-orphans || true
@@ -108,8 +105,11 @@ uninstall_stack() {
 reinstall_stack() {
   msg_info 'Reinstall: Uninstall + Neustart'
   if ! ask_yes_no 'Wirklich neu installieren?' 'n'; then
-    msg_warn 'Abgebrochen.'; return
+    msg_warn 'Abgebrochen.'; return 2
   fi
-  uninstall_stack
+  if ! uninstall_stack; then
+    msg_warn 'Reinstall nach abgebrochener oder fehlgeschlagener Deinstallation beendet.'
+    return 1
+  fi
   build_and_start
 }
