@@ -483,6 +483,16 @@
     .focus-controls-card .ctrl-btn:hover { border-color: #f4a261; color: #f4a261; }
     .focus-controls-card .ctrl-btn.miss { border-color: #e63946; background: #8b0000; }
     .focus-controls-card .ctrl-btn.miss:hover { background: #a00; border-color: #f4a261; color: #f4a261; }
+    .focus-controls-card .ctrl-btn.mode-btn { border-color: #457b9d; }
+    .focus-controls-card .ctrl-btn.mode-btn:hover { border-color: #6fa8c7; color: #d9f0ff; }
+    .focus-controls-card .ctrl-btn.rule-btn.rule-single { border-color: #2a9d8f; }
+    .focus-controls-card .ctrl-btn.rule-btn.rule-single:hover { border-color: #63c9bb; color: #bff5ed; }
+    .focus-controls-card .ctrl-btn.rule-btn.rule-master { border-color: #f4c542; }
+    .focus-controls-card .ctrl-btn.rule-btn.rule-master:hover { border-color: #ffe27a; color: #fff0ae; }
+    .focus-controls-card .ctrl-btn.rule-btn.rule-double { border-color: #e63946; }
+    .focus-controls-card .ctrl-btn.rule-btn.rule-double:hover { border-color: #ff7a83; color: #ffd6d9; }
+    .focus-controls-card .ctrl-btn.undo { border-color: #f4c542; background: #f4c542; color: #241700; }
+    .focus-controls-card .ctrl-btn.undo:hover { border-color: #ffe27a; background: #ffe27a; color: #241700; }
     .focus-controls-card .ctrl-btn.restart { border-color: #f4a261; color: #f4a261; }
     .focus-controls-card .ctrl-btn.restart:hover { border-color: #e63946; color: #e63946; }
     .focus-controls-card .ctrl-btn:disabled { opacity: .4; cursor: default; }
@@ -1166,7 +1176,7 @@
           '<button class="ctrl-btn mode-btn" id="ctrlModeBtn" onclick="openModeModal()" title="Spielmodus ändern">' +
             '<span class="btn-label">Modus</span><span class="btn-value">' + modeLabel + '</span>' +
           '</button>' +
-          '<button class="ctrl-btn rule-btn" id="ctrlRuleBtn" onclick="openRuleModal()" title="Finish-Regel ändern">' +
+          '<button class="ctrl-btn rule-btn rule-' + rule + '" id="ctrlRuleBtn" onclick="openRuleModal()" title="Finish-Regel ändern">' +
             '<span class="btn-label">Finish</span><span class="btn-value">' + ruleLabel + '</span>' +
           '</button>' +
         '</div>' +
