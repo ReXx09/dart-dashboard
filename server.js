@@ -235,6 +235,7 @@ function isValidCheckout(remaining, points, rule, segment = null) {
   // points = what was thrown
   const nextRemaining = remaining - points;
   if (nextRemaining < 0) return false; // bust (overthrow)
+  if ((rule === 'double' || rule === 'master') && nextRemaining === 1) return false; // Rest 1 ist nicht checkoutbar
   if (nextRemaining === 0) {
     // Checkout attempt – validate the finishing dart
     if (rule === 'single') return true; // any dart can finish
