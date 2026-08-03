@@ -499,6 +499,10 @@
     .focus-controls-card .ctrl-btn:hover { border-color: #f4a261; color: #f4a261; }
     .focus-controls-card .ctrl-btn.miss { border-color: #e63946; background: #8b0000; }
     .focus-controls-card .ctrl-btn.miss:hover { background: #a00; border-color: #f4a261; color: #f4a261; }
+    .focus-controls-card .ctrl-btn.miss,
+    .focus-controls-card .ctrl-btn.undo {
+      font-size: 1.64rem !important;
+    }
     .focus-controls-card .ctrl-btn.mode-btn { border-color: #457b9d; }
     .focus-controls-card .ctrl-btn.mode-btn:hover { border-color: #6fa8c7; color: #d9f0ff; }
     .focus-controls-card .ctrl-btn.rule-btn.rule-single { border-color: #2a9d8f; }
@@ -519,7 +523,8 @@
       width: 100%;
       padding: 8px 4px;
       justify-content: center;
-      height: 100% !important;
+      height: 90% !important;
+      align-self: center;
     }
     .focus-controls-card .ctrl-btn .btn-value {
       font-size: 1.5rem;
