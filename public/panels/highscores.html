@@ -311,6 +311,7 @@
           <option value="140">140+</option>
           <option value="100">100+</option>
           <option value="checkout">Checkouts</option>
+          <option value="finish">Finishes</option>
           <option value="manual">Manuelle Scores</option>
         </select>
       </div>
@@ -453,6 +454,7 @@
       '140': '140+',
       '100': '100+',
       checkout: 'Checkouts',
+      finish: 'Finishes',
       manual: 'Manuelle Scores'
     };
 
@@ -522,7 +524,8 @@
       const score = Number(entry.score || 0);
 
       if (filter === 'all') return true;
-      if (filter === 'checkout') return kind === 'checkout' || !!entry.legWin;
+      if (filter === 'checkout') return kind === 'checkout';
+      if (filter === 'finish') return !!entry.legWin && kind !== 'checkout';
       if (filter === 'manual') return kind === 'manual';
       if (filter === '140') return score >= 140 && score <= 180;
       if (filter === '100') return score >= 100 && score <= 180;
