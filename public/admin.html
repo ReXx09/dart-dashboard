@@ -128,6 +128,18 @@
       <span class="label">Datenbank:</span><span class="value" id="si-db">-</span>
       <span class="label">Arduino:</span><span class="value" id="si-ard">-</span>
     </div>
+    <div class="sec-hd" style="margin-top:24px"><span class="sec-title">Raspberry-Pi-Diagnose</span><div class="sec-line"></div></div>
+    <div class="status-info" id="raspiDiagnostics">
+      <span class="label">Host:</span><span class="value" id="rd-host">-</span>
+      <span class="label">System:</span><span class="value" id="rd-system">-</span>
+      <span class="label">CPU:</span><span class="value" id="rd-cpu">-</span>
+      <span class="label">CPU-Last:</span><span class="value" id="rd-load">-</span>
+      <span class="label">RAM:</span><span class="value" id="rd-memory">-</span>
+      <span class="label">Speicher:</span><span class="value" id="rd-disk">-</span>
+      <span class="label">System-Uptime:</span><span class="value" id="rd-uptime">-</span>
+      <span class="label">Prozess-Uptime:</span><span class="value" id="rd-process-uptime">-</span>
+      <span class="label">Temperatur:</span><span class="value" id="rd-temperature">nicht verfügbar</span>
+    </div>
     <div class="sec-hd" style="margin-top:24px"><span class="sec-title">Arduino-Telemetrie</span><div class="sec-line"></div></div>
     <div class="status-info" id="arduinoTelemetry">
       <span class="label">Verbindung:</span><span class="value" id="at-connection">-</span>
@@ -426,10 +438,11 @@
 
   async function load() {
     try {
-      const [info, settings, storage] = await Promise.all([
+      const [info, settings, storage, diagnostics] = await Promise.all([
         fetch('/api/server-info').then(r => r.json()),
         fetch('/api/settings').then(r => r.json()),
-        fetch('/api/storage/info').then(r => r.json())
+        fetch('/api/storage/info').then(r => r.json()),
+        fetch('/api/system/diagnostics', { cache: 'no-store' }).then(r => r.json())
       ]);
       document.getElementById('si-ip').textContent = info.ip;
       document.getElementById('si-port').textContent = info.port;
@@ -441,6 +454,7 @@
       document.getElementById('firetvUiScale').value = String(settings.firetvUiScale || 100);
       document.getElementById('firetvShowClock').checked = settings.firetvShowClock !== false;
       document.getElementById('matrixAutoThrowEnabled').checked = settings.matrixAutoThrowEnabled !== false;
+      updateRaspiDiagnostics(diagnostics);
     } catch(e) {
       document.getElementById('si-ip').textContent = 'Offline';
     }
@@ -453,6 +467,48 @@
       document.getElementById('matrixMappingJson').value = '{\n  "R3,C1": 104\n}';
     }
   }
+
+  function formatBytes(bytes) {
+    const value = Number(bytes);
+    if (!Number.isFinite(value)) return '-';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let index = 0;
+    let scaled = value;
+    while (scaled >= 1024 && index < units.length - 1) { scaled /= 1024; index += 1; }
+    return scaled.toFixed(index === 0 ? 0 : 1) + ' ' + units[index];
+  }
+
+  function formatSystemUptime(seconds) {
+    const value = Number(seconds);
+    if (!Number.isFinite(value) || value < 0) return '-';
+    const days = Math.floor(value / 86400);
+    const hours = Math.floor((value % 86400) / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
+    return (days ? days + 'd ' : '') + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+  }
+
+  function updateRaspiDiagnostics(data) {
+    const memory = data.memory || {};
+    const disk = data.disk || {};
+    document.getElementById('rd-host').textContent = data.host || '-';
+    document.getElementById('rd-system').textContent = [data.platform, data.release, data.arch].filter(Boolean).join(' · ') || '-';
+    document.getElementById('rd-cpu').textContent = (data.cpuCount || '-') + ' Kerne';
+    document.getElementById('rd-load').textContent = Array.isArray(data.loadAverage) ? data.loadAverage.map(value => Number(value).toFixed(2)).join(' / ') : '-';
+    document.getElementById('rd-memory').textContent = formatBytes(memory.usedBytes) + ' / ' + formatBytes(memory.totalBytes) + (memory.usedPercent == null ? '' : ' (' + memory.usedPercent + '%)');
+    document.getElementById('rd-disk').textContent = formatBytes(disk.usedBytes) + ' / ' + formatBytes(disk.totalBytes) + (disk.usedPercent == null ? '' : ' (' + disk.usedPercent + '%)');
+    document.getElementById('rd-uptime').textContent = formatSystemUptime(data.systemUptimeSec);
+    document.getElementById('rd-process-uptime').textContent = formatSystemUptime(data.processUptimeSec);
+    document.getElementById('rd-temperature').textContent = Number.isFinite(Number(data.temperatureC)) ? Number(data.temperatureC).toFixed(1) + ' °C' : 'nicht verfügbar';
+  }
+
+  async function refreshRaspiDiagnostics() {
+    try {
+      const response = await fetch('/api/system/diagnostics', { cache: 'no-store' });
+      if (response.ok) updateRaspiDiagnostics(await response.json());
+    } catch (_error) { document.getElementById('rd-host').textContent = 'Nicht erreichbar'; }
+  }
+
+  setInterval(refreshRaspiDiagnostics, 5000);
 
   function formatDuration(ms) {
     const value = Number(ms);

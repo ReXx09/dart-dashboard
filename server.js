@@ -34,6 +34,58 @@ function getLocalIP() {
   return 'localhost';
 }
 
+function readRaspberryTemperature() {
+  const candidates = [
+    '/sys/class/thermal/thermal_zone0/temp',
+    '/sys/devices/virtual/thermal/thermal_zone0/temp'
+  ];
+  for (const filePath of candidates) {
+    try {
+      const raw = Number(fs.readFileSync(filePath, 'utf8').trim());
+      if (Number.isFinite(raw)) return raw > 1000 ? raw / 1000 : raw;
+    } catch (_err) {
+      // Temperature files are Linux/Raspberry-Pi specific.
+    }
+  }
+  return null;
+}
+
+function getSystemDiagnostics() {
+  const totalMemory = Number(os.totalmem());
+  const freeMemory = Number(os.freemem());
+  const memoryUsed = Math.max(0, totalMemory - freeMemory);
+  let disk = { totalBytes: null, freeBytes: null, usedBytes: null, usedPercent: null };
+  try {
+    const stats = fs.statfsSync(DATA_DIR);
+    const blockSize = Number(stats.bsize || stats.frsize || 0);
+    const totalBytes = blockSize * Number(stats.blocks || 0);
+    const freeBytes = blockSize * Number(stats.bavail || stats.bfree || 0);
+    const usedBytes = Math.max(0, totalBytes - freeBytes);
+    disk = { totalBytes, freeBytes, usedBytes, usedPercent: totalBytes ? Math.round(usedBytes / totalBytes * 1000) / 10 : null };
+  } catch (_err) {
+    // Filesystem stats are not available on every platform/runtime.
+  }
+  return {
+    host: os.hostname(),
+    platform: process.platform,
+    release: os.release(),
+    arch: process.arch,
+    cpuCount: os.cpus().length,
+    loadAverage: os.loadavg(),
+    systemUptimeSec: Math.round(os.uptime()),
+    processUptimeSec: Math.round(process.uptime()),
+    memory: {
+      totalBytes: totalMemory,
+      freeBytes: freeMemory,
+      usedBytes: memoryUsed,
+      usedPercent: totalMemory ? Math.round(memoryUsed / totalMemory * 1000) / 10 : null
+    },
+    disk,
+    temperatureC: readRaspberryTemperature(),
+    sampledAt: Date.now()
+  };
+}
+
 const app = express();
 const BROWSER_PORT = Number(process.env.BROWSER_PORT || process.env.PORT || 3100);
 const FIRETV_PORT = Number(process.env.FIRETV_PORT || 3200);
@@ -2467,6 +2519,10 @@ app.get('/api/server-info', (_req, res) => {
     browserUrl: 'http://' + ip + ':' + BROWSER_PORT,
     fireTvUrl: 'http://' + ip + ':' + FIRETV_PORT
   });
+});
+
+app.get('/api/system/diagnostics', (_req, res) => {
+  res.json(getSystemDiagnostics());
 });
 
 // ── SSE – Live-Push ──
