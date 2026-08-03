@@ -725,15 +725,10 @@
       const currentRound = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
       // Wenn currentRoundPoints existiert (auch wenn leer), ist das die aktuelle Aufnahme
       // Leeres Array = neue Aufnahme begonnen, noch keine Würfe -> 0 Punkte
-      if (currentRound.length >= 0) {
+      if (currentRound.length > 0) {
         return currentRound.reduce((sum, pt) => sum + (Number(pt) || 0), 0);
       }
-      const throws = Array.isArray(player && player.throws) ? player.throws : [];
-      if (throws.length === 0) return '-';
-      const remainder = throws.length % 3;
-      const chunkSize = remainder === 0 ? 3 : remainder;
-      const lastChunk = throws.slice(-chunkSize);
-      return lastChunk.reduce((sum, t) => sum + (Number(t && t.points) || 0), 0);
+      return 0;
     }
 
     function getLiveLegStats(player) {
@@ -765,10 +760,11 @@
       const isElimination = state.game.mode === 'elimination';
       
       const throwsHtml = displayThrows.map((pt, ti) => {
-        const pointsLabel = pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt);
         const throwData = Array.isArray(p.currentRoundPoints) ? throws.slice(-currentRound.length)[ti] : lastThrows[ti];
+        const isBust = !!(throwData && throwData.bust);
+        const pointsLabel = isBust ? 'BUST' : (pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt));
         const segmentLabel = throwData && throwData.segment ? throwData.segment : (pt === null ? '-' : String(pt));
-        return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
+        return '<div class="throw-seg' + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
           '<div class="seg">' + segmentLabel + '</div>' +
         '</div>';
@@ -808,16 +804,28 @@
       if (!p) return '';
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const turnScores = [];
-      for (let i = 0; i < throws.length; i += 3) {
-        const chunk = throws.slice(i, i + 3);
-        const score = chunk.reduce((sum, t) => sum + (Number(t.points) || 0), 0);
-        turnScores.push({ score, throws: chunk.map(t => t.segment || t.points) });
+      const hasTurnRounds = throws.some(t => Number.isFinite(Number(t && t.turnRound)));
+      if (hasTurnRounds) {
+        throws.forEach((throwData) => {
+          const turnRound = Number(throwData && throwData.turnRound);
+          const previous = turnScores[turnScores.length - 1];
+          if (!previous || previous.turnRound !== turnRound) turnScores.push({ turnRound, score: 0, busted: false, throws: [] });
+          const turn = turnScores[turnScores.length - 1];
+          turn.score += throwData.bust ? 0 : (Number(throwData.points) || 0);
+          turn.busted = turn.busted || !!throwData.bust;
+          turn.throws.push({ label: throwData.segment || throwData.points, bust: !!throwData.bust });
+        });
+      } else {
+        for (let i = 0; i < throws.length; i += 3) {
+          const chunk = throws.slice(i, i + 3);
+          turnScores.push({ score: chunk.some(t => t.bust) ? 0 : chunk.reduce((sum, t) => sum + (Number(t.points) || 0), 0), busted: chunk.some(t => t.bust), throws: chunk.map(t => ({ label: t.segment || t.points, bust: !!t.bust })) });
+        }
       }
       const legListHtml = turnScores.length
         ? turnScores.slice(-20).reverse().map((turn, orderIdx) => {
             const turnIdx = turnScores.length - orderIdx;
-            const throwsHtml = turn.throws.map((seg, si) => 
-              '<span>' + escapeHtml(seg) + '</span>' + (si < turn.throws.length - 1 ? '<span class="sep">|</span>' : '')
+            const throwsHtml = turn.throws.map((throwData, si) =>
+              '<span' + (throwData.bust ? ' class="bust"' : '') + '>' + escapeHtml(throwData.label) + (throwData.bust ? ' BUST' : '') + '</span>' + (si < turn.throws.length - 1 ? '<span class="sep">|</span>' : '')
             ).join('');
             return '<div class="leg-item">' +
               '<span class="idx">Aufnahme ' + turnIdx + '</span>' +
@@ -862,9 +870,10 @@
 
       const throwsHtml = displayThrows.map((points, index) => {
         const throwData = currentRoundThrows[index];
-        const pointsLabel = points === null ? 'offen' : (points === 0 ? '0' : '+' + points);
+        const isBust = !!(throwData && throwData.bust);
+        const pointsLabel = isBust ? 'BUST' : (points === null ? 'offen' : (points === 0 ? '0' : '+' + points));
         const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
-        return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>';
+        return '<div class="throw-seg' + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>';
       }).join('');
       const legStats = getLiveLegStats(p);
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
