@@ -40,6 +40,7 @@ const FIRETV_PORT = Number(process.env.FIRETV_PORT || 3200);
 const ADMIN_SESSION_TTL_MS = Number(process.env.ADMIN_SESSION_TTL_MS || 15 * 60 * 1000);
 const ADMIN_BACKUP_DIR = path.join(__dirname, 'data', 'backups');
 const adminSessions = new Map();
+let adminAuthEnabled = String(process.env.ADMIN_AUTH_ENABLED || 'true').toLowerCase() !== 'false';
 
 const DATA_DIR       = path.join(__dirname, 'data');
 const SETTINGS_FILE  = path.join(DATA_DIR, 'settings.json');
@@ -433,7 +434,14 @@ function getAdminSession(req) {
 
 function requireAdmin(req, res, next) {
   if (!isLocalOrPrivateAddress(req.socket.remoteAddress)) return res.status(403).json({ error: 'Admin-Zugriff nur aus dem lokalen Netz.' });
+  if (!adminAuthEnabled) return next();
   if (!getAdminSession(req)) return res.status(401).json({ error: 'Admin-Anmeldung erforderlich.' });
+  next();
+}
+
+function requireAdminPinChange(req, res, next) {
+  if (!isLocalOrPrivateAddress(req.socket.remoteAddress)) return res.status(403).json({ error: 'Admin-Zugriff nur aus dem lokalen Netz.' });
+  if (!verifyAdminPin(req.body?.currentPin)) return res.status(401).json({ error: 'Aktuelle PIN ist ungültig.' });
   next();
 }
 
@@ -2279,8 +2287,9 @@ app.use(express.json());
 app.get('/api/admin/auth/status', (req, res) => {
   res.json({
     configured: Boolean(getAdminPinHash()),
+    enabled: adminAuthEnabled,
     localNetwork: isLocalOrPrivateAddress(req.socket.remoteAddress),
-    authenticated: Boolean(getAdminSession(req)),
+    authenticated: !adminAuthEnabled || Boolean(getAdminSession(req)),
     sessionTtlMs: ADMIN_SESSION_TTL_MS
   });
 });
@@ -2299,6 +2308,13 @@ app.post('/api/admin/auth/logout', (req, res) => {
   if (token) adminSessions.delete(token);
   res.setHeader('Set-Cookie', 'admin_session=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/');
   res.json({ authenticated: false });
+});
+
+app.put('/api/admin/auth/config', requireAdminPinChange, (req, res) => {
+  const enabled = req.body?.enabled === true;
+  adminAuthEnabled = enabled;
+  saveSettings({ ...getSettings(), adminAuthEnabled: enabled });
+  res.json({ enabled: adminAuthEnabled });
 });
 
 app.get('/api/admin/backups', requireAdmin, (_req, res) => {
@@ -2365,7 +2381,7 @@ app.get('/api/players', async (_req, res) => {
   catch (err) { res.status(500).json({ error: 'Spieler konnten nicht geladen werden: ' + err.message }); }
 });
 
-app.put('/api/players', async (req, res) => {
+app.put('/api/players', requireAdmin, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
   try {
     await savePlayers(req.body);
@@ -2382,7 +2398,7 @@ app.get('/api/profiles', async (_req, res) => {
   catch (err) { res.status(500).json({ error: 'Profile konnten nicht geladen werden: ' + err.message }); }
 });
 
-app.put('/api/profiles', async (req, res) => {
+app.put('/api/profiles', requireAdmin, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
   try {
     await dataStore.saveProfiles(req.body);
@@ -2397,7 +2413,7 @@ app.get('/api/storage/info', (_req, res) => { res.json(dataStore.getInfo()); });
 
 // ── Settings ──
 app.get('/api/settings', (_req, res) => res.json(getSettings()));
-app.put('/api/settings', (req, res) => {
+app.put('/api/settings', requireAdmin, (req, res) => {
   const current = getSettings();
   const next = req.body && typeof req.body === 'object' ? req.body : {};
   const s = { ...current, ...next };
@@ -2417,7 +2433,7 @@ app.get('/api/matrix-mapping', (_req, res) => {
   res.json({ updatedAt: arduinoState.matrixMappingUpdatedAt || null, mapping: MATRIX_CODE_BY_ROW_COLUMN });
 });
 
-app.put('/api/matrix-mapping', (req, res) => {
+app.put('/api/matrix-mapping', requireAdmin, (req, res) => {
   const payload = req.body && typeof req.body === 'object' && !Array.isArray(req.body) && req.body.mapping
     ? req.body.mapping
     : req.body;
@@ -2575,7 +2591,7 @@ app.get('/api/duels/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht geladen werden: ' + err.message }); }
 });
 
-app.post('/api/duels/start', async (req, res) => {
+app.post('/api/duels/start', requireAdmin, async (req, res) => {
   const mode = String(req.body?.mode || '').trim();
   if (!['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'Begegnungen sind zunächst nur für 501, 301 und 701 verfügbar.' });
   try {
@@ -2600,7 +2616,7 @@ app.post('/api/duels/start', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gestartet werden: ' + err.message }); }
 });
 
-app.post('/api/duels/:id/finish', async (req, res) => {
+app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
   try {
     const state = await getLiveState();
     if (Number(state.game.duelId) !== Number(req.params.id)) return res.status(409).json({ error: 'Diese Begegnung ist nicht aktiv.' });
@@ -2833,7 +2849,7 @@ app.get('/api/highscores', async (_req, res) => {
   catch (err) { res.status(500).json({ error: 'Highscores konnten nicht geladen werden: ' + err.message }); }
 });
 
-app.post('/api/highscores', async (req, res) => {
+app.post('/api/highscores', requireAdmin, async (req, res) => {
   const player = String(req.body && req.body.player || '').trim();
   const score = Number(req.body && req.body.score);
   if (!player || !Number.isFinite(score) || score <= 0) return res.status(400).json({ error: 'player und positive score erforderlich.' });
@@ -2843,7 +2859,7 @@ app.post('/api/highscores', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht gespeichert werden: ' + err.message }); }
 });
 
-app.delete('/api/highscores/:id', async (req, res) => {
+app.delete('/api/highscores/:id', requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'Ungültige ID.' });
   try {
@@ -2852,7 +2868,7 @@ app.delete('/api/highscores/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht gelöscht werden: ' + err.message }); }
 });
 
-app.put('/api/highscores/:id', async (req, res) => {
+app.put('/api/highscores/:id', requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const player = String(req.body?.player || '').trim();
   const score = Number(req.body?.score);
@@ -2865,7 +2881,7 @@ app.put('/api/highscores/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht bearbeitet werden: ' + err.message }); }
 });
 
-app.delete('/api/highscores', async (_req, res) => {
+app.delete('/api/highscores', requireAdmin, async (_req, res) => {
   try {
     await dataStore.clearAllHighscores();
     res.json({ ok: true, highscores: [] });
@@ -2972,7 +2988,7 @@ const EDITABLE_PLAYER_STAT_FIELDS = [
   'count_140plus', 'count_100plus', 'max_score', 'cricket_legs', 'cricket_won', 'cricket_mpr'
 ];
 
-app.put('/api/players/:id/stats', async (req, res) => {
+app.put('/api/players/:id/stats', requireAdmin, async (req, res) => {
   const playerId = Number(req.params.id);
   if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
   try {
@@ -2993,7 +3009,7 @@ app.put('/api/players/:id/stats', async (req, res) => {
   }
 });
 
-app.post('/api/players/:id/stats/reset', async (req, res) => {
+app.post('/api/players/:id/stats/reset', requireAdmin, async (req, res) => {
   const playerId = Number(req.params.id);
   if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
   try {
@@ -3058,6 +3074,9 @@ async function startServer() {
     liveStateFile: LIVE_STATE_FILE,
     highscoresFile: HIGHSCORES_FILE
   });
+
+  const storedSettings = readJson(SETTINGS_FILE, {});
+  if (typeof storedSettings.adminAuthEnabled === 'boolean') adminAuthEnabled = storedSettings.adminAuthEnabled;
 
   const storageInfo = dataStore.getInfo();
   console.log('[Storage] client=' + storageInfo.client + ' external=' + storageInfo.external);

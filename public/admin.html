@@ -69,6 +69,14 @@
     .status-info .value{color:#ddd;text-align:right;font-family:monospace}
     .admin-coming-soon{background:#111;border:1px solid #292929;border-left:3px solid #f4a261;border-radius:10px;padding:16px;color:#aaa;font-size:.84rem;line-height:1.5}
     .admin-coming-soon strong{display:block;color:#f4a261;margin-bottom:5px}
+    .admin-gate{position:fixed;inset:0;background:#0a0a0a;display:grid;place-items:center;padding:24px;z-index:1000}
+    .admin-gate[hidden]{display:none}
+    .admin-gate-box{width:min(420px,100%);background:#141414;border:1px solid #292929;border-top:3px solid #e63946;border-radius:12px;padding:24px}
+    .admin-gate-box h2{font-size:1.05rem;margin-bottom:8px}
+    .admin-gate-box p{color:#888;font-size:.84rem;line-height:1.5;margin-bottom:18px}
+    .admin-gate-box input{width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:10px 12px;border-radius:8px;font:inherit;margin-bottom:10px}
+    .admin-gate-box input:focus{border-color:#e63946;outline:none}
+    .admin-gate-status{min-height:1.2em;color:#e63946;font-size:.78rem;margin-top:10px}
     @media (max-width:600px){header{padding:12px 16px}.admin-nav{padding:8px 16px}main{padding:20px 16px}.admin-tab{padding:8px 11px}}
   </style>
 </head>
@@ -89,6 +97,15 @@
   <button class="admin-tab" type="button" data-admin-tab="data">Highscores &amp; Statistik</button>
   <button class="admin-tab" type="button" data-admin-tab="system">Backups &amp; System</button>
 </nav>
+<div class="admin-gate" id="adminGate">
+  <div class="admin-gate-box">
+    <h2>Adminpanel gesperrt</h2>
+    <p>Bitte die Admin-PIN eingeben, um die Betriebszentrale zu öffnen.</p>
+    <input id="adminGatePin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="Admin-PIN" />
+    <button class="btn-save" id="adminGateLoginBtn">Adminpanel öffnen</button>
+    <div class="admin-gate-status" id="adminGateStatus"></div>
+  </div>
+</div>
 <main>
   <div class="section" data-admin-panel="game">
     <div class="sec-hd"><span class="sec-title">Duell-Erfassung</span><div class="sec-line"></div></div>
@@ -264,6 +281,8 @@
       <strong>Admin-Schutz</strong>
       <div class="field-row"><label for="adminPin">PIN</label><input id="adminPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="Admin-PIN" /></div>
       <div class="field-inline"><button class="btn-save" id="adminLoginBtn">Anmelden</button><button class="btn-save" id="adminLogoutBtn" style="background:#1e1e1e;border:1px solid #2a2a2a">Abmelden</button><span id="adminAuthStatus" style="font-size:.8rem;color:#888">Nicht angemeldet</span></div>
+      <div class="field-row" style="margin-top:14px"><label for="adminAuthToggle">PIN-Schutz</label><input type="checkbox" id="adminAuthToggle" /></div>
+      <div class="field-inline"><input id="adminAuthTogglePin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="PIN zur Bestätigung" /><button class="btn-save" id="saveAdminAuthBtn">Schutzstatus speichern</button></div>
     </div>
     <div class="admin-coming-soon" id="adminBackupPanel" hidden style="margin-top:12px;border-left-color:#2a9d8f">
       <strong style="color:#2a9d8f">Backup erstellen</strong>
@@ -305,8 +324,15 @@
     const response = await fetch('/api/admin/auth/status');
     const status = await response.json();
     const authenticated = status.authenticated === true;
+    const canOpenPanel = authenticated && status.configured === true;
     document.getElementById('adminAuthStatus').textContent = authenticated ? 'Angemeldet (Session aktiv)' : (status.configured ? 'Nicht angemeldet' : 'PIN nicht konfiguriert');
-    document.getElementById('adminBackupPanel').hidden = !authenticated;
+    document.getElementById('adminAuthToggle').checked = status.enabled === true;
+    document.getElementById('adminBackupPanel').hidden = !canOpenPanel;
+    document.getElementById('adminGate').hidden = canOpenPanel;
+    document.querySelector('header').hidden = !canOpenPanel;
+    document.querySelector('.admin-nav').hidden = !canOpenPanel;
+    document.querySelector('main').hidden = !canOpenPanel;
+    if (!status.configured) document.getElementById('adminGateStatus').textContent = 'Keine PIN konfiguriert. Bitte ADMIN_PIN_HASH setzen.';
     if (authenticated) await loadAdminBackups();
   }
 
@@ -328,6 +354,42 @@
       showToast('Admin-Session aktiviert.');
       await refreshAdminAuth();
     } catch (error) { showToast(error.message, true); }
+  });
+
+  async function loginFromGate() {
+    const pin = document.getElementById('adminGatePin').value;
+    try {
+      const response = await fetch('/api/admin/auth/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ pin }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Anmeldung fehlgeschlagen');
+      document.getElementById('adminGatePin').value = '';
+      document.getElementById('adminGateStatus').textContent = '';
+      await refreshAdminAuth();
+      showToast('Adminpanel geöffnet.');
+    } catch (error) { document.getElementById('adminGateStatus').textContent = error.message; }
+  }
+
+  document.getElementById('adminGateLoginBtn').addEventListener('click', loginFromGate);
+  document.getElementById('adminGatePin').addEventListener('keydown', event => {
+    if (event.key === 'Enter') loginFromGate();
+  });
+
+  document.getElementById('saveAdminAuthBtn').addEventListener('click', async function() {
+    const enabled = document.getElementById('adminAuthToggle').checked;
+    const currentPin = document.getElementById('adminAuthTogglePin').value;
+    if (!enabled && !confirm('PIN-Schutz wirklich deaktivieren?')) return;
+    this.disabled = true;
+    try {
+      const response = await fetch('/api/admin/auth/config', {
+        method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ enabled, currentPin })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Schutzstatus konnte nicht gespeichert werden');
+      document.getElementById('adminAuthTogglePin').value = '';
+      showToast(result.enabled ? 'PIN-Schutz aktiviert.' : 'PIN-Schutz deaktiviert.');
+      await refreshAdminAuth();
+    } catch (error) { showToast(error.message, true); }
+    this.disabled = false;
   });
 
   document.getElementById('adminLogoutBtn').addEventListener('click', async () => {

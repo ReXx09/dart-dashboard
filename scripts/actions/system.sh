@@ -78,7 +78,21 @@ generate_admin_pin_hash() {
 run_raspi_update() {
   if ! command_exists raspi-update; then
     msg_fail 'raspi-update wurde auf diesem System nicht gefunden.'
-    msg_info 'Diese Funktion ist nur für Raspberry Pi OS vorgesehen.'
+    local os_release=''
+    if [[ -r /etc/os-release ]]; then
+      os_release="$(cat /etc/os-release 2>/dev/null || true)"
+    fi
+    if printf '%s\n' "$os_release" | grep -Eiq 'PRETTY_NAME=.*(Raspberry Pi OS|Raspbian)'; then
+      msg_info 'Auf Raspberry Pi OS kann das Werkzeug installiert werden mit:'
+      msg_info 'sudo apt-get update && sudo apt-get install -y rpi-update'
+    elif printf '%s\n' "$os_release" | grep -q 'ID=debian'; then
+      msg_info 'Dieses System ist Debian, nicht Raspberry Pi OS.'
+      msg_info 'Verwende fuer regulare System- und Paketupdates:'
+      msg_info 'sudo apt update && sudo apt full-upgrade'
+    else
+      msg_info 'Diese Funktion ist nur fuer Raspberry Pi OS vorgesehen.'
+    fi
+    msg_info 'Pruefe das Betriebssystem mit: cat /etc/os-release'
     return 1
   fi
   msg_warn 'raspi-update aktualisiert die Raspberry-Pi-Firmware und kann einen Neustart erfordern.'
