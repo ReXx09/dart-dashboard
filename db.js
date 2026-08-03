@@ -128,7 +128,49 @@ class DataStore {
     await this.ensureCheckoutRuleColumns();
     await this.ensureCheckoutStatsVersion();
     await this.ensureDuelSchema();
+    await this.ensureThrowSegmentSchema();
     await this.seedFromLegacyJson();
+  }
+
+  async ensureThrowSegmentSchema() {
+    if (this.isSQLite()) {
+      await this.sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS player_throw_segments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          player_slot INTEGER NOT NULL,
+          segment TEXT NOT NULL,
+          points INTEGER NOT NULL DEFAULT 0,
+          mode TEXT,
+          bust INTEGER NOT NULL DEFAULT 0,
+          thrown_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_throw_segments_player ON player_throw_segments (player_slot, thrown_at);
+      `);
+      return;
+    }
+    const query = this.isPostgres()
+      ? `CREATE TABLE IF NOT EXISTS player_throw_segments (
+          id BIGSERIAL PRIMARY KEY,
+          player_slot INTEGER NOT NULL,
+          segment TEXT NOT NULL,
+          points INTEGER NOT NULL DEFAULT 0,
+          mode TEXT,
+          bust INTEGER NOT NULL DEFAULT 0,
+          thrown_at BIGINT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_throw_segments_player ON player_throw_segments (player_slot, thrown_at);`
+      : `CREATE TABLE IF NOT EXISTS player_throw_segments (
+          id BIGINT PRIMARY KEY AUTO_INCREMENT,
+          player_slot INT NOT NULL,
+          segment VARCHAR(16) NOT NULL,
+          points INT NOT NULL DEFAULT 0,
+          mode VARCHAR(64) NULL,
+          bust TINYINT NOT NULL DEFAULT 0,
+          thrown_at BIGINT NOT NULL,
+          INDEX idx_throw_segments_player (player_slot, thrown_at)
+        );`;
+    if (this.isPostgres()) await this.pg.query(query);
+    else await this.my.query(query);
   }
 
   async ensureDuelSchema() {
@@ -835,6 +877,59 @@ class DataStore {
     else if (this.isPostgres()) rows = (await this.pg.query('SELECT * FROM duels ORDER BY started_at DESC LIMIT $1', [safeLimit])).rows;
     else rows = (await this.my.query('SELECT * FROM duels ORDER BY started_at DESC LIMIT ?', [safeLimit]))[0];
     return Promise.all(rows.map(row => this.getDuel(row.id)));
+  }
+
+  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now()) {
+    const values = [Number(playerSlot), String(segment || 'MISS').toUpperCase(), Number(points || 0), mode ? String(mode) : null, bust ? 1 : 0, Number(thrownAt) || Date.now()];
+    if (this.isSQLite()) await this.sqlite.run('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at) VALUES (?, ?, ?, ?, ?, ?)', values);
+    else if (this.isPostgres()) await this.pg.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at) VALUES ($1, $2, $3, $4, $5, $6)', values);
+    else await this.my.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at) VALUES (?, ?, ?, ?, ?, ?)', values);
+  }
+
+  async getSegmentAnalysis(playerSlot, mode = '') {
+    const slot = Number(playerSlot);
+    let rows;
+    if (this.isSQLite()) rows = await this.sqlite.all(
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND (? = \'\' OR mode = ?) ORDER BY thrown_at ASC',
+      [slot, String(mode || ''), String(mode || '')]
+    );
+    else if (this.isPostgres()) rows = (await this.pg.query(
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND ($2 = \'\' OR mode = $2) ORDER BY thrown_at ASC',
+      [slot, String(mode || '')]
+    )).rows;
+    else rows = (await this.my.query(
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND (? = \'\' OR mode = ?) ORDER BY thrown_at ASC',
+      [slot, String(mode || ''), String(mode || '')]
+    ))[0];
+
+    const bySegment = new Map();
+    for (const row of rows) {
+      const segment = String(row.segment || 'MISS').toUpperCase();
+      const current = bySegment.get(segment) || { segment, throws: 0, hits: 0, points: 0, busts: 0 };
+      current.throws += 1;
+      current.points += Number(row.points || 0);
+      if (row.bust) current.busts += 1;
+      else current.hits += 1;
+      bySegment.set(segment, current);
+    }
+    const segments = Array.from(bySegment.values()).map(item => ({
+      ...item,
+      average: item.throws > 0 ? Number((item.points / item.throws).toFixed(2)) : 0
+    })).sort((a, b) => b.throws - a.throws || b.points - a.points || a.segment.localeCompare(b.segment));
+    const category = (segment) => /^S(?:[1-9]|1[0-9]|20)$/.test(segment) ? 'single'
+      : /^D(?:[1-9]|1[0-9]|20)$/.test(segment) ? 'double'
+        : /^T(?:[1-9]|1[0-9]|20)$/.test(segment) ? 'triple'
+          : /BULL/.test(segment) ? 'bull' : 'other';
+    const categories = {};
+    for (const item of segments) {
+      const key = category(item.segment);
+      if (!categories[key]) categories[key] = { category: key, throws: 0, hits: 0, points: 0, busts: 0 };
+      categories[key].throws += item.throws;
+      categories[key].hits += item.hits;
+      categories[key].points += item.points;
+      categories[key].busts += item.busts;
+    }
+    return { playerSlot: slot, mode: String(mode || ''), totalThrows: rows.length, segments, categories: Object.values(categories) };
   }
 
   async finishDuel(id, winnerSlot = null, endedAt = Date.now()) {

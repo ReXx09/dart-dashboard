@@ -1449,6 +1449,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   player.currentRoundPoints.push(value);
 
   if (!Array.isArray(player.throws)) player.throws = [];
+  const throwSegment = evt.segment || codeToSegment(evt.code) || pointsToSegment(value) || 'MISS';
   player.throws.push({
     points: value,
     cricketPointsAwarded,
@@ -1456,10 +1457,11 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     bust,
     ts: Date.now(),
     source: 'arduino',
-    segment: pointsToSegment(value),
+    segment: throwSegment,
     channel: formatChannel(channel),
     raw: evt.line || null
   });
+  await dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust);
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -1544,6 +1546,7 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
   player.currentRoundPoints.push(0);
 
   if (!Array.isArray(player.throws)) player.throws = [];
+  const throwSegment = codeToSegment(hit.code) || pointsToSegment(value) || 'MISS';
   player.throws.push({
     points: 0,
     remaining: player.remaining,
@@ -1779,13 +1782,14 @@ async function applyArduinoThrowFromMatrix(hit) {
     bust,
     ts: Date.now(),
     source: 'arduino-matrix',
-    segment: codeToSegment(hit.code) || pointsToSegment(value),
+    segment: throwSegment,
     row: hit.row,
     column: hit.column,
     code: hit.code,
     channel: hit.key,
     raw: hit.line || null
   });
+  await dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust);
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -2885,6 +2889,7 @@ app.post('/api/live/throw', async (req, res) => {
     if (!Array.isArray(player.throws)) player.throws = [];
     const throwSegment = incomingSegment;
     player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment });
+    await dataStore.recordThrowSegment(player.slot, throwSegment, points, mode, bust);
 
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
@@ -3152,6 +3157,17 @@ app.get('/api/players/:id/stats', async (req, res) => {
     res.json(stats);
   } catch (err) {
     res.status(500).json({ error: 'Stats konnten nicht geladen werden: ' + err.message });
+  }
+});
+
+app.get('/api/players/:id/segment-analysis', async (req, res) => {
+  try {
+    const playerId = Number(req.params.id);
+    if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
+    const mode = String(req.query.mode || '').trim();
+    res.json(await dataStore.getSegmentAnalysis(playerId, mode));
+  } catch (err) {
+    res.status(500).json({ error: 'Segmentanalyse konnte nicht geladen werden: ' + err.message });
   }
 });
 

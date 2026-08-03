@@ -1173,19 +1173,19 @@
       const button = document.getElementById('duelStatsToggle');
       if (!button) return;
       const eligible = isDuelStatsEligible(state);
-      button.disabled = !eligible;
+      button.disabled = false;
       button.classList.toggle('active', eligible && duelStatsEnabled);
       button.textContent = duelStatsEnabled ? 'Duell-Stats ✓' : 'Duell-Stats ○';
       button.title = eligible
         ? (duelStatsEnabled ? 'Duell-Statistik deaktivieren' : 'Duell-Statistik aktivieren')
-        : 'Nur bei einem aktiven 501-Duell mit zwei Spielern verfügbar';
+        : 'Für die nächste automatisch erkannte 501-Begegnung aktivieren/deaktivieren';
     }
 
     function toggleDuelStats() {
-      if (!isDuelStatsEligible(liveState)) return;
       duelStatsEnabled = !duelStatsEnabled;
       localStorage.setItem('liveDuelStatsEnabled', String(duelStatsEnabled));
       updateDuelStatsToggle(liveState);
+      if (!liveState) return;
       if (!duelStatsEnabled) {
         if (duelStatsTimer) { clearTimeout(duelStatsTimer); duelStatsTimer = null; }
         duelStatsScheduledFor = '';

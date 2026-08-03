@@ -171,6 +171,33 @@
       color: #555;
       margin-top: 2px;
     }
+    .segment-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+    }
+    .segment-toolbar select { width: auto; min-width: 180px; }
+    .segment-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .8rem;
+    }
+    .segment-table th,
+    .segment-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #1f1f1f;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .segment-table th:first-child,
+    .segment-table td:first-child { text-align: left; }
+    .segment-table th {
+      color: #666;
+      font-size: .62rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .segment-table td:first-child { color: #f4a261; font-weight: 800; }
     .history-table {
       width: 100%;
       border-collapse: collapse;
@@ -341,6 +368,25 @@
         <h2 class="section-title">Verteilung</h2>
         <div class="stats-grid" id="distributionStats"></div>
       </div>
+      <div class="section">
+        <h2 class="section-title">Segmentanalyse</h2>
+        <div class="segment-toolbar">
+          <select id="segmentTypeSelect" aria-label="Segmentanalyse auswählen">
+            <option value="all">Alle Segmente</option>
+            <option value="single">Singles</option>
+            <option value="double">Doubles</option>
+            <option value="triple">Triples</option>
+            <option value="bull">Bulls</option>
+          </select>
+        </div>
+        <div class="stats-grid" id="segmentSummaryStats"></div>
+        <div style="overflow-x:auto;margin-top:12px">
+          <table class="segment-table" id="segmentTable">
+            <thead><tr><th>Segment</th><th>Würfe</th><th>Treffer</th><th>Quote</th><th>Punkte</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div class="tab-panel" id="tab-checkout">
@@ -407,6 +453,8 @@
     let currentSeason = '2026';
     let encounters = [];
     let selectedEncounterCategory = 'all';
+    let segmentAnalysis = null;
+    let selectedSegmentType = 'all';
 
     // DOM Elements
     const playerSelect = document.getElementById('playerSelect');
@@ -480,15 +528,18 @@
     async function loadStats() {
       if (!currentPlayerId) return;
       try {
-        const [statsRes, historyRes] = await Promise.all([
+        const [statsRes, historyRes, segmentRes] = await Promise.all([
           fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${currentSeason}`),
-          fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=50`)
+          fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=50`),
+          fetch(`${API_BASE}/players/${currentPlayerId}/segment-analysis`, { cache: 'no-store' })
         ]);
         const stats = await statsRes.json();
         const history = await historyRes.json();
+        segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
         renderSummary(stats);
         renderOverview(stats);
         renderScoring(stats);
+        renderSegmentAnalysis();
         renderCheckout(stats);
         renderHistory(history);
         loadEncounterStats();
@@ -662,6 +713,45 @@
       `;
     }
 
+    function renderSegmentAnalysis() {
+      const summary = document.getElementById('segmentSummaryStats');
+      const tableBody = document.querySelector('#segmentTable tbody');
+      const data = segmentAnalysis;
+      if (!summary || !tableBody) return;
+      const filtered = (data && Array.isArray(data.segments) ? data.segments : [])
+        .filter(item => selectedSegmentType === 'all' || segmentCategory(item.segment) === selectedSegmentType);
+      const throws = filtered.reduce((sum, item) => sum + Number(item.throws || 0), 0);
+      const hits = filtered.reduce((sum, item) => sum + Number(item.hits || 0), 0);
+      const busts = filtered.reduce((sum, item) => sum + Number(item.busts || 0), 0);
+      const points = filtered.reduce((sum, item) => sum + Number(item.points || 0), 0);
+      const hitRate = throws > 0 ? (hits / throws * 100).toFixed(1) : '0.0';
+      summary.innerHTML = `
+        <div class="stat-item"><div class="stat-label">Würfe</div><div class="stat-value">${throws}</div><div class="stat-sub">Auswahl: ${segmentLabel(selectedSegmentType)}</div></div>
+        <div class="stat-item"><div class="stat-label">Treffer</div><div class="stat-value">${hits}</div><div class="stat-sub">${hitRate}% Trefferquote</div></div>
+        <div class="stat-item"><div class="stat-label">Punkte</div><div class="stat-value">${points}</div><div class="stat-sub">Summe der Würfe</div></div>
+        <div class="stat-item"><div class="stat-label">Busts</div><div class="stat-value">${busts}</div><div class="stat-sub">in dieser Auswahl</div></div>
+      `;
+      tableBody.innerHTML = filtered.length
+        ? filtered.slice(0, 30).map(item => {
+            const quote = item.throws > 0 ? (item.hits / item.throws * 100).toFixed(1) : '0.0';
+            return '<tr><td>' + escapeHtml(item.segment) + '</td><td>' + item.throws + '</td><td>' + item.hits + '</td><td>' + quote + '%</td><td>' + item.points + '</td></tr>';
+          }).join('')
+        : '<tr><td colspan="5" style="text-align:center;color:#555;padding:24px">Noch keine Segmentwürfe gespeichert.</td></tr>';
+    }
+
+    function segmentCategory(segment) {
+      const value = String(segment || '').toUpperCase();
+      if (/^S(?:[1-9]|1[0-9]|20)$/.test(value)) return 'single';
+      if (/^D(?:[1-9]|1[0-9]|20)$/.test(value)) return 'double';
+      if (/^T(?:[1-9]|1[0-9]|20)$/.test(value)) return 'triple';
+      if (value.includes('BULL')) return 'bull';
+      return 'other';
+    }
+
+    function segmentLabel(type) {
+      return ({ all: 'Alle', single: 'Singles', double: 'Doubles', triple: 'Triples', bull: 'Bulls' })[type] || 'Alle';
+    }
+
     function renderHistory(history) {
       const tbody = document.querySelector('#historyTable tbody');
       const emptyState = document.getElementById('emptyHistory');
@@ -697,6 +787,11 @@
       selectedEncounterCategory = event.target.value;
       renderEncounters();
       loadEncounterStats();
+    });
+
+    document.getElementById('segmentTypeSelect').addEventListener('change', event => {
+      selectedSegmentType = event.target.value;
+      renderSegmentAnalysis();
     });
 
     refreshBtn.addEventListener('click', loadStats);
