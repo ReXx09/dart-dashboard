@@ -13,9 +13,15 @@
     header .sub{font-size:.75rem;color:#555;margin-top:2px}
     .back-link{color:#666;text-decoration:none;font-size:.82rem;padding:7px 14px;border:1px solid #252525;border-radius:8px;transition:color .2s,border-color .2s;white-space:nowrap;margin-left:auto}
     .back-link:hover{color:#f1f1f1;border-color:#555}
-    main{flex:1;padding:28px;max-width:800px;margin:0 auto;width:100%}
+    .admin-nav{display:flex;gap:6px;overflow-x:auto;padding:10px 28px;background:#0f0f0f;border-bottom:1px solid #202020;scrollbar-width:thin}
+    .admin-tab{flex:0 0 auto;background:#151515;border:1px solid #292929;color:#888;padding:8px 13px;border-radius:8px;cursor:pointer;font:inherit;font-size:.76rem;white-space:nowrap;transition:background .2s,border-color .2s,color .2s}
+    .admin-tab:hover{color:#f1f1f1;border-color:#457b9d}
+    .admin-tab.is-active{background:#16232d;border-color:#457b9d;color:#d9f0ff;box-shadow:0 0 0 1px rgba(69,123,157,.2)}
+    main{flex:1;padding:28px;max-width:900px;margin:0 auto;width:100%}
 
     .section{margin-bottom:28px}
+    .section[data-admin-panel]{display:none}
+    .section[data-admin-panel].is-visible{display:block}
     .sec-hd{display:flex;align-items:center;gap:12px;margin-bottom:14px}
     .sec-title{font-size:.72rem;text-transform:uppercase;letter-spacing:3px;color:#444;font-weight:600;white-space:nowrap}
     .sec-line{flex:1;height:1px;background:#1a1a1a}
@@ -61,6 +67,9 @@
     .status-info{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.82rem}
     .status-info .label{color:#555}
     .status-info .value{color:#ddd;text-align:right;font-family:monospace}
+    .admin-coming-soon{background:#111;border:1px solid #292929;border-left:3px solid #f4a261;border-radius:10px;padding:16px;color:#aaa;font-size:.84rem;line-height:1.5}
+    .admin-coming-soon strong{display:block;color:#f4a261;margin-bottom:5px}
+    @media (max-width:600px){header{padding:12px 16px}.admin-nav{padding:8px 16px}main{padding:20px 16px}.admin-tab{padding:8px 11px}}
   </style>
 </head>
 <body>
@@ -72,8 +81,16 @@
   </div>
   <a href="/" class="back-link">← Zurück</a>
 </header>
+<nav class="admin-nav" aria-label="Admin-Navigation">
+  <button class="admin-tab is-active" type="button" data-admin-tab="overview">Übersicht</button>
+  <button class="admin-tab" type="button" data-admin-tab="game">Spiel &amp; Duelle</button>
+  <button class="admin-tab" type="button" data-admin-tab="devices">Arduino &amp; Matrix</button>
+  <button class="admin-tab" type="button" data-admin-tab="display">Fire-TV &amp; Dashboard</button>
+  <button class="admin-tab" type="button" data-admin-tab="data">Highscores &amp; Statistik</button>
+  <button class="admin-tab" type="button" data-admin-tab="system">Backups &amp; System</button>
+</nav>
 <main>
-  <div class="section">
+  <div class="section" data-admin-panel="game">
     <div class="sec-hd"><span class="sec-title">Duell-Erfassung</span><div class="sec-line"></div></div>
     <fieldset>
       <div class="admin-player-tools">
@@ -86,7 +103,7 @@
     </fieldset>
   </div>
 
-  <div class="section">
+  <div class="section is-visible" data-admin-panel="overview">
     <div class="sec-hd"><span class="sec-title">Server-Status</span><div class="sec-line"></div></div>
     <div class="status-info" id="serverInfo">
       <span class="label">IP:</span><span class="value" id="si-ip">-</span>
@@ -96,7 +113,7 @@
     </div>
   </div>
 
-  <div class="section">
+  <div class="section" data-admin-panel="devices">
     <div class="sec-hd"><span class="sec-title">Arduino-Einstellungen</span><div class="sec-line"></div></div>
     <fieldset>
       <div class="field-row">
@@ -124,7 +141,7 @@
     </fieldset>
   </div>
 
-  <div class="section">
+  <div class="section" data-admin-panel="devices">
     <div class="sec-hd"><span class="sec-title">Matrix-Mapping</span><div class="sec-line"></div></div>
     <fieldset>
       <div class="field-row" style="align-items:flex-start">
@@ -137,7 +154,7 @@
     </fieldset>
   </div>
 
-  <div class="section">
+  <div class="section" data-admin-panel="display">
     <div class="sec-hd"><span class="sec-title">Fire-TV</span><div class="sec-line"></div></div>
     <fieldset>
       <div class="field-row">
@@ -161,7 +178,7 @@
     </fieldset>
   </div>
 
-  <div class="section">
+  <div class="section" data-admin-panel="devices">
     <div class="sec-hd"><span class="sec-title">Matrix-Übernahme</span><div class="sec-line"></div></div>
     <fieldset>
       <div class="field-row">
@@ -173,7 +190,7 @@
     </fieldset>
   </div>
 
-  <div class="section">
+  <div class="section" data-admin-panel="data">
     <div class="sec-hd"><span class="sec-title">Highscore-Verwaltung</span><div class="sec-line"></div></div>
     <fieldset>
       <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -213,7 +230,7 @@
     </fieldset>
   </div>
 
-  <div class="section">
+  <div class="section" data-admin-panel="data">
     <div class="sec-hd"><span class="sec-title">Statistik-Verwaltung</span><div class="sec-line"></div></div>
     <fieldset>
       <div class="admin-player-tools">
@@ -241,9 +258,30 @@
     </fieldset>
   </div>
 
+  <div class="section" data-admin-panel="system">
+    <div class="sec-hd"><span class="sec-title">Backups &amp; System</span><div class="sec-line"></div></div>
+    <div class="admin-coming-soon">
+      <strong>Systempflege wird vorbereitet</strong>
+      Backups, Git-Pull, Docker-Verwaltung und Raspi-Update werden hier über geschützte Admin-Aktionen ergänzt. Die Oberfläche ist bereits getrennt; ausführbare Systembefehle werden erst nach Authentifizierung und Sicherheitsprüfung freigeschaltet.
+    </div>
+  </div>
+
 </main>
 <div class="toast" id="toast"></div>
 <script>
+  const adminTabs = Array.from(document.querySelectorAll('[data-admin-tab]'));
+  const adminPanels = Array.from(document.querySelectorAll('[data-admin-panel]'));
+
+  function activateAdminTab(tabId, updateUrl = true) {
+    const id = adminTabs.some(tab => tab.dataset.adminTab === tabId) ? tabId : 'overview';
+    adminTabs.forEach(tab => tab.classList.toggle('is-active', tab.dataset.adminTab === id));
+    adminPanels.forEach(panel => panel.classList.toggle('is-visible', panel.dataset.adminPanel === id));
+    if (updateUrl) history.replaceState(null, '', '#' + id);
+  }
+
+  adminTabs.forEach(tab => tab.addEventListener('click', () => activateAdminTab(tab.dataset.adminTab)));
+  activateAdminTab(location.hash.slice(1), false);
+
   const toast = document.getElementById('toast');
   function showToast(msg, isError) {
     toast.textContent = msg;
