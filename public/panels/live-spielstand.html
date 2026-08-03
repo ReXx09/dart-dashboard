@@ -163,13 +163,17 @@
       color: #aaa;
       background: #1b1b1b;
       border-radius: 4px;
-      padding: 2px 0;
-      font-size: .5rem;
+      padding: 3px 1px;
+      min-height: 18px;
+      font-size: .52rem;
+      font-weight: 700;
       line-height: 1;
       text-align: center;
       white-space: nowrap;
     }
-    .compact-cricket-status span.closed { color: #2a9d8f; font-weight: 700; }
+    .compact-cricket-status span.hit-1 { color: #071a14; background: #2a9d8f; }
+    .compact-cricket-status span.hit-2 { color: #241700; background: #f4c542; }
+    .compact-cricket-status span.closed { color: #fff; background: #e63946; font-weight: 900; }
 
     /* Countdown – immer mit fester Höhe, aber ausblendbar */
     #countdownDisplay {
@@ -1286,8 +1290,9 @@
         compactCricketHtml = '<div class="compact-cricket-status" aria-label="Cricket Status">' + nums.map(n => {
           const hits = cricketHits[n] || 0;
           const closed = !!cricketClosed[n];
-          const label = n === 25 ? 'B' : n;
-          return '<span class="' + (closed ? 'closed' : '') + '">' + label + ':' + (closed ? 'X' : hits) + '</span>';
+          const label = n;
+          const statusClass = closed ? 'closed' : hits >= 2 ? 'hit-2' : hits === 1 ? 'hit-1' : '';
+          return '<span class="' + statusClass + '" title="' + label + ': ' + (closed ? 'geschlossen' : hits + ' Treffer') + '">' + (closed ? 'X' : label) + '</span>';
         }).join('') + '</div>';
       }
 
