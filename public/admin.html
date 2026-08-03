@@ -956,7 +956,7 @@
       ).join('') || '<span style="color:#555;font-size:.8rem">Keine benannten Spieler vorhanden.</span>';
       renderDuelCurrent(current);
       document.getElementById('duelList').innerHTML = duels.map(duel =>
-        '<div class="duel-row"><span><strong>#' + Number(duel.id) + '</strong> · ' + escapeHtml(duel.mode) + ' · ' + (duel.players || []).map(player => escapeHtml(player.player_name)).join(', ') + '</span><span>' + Number(duel.total_legs || 0) + ' Legs · ' + escapeHtml(duel.status) + '</span></div>'
+        '<div class="duel-row"><span><strong>#' + Number(duel.id) + '</strong> · ' + escapeHtml(duel.categoryLabel || (Number(duel.participant_count) === 2 ? '2-Player-Duell' : 'Gruppen-Begegnung')) + ' · ' + escapeHtml(duel.mode) + ' · ' + (duel.players || []).map(player => escapeHtml(player.player_name)).join(', ') + '</span><span>' + Number(duel.total_legs || 0) + ' Legs · ' + escapeHtml(duel.status) + '</span></div>'
       ).join('') || '<span style="color:#555;font-size:.8rem">Noch keine Begegnungen gespeichert.</span>';
     } catch (err) { showToast('Begegnungen konnten nicht geladen werden: ' + err.message, true); }
   }
@@ -969,7 +969,7 @@
       finishButton.disabled = true;
       return;
     }
-    current.innerHTML = '<strong>Aktiv: #' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + '</strong><br>' +
+    current.innerHTML = '<strong>Aktiv: #' + Number(duel.id) + ' · ' + escapeHtml(duel.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(duel.mode) + '</strong><br>' +
       (duel.players || []).map(player => 'S' + Number(player.player_slot) + ' · ' + escapeHtml(player.player_name)).join(' · ') +
       '<br>' + Number(duel.total_legs || 0) + ' Legs gespeichert';
     finishButton.disabled = false;

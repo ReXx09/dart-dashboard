@@ -6,6 +6,13 @@ const sqlite3 = require('sqlite3');
 const { Pool } = require('pg');
 const mysql = require('mysql2/promise');
 
+function getDuelCategory(participantCount) {
+  const count = Number(participantCount);
+  if (count === 2) return { category: 'duel', categoryLabel: '2-Player-Duell' };
+  if (count >= 3) return { category: 'group', categoryLabel: 'Gruppen-Begegnung' };
+  return { category: 'unknown', categoryLabel: 'Unkategorisierte Begegnung' };
+}
+
 function readJson(filePath, fallback) {
   try {
     if (fs.existsSync(filePath)) {
@@ -795,7 +802,8 @@ class DataStore {
       if (!legPlayersById.has(key)) legPlayersById.set(key, []);
       legPlayersById.get(key).push(player);
     }
-    return { ...duel, id: Number(duel.id), players, legs: legs.map(leg => ({ ...leg, players: legPlayersById.get(String(leg.id)) || [] })) };
+    const categoryInfo = getDuelCategory(duel.participant_count || players.length);
+    return { ...duel, id: Number(duel.id), ...categoryInfo, players, legs: legs.map(leg => ({ ...leg, players: legPlayersById.get(String(leg.id)) || [] })) };
   }
 
   async listDuels(limit = 20) {

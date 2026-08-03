@@ -2664,7 +2664,12 @@ app.get('/api/live/state', async (_req, res) => {
 });
 
 app.get('/api/duels', async (req, res) => {
-  try { res.json(await dataStore.listDuels(req.query.limit || 20)); }
+  const category = String(req.query.category || 'all').trim().toLowerCase();
+  if (!['all', 'duel', 'group'].includes(category)) return res.status(400).json({ error: 'category muss all, duel oder group sein.' });
+  try {
+    const duels = await dataStore.listDuels(req.query.limit || 20);
+    res.json(category === 'all' ? duels : duels.filter(duel => duel.category === category));
+  }
   catch (err) { res.status(500).json({ error: 'Begegnungen konnten nicht geladen werden: ' + err.message }); }
 });
 
@@ -2689,14 +2694,18 @@ app.get('/api/duels/top', async (req, res) => {
 
 app.get('/api/duel-stats', async (req, res) => {
   const slots = String(req.query.playerSlots || '').split(',').map(Number).filter(Number.isInteger).filter(slot => slot > 0).sort((a, b) => a - b);
-  if (!slots.length || slots.length > 8) return res.status(400).json({ error: 'playerSlots muss 1 bis 8 Slots enthalten.' });
+  if (slots.length > 8) return res.status(400).json({ error: 'playerSlots darf höchstens 8 Slots enthalten.' });
   const exactGroup = String(req.query.exact || 'false').toLowerCase() === 'true';
+  const category = String(req.query.category || 'all').trim().toLowerCase();
+  if (!['all', 'duel', 'group'].includes(category)) return res.status(400).json({ error: 'category muss all, duel oder group sein.' });
   try {
     const duels = await dataStore.listDuels(100);
     const wanted = slots.join('-');
     const matching = duels.filter(duel => {
+      if (category !== 'all' && duel.category !== category) return false;
       const participantSlots = (duel.players || []).map(player => Number(player.player_slot)).sort((a, b) => a - b);
       const key = participantSlots.join('-');
+      if (!slots.length) return true;
       return exactGroup ? key === wanted : slots.every(slot => participantSlots.includes(slot));
     });
     const aggregate = new Map();
@@ -2705,7 +2714,7 @@ app.get('/api/duel-stats', async (req, res) => {
       for (const leg of duel.legs || []) {
         totalLegs += 1;
         for (const player of leg.players || []) {
-          if (!slots.includes(Number(player.player_slot))) continue;
+          if (slots.length && !slots.includes(Number(player.player_slot))) continue;
           const key = Number(player.player_slot);
           const current = aggregate.get(key) || { slot: key, name: player.player_name, legs: 0, wins: 0, darts: 0, scored: 0, average: 0, bestTurn: 0, count100plus: 0, count140plus: 0, count180: 0, checkoutAttempts: 0, checkoutSuccess: 0, busts: 0 };
           current.legs += 1;
@@ -2724,7 +2733,7 @@ app.get('/api/duel-stats', async (req, res) => {
         }
       }
     }
-    res.json({ playerSlots: slots, exactGroup, duels: matching.length, legs: totalLegs, players: Array.from(aggregate.values()) });
+    res.json({ category, playerSlots: slots, exactGroup, duels: matching.length, legs: totalLegs, players: Array.from(aggregate.values()) });
   } catch (err) { res.status(500).json({ error: 'Duellstatistik konnte nicht geladen werden: ' + err.message }); }
 });
 
@@ -2745,7 +2754,7 @@ app.post('/api/duels/start', requireAdmin, async (req, res) => {
     const requestedSlots = Array.isArray(req.body?.playerSlots) ? req.body.playerSlots.map(Number).filter(Number.isInteger) : [];
     const sourcePlayers = state.players.filter(player => requestedSlots.length === 0 || requestedSlots.includes(Number(player.slot)));
     const participants = sourcePlayers.filter(player => player.name && player.slot).slice(0, 8);
-    if (participants.length < 1) return res.status(400).json({ error: 'Mindestens ein Spieler wird benötigt.' });
+    if (participants.length < 2) return res.status(400).json({ error: 'Mindestens zwei Spieler werden für eine Begegnung benötigt.' });
     const profiles = await dataStore.getProfiles();
     const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
     const duel = await dataStore.createDuel({
