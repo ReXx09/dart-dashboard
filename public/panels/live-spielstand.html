@@ -856,6 +856,80 @@
       box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
     }
 
+    /* Duell-Statistik */
+    .duel-stats-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 9, 11, 0.94);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10001;
+      padding: 24px;
+    }
+    .duel-stats-card {
+      width: min(900px, 100%);
+      background: linear-gradient(135deg, #202326, #131517);
+      border: 2px solid #f4a261;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 0 60px rgba(244, 162, 97, .22);
+    }
+    .duel-stats-title {
+      text-align: center;
+      color: #f4a261;
+      font-size: 1.4rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .duel-stats-score {
+      text-align: center;
+      color: #f4c542;
+      font-size: 1.2rem;
+      font-weight: 800;
+      margin-bottom: 18px;
+    }
+    .duel-stats-grid {
+      display: grid;
+      grid-template-columns: minmax(110px, 1fr) minmax(120px, 1.15fr) minmax(120px, 1.15fr);
+      gap: 2px;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+    .duel-stats-cell {
+      min-height: 38px;
+      padding: 7px 10px;
+      background: #2b2f32;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .duel-stats-cell.label { color: #eee; font-weight: 700; }
+    .duel-stats-cell.player { color: #f4c542; font-size: 1.05rem; font-weight: 800; }
+    .duel-stats-cell.player.second { color: #d7e0e5; }
+    .duel-stats-cell.value { color: #fff; font-size: 1.05rem; font-weight: 700; }
+    .duel-stats-close {
+      display: block;
+      margin: 20px auto 0;
+      background: #f4a261;
+      border: 0;
+      color: #171717;
+      border-radius: 8px;
+      padding: 9px 22px;
+      font-family: inherit;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    @media (max-width: 600px) {
+      .duel-stats-overlay { padding: 10px; }
+      .duel-stats-card { padding: 12px 8px; }
+      .duel-stats-cell { min-height: 32px; padding: 5px 3px; font-size: .72rem; }
+      .duel-stats-cell.player, .duel-stats-cell.value { font-size: .78rem; }
+    }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -1002,6 +1076,7 @@
 <body>
   <!-- Winner Overlay -->
   <div class="winner-overlay" id="winnerOverlay"></div>
+  <div class="duel-stats-overlay" id="duelStatsOverlay"></div>
   
   <!-- Toast -->
   <div class="toast" id="toast"></div>
@@ -1010,6 +1085,7 @@
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
     <div class="clock" id="clockDisplay">--:--:--</div>
+    <button class="fs-btn" id="duelStatsToggle" onclick="toggleDuelStats()" title="Duell-Statistik aktivieren/deaktivieren">Duell-Stats</button>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <button class="restart-btn" id="restartLegBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
@@ -1028,6 +1104,12 @@
     let pendingWinner = null;
     let isFirstLoad = true;
     let lastCricketAnimationKey = '';
+    let duelStatsTimer = null;
+    let duelStatsScheduledFor = '';
+    let duelStatsVisibleFor = '';
+    let duelStatsCache = null;
+    let duelStatsCacheKey = '';
+    let duelStatsEnabled = localStorage.getItem('liveDuelStatsEnabled') !== 'false';
 
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
@@ -1077,6 +1159,128 @@
       const checkoutSuccess = Number(player && player.checkoutSuccess) || 0;
       const checkout = checkoutAttempts > 0 ? ((checkoutSuccess / checkoutAttempts) * 100).toFixed(1) + '%' : '-';
       return { legAverage, firstNineAverage, checkout };
+    }
+
+    function isDuelStatsEligible(state) {
+      return state && state.game && state.game.mode === '501' && Number(state.game.duelId) > 0 && Array.isArray(state.players) && state.players.length === 2;
+    }
+
+    function getDuelStatsKey(state) {
+      return isDuelStatsEligible(state) ? String(state.game.duelId) + ':' + String(state.game.status) + ':' + String(state.game.updatedAt || '') : '';
+    }
+
+    function updateDuelStatsToggle(state) {
+      const button = document.getElementById('duelStatsToggle');
+      if (!button) return;
+      const eligible = isDuelStatsEligible(state);
+      button.disabled = !eligible;
+      button.classList.toggle('active', eligible && duelStatsEnabled);
+      button.textContent = duelStatsEnabled ? 'Duell-Stats ✓' : 'Duell-Stats ○';
+      button.title = eligible
+        ? (duelStatsEnabled ? 'Duell-Statistik deaktivieren' : 'Duell-Statistik aktivieren')
+        : 'Nur bei einem aktiven 501-Duell mit zwei Spielern verfügbar';
+    }
+
+    function toggleDuelStats() {
+      if (!isDuelStatsEligible(liveState)) return;
+      duelStatsEnabled = !duelStatsEnabled;
+      localStorage.setItem('liveDuelStatsEnabled', String(duelStatsEnabled));
+      updateDuelStatsToggle(liveState);
+      if (!duelStatsEnabled) {
+        if (duelStatsTimer) { clearTimeout(duelStatsTimer); duelStatsTimer = null; }
+        duelStatsScheduledFor = '';
+        duelStatsVisibleFor = '';
+        hideDuelStatsOverlay();
+        if (liveState.game.status === 'leg-finished' && pendingWinner) showWinnerOverlay(pendingWinner, liveState);
+      } else if (liveState.game.status === 'leg-finished') {
+        showDuelStatsAfterWinner(liveState);
+      }
+    }
+
+    function aggregateDuelStats(duel) {
+      const rows = new Map();
+      (duel && duel.players || []).forEach(player => rows.set(Number(player.player_slot), {
+        name: player.player_name || 'Spieler', wins: 0, legs: 0, darts: 0, scored: 0,
+        checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, bestLeg: null,
+        count100plus: 0, count140plus: 0, count180: 0
+      }));
+      (duel && duel.legs || []).forEach(leg => (leg.players || []).forEach(player => {
+        const row = rows.get(Number(player.player_slot));
+        if (!row) return;
+        row.legs += 1;
+        row.wins += Number(player.won || 0);
+        row.darts += Number(player.darts || 0);
+        row.scored += Number(player.scored || 0);
+        row.checkoutAttempts += Number(player.checkout_attempts || 0);
+        row.checkoutSuccess += Number(player.checkout_success || 0);
+        row.highestCheckout = Math.max(row.highestCheckout, Number(player.checkout_highest || 0));
+        row.bestLeg = row.bestLeg === null ? Number(player.won || 0) ? Number(player.darts || 0) : null : row.bestLeg;
+        if (Number(player.won || 0) && Number(player.darts || 0) > 0) row.bestLeg = row.bestLeg === null ? Number(player.darts) : Math.min(row.bestLeg, Number(player.darts));
+        row.count100plus += Number(player.count_100plus || 0);
+        row.count140plus += Number(player.count_140plus || 0);
+        row.count180 += Number(player.count_180 || 0);
+      }));
+      return Array.from(rows.values()).slice(0, 2).map(row => ({
+        ...row,
+        average: row.darts > 0 ? (row.scored / row.darts * 3).toFixed(2) : '-',
+        checkoutRate: row.checkoutAttempts > 0 ? Math.round(row.checkoutSuccess / row.checkoutAttempts * 100) + '%' : '-',
+        checkoutCount: row.checkoutSuccess + ' / ' + row.checkoutAttempts,
+        bestLeg: row.bestLeg || '-',
+        scoring: row.darts > 0 ? (row.scored / row.darts * 3).toFixed(2) : '-'
+      }));
+    }
+
+    function renderDuelStatsOverlay(duel, state) {
+      const overlay = document.getElementById('duelStatsOverlay');
+      if (!overlay) return;
+      const stats = aggregateDuelStats(duel);
+      if (stats.length < 2) return;
+      const labels = [
+        ['Legs gewonnen', stats[0].wins, stats[1].wins],
+        ['Schnitt', stats[0].average, stats[1].average],
+        ['Scoring', stats[0].scoring, stats[1].scoring],
+        ['Erster-9-AVG', '-', '-'],
+        ['Checkout', stats[0].checkoutRate, stats[1].checkoutRate],
+        ['Checkout-Rate', stats[0].checkoutCount, stats[1].checkoutCount],
+        ['Höchstes Finish', stats[0].highestCheckout || '-', stats[1].highestCheckout || '-'],
+        ['Würfe', stats[0].darts, stats[1].darts],
+        ['Bestes Leg', stats[0].bestLeg, stats[1].bestLeg],
+        ['100+', stats[0].count100plus, stats[1].count100plus],
+        ['140+', stats[0].count140plus, stats[1].count140plus],
+        ['180', stats[0].count180, stats[1].count180]
+      ];
+      overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">Statistiken für alle Legs</div>' +
+        '<div class="duel-stats-score">501 · ' + stats[0].wins + ':' + stats[1].wins + '</div>' +
+        '<div class="duel-stats-grid"><div class="duel-stats-cell label"> </div>' +
+        '<div class="duel-stats-cell player">' + escapeHtml(stats[0].name) + '</div>' +
+        '<div class="duel-stats-cell player second">' + escapeHtml(stats[1].name) + '</div>' +
+        labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div><div class="duel-stats-cell value">' + row[1] + '</div><div class="duel-stats-cell value">' + row[2] + '</div>').join('') +
+        '</div><button class="duel-stats-close" onclick="hideDuelStatsOverlay()">Schließen</button></div>';
+      overlay.style.display = 'flex';
+    }
+
+    async function showDuelStatsAfterWinner(state) {
+      const key = getDuelStatsKey(state);
+      if (!key || !duelStatsEnabled || duelStatsScheduledFor === key || duelStatsVisibleFor === key) return;
+      duelStatsScheduledFor = key;
+      duelStatsTimer = setTimeout(async () => {
+        duelStatsTimer = null;
+        if (!liveState || liveState.game.status !== 'leg-finished' || getDuelStatsKey(liveState) !== key || !duelStatsEnabled) return;
+        try {
+          const response = await fetch('/api/duels/current');
+          if (!response.ok) return;
+          duelStatsCache = await response.json();
+          duelStatsCacheKey = key;
+          duelStatsVisibleFor = key;
+          hideWinnerOverlay();
+          renderDuelStatsOverlay(duelStatsCache, liveState);
+        } catch {}
+      }, 15000);
+    }
+
+    function hideDuelStatsOverlay() {
+      const overlay = document.getElementById('duelStatsOverlay');
+      if (overlay) overlay.style.display = 'none';
     }
 
     function getGameModeLabel(mode) {
@@ -1364,6 +1568,14 @@
       const active = state.players[activePlayer];
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
+      const duelStatsKey = getDuelStatsKey(state);
+      updateDuelStatsToggle(state);
+      if (!duelStatsKey || state.game.status !== 'leg-finished') {
+        if (duelStatsTimer) { clearTimeout(duelStatsTimer); duelStatsTimer = null; }
+        duelStatsScheduledFor = '';
+        duelStatsVisibleFor = '';
+        hideDuelStatsOverlay();
+      }
 
       // ── Sync buttons (Control-Kachel) ──
       const modeBtn = document.getElementById('ctrlModeBtn');
@@ -1456,7 +1668,13 @@
 
       if (winner && state.game.status === 'leg-finished') {
         pendingWinner = winner;
-        showWinnerOverlay(winner, state);
+        if (duelStatsVisibleFor === duelStatsKey) {
+          hideWinnerOverlay();
+          if (duelStatsCacheKey === duelStatsKey && duelStatsCache) renderDuelStatsOverlay(duelStatsCache, state);
+        } else {
+          showWinnerOverlay(winner, state);
+          showDuelStatsAfterWinner(state);
+        }
       } else if (pendingWinner) {
         showWinnerOverlay(pendingWinner, state);
       } else {
