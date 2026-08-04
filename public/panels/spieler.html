@@ -334,14 +334,24 @@
       const btn = document.getElementById('saveBtn');
       btn.disabled = true;
       btn.textContent = '…';
-      await fetch('/api/players', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(players)
-      });
-      dirty = false;
-      btn.textContent = '💾 Speichern';
-      showToast('Spieler gespeichert ✓');
+      try {
+        const response = await fetch('/api/players', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(players)
+        });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.error || 'HTTP ' + response.status);
+        }
+        dirty = false;
+        showToast('Spieler gespeichert ✓');
+      } catch (error) {
+        showToast('Spieler nicht gespeichert: ' + error.message);
+      } finally {
+        btn.disabled = !dirty;
+        btn.textContent = '💾 Speichern';
+      }
     }
 
     function showToast(msg) {
@@ -409,15 +419,24 @@
       const btn = document.getElementById('saveProfilesBtn');
       btn.disabled = true;
       btn.textContent = '…';
-      await fetch('/api/profiles', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profiles)
-      });
-      profilesDirty = false;
-      btn.textContent = 'Profile speichern';
-      btn.disabled = false;
-      showToast('Profile gespeichert ✓');
+      try {
+        const response = await fetch('/api/profiles', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profiles)
+        });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.error || 'HTTP ' + response.status);
+        }
+        profilesDirty = false;
+        showToast('Profile gespeichert ✓');
+      } catch (error) {
+        showToast('Profile nicht gespeichert: ' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Profile speichern';
+      }
     }
 
     function applyProfile(idx, sel) {
