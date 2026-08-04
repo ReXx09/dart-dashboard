@@ -434,7 +434,10 @@
       <section>
         <div class="overview-header">
           <div><h2>Top 3 pro Kennzahl</h2><p id="overviewStatus">Gesamtwerte aus dem aktiven Statistik-Tracking</p></div>
-          <select id="overviewMode" aria-label="Spielmodus für Übersicht"><option value="gesamt">Gesamt</option></select>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+            <select id="overviewMode" aria-label="Spielmodus für Übersicht"><option value="gesamt">Gesamt</option></select>
+            <select id="overviewPlayer" aria-label="Spieler für Übersicht"><option value="all">Alle Spieler</option></select>
+          </div>
         </div>
         <div class="metric-grid" id="metricGrid"></div>
       </section>
@@ -512,6 +515,7 @@
     let selectedFilter = 'all';
     let selectedGameMode = '';
     let overviewData = null;
+    let selectedOverviewPlayer = 'all';
     let encounters = [];
 
     const LIST_LABELS = {
@@ -577,7 +581,10 @@
       const metrics = overviewData && overviewData.metrics;
       if (!metrics) { grid.innerHTML = '<div class="metric-empty">Noch keine Statistikdaten vorhanden.</div>'; return; }
       grid.innerHTML = METRICS.map(([key, title, accent, format]) => {
-        const rows = (metrics[key] || []).filter(item => item.mode === mode || mode === 'gesamt').slice(0, 3);
+        const rows = (metrics[key] || [])
+          .filter(item => item.mode === mode || mode === 'gesamt')
+          .filter(item => selectedOverviewPlayer === 'all' || String(item.profileId) === selectedOverviewPlayer)
+          .slice(0, 3);
         return '<article class="metric-card" style="--accent:' + accent + '"><h3>' + title + '</h3><ol class="metric-list">' +
           (rows.length ? rows.map((item, index) => '<li><span class="metric-rank">' + (index + 1) + '</span><span class="metric-player">' + escapeHtml(item.player) + '</span><span class="metric-value">' + format(item[key]) + '</span></li>').join('') : '<li class="metric-empty">Noch keine Daten</li>') +
           '</ol></article>';
@@ -591,6 +598,19 @@
         overviewData = await response.json();
         const modeSelect = document.getElementById('overviewMode');
         modeSelect.innerHTML = (overviewData.modes || ['gesamt']).map(mode => '<option value="' + escapeHtml(mode) + '">' + escapeHtml(mode) + '</option>').join('');
+        const playerSelect = document.getElementById('overviewPlayer');
+        const playerNames = new Map();
+        (overviewData.players || []).forEach(item => {
+          if (item && item.profileId && item.player) playerNames.set(String(item.profileId), item.player);
+        });
+        Object.values(overviewData.metrics || {}).flat().forEach(item => {
+          if (item && item.profileId && item.player) playerNames.set(String(item.profileId), item.player);
+        });
+        playerSelect.innerHTML = '<option value="all">Alle Spieler</option>' + Array.from(playerNames.entries())
+          .sort((a, b) => a[1].localeCompare(b[1], 'de'))
+          .map(([id, name]) => '<option value="' + escapeHtml(id) + '">' + escapeHtml(name) + '</option>').join('');
+        if ([...playerNames.keys()].includes(selectedOverviewPlayer)) playerSelect.value = selectedOverviewPlayer;
+        else selectedOverviewPlayer = 'all';
         document.getElementById('overviewStatus').textContent = overviewData.modes && overviewData.modes.length > 1 ? 'Nach Spielmodus getrennt' : 'Gesamtwerte; Modus-Tracking folgt mit der Detailstatistik';
         renderOverview();
       } catch (err) {
@@ -837,6 +857,10 @@
       render();
     });
     document.getElementById('overviewMode').addEventListener('change', renderOverview);
+    document.getElementById('overviewPlayer').addEventListener('change', event => {
+      selectedOverviewPlayer = event.target.value;
+      renderOverview();
+    });
 
     document.getElementById('playerFilter').addEventListener('change', render);
     document.getElementById('scoreBody').addEventListener('click', event => {

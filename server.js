@@ -1222,6 +1222,8 @@ async function recordPlayerLegStats(player, state) {
     // Update player stats
     const currentStats = await dataStore.getPlayerStats(player.slot) || {};
     const updates = {
+      games_played: (Number(currentStats.games_played || 0)) + 1,
+      games_won: (Number(currentStats.games_won || 0)) + (won ? 1 : 0),
       legs_played: (Number(currentStats.legs_played || 0)) + 1,
       legs_won: (Number(currentStats.legs_won || 0)) + (won ? 1 : 0),
       total_darts: (Number(currentStats.total_darts || 0)) + dartsThrawn,
@@ -3138,7 +3140,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
     const ranked = (field, predicate = value => value > 0) => entries
       .filter(entry => predicate(entry[field], entry))
       .sort((a, b) => b[field] - a[field]);
-    res.json({ trackingMode: 'gesamt', modes: ['gesamt'], metrics: {
+    res.json({ trackingMode: 'gesamt', modes: ['gesamt'], players: entries.map(entry => ({ profileId: entry.profileId, player: entry.player })), metrics: {
       count180: ranked('count180'),
       checkoutRate: ranked('checkoutRate', (_value, entry) => entry.checkoutAttempts > 0),
       checkoutRateSingle: entries.filter(entry => entry.checkoutByRule.single.attempts > 0).map(entry => ({ ...entry, checkoutRateSingle: entry.checkoutByRule.single.rate })).sort((a, b) => b.checkoutRateSingle - a.checkoutRateSingle),
