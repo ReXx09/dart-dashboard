@@ -1267,7 +1267,7 @@
       (duel && duel.players || []).forEach(player => rows.set(Number(player.player_slot), {
         name: player.player_name || 'Spieler', wins: 0, legs: 0, darts: 0, scored: 0,
         checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, bestLeg: null,
-        count100plus: 0, count140plus: 0, count180: 0
+        count100plus: 0, count140plus: 0, count180: 0, firstNineTotal: 0, firstNineCount: 0
       }));
       (duel && duel.legs || []).forEach(leg => (leg.players || []).forEach(player => {
         const row = rows.get(Number(player.player_slot));
@@ -1279,6 +1279,10 @@
         row.checkoutAttempts += Number(player.checkout_attempts || 0);
         row.checkoutSuccess += Number(player.checkout_success || 0);
         row.highestCheckout = Math.max(row.highestCheckout, Number(player.checkout_highest || 0));
+        if (Number(player.first_nine_avg || 0) > 0) {
+          row.firstNineTotal += Number(player.first_nine_avg);
+          row.firstNineCount += 1;
+        }
         row.bestLeg = row.bestLeg === null ? Number(player.won || 0) ? Number(player.darts || 0) : null : row.bestLeg;
         if (Number(player.won || 0) && Number(player.darts || 0) > 0) row.bestLeg = row.bestLeg === null ? Number(player.darts) : Math.min(row.bestLeg, Number(player.darts));
         row.count100plus += Number(player.count_100plus || 0);
@@ -1290,6 +1294,7 @@
         average: row.darts > 0 ? (row.scored / row.darts * 3).toFixed(2) : '-',
         checkoutRate: row.checkoutAttempts > 0 ? Math.round(row.checkoutSuccess / row.checkoutAttempts * 100) + '%' : '-',
         checkoutCount: row.checkoutSuccess + ' / ' + row.checkoutAttempts,
+        firstNineAverage: row.firstNineCount > 0 ? (row.firstNineTotal / row.firstNineCount).toFixed(2) : '-',
         bestLeg: row.bestLeg || '-',
         scoring: row.darts > 0 ? (row.scored / row.darts * 3).toFixed(2) : '-'
       }));
@@ -1304,7 +1309,7 @@
         ['Legs gewonnen', stats[0].wins, stats[1].wins],
         ['Schnitt', stats[0].average, stats[1].average],
         ['Scoring', stats[0].scoring, stats[1].scoring],
-        ['Erster-9-AVG', '-', '-'],
+        ['Erster-9-AVG', stats[0].firstNineAverage, stats[1].firstNineAverage],
         ['Checkout', stats[0].checkoutRate, stats[1].checkoutRate],
         ['Checkout-Rate', stats[0].checkoutCount, stats[1].checkoutCount],
         ['Höchstes Finish', stats[0].highestCheckout || '-', stats[1].highestCheckout || '-'],
@@ -1400,18 +1405,25 @@
     async function showDuelStatsAfterWinner(state) {
       const key = getDuelStatsKey(state);
       if (!key || !duelStatsEnabled || duelStatsScheduledFor === key || duelStatsVisibleFor === key) return;
+      const duelId = Number(state.game.duelId);
+      if (!duelId) return;
       duelStatsScheduledFor = key;
       duelStatsTimer = setTimeout(async () => {
         duelStatsTimer = null;
         if (!liveState || liveState.game.status !== 'leg-finished' || getDuelStatsKey(liveState) !== key || !duelStatsEnabled) return;
         try {
-          const response = await fetch('/api/duels/current');
-          if (!response.ok) return;
-          duelStatsCache = await response.json();
+          const response = await fetch('/api/duels/' + encodeURIComponent(duelId), { cache: 'no-store' });
+          if (!response.ok) throw new Error('Duell konnte nicht geladen werden');
+          const duel = await response.json();
+          if (!duel || !Array.isArray(duel.players) || duel.players.length < 2 || !Array.isArray(duel.legs) || duel.legs.length < 1) {
+            duelStatsScheduledFor = '';
+            return;
+          }
+          duelStatsCache = duel;
           duelStatsCacheKey = key;
+          renderDuelStatsOverlay(duelStatsCache, liveState);
           duelStatsVisibleFor = key;
           hideWinnerOverlay();
-          renderDuelStatsOverlay(duelStatsCache, liveState);
         } catch {}
       }, 5000);
     }

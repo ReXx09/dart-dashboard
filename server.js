@@ -1195,9 +1195,9 @@ function clearPendingArduinoThrow() {
   pendingArduinoThrow = null;
 }
 
-async function recordPlayerLegStats(player, state) {
+async function recordPlayerLegStats(player, state, options = {}) {
   try {
-    await recordDuelLegIfActive(state, player);
+    if (!options.skipDuel) await recordDuelLegIfActive(state, player);
     // Ensure player has stats entry
     await dataStore.initPlayerStats(player.slot);
 
@@ -1206,8 +1206,16 @@ async function recordPlayerLegStats(player, state) {
     const totalScored = Number(player.totalScored || 0);
     const legAvg = dartsThrawn > 0 ? (totalScored / dartsThrawn * 3) : 0;
     
-    // Get current turn history to detect 180s and high scores
-    const turns = player.turnHistory || [];
+    // Der Live-State speichert einzelne Würfe; daraus werden die Aufnahmen gebildet.
+    const throws = Array.isArray(player.throws) ? player.throws : [];
+    const firstNine = throws.slice(0, 9);
+    const firstNineScored = firstNine.reduce((sum, item) => sum + (item && item.bust ? 0 : Number(item && item.points || 0)), 0);
+    const firstNineAvg = firstNine.length >= 9 ? (firstNineScored / 9 * 3) : 0;
+    const turns = [];
+    for (let index = 0; index < throws.length; index += 3) {
+      const turn = throws.slice(index, index + 3);
+      if (turn.length === 3) turns.push(turn.reduce((sum, item) => sum + (item && item.bust ? 0 : Number(item && item.points || 0)), 0));
+    }
     let count180 = 0, count171 = 0, count140 = 0, count100 = 0;
     let maxScore = 0;
     
@@ -1241,6 +1249,9 @@ async function recordPlayerLegStats(player, state) {
       total_darts: (Number(currentStats.total_darts || 0)) + dartsThrawn,
       total_scored: (Number(currentStats.total_scored || 0)) + totalScored,
       highest_leg_avg: Math.max(Number(currentStats.highest_leg_avg || 0), legAvg),
+      avg_first9: firstNineAvg > 0
+        ? ((Number(currentStats.avg_first9 || 0) * Number(currentStats.legs_played || 0) + firstNineAvg) / (Number(currentStats.legs_played || 0) + 1))
+        : Number(currentStats.avg_first9 || 0),
       max_score: Math.max(Number(currentStats.max_score || 0), maxScore),
       count_180: (Number(currentStats.count_180 || 0)) + count180,
       count_171plus: (Number(currentStats.count_171plus || 0)) + count171,
@@ -1279,6 +1290,13 @@ async function recordPlayerLegStats(player, state) {
     await dataStore.updatePlayerStats(player.slot, updates);
   } catch (err) {
     console.error('[Stats] Error recording player leg stats:', err);
+  }
+}
+
+async function recordCompletedLegStats(state, winner) {
+  await recordDuelLegIfActive(state, winner);
+  for (const player of Array.isArray(state.players) ? state.players : []) {
+    await recordPlayerLegStats(player, state, { skipDuel: true });
   }
 }
 
@@ -1525,7 +1543,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     state.lastAction.winner = player.name;
     state.lastAction.winnerSlot = player.slot;
     // Record stats after leg finish
-    await recordPlayerLegStats(player, state);
+    await recordCompletedLegStats(state, player);
   } else if (isCricket && checkCricketWin(player, state.players)) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
     await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino', gameMode: mode });
@@ -1534,7 +1552,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     state.lastAction.winner = player.name;
     state.lastAction.winnerSlot = player.slot;
     // Record stats after leg finish
-    await recordPlayerLegStats(player, state);
+    await recordCompletedLegStats(state, player);
   } else if (isElimination && checkEliminationWin(state)) {
     const winner = getEliminationWinner(state);
     if (winner) {
@@ -1545,7 +1563,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
       state.lastAction.winner = winner.name;
       state.lastAction.winnerSlot = winner.slot;
       // Record stats after leg finish
-      await recordPlayerLegStats(winner, state);
+      await recordCompletedLegStats(state, winner);
     }
   }
 
@@ -1858,8 +1876,10 @@ async function applyArduinoThrowFromMatrix(hit) {
     await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode, checkoutRule });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
+    state.lastAction.winner = player.name;
+    state.lastAction.winnerSlot = player.slot;
     // Record stats after leg finish
-    await recordPlayerLegStats(player, state);
+    await recordCompletedLegStats(state, player);
   } else if (isCricket && checkCricketWin(player, state.players)) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
     await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix', gameMode: mode });
@@ -1868,7 +1888,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     state.lastAction.winner = player.name;
     state.lastAction.winnerSlot = player.slot;
     // Record stats after leg finish
-    await recordPlayerLegStats(player, state);
+    await recordCompletedLegStats(state, player);
   } else if (isElimination && checkEliminationWin(state)) {
     const winner = getEliminationWinner(state);
     if (winner) {
@@ -1879,7 +1899,7 @@ async function applyArduinoThrowFromMatrix(hit) {
       state.lastAction.winner = winner.name;
       state.lastAction.winnerSlot = winner.slot;
       // Record stats after leg finish
-      await recordPlayerLegStats(winner, state);
+      await recordCompletedLegStats(state, winner);
     }
   }
 
@@ -2986,8 +3006,11 @@ app.post('/api/live/throw', async (req, res) => {
       player.legs += 1;
       await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, gameMode: mode, checkoutRule });
       state.game.status = 'leg-finished';
+      state.lastAction.legWin = true;
+      state.lastAction.winner = player.name;
+      state.lastAction.winnerSlot = player.slot;
       // Record stats after leg finish
-      await recordPlayerLegStats(player, state);
+      await recordCompletedLegStats(state, player);
     } else if (isCricket && checkCricketWin(player, state.players)) {
       player.legs += 1;
       await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, gameMode: mode });
@@ -2996,7 +3019,7 @@ app.post('/api/live/throw', async (req, res) => {
       state.lastAction.winner = player.name;
       state.lastAction.winnerSlot = player.slot;
       // Record stats after leg finish
-      await recordPlayerLegStats(player, state);
+      await recordCompletedLegStats(state, player);
     } else if (isElimination && checkEliminationWin(state)) {
       const winner = getEliminationWinner(state);
       if (winner) {
@@ -3007,7 +3030,7 @@ app.post('/api/live/throw', async (req, res) => {
         state.lastAction.winner = winner.name;
         state.lastAction.winnerSlot = winner.slot;
         // Record stats after leg finish
-        await recordPlayerLegStats(winner, state);
+        await recordCompletedLegStats(state, winner);
       }
     }
 
