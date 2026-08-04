@@ -707,6 +707,13 @@ async function ensureAutomaticEncounter(state) {
     })().finally(() => { automaticEncounterCreation = null; });
   }
   const duel = await automaticEncounterCreation;
+  for (const participant of participants) {
+    await dataStore.initPlayerStats(participant.slot);
+    const stats = await dataStore.getPlayerStats(participant.slot) || {};
+    await dataStore.updatePlayerStats(participant.slot, {
+      games_played: Number(stats.games_played || 0) + 1
+    });
+  }
   state.game.duelId = duel.id;
   return state;
 }
@@ -1221,9 +1228,8 @@ async function recordPlayerLegStats(player, state) {
 
     // Update player stats
     const currentStats = await dataStore.getPlayerStats(player.slot) || {};
+    const isTrackedDuel = Number(state.game?.duelId || 0) > 0;
     const updates = {
-      games_played: (Number(currentStats.games_played || 0)) + 1,
-      games_won: (Number(currentStats.games_won || 0)) + (won ? 1 : 0),
       legs_played: (Number(currentStats.legs_played || 0)) + 1,
       legs_won: (Number(currentStats.legs_won || 0)) + (won ? 1 : 0),
       total_darts: (Number(currentStats.total_darts || 0)) + dartsThrawn,
@@ -1235,6 +1241,10 @@ async function recordPlayerLegStats(player, state) {
       count_140plus: (Number(currentStats.count_140plus || 0)) + count140,
       count_100plus: (Number(currentStats.count_100plus || 0)) + count100
     };
+    if (!isTrackedDuel) {
+      updates.games_played = Number(currentStats.games_played || 0) + 1;
+      updates.games_won = Number(currentStats.games_won || 0) + (won ? 1 : 0);
+    }
 
     // Add checkout stats if not cricket
     if (!isCricket) {
@@ -2814,7 +2824,15 @@ app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
   try {
     const state = await getLiveState();
     if (Number(state.game.duelId) !== Number(req.params.id)) return res.status(409).json({ error: 'Diese Begegnung ist nicht aktiv.' });
-    const duel = await dataStore.finishDuel(req.params.id, Number(req.body?.winnerSlot || 0) || null);
+    const winnerSlot = Number(req.body?.winnerSlot || 0) || null;
+    const duel = await dataStore.finishDuel(req.params.id, winnerSlot);
+    if (winnerSlot) {
+      await dataStore.initPlayerStats(winnerSlot);
+      const winnerStats = await dataStore.getPlayerStats(winnerSlot) || {};
+      await dataStore.updatePlayerStats(winnerSlot, {
+        games_won: Number(winnerStats.games_won || 0) + 1
+      });
+    }
     state.game.duelId = null;
     await saveLiveState(state);
     broadcastReload();
