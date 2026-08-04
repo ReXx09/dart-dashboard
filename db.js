@@ -228,6 +228,7 @@ class DataStore {
           darts INTEGER NOT NULL DEFAULT 0,
           scored INTEGER NOT NULL DEFAULT 0,
           average REAL NOT NULL DEFAULT 0,
+          first_nine_avg REAL NOT NULL DEFAULT 0,
           best_turn INTEGER NOT NULL DEFAULT 0,
           count_100plus INTEGER NOT NULL DEFAULT 0,
           count_140plus INTEGER NOT NULL DEFAULT 0,
@@ -240,6 +241,7 @@ class DataStore {
           PRIMARY KEY (duel_leg_id, player_slot)
         );
       `);
+      try { await this.sqlite.run('ALTER TABLE duel_leg_players ADD COLUMN first_nine_avg REAL NOT NULL DEFAULT 0'); } catch (_err) { }
       return;
     }
 
@@ -284,6 +286,7 @@ class DataStore {
           darts INTEGER NOT NULL DEFAULT 0,
           scored INTEGER NOT NULL DEFAULT 0,
           average NUMERIC NOT NULL DEFAULT 0,
+          first_nine_avg NUMERIC NOT NULL DEFAULT 0,
           best_turn INTEGER NOT NULL DEFAULT 0,
           count_100plus INTEGER NOT NULL DEFAULT 0,
           count_140plus INTEGER NOT NULL DEFAULT 0,
@@ -296,6 +299,7 @@ class DataStore {
           PRIMARY KEY (duel_leg_id, player_slot)
         );
       `);
+      try { await this.pg.query('ALTER TABLE duel_leg_players ADD COLUMN IF NOT EXISTS first_nine_avg NUMERIC NOT NULL DEFAULT 0'); } catch (_err) { }
       return;
     }
 
@@ -339,6 +343,7 @@ class DataStore {
         darts INT NOT NULL DEFAULT 0,
         scored INT NOT NULL DEFAULT 0,
         average DECIMAL(8,2) NOT NULL DEFAULT 0,
+        first_nine_avg DECIMAL(8,2) NOT NULL DEFAULT 0,
         best_turn INT NOT NULL DEFAULT 0,
         count_100plus INT NOT NULL DEFAULT 0,
         count_140plus INT NOT NULL DEFAULT 0,
@@ -351,6 +356,7 @@ class DataStore {
         PRIMARY KEY (duel_leg_id, player_slot)
       );`];
     for (const query of mysqlQueries) await this.my.query(query);
+    try { await this.my.query('ALTER TABLE duel_leg_players ADD COLUMN first_nine_avg DECIMAL(8,2) NOT NULL DEFAULT 0'); } catch (_err) { }
   }
 
   async ensureHighscoreModeColumn() {
@@ -968,10 +974,10 @@ class DataStore {
     else legId = Number((await this.my.query('INSERT INTO duel_legs (duel_id, leg_number, mode, winner_slot, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?)', legValues))[0].insertId);
 
     for (const player of Array.isArray(players) ? players : []) {
-      const stats = [legId, Number(duelId), Number(player.slot), String(player.name || 'Spieler'), Number(player.turns || 0), Number(player.totalScored || 0), Number(player.average || 0), Number(player.bestTurn || 0), Number(player.count100plus || 0), Number(player.count140plus || 0), Number(player.count180 || 0), Number(player.checkoutAttempts || 0), Number(player.checkoutSuccess || 0), Number(player.lastCheckoutValue || 0), Number(player.busts || 0), Number(player.slot) === Number(winnerSlot) ? 1 : 0];
-      if (this.isSQLite()) await this.sqlite.run('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
-      else if (this.isPostgres()) await this.pg.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)', stats);
-      else await this.my.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
+      const stats = [legId, Number(duelId), Number(player.slot), String(player.name || 'Spieler'), Number(player.turns || 0), Number(player.totalScored || 0), Number(player.average || 0), Number(player.firstNineAvg || 0), Number(player.bestTurn || 0), Number(player.count100plus || 0), Number(player.count140plus || 0), Number(player.count180 || 0), Number(player.checkoutAttempts || 0), Number(player.checkoutSuccess || 0), Number(player.lastCheckoutValue || 0), Number(player.busts || 0), Number(player.slot) === Number(winnerSlot) ? 1 : 0];
+      if (this.isSQLite()) await this.sqlite.run('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
+      else if (this.isPostgres()) await this.pg.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)', stats);
+      else await this.my.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
     }
     if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET total_legs = ?, updated_at = ? WHERE id = ?', [legNumber, endedAt, Number(duelId)]);
     else if (this.isPostgres()) await this.pg.query('UPDATE duels SET total_legs = $1, updated_at = $2 WHERE id = $3', [legNumber, endedAt, Number(duelId)]);

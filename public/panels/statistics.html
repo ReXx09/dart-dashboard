@@ -273,30 +273,45 @@
       margin-bottom: 14px;
     }
     .encounter-toolbar select { width: auto; min-width: 190px; }
-    .encounter-grid { display: grid; gap: 10px; }
-    .encounter-card {
-      background: #0f0f0f;
-      border: 1px solid #262626;
-      border-left: 3px solid #f4a261;
-      border-radius: 10px;
-      padding: 12px 14px;
-    }
-    .encounter-card-head,
-    .encounter-card-meta {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-    }
-    .encounter-card-head strong { color: #f1f1f1; }
-    .encounter-card-head span,
-    .encounter-card-meta { color: #777; font-size: .72rem; }
-    .encounter-card-players { color: #bbb; font-size: .8rem; margin: 8px 0; }
+    .encounter-grid { overflow-x: auto; border: 1px solid #262626; border-radius: 10px; }
+    .encounter-table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: .76rem; }
+    .encounter-table th { padding: 9px 10px; background: #151515; color: #666; text-align: left; text-transform: uppercase; letter-spacing: 1px; font-size: .6rem; white-space: nowrap; }
+    .encounter-table td { padding: 8px 10px; border-top: 1px solid #202020; color: #bbb; vertical-align: middle; white-space: nowrap; }
+    .encounter-table tbody tr:hover td { background: #171717; }
+    .encounter-table .encounter-kind { color: #f1f1f1; font-weight: 800; }
+    .encounter-table .encounter-id { color: #666; font-size: .68rem; }
+    .encounter-table .player-lines span, .encounter-table .metric-lines span { display: block; line-height: 1.55; }
+    .encounter-table .player-lines span { color: #ddd; font-weight: 700; }
+    .encounter-table .metric-lines span { color: #f4a261; font-variant-numeric: tabular-nums; }
+    .encounter-table .winner { color: #2a9d8f; font-weight: 800; }
+    .encounter-actions { display: flex; gap: 5px; }
+    .encounter-action { border: 1px solid #2d2d2d; background: #1b1b1b; color: #bbb; border-radius: 6px; padding: 5px 7px; cursor: pointer; font: inherit; font-size: .66rem; white-space: nowrap; }
+    .encounter-action:hover { border-color: #f4a261; color: #f4a261; }
     .encounter-empty { color: #555; text-align: center; padding: 24px 12px; }
+    .encounter-dialog { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; padding: 18px; background: rgba(0,0,0,.78); }
+    .encounter-dialog.is-open { display: grid; }
+    .encounter-dialog-card { width: min(1100px, 100%); max-height: min(820px, 92vh); overflow: auto; background: #141414; border: 1px solid #333; border-top: 3px solid #f4a261; border-radius: 12px; padding: 16px; }
+    .encounter-dialog-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .encounter-dialog-head h3 { font-size: 1rem; color:#f1f1f1; }
+    .encounter-dialog-close { border:1px solid #333; background:#1b1b1b; color:#bbb; border-radius:6px; padding:5px 9px; cursor:pointer; }
+    .encounter-dialog-tabs { display:flex; gap:5px; margin-bottom:12px; }
+    .encounter-dialog-tab { border:1px solid #2d2d2d; background:#101010; color:#888; border-radius:6px; padding:7px 10px; cursor:pointer; font:inherit; font-size:.72rem; }
+    .encounter-dialog-tab.active { background:#f4a261; border-color:#f4a261; color:#111; font-weight:800; }
+    .encounter-detail-table { width:100%; border-collapse:collapse; font-size:.74rem; }
+    .encounter-detail-table th, .encounter-detail-table td { padding:7px 8px; border-bottom:1px solid #242424; text-align:right; white-space:nowrap; }
+    .encounter-detail-table th:first-child, .encounter-detail-table td:first-child { text-align:left; }
+    .encounter-detail-table th { color:#666; text-transform:uppercase; letter-spacing:.8px; font-size:.6rem; }
+    .encounter-detail-table td { color:#ccc; font-variant-numeric:tabular-nums; }
+    .encounter-detail-table .accent { color:#f4a261; font-weight:800; }
+    .encounter-heatmap { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
+    .heatmap-player-card { background:#0f0f0f; border:1px solid #262626; border-radius:8px; padding:10px; }
+    .heatmap-player-card h4 { color:#f1f1f1; margin-bottom:8px; }
+    .heatmap-cell { display:flex; justify-content:space-between; gap:8px; padding:5px 7px; margin-top:3px; border-radius:4px; color:#ddd; font-size:.7rem; }
+    .heatmap-cell strong { color:#f4a261; }
     @media (max-width: 768px) {
       .encounter-toolbar { align-items: stretch; flex-direction: column; }
       .encounter-toolbar select { width: 100%; }
-      .encounter-card-head, .encounter-card-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+      .encounter-dialog { padding: 8px; }
     }
     @media (max-width: 768px) {
       .toolbar { grid-template-columns: 1fr; }
@@ -447,6 +462,16 @@
       </div>
     </div>
   </main>
+  <div class="encounter-dialog" id="encounterDialog" role="dialog" aria-modal="true" aria-labelledby="encounterDialogTitle">
+    <div class="encounter-dialog-card">
+      <div class="encounter-dialog-head">
+        <h3 id="encounterDialogTitle">Begegnungsdetails</h3>
+        <button class="encounter-dialog-close" type="button" onclick="closeEncounterDialog()">Schließen</button>
+      </div>
+      <div class="encounter-dialog-tabs" id="encounterDialogTabs"></div>
+      <div id="encounterDialogContent"><div class="encounter-empty">Daten werden geladen...</div></div>
+    </div>
+  </div>
   <script>
     const API_BASE = '/api';
     let currentPlayerId = null;
@@ -455,6 +480,8 @@
     let selectedEncounterCategory = 'all';
     let segmentAnalysis = null;
     let selectedSegmentType = 'all';
+    let encounterDetail = null;
+    let encounterDetailView = 'duel';
 
     // DOM Elements
     const playerSelect = document.getElementById('playerSelect');
@@ -574,6 +601,10 @@
       } catch (_error) { renderEncounterStats(null); }
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+    }
+
     function renderEncounters() {
       const list = document.getElementById('encounterList');
       const visible = encounters.filter(encounter => selectedEncounterCategory === 'all' || encounter.category === selectedEncounterCategory);
@@ -581,11 +612,110 @@
         list.innerHTML = '<div class="encounter-empty">Noch keine Begegnungen in dieser Kategorie.</div>';
         return;
       }
-      list.innerHTML = visible.map(encounter => {
-        const players = (encounter.players || []).map(player => player.player_name).join(' · ');
+      list.innerHTML = '<table class="encounter-table"><thead><tr><th>Begegnung</th><th>Spieler</th><th>Legs</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Checkout</th><th>Sieger</th><th>Details</th></tr></thead><tbody>' + visible.map(encounter => {
+        const stats = aggregateEncounterPlayers(encounter);
         const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
-        return `<article class="encounter-card"><div class="encounter-card-head"><strong>${escapeHtml(encounter.categoryLabel || 'Begegnung')} · ${escapeHtml(encounter.mode)}</strong><span>#${Number(encounter.id)}</span></div><div class="encounter-card-players">${escapeHtml(players)}</div><div class="encounter-card-meta"><span>${Number(encounter.total_legs || 0)} Legs · ${escapeHtml(encounter.status || '')}</span><span>${winner ? 'Sieger: ' + escapeHtml(winner.player_name) : 'Sieger wird noch ermittelt'}</span></div></article>`;
-      }).join('');
+        const lines = field => stats.map(player => '<span>' + field(player) + '</span>').join('');
+        return '<tr>' +
+          '<td><div class="encounter-kind">' + escapeHtml(encounter.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(encounter.mode) + '</div><div class="encounter-id">#' + Number(encounter.id) + ' · ' + escapeHtml(encounter.status || '') + '</div></td>' +
+          '<td class="player-lines">' + lines(player => escapeHtml(player.name)) + '</td>' +
+          '<td>' + Number(encounter.total_legs || 0) + '</td>' +
+          '<td class="metric-lines">' + lines(player => formatMetric(player.average)) + '</td>' +
+          '<td class="metric-lines">' + lines(player => formatMetric(player.firstNineAvg)) + '</td>' +
+          '<td class="metric-lines">' + lines(player => String(player.turns)) + '</td>' +
+          '<td class="metric-lines">' + lines(player => player.checkoutSuccess + '/' + player.checkoutAttempts + ' · ' + (player.highestCheckout || '-')) + '</td>' +
+          '<td class="winner">' + (winner ? escapeHtml(winner.player_name) : 'offen') + '</td>' +
+          '<td><div class="encounter-actions"><button class="encounter-action" type="button" onclick="openEncounterDetail(' + Number(encounter.id) + ',\'throws\')">Würfe</button><button class="encounter-action" type="button" onclick="openEncounterDetail(' + Number(encounter.id) + ',\'duel\')">Duell</button><button class="encounter-action" type="button" onclick="openEncounterDetail(' + Number(encounter.id) + ',\'heatmap\')">Heatmap</button></div></td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+    }
+
+    function formatMetric(value) {
+      const number = Number(value || 0);
+      return number > 0 ? number.toFixed(2) : '-';
+    }
+
+    function aggregateEncounterPlayers(encounter) {
+      const rows = new Map();
+      (encounter.players || []).forEach(player => rows.set(Number(player.player_slot), { name: player.player_name || 'Spieler', slot: Number(player.player_slot), darts: 0, scored: 0, turns: 0, firstNine: [], bestTurn: 0, count180: 0, checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, wins: 0 }));
+      (encounter.legs || []).forEach(leg => (leg.players || []).forEach(player => {
+        const row = rows.get(Number(player.player_slot));
+        if (!row) return;
+        const darts = Number(player.darts || 0);
+        row.darts += darts;
+        row.scored += Number(player.scored || 0);
+        row.turns += Math.ceil(darts / 3);
+        if (Number(player.first_nine_avg || 0) > 0) row.firstNine.push(Number(player.first_nine_avg));
+        row.bestTurn = Math.max(row.bestTurn, Number(player.best_turn || 0));
+        row.count180 += Number(player.count_180 || 0);
+        row.checkoutAttempts += Number(player.checkout_attempts || 0);
+        row.checkoutSuccess += Number(player.checkout_success || 0);
+        row.highestCheckout = Math.max(row.highestCheckout, Number(player.checkout_highest || 0));
+        row.wins += Number(player.won || 0);
+      }));
+      return Array.from(rows.values()).map(row => ({ ...row, average: row.darts > 0 ? row.scored / row.darts * 3 : 0, firstNineAvg: row.firstNine.length ? row.firstNine.reduce((sum, value) => sum + value, 0) / row.firstNine.length : 0 }));
+    }
+
+    async function openEncounterDetail(id, view) {
+      const dialog = document.getElementById('encounterDialog');
+      dialog.classList.add('is-open');
+      encounterDetailView = view || 'duel';
+      document.getElementById('encounterDialogContent').innerHTML = '<div class="encounter-empty">Daten werden geladen...</div>';
+      try {
+        const response = await fetch(API_BASE + '/duels/' + encodeURIComponent(id), { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        encounterDetail = await response.json();
+        document.getElementById('encounterDialogTitle').textContent = (encounterDetail.categoryLabel || 'Begegnung') + ' · ' + encounterDetail.mode + ' #' + encounterDetail.id;
+        renderEncounterDetail();
+      } catch (_error) {
+        document.getElementById('encounterDialogContent').innerHTML = '<div class="encounter-empty">Begegnungsdaten konnten nicht geladen werden.</div>';
+      }
+    }
+
+    function closeEncounterDialog() {
+      document.getElementById('encounterDialog').classList.remove('is-open');
+      encounterDetail = null;
+    }
+
+    function renderEncounterDetail() {
+      if (!encounterDetail) return;
+      const tabs = [['throws', 'Wurfstatistik'], ['duel', 'Duellstatistik'], ['heatmap', 'Heatmap']];
+      document.getElementById('encounterDialogTabs').innerHTML = tabs.map(tab => '<button class="encounter-dialog-tab' + (encounterDetailView === tab[0] ? ' active' : '') + '" type="button" onclick="setEncounterDetailView(\'' + tab[0] + '\')">' + tab[1] + '</button>').join('');
+      if (encounterDetailView === 'heatmap') loadEncounterHeatmap();
+      else if (encounterDetailView === 'throws') renderEncounterThrows();
+      else renderEncounterDuel();
+    }
+
+    function setEncounterDetailView(view) {
+      encounterDetailView = view;
+      renderEncounterDetail();
+    }
+
+    function renderEncounterDuel() {
+      const stats = aggregateEncounterPlayers(encounterDetail);
+      document.getElementById('encounterDialogContent').innerHTML = '<table class="encounter-detail-table"><thead><tr><th>Spieler</th><th>Legs gewonnen</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Darts</th><th>Checkout</th><th>Best Turn</th><th>180er</th></tr></thead><tbody>' + stats.map(player => '<tr><td class="accent">' + escapeHtml(player.name) + '</td><td>' + player.wins + '</td><td>' + formatMetric(player.average) + '</td><td>' + formatMetric(player.firstNineAvg) + '</td><td>' + player.turns + '</td><td>' + player.darts + '</td><td>' + player.checkoutSuccess + '/' + player.checkoutAttempts + ' · ' + (player.highestCheckout || '-') + '</td><td>' + (player.bestTurn || '-') + '</td><td>' + player.count180 + '</td></tr>').join('') + '</tbody></table>';
+    }
+
+    function renderEncounterThrows() {
+      const rows = [];
+      (encounterDetail.legs || []).slice().reverse().forEach(leg => (leg.players || []).forEach(player => rows.push('<tr><td>Leg ' + Number(leg.leg_number || 0) + '</td><td class="accent">' + escapeHtml(player.player_name) + '</td><td>' + Number(player.darts || 0) + '</td><td>' + Math.ceil(Number(player.darts || 0) / 3) + '</td><td>' + Number(player.scored || 0) + '</td><td>' + formatMetric(player.average) + '</td><td>' + formatMetric(player.first_nine_avg) + '</td><td>' + Number(player.checkout_success || 0) + '/' + Number(player.checkout_attempts || 0) + '</td><td>' + (Number(player.won || 0) ? 'Sieger' : '-') + '</td></tr>')));
+      document.getElementById('encounterDialogContent').innerHTML = rows.length ? '<table class="encounter-detail-table"><thead><tr><th>Leg</th><th>Spieler</th><th>Darts</th><th>Turns</th><th>Punkte</th><th>Schnitt</th><th>1.-9. AVG</th><th>Checkout</th><th>Ergebnis</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>' : '<div class="encounter-empty">Für diese Begegnung sind noch keine Legs gespeichert.</div>';
+    }
+
+    async function loadEncounterHeatmap() {
+      const content = document.getElementById('encounterDialogContent');
+      content.innerHTML = '<div class="encounter-empty">Heatmap wird geladen...</div>';
+      try {
+        const response = await fetch(API_BASE + '/duels/' + encodeURIComponent(encounterDetail.id) + '/segment-analysis?mode=' + encodeURIComponent(encounterDetail.mode || '501'), { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+        const players = data.players || [];
+        content.innerHTML = players.length ? '<div class="encounter-heatmap">' + players.map(player => {
+          const segments = (player.analysis && player.analysis.segments || []).slice().sort((a, b) => Number(b.throws || 0) - Number(a.throws || 0)).slice(0, 20);
+          const max = Math.max(1, ...segments.map(item => Number(item.throws || 0)));
+          return '<div class="heatmap-player-card"><h4>' + escapeHtml(player.name) + '</h4>' + (segments.length ? segments.map(item => '<div class="heatmap-cell" style="background:rgba(230,57,70,' + (0.12 + Number(item.throws || 0) / max * 0.55).toFixed(2) + ')"><strong>' + escapeHtml(item.segment) + '</strong><span>' + item.throws + ' Würfe · ' + (item.throws ? (item.hits / item.throws * 100).toFixed(1) : '0.0') + '% · ' + item.points + ' P</span></div>').join('') : '<div class="encounter-empty">Keine Wurfsegmente gespeichert.</div>') + '</div>';
+        }).join('') + '</div>' : '<div class="encounter-empty">Für diese Begegnung sind noch keine Wurfsegmente gespeichert.</div>';
+      } catch (_error) { content.innerHTML = '<div class="encounter-empty">Heatmap-Daten konnten nicht geladen werden.</div>'; }
     }
 
     async function loadEncounters() {

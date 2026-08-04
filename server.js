@@ -1285,6 +1285,9 @@ async function recordDuelLegIfActive(state, winner) {
   const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
   const players = (Array.isArray(state.players) ? state.players : []).map(player => {
     const throws = Array.isArray(player.throws) ? player.throws : [];
+    const firstNine = throws.slice(0, 9);
+    const firstNineScored = firstNine.reduce((sum, item) => sum + (item.bust ? 0 : Number(item.points || 0)), 0);
+    const firstNineAvg = firstNine.length >= 9 ? roundAverage(firstNineScored / 9 * 3) : 0;
     const turnScores = [];
     for (let index = 0; index < throws.length; index += 3) {
       const turn = throws.slice(index, index + 3);
@@ -1298,6 +1301,7 @@ async function recordDuelLegIfActive(state, winner) {
       turns: player.turns,
       totalScored: player.totalScored,
       average: Number(player.turns || 0) > 0 ? roundAverage(Number(player.totalScored || 0) / Number(player.turns) * 3) : 0,
+      firstNineAvg,
       bestTurn: player.bestTurn,
       count100plus: turnScores.filter(score => score >= 100).length,
       count140plus: turnScores.filter(score => score >= 140).length,
