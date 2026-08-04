@@ -1169,6 +1169,13 @@ function getThrowHitCount(value) {
   return 1;
 }
 
+function getCheckoutValue(player, finalThrowPoints) {
+  const previousThrowPoints = Array.isArray(player && player.currentRoundPoints)
+    ? player.currentRoundPoints.reduce((sum, points) => sum + (Number(points) || 0), 0)
+    : 0;
+  return Math.max(0, previousThrowPoints + (Number(finalThrowPoints) || 0));
+}
+
 function clearPendingArduinoThrow() {
   if (pendingArduinoThrowTimer) clearTimeout(pendingArduinoThrowTimer);
   pendingArduinoThrowTimer = null;
@@ -1484,7 +1491,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
   if (!isCricket && !isElimination && player.remaining === 0) {
-    player.lastCheckoutValue = remainingBeforeThrow;
+    player.lastCheckoutValue = getCheckoutValue(player, value);
     player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
     const ruleStats = getCheckoutRuleStats(player, checkoutRule);
     ruleStats.success += 1;
@@ -1818,7 +1825,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
   if (!isCricket && !isElimination && player.remaining === 0) {
-    player.lastCheckoutValue = remainingBeforeThrow;
+    player.lastCheckoutValue = getCheckoutValue(player, value);
     player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
     const ruleStats = getCheckoutRuleStats(player, checkoutRule);
     ruleStats.success += 1;
@@ -2906,7 +2913,7 @@ app.post('/api/live/throw', async (req, res) => {
     if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
     if (!isCricket && !isElimination && player.remaining === 0) {
-      player.lastCheckoutValue = remainingBeforeThrow;
+      player.lastCheckoutValue = getCheckoutValue(player, points);
       player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
       const ruleStats = getCheckoutRuleStats(player, checkoutRule);
       ruleStats.success += 1;
