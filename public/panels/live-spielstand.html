@@ -1424,7 +1424,9 @@
           renderDuelStatsOverlay(duelStatsCache, liveState);
           duelStatsVisibleFor = key;
           hideWinnerOverlay();
-        } catch {}
+        } catch {
+          duelStatsScheduledFor = '';
+        }
       }, 5000);
     }
 
