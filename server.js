@@ -3183,6 +3183,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
         checkoutSuccess,
         checkoutByRule,
         highestCheckout: Number(stats.highest_checkout || 0),
+        gamesPlayed: Number(stats.games_played || 0),
         gamesWon: Number(stats.games_won || 0),
         legsWon: Number(stats.legs_won || 0),
         trackingSince: stats.updated_at ? Number(stats.updated_at) : null
@@ -3199,6 +3200,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
       checkoutRateMaster: entries.filter(entry => entry.checkoutByRule.master.attempts > 0).map(entry => ({ ...entry, checkoutRateMaster: entry.checkoutByRule.master.rate })).sort((a, b) => b.checkoutRateMaster - a.checkoutRateMaster),
       threeDartAverage: ranked('threeDartAverage'),
       highestCheckout: ranked('highestCheckout'),
+      gamesPlayed: ranked('gamesPlayed'),
       gamesWon: ranked('gamesWon')
     }});
   } catch (err) {
