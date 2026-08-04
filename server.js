@@ -1298,6 +1298,13 @@ async function recordCompletedLegStats(state, winner) {
   for (const player of Array.isArray(state.players) ? state.players : []) {
     await recordPlayerLegStats(player, state, { skipDuel: true });
   }
+  if (Number(state.game?.duelId || 0) > 0 && winner) {
+    await dataStore.initPlayerStats(winner.slot);
+    const winnerStats = await dataStore.getPlayerStats(winner.slot) || {};
+    await dataStore.updatePlayerStats(winner.slot, {
+      games_won: Number(winnerStats.games_won || 0) + 1
+    });
+  }
 }
 
 async function recordDuelLegIfActive(state, winner) {
@@ -2914,7 +2921,7 @@ app.post('/api/live/reset', async (req, res) => {
     const duel = current.game.duelId ? await dataStore.getDuel(current.game.duelId) : null;
     const currentSlots = current.players.map(player => Number(player.slot)).sort((a, b) => a - b).join('-');
     const duelSlots = duel ? duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-') : '';
-    fresh.game.duelId = duel && currentSlots === duelSlots ? duel.id : null;
+    fresh.game.duelId = duel && duel.status === 'active' && currentSlots === duelSlots ? duel.id : null;
     await ensureAutomaticEncounter(fresh);
     const saved = await saveLiveState(fresh);
     broadcastReload();

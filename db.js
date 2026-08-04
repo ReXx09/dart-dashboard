@@ -979,9 +979,9 @@ class DataStore {
       else if (this.isPostgres()) await this.pg.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)', stats);
       else await this.my.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
     }
-    if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET total_legs = ?, updated_at = ? WHERE id = ?', [legNumber, endedAt, Number(duelId)]);
-    else if (this.isPostgres()) await this.pg.query('UPDATE duels SET total_legs = $1, updated_at = $2 WHERE id = $3', [legNumber, endedAt, Number(duelId)]);
-    else await this.my.query('UPDATE duels SET total_legs = ?, updated_at = ? WHERE id = ?', [legNumber, endedAt, Number(duelId)]);
+    if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET total_legs = ?, status = \'finished\', ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', [legNumber, endedAt, Number(winnerSlot || 0) || null, endedAt, Number(duelId)]);
+    else if (this.isPostgres()) await this.pg.query('UPDATE duels SET total_legs = $1, status = \'finished\', ended_at = $2, winner_slot = $3, updated_at = $4 WHERE id = $5', [legNumber, endedAt, Number(winnerSlot || 0) || null, endedAt, Number(duelId)]);
+    else await this.my.query('UPDATE duels SET total_legs = ?, status = \'finished\', ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', [legNumber, endedAt, Number(winnerSlot || 0) || null, endedAt, Number(duelId)]);
     return this.getDuel(duelId);
   }
 
