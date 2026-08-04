@@ -3167,7 +3167,6 @@ app.get('/api/highscores/overview', async (_req, res) => {
     const entries = [];
     for (const player of players) {
       if (!player.name) continue;
-      if (!player.active) continue;
       const stats = await dataStore.getPlayerStats(player.slot) || {};
       const darts = Number(stats.total_darts || 0);
       const totalScored = Number(stats.total_scored || 0);
