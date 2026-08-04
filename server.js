@@ -3162,11 +3162,12 @@ app.get('/api/players/:id/stats', async (req, res) => {
     if (!Number.isInteger(playerId) || playerId < 0) {
       return res.status(400).json({ error: 'Invalid player ID' });
     }
-    const stats = await dataStore.getPlayerStats(playerId);
+    let stats = await dataStore.getPlayerStats(playerId);
     if (!stats) {
-      return res.status(404).json({ error: 'Player stats not found' });
+      await dataStore.initPlayerStats(playerId);
+      stats = await dataStore.getPlayerStats(playerId);
     }
-    res.json(stats);
+    res.json(stats || {});
   } catch (err) {
     res.status(500).json({ error: 'Stats konnten nicht geladen werden: ' + err.message });
   }
