@@ -498,6 +498,11 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function requireLocalNetwork(req, res, next) {
+  if (!isLocalOrPrivateAddress(req.socket.remoteAddress)) return res.status(403).json({ error: 'Zugriff nur aus dem lokalen Netz.' });
+  next();
+}
+
 function requireAdminPinChange(req, res, next) {
   if (!isLocalOrPrivateAddress(req.socket.remoteAddress)) return res.status(403).json({ error: 'Admin-Zugriff nur aus dem lokalen Netz.' });
   if (!verifyAdminPin(req.body?.currentPin)) return res.status(401).json({ error: 'Aktuelle PIN ist ungültig.' });
@@ -2610,7 +2615,7 @@ app.get('/api/players', async (_req, res) => {
   catch (err) { res.status(500).json({ error: 'Spieler konnten nicht geladen werden: ' + err.message }); }
 });
 
-app.put('/api/players', requireAdmin, async (req, res) => {
+app.put('/api/players', requireLocalNetwork, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
   try {
     await savePlayers(req.body);
@@ -2644,7 +2649,7 @@ app.get('/api/profiles', async (_req, res) => {
   catch (err) { res.status(500).json({ error: 'Profile konnten nicht geladen werden: ' + err.message }); }
 });
 
-app.put('/api/profiles', requireAdmin, async (req, res) => {
+app.put('/api/profiles', requireLocalNetwork, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
   try {
     await dataStore.saveProfiles(req.body);

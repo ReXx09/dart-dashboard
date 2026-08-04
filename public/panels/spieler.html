@@ -330,31 +330,12 @@
       document.getElementById('saveBtn').disabled = false;
     }
 
-    async function fetchWithAdminLogin(url, options) {
-      let response = await fetch(url, options);
-      if (response.status !== 401) return response;
-      const result = await response.clone().json().catch(() => ({}));
-      if (!String(result.error || '').toLowerCase().includes('admin')) return response;
-      const pin = window.prompt('Admin-PIN eingeben, um die Änderung zu speichern:');
-      if (!pin) return response;
-      const loginResponse = await fetch('/api/admin/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin })
-      });
-      if (!loginResponse.ok) {
-        const loginResult = await loginResponse.json().catch(() => ({}));
-        throw new Error(loginResult.error || 'Admin-Anmeldung fehlgeschlagen');
-      }
-      return fetch(url, options);
-    }
-
     async function saveAll() {
       const btn = document.getElementById('saveBtn');
       btn.disabled = true;
       btn.textContent = '…';
       try {
-        const response = await fetchWithAdminLogin('/api/players', {
+        const response = await fetch('/api/players', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(players)
@@ -439,7 +420,7 @@
       btn.disabled = true;
       btn.textContent = '…';
       try {
-        const response = await fetchWithAdminLogin('/api/profiles', {
+        const response = await fetch('/api/profiles', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(profiles)
