@@ -1522,6 +1522,8 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode, checkoutRule });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
+    state.lastAction.winner = player.name;
+    state.lastAction.winnerSlot = player.slot;
     // Record stats after leg finish
     await recordPlayerLegStats(player, state);
   } else if (isCricket && checkCricketWin(player, state.players)) {

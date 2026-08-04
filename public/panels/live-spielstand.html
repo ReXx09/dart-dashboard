@@ -1413,7 +1413,7 @@
           hideWinnerOverlay();
           renderDuelStatsOverlay(duelStatsCache, liveState);
         } catch {}
-      }, 15000);
+      }, 5000);
     }
 
     function hideDuelStatsOverlay() {
@@ -1796,8 +1796,8 @@
             state.players.find(p => isClientCricketWinner(p, state.players));
         }
       } else {
-        // x01 (501, 301, etc.): Winner hat remaining === 0
-        winner = state.players.find(p => Number(p.remaining) === 0);
+        // x01 (501, 301, etc.): Server-Sieger bevorzugen, dann remaining === 0.
+        winner = state.players.find(p => p.slot === state.lastAction?.winnerSlot) || state.players.find(p => Number(p.remaining) === 0);
         if (!winner && state.game.status === 'leg-finished') {
           console.log('[Winner-Check] x01: leg-finished triggered');
           winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
@@ -2327,30 +2327,6 @@
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
-        // Auto-Recovery NUR beim ersten Laden (nicht bei SSE-Updates)
-        if (isFirstLoad && state.game.status === 'leg-finished') {
-          isFirstLoad = false;
-          try {
-            const resetRes = await fetch('/api/live/reset', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ carryLegs: true })
-            });
-            if (resetRes.ok) {
-              const freshState = await resetRes.json();
-              liveState = freshState;
-              const modeBtn2 = document.getElementById('ctrlModeBtn');
-              const ruleBtn2 = document.getElementById('ctrlRuleBtn');
-              const modeLabel2 = freshState.game.mode === '501' ? '501' : freshState.game.mode === '301' ? '301' : freshState.game.mode === '701' ? '701' : freshState.game.mode === 'cricket' ? 'Cricket' : freshState.game.mode === 'elimination' ? 'Elimination' : freshState.game.mode === 'shanghai' ? 'Shanghai' : freshState.game.mode === 'atc' ? 'ATC' : freshState.game.mode === 'split' ? 'Split' : freshState.game.mode;
-              const ruleLabel2 = freshState.game.checkoutRule === 'single' ? 'Single Out' : freshState.game.checkoutRule === 'double' ? 'Double Out' : freshState.game.checkoutRule === 'master' ? 'Master Out' : freshState.game.checkoutRule;
-              if (modeBtn2) modeBtn2.querySelector('.btn-value').textContent = modeLabel2;
-              if (ruleBtn2) ruleBtn2.querySelector('.btn-value').textContent = ruleLabel2;
-              renderState(freshState);
-              showToast('↻ Neues Leg automatisch gestartet');
-              return;
-            }
-          } catch {}
-        }
         isFirstLoad = false;
         renderState(state);
       } catch(e) {
