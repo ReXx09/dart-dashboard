@@ -985,6 +985,18 @@ class DataStore {
     if (this.isSQLite()) {
       await this.sqlite.exec('BEGIN TRANSACTION');
       try {
+        const previousPlayers = await this.sqlite.all('SELECT slot, name FROM players');
+        for (const previous of previousPlayers) {
+          const oldName = String(previous.name || '').trim();
+          if (!oldName) continue;
+          const next = safeList.find(player => Number(player.slot) === Number(previous.slot));
+          const newName = next && String(next.name || '').trim();
+          if (newName && newName !== oldName) {
+            await this.sqlite.run('UPDATE highscores SET player = ? WHERE player = ?', [newName, oldName]);
+          } else if (!newName) {
+            await this.sqlite.run('DELETE FROM highscores WHERE player = ?', [oldName]);
+          }
+        }
         await this.sqlite.run('DELETE FROM players');
         for (const p of safeList) {
           await this.sqlite.run(
@@ -1004,6 +1016,18 @@ class DataStore {
       const client = await this.pg.connect();
       try {
         await client.query('BEGIN');
+        const previousPlayers = (await client.query('SELECT slot, name FROM players')).rows;
+        for (const previous of previousPlayers) {
+          const oldName = String(previous.name || '').trim();
+          if (!oldName) continue;
+          const next = safeList.find(player => Number(player.slot) === Number(previous.slot));
+          const newName = next && String(next.name || '').trim();
+          if (newName && newName !== oldName) {
+            await client.query('UPDATE highscores SET player = $1 WHERE player = $2', [newName, oldName]);
+          } else if (!newName) {
+            await client.query('DELETE FROM highscores WHERE player = $1', [oldName]);
+          }
+        }
         await client.query('DELETE FROM players');
         for (const p of safeList) {
           await client.query(
@@ -1024,6 +1048,18 @@ class DataStore {
     const conn = await this.my.getConnection();
     try {
       await conn.beginTransaction();
+      const [previousPlayers] = await conn.query('SELECT slot, name FROM players');
+      for (const previous of previousPlayers) {
+        const oldName = String(previous.name || '').trim();
+        if (!oldName) continue;
+        const next = safeList.find(player => Number(player.slot) === Number(previous.slot));
+        const newName = next && String(next.name || '').trim();
+        if (newName && newName !== oldName) {
+          await conn.query('UPDATE highscores SET player = ? WHERE player = ?', [newName, oldName]);
+        } else if (!newName) {
+          await conn.query('DELETE FROM highscores WHERE player = ?', [oldName]);
+        }
+      }
       await conn.query('DELETE FROM players');
       for (const p of safeList) {
         await conn.query(
