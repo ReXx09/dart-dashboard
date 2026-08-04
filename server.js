@@ -2250,7 +2250,8 @@ async function getPlayers() { return dataStore.getPlayers(); }
 
 async function savePlayers(list) {
   await dataStore.savePlayers(list);
-  const fresh = await defaultLiveState(savedLiveMode);
+  const current = await getLiveState();
+  const fresh = await defaultLiveState(savedLiveMode, current.game?.selectedPlayerSlots);
   await dataStore.saveLiveState(fresh);
 }
 
@@ -2262,12 +2263,17 @@ async function getActivePlayersForLive() {
   }));
 }
 
-async function defaultLiveState(mode) {
+async function defaultLiveState(mode, selectedPlayerSlots = null) {
   const m = mode || DEFAULT_MODE;
   const active = await getActivePlayersForLive();
-  const fallbackPlayers = active.length > 0
-    ? active
-    : [{ slot: 1, name: 'Spieler 1', color: '#e63946' }, { slot: 2, name: 'Spieler 2', color: '#f4a261' }];
+  const selected = Array.isArray(selectedPlayerSlots)
+    ? active.filter(player => selectedPlayerSlots.includes(Number(player.slot)))
+    : active;
+  const fallbackPlayers = selected.length > 0
+    ? selected
+    : active.length > 0
+      ? active
+      : [{ slot: 1, name: 'Spieler 1', color: '#e63946' }, { slot: 2, name: 'Spieler 2', color: '#f4a261' }];
   const startScore = getStartScoreForMode(m);
 
   return {
@@ -2388,8 +2394,9 @@ function resetLiveState(carryLegs = false, modeOverride) {
       updatedAt: now,
       activePlayer: 0,
       throwRound: 1,
-      currentThrow: 0
-      ,duelId: null
+      currentThrow: 0,
+      duelId: null,
+      selectedPlayerSlots: players.map(player => Number(player.slot))
     },
     players,
     lastAction: null,
@@ -2407,6 +2414,12 @@ async function getLiveState() {
   const saved = await dataStore.getLiveState(fallback);
   const arduinoView = buildArduinoStateView();
   const activePlayers = fallback.players;
+  let selectedPlayerSlots = Array.isArray(saved.game?.selectedPlayerSlots)
+    ? saved.game.selectedPlayerSlots.map(Number).filter(Number.isInteger)
+    : activePlayers.map(player => Number(player.slot));
+  if (!activePlayers.some(player => selectedPlayerSlots.includes(Number(player.slot)))) {
+    selectedPlayerSlots = activePlayers.map(player => Number(player.slot));
+  }
   const savedMode = String(saved.game?.mode || '');
   if (GAME_MODES[savedMode]) savedLiveMode = savedMode;
   // Restore or fallback checkout rule
@@ -2414,12 +2427,14 @@ async function getLiveState() {
   if (CHECKOUT_RULES[savedRule]) savedCheckoutRule = savedRule;
   savedLiveStateTemplate = Array.isArray(saved.players) && saved.players.length > 0
     ? saved.players.map(p => ({ ...p, throws: Array.isArray(p.throws) ? p.throws : [], currentRoundPoints: Array.isArray(p.currentRoundPoints) ? p.currentRoundPoints : [] }))
-    : activePlayers;
+    : activePlayers.filter(player => selectedPlayerSlots.includes(Number(player.slot)));
   const savedPlayers = Array.isArray(saved.players) && saved.players.length > 0 ? saved.players : activePlayers;
-  const mergedPlayers = savedPlayers.map((player, index) => sanitizePlayerState(player, activePlayers[index] || activePlayers[0]));
+  const mergedPlayers = savedPlayers
+    .filter(player => selectedPlayerSlots.includes(Number(player.slot)))
+    .map((player, index) => sanitizePlayerState(player, activePlayers[index] || activePlayers[0]));
 
   activePlayers.forEach(player => {
-    if (!mergedPlayers.some(p => Number(p.slot) === Number(player.slot)))
+    if (selectedPlayerSlots.includes(Number(player.slot)) && !mergedPlayers.some(p => Number(p.slot) === Number(player.slot)))
       mergedPlayers.push(sanitizePlayerState(player, player));
   });
 
@@ -2434,8 +2449,9 @@ async function getLiveState() {
       updatedAt: Number(saved.game?.updatedAt || Date.now()),
       activePlayer: Math.min(Number(saved.game?.activePlayer || 0), mergedPlayers.length - 1),
       throwRound: Number(saved.game?.throwRound || 1),
-      currentThrow: Number(saved.game?.currentThrow || 0)
-      ,duelId: Number(saved.game?.duelId || 0) || null
+      currentThrow: Number(saved.game?.currentThrow || 0),
+      duelId: Number(saved.game?.duelId || 0) || null,
+      selectedPlayerSlots: mergedPlayers.map(player => Number(player.slot))
     },
     players: mergedPlayers,
     lastAction: saved.lastAction || null,
@@ -2598,6 +2614,23 @@ app.put('/api/players', requireAdmin, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Spieler konnten nicht gespeichert werden: ' + err.message });
   }
+});
+
+app.post('/api/live/players', async (req, res) => {
+  const requested = Array.isArray(req.body?.playerSlots) ? req.body.playerSlots.map(Number) : [];
+  const slots = [...new Set(requested)].filter(slot => Number.isInteger(slot) && slot > 0).sort((a, b) => a - b);
+  if (slots.length < 1 || slots.length > 8) return res.status(400).json({ error: 'Bitte 1 bis 8 Spieler auswählen.' });
+  try {
+    const available = await getActivePlayersForLive();
+    const availableSlots = new Set(available.map(player => Number(player.slot)));
+    if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
+    const fresh = await defaultLiveState(savedLiveMode, slots);
+    fresh.game.selectedPlayerSlots = slots;
+    await ensureAutomaticEncounter(fresh);
+    const saved = await saveLiveState(fresh);
+    broadcastReload();
+    res.json(saved);
+  } catch (err) { res.status(500).json({ error: 'Spielerauswahl konnte nicht gespeichert werden: ' + err.message }); }
 });
 
 // ── Profile ──

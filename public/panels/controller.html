@@ -165,6 +165,9 @@
     .btn-sm { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: background .15s; }
     .btn-sm:hover { background: #2a2a2a; }
     .btn-sm.active-player { border-color: var(--pc, #e63946); }
+    .live-player-selection { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 10px; }
+    .live-player-selection label { display:flex; align-items:center; gap:6px; background:#0d0d0d; border:1px solid #2a2a2a; border-radius:7px; padding:6px 9px; font-size:.78rem; cursor:pointer; }
+    .live-player-selection input { accent-color:#e63946; }
     .input-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
     .input-row .points-in { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 8px 10px; border-radius: 8px; width: 80px; font-size: .95rem; font-family: inherit; text-align: center; }
     .input-row .points-in:focus { border-color: #e63946; outline: none; }
@@ -251,6 +254,7 @@
       </div>
       <div style="height:10px"></div>
       <h3>Spieler</h3>
+      <div id="livePlayerSelection" class="live-player-selection"><span style="color:#444">Lade Auswahl...</span></div>
       <div id="playerListContainer"><div style="color:#444">Lade Spieler...</div></div>
       <div style="height:10px"></div>
       <h3>Aktionen</h3>
@@ -1148,6 +1152,7 @@
     async function loadAll() {
       const res = await fetch('/api/live/state');
       liveState = await res.json();
+      await loadLivePlayerSelection(liveState);
       render(liveState);
       const arduino = await fetch('/api/arduino/state').then(r => r.json()).catch(() => ({}));
       renderArduinoState(arduino);
@@ -1166,6 +1171,25 @@
       } else if (!document.querySelector('.ctrl-section.is-active')) {
         activateSection('spiel');
       }
+    }
+
+    async function loadLivePlayerSelection(state) {
+      const container = document.getElementById('livePlayerSelection');
+      if (!container) return;
+      const players = await fetch('/api/players').then(r => r.json()).catch(() => []);
+      const selected = new Set((state.game && state.game.selectedPlayerSlots || state.players || []).map(p => Number(p.slot || p)));
+      container.innerHTML = players.filter(p => p.active && p.name).map(p =>
+        '<label><input type="checkbox" value="' + p.slot + '"' + (selected.has(Number(p.slot)) ? ' checked' : '') + '> ' + escHtml(p.name) + '</label>'
+      ).join('') + '<button class="btn-sm primary" type="button" onclick="saveLivePlayerSelection()">Auswahl übernehmen</button>';
+    }
+
+    async function saveLivePlayerSelection() {
+      const slots = Array.from(document.querySelectorAll('#livePlayerSelection input:checked')).map(input => Number(input.value));
+      const res = await fetch('/api/live/players', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ playerSlots: slots }) });
+      if (!res.ok) { const err = await res.json().catch(() => ({ error:'Fehler' })); showToast(err.error || 'Auswahl konnte nicht gespeichert werden'); return; }
+      liveState = await res.json();
+      render(liveState);
+      showToast('Spielerauswahl übernommen');
     }
 
     function render(state) {
