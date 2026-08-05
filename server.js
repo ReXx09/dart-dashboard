@@ -2440,13 +2440,16 @@ function sanitizePlayerState(player, fallback) {
   return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, checkoutAttempts, checkoutSuccess, lastCheckoutValue, checkoutByRule, cricketHits, cricketClosed, cricketPoints, turnScoreRecorded: !!player?.turnScoreRecorded };
 }
 
-function resetLiveState(carryLegs = false, modeOverride) {
+function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
   const now = Date.now();
-  const basePlayers = savedLiveStateTemplate || [];
+  const sourcePlayers = Array.isArray(sourceState?.players) && sourceState.players.length > 0
+    ? sourceState.players
+    : savedLiveStateTemplate;
+  const basePlayers = sourcePlayers || [];
   const mode = modeOverride || savedLiveMode || DEFAULT_MODE;
   const startScore = getStartScoreForMode(mode);
-  const legsBySlot = carryLegs && Array.isArray(savedLiveStateTemplate)
-    ? new Map(savedLiveStateTemplate.map(p => [Number(p.slot || 0), Number(p.legs || 0)]))
+  const legsBySlot = carryLegs && Array.isArray(sourcePlayers)
+    ? new Map(sourcePlayers.map(p => [Number(p.slot || 0), Number(p.legs || 0)]))
     : new Map();
 
   const players = basePlayers.map((p) => ({
@@ -3038,7 +3041,7 @@ app.post('/api/live/reset', async (req, res) => {
   try {
     const mode = savedLiveMode || DEFAULT_MODE;
     const current = await getLiveState();
-    const fresh = resetLiveState(carryLegs, mode);
+    const fresh = resetLiveState(carryLegs, mode, current);
     const duel = current.game.duelId ? await dataStore.getDuel(current.game.duelId) : null;
     const currentSlots = current.players.map(player => Number(player.slot)).sort((a, b) => a - b).join('-');
     const duelSlots = duel ? duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-') : '';

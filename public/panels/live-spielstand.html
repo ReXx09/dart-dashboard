@@ -2249,7 +2249,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ carryLegs: true })
         });
-        if (!r.ok) { showToast('Fehler', true); return; }
+        if (!r.ok) {
+          var errorPayload = await r.json().catch(function() { return {}; });
+          showToast(errorPayload.error || 'Fehler', true);
+          return;
+        }
         liveState = await r.json();
         pendingWinner = null;
         hideWinnerOverlay();
