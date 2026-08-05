@@ -19,6 +19,14 @@ try {
 // SSE – alle offenen Dashboard-Clients
 // ──────────────────────────────────────────────
 const sseClients = new Set();
+let liveDetailWriteQueue = Promise.resolve();
+
+function queueLiveDetailWrite(task, label) {
+  liveDetailWriteQueue = liveDetailWriteQueue
+    .then(() => task())
+    .catch(error => console.error('[Live-Detail] ' + label + ' fehlgeschlagen:', error));
+}
+
 function broadcastReload() {
   sseClients.forEach(res => { try { res.write('event: reload\ndata: 1\n\n'); } catch { sseClients.delete(res); } });
 }
@@ -1524,7 +1532,10 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     channel: formatChannel(channel),
     raw: evt.line || null
   });
-  await dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust, Date.now(), state.game.duelId);
+  queueLiveDetailWrite(
+    () => dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust, Date.now(), state.game.duelId),
+    'Arduino-Wurf'
+  );
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -1623,7 +1634,10 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
     segment: throwSegment,
     raw: evt.line || null
   });
-  await dataStore.recordThrowSegment(player.slot, throwSegment, 0, state.game.mode, false, Date.now(), state.game.duelId);
+  queueLiveDetailWrite(
+    () => dataStore.recordThrowSegment(player.slot, throwSegment, 0, state.game.mode, false, Date.now(), state.game.duelId),
+    'Arduino-Miss'
+  );
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -1857,7 +1871,10 @@ async function applyArduinoThrowFromMatrix(hit) {
     channel: hit.key,
     raw: hit.line || null
   });
-  await dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust, Date.now(), state.game.duelId);
+  queueLiveDetailWrite(
+    () => dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust, Date.now(), state.game.duelId),
+    'Matrix-Wurf'
+  );
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -2368,8 +2385,11 @@ async function addTurnScoreHighscoreIfNeeded(player, state, source = 'live') {
   const kind = getTurnScoreHighscoreKind(turnScore);
   if (!kind) return;
 
-  await addHighscore(player.name, turnScore, { kind, source, gameMode: state.game.mode });
   player.turnScoreRecorded = true;
+  queueLiveDetailWrite(
+    () => addHighscore(player.name, turnScore, { kind, source, gameMode: state.game.mode }),
+    'Turn-Highscore'
+  );
 }
 
 function sanitizePlayerState(player, fallback) {
@@ -3072,7 +3092,10 @@ app.post('/api/live/throw', async (req, res) => {
     if (!Array.isArray(player.throws)) player.throws = [];
     const throwSegment = incomingSegment;
     player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment });
-    await dataStore.recordThrowSegment(player.slot, throwSegment, points, mode, bust, Date.now(), state.game.duelId);
+    queueLiveDetailWrite(
+      () => dataStore.recordThrowSegment(player.slot, throwSegment, points, mode, bust, Date.now(), state.game.duelId),
+      'Manueller Wurf'
+    );
 
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;

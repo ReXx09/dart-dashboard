@@ -1480,7 +1480,7 @@
     function renderDuelStatsOverlay(duel, state) {
       const overlay = document.getElementById('duelStatsOverlay');
       if (!overlay) return;
-      const legs = Array.isArray(duel && duel.legs) ? duel.legs.slice().sort((a, b) => Number(b.leg_number || 0) - Number(a.leg_number || 0)) : [];
+      const legs = Array.isArray(duel && duel.legs) ? duel.legs.slice().sort((a, b) => Number(a.leg_number || 0) - Number(b.leg_number || 0)) : [];
       if (!legs.length) return;
       if (duelStatsLegIndex >= legs.length) duelStatsLegIndex = -1;
       const selectedLegs = duelStatsLegIndex >= 0 ? [legs[duelStatsLegIndex]] : legs;
@@ -1495,7 +1495,7 @@
         ? 'Begegnung beendet · Sieger: ' + escapeHtml(winner ? winner.name : 'unbekannt')
         : 'Leg beendet · Stand ' + stats.map(item => item.wins).join(' : ') + ' · nächster Schritt: Nächstes Leg starten';
       const viewLabel = duelStatsLegIndex < 0 ? 'Alle Legs' : 'Leg ' + Number(legs[duelStatsLegIndex].leg_number || duelStatsLegIndex + 1);
-      const legNavigation = '<div class="duel-leg-nav"><button type="button" onclick="changeDuelStatsLeg(-1)" ' + (duelStatsLegIndex === -1 ? 'disabled' : '') + '>‹ Zurück</button><strong>' + viewLabel + '</strong><button type="button" onclick="changeDuelStatsLeg(1)" ' + (duelStatsLegIndex >= legs.length - 1 ? 'disabled' : '') + '>Vor ›</button></div>';
+      const legNavigation = '<div class="duel-leg-nav"><button type="button" onclick="changeDuelStatsLeg(-1)" ' + (duelStatsLegIndex < 0 ? 'disabled' : '') + '>‹ Zurück</button><strong>' + viewLabel + '</strong><button type="button" onclick="changeDuelStatsLeg(1)" ' + (duelStatsLegIndex >= legs.length - 1 ? 'disabled' : '') + '>Vor ›</button></div>';
       const labels = [
         [duelStatsLegIndex < 0 ? 'Legs gewonnen' : 'Leg gewonnen', stats[0].wins, stats[1].wins],
         ['Schnitt', stats[0].average, stats[1].average],
@@ -1534,8 +1534,11 @@
     function changeDuelStatsLeg(direction) {
       if (!duelStatsCache || !Array.isArray(duelStatsCache.legs)) return;
       const count = duelStatsCache.legs.length;
-      if (duelStatsLegIndex < 0) duelStatsLegIndex = direction < 0 ? 0 : count - 1;
-      else duelStatsLegIndex = Math.max(0, Math.min(count - 1, duelStatsLegIndex - direction));
+      if (direction > 0) {
+        duelStatsLegIndex = duelStatsLegIndex < 0 ? 0 : Math.min(count - 1, duelStatsLegIndex + 1);
+      } else if (direction < 0) {
+        duelStatsLegIndex = duelStatsLegIndex <= 0 ? -1 : duelStatsLegIndex - 1;
+      }
       renderDuelStatsOverlay(duelStatsCache, liveState);
     }
 
