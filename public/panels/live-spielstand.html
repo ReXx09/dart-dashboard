@@ -878,15 +878,23 @@
       align-items: center;
       justify-content: center;
       z-index: 10001;
-      padding: 24px;
+      padding: 12px;
+      overflow: auto;
     }
     .duel-stats-card {
       width: min(900px, 100%);
+      box-sizing: border-box;
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
       background: linear-gradient(135deg, #202326, #131517);
       border: 2px solid #f4a261;
       border-radius: 18px;
       padding: 24px;
       box-shadow: 0 0 60px rgba(244, 162, 97, .22);
+    }
+    @supports (height: 100dvh) {
+      .duel-stats-card { max-height: calc(100dvh - 24px); }
     }
     .duel-stats-title {
       text-align: center;
@@ -1434,7 +1442,7 @@
       (duel && duel.players || []).forEach(player => rows.set(Number(player.player_slot), {
         name: player.player_name || 'Spieler', wins: 0, legs: 0, darts: 0, scored: 0,
         checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, bestLeg: null,
-        count100plus: 0, count140plus: 0, count180: 0, firstNineTotal: 0, firstNineCount: 0
+        count60plus: 0, count80plus: 0, count100plus: 0, count140plus: 0, count180: 0, firstNineTotal: 0, firstNineCount: 0
       }));
       (selectedLegs || duel && duel.legs || []).forEach(leg => (leg.players || []).forEach(player => {
         const row = rows.get(Number(player.player_slot));
@@ -1452,6 +1460,8 @@
         }
         row.bestLeg = row.bestLeg === null ? Number(player.won || 0) ? Number(player.darts || 0) : null : row.bestLeg;
         if (Number(player.won || 0) && Number(player.darts || 0) > 0) row.bestLeg = row.bestLeg === null ? Number(player.darts) : Math.min(row.bestLeg, Number(player.darts));
+        row.count60plus += Number(player.count_60plus || 0);
+        row.count80plus += Number(player.count_80plus || 0);
         row.count100plus += Number(player.count_100plus || 0);
         row.count140plus += Number(player.count_140plus || 0);
         row.count180 += Number(player.count_180 || 0);
@@ -1496,6 +1506,8 @@
         ['Höchstes Finish', stats[0].highestCheckout || '-', stats[1].highestCheckout || '-'],
         ['Würfe', stats[0].darts, stats[1].darts],
         ['Bestes Leg', stats[0].bestLeg, stats[1].bestLeg],
+        ['60+', stats[0].count60plus, stats[1].count60plus],
+        ['80+', stats[0].count80plus, stats[1].count80plus],
         ['100+', stats[0].count100plus, stats[1].count100plus],
         ['140+', stats[0].count140plus, stats[1].count140plus],
         ['180', stats[0].count180, stats[1].count180]

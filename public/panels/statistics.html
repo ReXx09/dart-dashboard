@@ -670,7 +670,7 @@
 
     function aggregateEncounterPlayers(encounter) {
       const rows = new Map();
-      (encounter.players || []).forEach(player => rows.set(Number(player.player_slot), { name: player.player_name || 'Spieler', slot: Number(player.player_slot), darts: 0, scored: 0, turns: 0, firstNine: [], bestTurn: 0, count180: 0, checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, wins: 0 }));
+      (encounter.players || []).forEach(player => rows.set(Number(player.player_slot), { name: player.player_name || 'Spieler', slot: Number(player.player_slot), darts: 0, scored: 0, turns: 0, firstNine: [], bestTurn: 0, count60plus: 0, count80plus: 0, count180: 0, checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, wins: 0 }));
       (encounter.legs || []).forEach(leg => (leg.players || []).forEach(player => {
         const row = rows.get(Number(player.player_slot));
         if (!row) return;
@@ -680,6 +680,8 @@
         row.turns += Math.ceil(darts / 3);
         if (Number(player.first_nine_avg || 0) > 0) row.firstNine.push(Number(player.first_nine_avg));
         row.bestTurn = Math.max(row.bestTurn, Number(player.best_turn || 0));
+        row.count60plus += Number(player.count_60plus || 0);
+        row.count80plus += Number(player.count_80plus || 0);
         row.count180 += Number(player.count_180 || 0);
         row.checkoutAttempts += Number(player.checkout_attempts || 0);
         row.checkoutSuccess += Number(player.checkout_success || 0);
@@ -726,7 +728,7 @@
 
     function renderEncounterDuel() {
       const stats = aggregateEncounterPlayers(encounterDetail);
-      document.getElementById('encounterDialogContent').innerHTML = '<table class="encounter-detail-table"><thead><tr><th>Spieler</th><th>Legs gewonnen</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Darts</th><th>Checkout</th><th>Best Turn</th><th>180er</th></tr></thead><tbody>' + stats.map(player => '<tr><td class="accent">' + escapeHtml(player.name) + '</td><td>' + player.wins + '</td><td>' + formatMetric(player.average) + '</td><td>' + formatMetric(player.firstNineAvg) + '</td><td>' + player.turns + '</td><td>' + player.darts + '</td><td>' + player.checkoutSuccess + '/' + player.checkoutAttempts + ' · ' + (player.highestCheckout || '-') + '</td><td>' + (player.bestTurn || '-') + '</td><td>' + player.count180 + '</td></tr>').join('') + '</tbody></table>';
+      document.getElementById('encounterDialogContent').innerHTML = '<table class="encounter-detail-table"><thead><tr><th>Spieler</th><th>Legs gewonnen</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Darts</th><th>Checkout</th><th>Best Turn</th><th>60+</th><th>80+</th><th>180er</th></tr></thead><tbody>' + stats.map(player => '<tr><td class="accent">' + escapeHtml(player.name) + '</td><td>' + player.wins + '</td><td>' + formatMetric(player.average) + '</td><td>' + formatMetric(player.firstNineAvg) + '</td><td>' + player.turns + '</td><td>' + player.darts + '</td><td>' + player.checkoutSuccess + '/' + player.checkoutAttempts + ' · ' + (player.highestCheckout || '-') + '</td><td>' + (player.bestTurn || '-') + '</td><td>' + player.count60plus + '</td><td>' + player.count80plus + '</td><td>' + player.count180 + '</td></tr>').join('') + '</tbody></table>';
     }
 
     function renderEncounterThrows() {
