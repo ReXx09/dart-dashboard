@@ -262,7 +262,6 @@
       <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <span style="font-size:.82rem;color:#888">Einträge: <strong id="hsCount" style="color:#f4a261">0</strong></span>
         <button class="btn-save" id="refreshHsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Aktualisieren</button>
-        <button class="btn-save" id="clearAllHsBtn" style="background:#8b0000;border:none;padding:6px 14px;font-size:.78rem">🗑 Alle löschen</button>
       </div>
       <div class="hs-filters">
         <input id="hsPlayerSearch" type="search" placeholder="Spieler suchen, z. B. Test-Player" aria-label="Spieler suchen" />
@@ -704,10 +703,11 @@
   let hsData = [];
   let hsFilteredData = [];
   let hsPlayers = [];
+  let editingHighscoreId = null;
 
   async function loadHighscores() {
     try {
-      const r = await fetch('/api/highscores?limit=500');
+      const r = await fetch('/api/highscores?limit=500', { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       hsData = await r.json();
       renderMonthFilter();
@@ -794,16 +794,21 @@
     }
     body.innerHTML = list.map((entry, idx) => {
       const kind = entry.kind || 'score';
+      const isEditing = Number(editingHighscoreId) === Number(entry.id);
+      const action = isEditing
+        ? '<input type="text" value="' + escapeAttr(entry.player) + '" data-hs-edit-player style="width:105px;padding:5px;background:#111;color:#f1f1f1;border:1px solid #555;border-radius:4px;margin-right:4px" aria-label="Spielername" />' +
+          '<input type="number" min="1" value="' + Number(entry.score || 0) + '" data-hs-edit-score style="width:72px;padding:5px;background:#111;color:#f1f1f1;border:1px solid #555;border-radius:4px;margin-right:4px" aria-label="Score" />' +
+          '<button class="btn-save" style="background:#2a9d8f;border:none;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-save-id="' + Number(entry.id) + '">Speichern</button>' +
+          '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem" data-hs-cancel-edit>Abbrechen</button>'
+        : '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-edit-id="' + entry.id + '">Bearbeiten</button>' +
+          '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>';
       return '<tr>' +
         '<td style="padding:8px 10px;color:#666;font-weight:700">' + (idx + 1) + '</td>' +
         '<td style="padding:8px 10px;color:#f1f1f1">' + escapeHtml(entry.player) + '</td>' +
         '<td style="padding:8px 10px;text-align:right;color:#f4a261;font-weight:700">' + entry.score + '</td>' +
         '<td style="padding:8px 10px;color:#888;font-size:.72rem">' + escapeHtml(kind) + (entry.legWin ? ' / LegWin' : '') + '</td>' +
         '<td style="padding:8px 10px;color:#666;font-size:.72rem">' + formatHSTime(entry.ts) + '</td>' +
-        '<td style="padding:8px 10px;text-align:center">' +
-          '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-edit-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">Bearbeiten</button>' +
-          '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>' +
-        '</td>' +
+          '<td style="padding:8px 10px;text-align:center">' + action + '</td>' +
         '</tr>';
     }).join('');
 
@@ -820,11 +825,22 @@
     });
     body.querySelectorAll('[data-hs-edit-id]').forEach(btn => {
       btn.addEventListener('click', function() {
-        const player = prompt('Spielername:', this.dataset.hsName);
-        if (player === null) return;
-        const score = prompt('Score:', this.dataset.hsScore);
-        if (score === null) return;
-        editHighscore(Number(this.dataset.hsEditId), player, Number(score));
+        editingHighscoreId = Number(this.dataset.hsEditId);
+        renderHighscores();
+        const input = document.querySelector('[data-hs-edit-player]');
+        if (input) input.focus();
+      });
+    });
+    body.querySelectorAll('[data-hs-save-id]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const row = this.closest('tr');
+        editHighscore(Number(this.dataset.hsSaveId), row.querySelector('[data-hs-edit-player]').value, Number(row.querySelector('[data-hs-edit-score]').value));
+      });
+    });
+    body.querySelectorAll('[data-hs-cancel-edit]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        editingHighscoreId = null;
+        renderHighscores();
       });
     });
   }
@@ -840,6 +856,7 @@
         body: JSON.stringify({ player: player.trim(), score })
       });
       if (!response.ok) throw new Error('HTTP ' + response.status);
+      editingHighscoreId = null;
       await loadHighscores();
       showToast('Highscore bearbeitet ✓');
     } catch (err) { showToast('Fehler beim Bearbeiten: ' + err.message, true); }
@@ -871,23 +888,6 @@
   document.getElementById('hsPlayerSelect').addEventListener('change', renderHighscores);
   document.getElementById('hsMonthFilter').addEventListener('change', renderHighscores);
   document.getElementById('hsSort').addEventListener('change', renderHighscores);
-  document.getElementById('clearAllHsBtn').addEventListener('click', async function() {
-    if (!confirm('ALLE Highscore-Einträge unwiderruflich löschen?')) return;
-    if (!confirm('Wirklich ALLE ' + hsData.length + ' Einträge löschen?')) return;
-    this.disabled = true;
-    this.textContent = '…';
-    try {
-      const r = await fetch('/api/highscores', { method: 'DELETE' });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      await loadHighscores();
-      showToast('Alle Highscores gelöscht ✓');
-    } catch(e) {
-      showToast('Fehler: ' + e.message, true);
-    }
-    this.disabled = false;
-    this.textContent = '🗑 Alle löschen';
-  });
-
   // Highscores automatisch laden
   loadHighscores();
   loadHighscorePlayers();

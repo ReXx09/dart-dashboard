@@ -556,8 +556,8 @@
       if (!currentPlayerId) return;
       try {
         const [statsRes, historyRes, segmentRes] = await Promise.all([
-          fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${currentSeason}`),
-          fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=50`),
+          fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${currentSeason}`, { cache: 'no-store' }),
+          fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=50`, { cache: 'no-store' }),
           fetch(`${API_BASE}/players/${currentPlayerId}/segment-analysis`, { cache: 'no-store' })
         ]);
         const stats = await statsRes.json();

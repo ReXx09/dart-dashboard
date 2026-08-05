@@ -910,7 +910,7 @@
 
     async function loadScores() {
       try {
-        const response = await fetch('/api/highscores');
+        const response = await fetch('/api/highscores', { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         allScores = await response.json();
         renderGameHighscores();
