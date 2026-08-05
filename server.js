@@ -3240,6 +3240,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
         mode: 'gesamt',
         count180: Number(stats.count_180 || 0),
         threeDartAverage: darts > 0 ? Number((totalScored / darts * 3).toFixed(1)) : 0,
+        firstNineAverage: Number(stats.avg_first9 || 0),
         checkoutRate: checkoutAttempts > 0 ? Number((checkoutSuccess / checkoutAttempts * 100).toFixed(1)) : 0,
         checkoutAttempts,
         checkoutSuccess,
@@ -3261,6 +3262,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
       checkoutRateDouble: entries.filter(entry => entry.checkoutByRule.double.attempts > 0).map(entry => ({ ...entry, checkoutRateDouble: entry.checkoutByRule.double.rate })).sort((a, b) => b.checkoutRateDouble - a.checkoutRateDouble),
       checkoutRateMaster: entries.filter(entry => entry.checkoutByRule.master.attempts > 0).map(entry => ({ ...entry, checkoutRateMaster: entry.checkoutByRule.master.rate })).sort((a, b) => b.checkoutRateMaster - a.checkoutRateMaster),
       threeDartAverage: ranked('threeDartAverage'),
+      firstNineAverage: ranked('firstNineAverage'),
       highestCheckout: ranked('highestCheckout'),
       gamesPlayed: ranked('gamesPlayed'),
       gamesWon: ranked('gamesWon')
