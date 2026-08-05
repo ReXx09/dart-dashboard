@@ -1014,7 +1014,7 @@ class DataStore {
     }
   }
 
-  async recordDuelLeg({ duelId, mode, winnerSlot, startedAt, endedAt = Date.now(), players }) {
+  async recordDuelLeg({ duelId, mode, winnerSlot, startedAt, endedAt = Date.now(), players, matchComplete = true }) {
     const duel = await this.getDuel(duelId);
     if (!duel) throw new Error('Begegnung nicht gefunden.');
     const expectedSlots = duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-');
@@ -1033,9 +1033,11 @@ class DataStore {
       else if (this.isPostgres()) await this.pg.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)', stats);
       else await this.my.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_100plus, count_140plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
     }
-    if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET total_legs = ?, status = \'finished\', ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', [legNumber, endedAt, Number(winnerSlot || 0) || null, endedAt, Number(duelId)]);
-    else if (this.isPostgres()) await this.pg.query('UPDATE duels SET total_legs = $1, status = \'finished\', ended_at = $2, winner_slot = $3, updated_at = $4 WHERE id = $5', [legNumber, endedAt, Number(winnerSlot || 0) || null, endedAt, Number(duelId)]);
-    else await this.my.query('UPDATE duels SET total_legs = ?, status = \'finished\', ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', [legNumber, endedAt, Number(winnerSlot || 0) || null, endedAt, Number(duelId)]);
+    const status = matchComplete ? 'finished' : 'active';
+    const matchWinner = matchComplete ? Number(winnerSlot || 0) || null : null;
+    if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET total_legs = ?, status = ?, ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', [legNumber, status, endedAt, matchWinner, endedAt, Number(duelId)]);
+    else if (this.isPostgres()) await this.pg.query('UPDATE duels SET total_legs = $1, status = $2, ended_at = $3, winner_slot = $4, updated_at = $5 WHERE id = $6', [legNumber, status, endedAt, matchWinner, endedAt, Number(duelId)]);
+    else await this.my.query('UPDATE duels SET total_legs = ?, status = ?, ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', [legNumber, status, endedAt, matchWinner, endedAt, Number(duelId)]);
     return this.getDuel(duelId);
   }
 

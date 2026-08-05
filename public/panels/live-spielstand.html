@@ -971,7 +971,7 @@
     }
     .heatmap-boards {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 14px;
     }
     .heatmap-player { min-width: 0; text-align: center; }
@@ -983,6 +983,39 @@
     .dartboard-number { fill: #f1f1f1; font-size: 11px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
     .heatmap-detail { min-height: 34px; color: #d7e0e5; font-size: .8rem; text-align: center; }
     .heatmap-empty { color: #777; text-align: center; padding: 30px 10px; }
+    .match-menu-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(8, 9, 11, .9);
+      z-index: 10002;
+    }
+    .match-menu-overlay.open { display: flex; }
+    .match-menu-card {
+      width: min(620px, 100%);
+      max-height: 92vh;
+      overflow: auto;
+      padding: 22px;
+      background: #191b1d;
+      border: 1px solid #f4a261;
+      border-radius: 14px;
+      box-shadow: 0 0 45px rgba(244, 162, 97, .2);
+    }
+    .match-menu-card h3 { margin: 0 0 5px; color: #f4a261; }
+    .match-menu-card p { margin: 0 0 18px; color: #9aa3a8; font-size: .82rem; }
+    .match-menu-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .match-menu-field { display: flex; flex-direction: column; gap: 5px; color: #cfd6da; font-size: .75rem; }
+    .match-menu-field.full { grid-column: 1 / -1; }
+    .match-menu-field select, .match-menu-field input { width: 100%; box-sizing: border-box; padding: 9px 10px; background: #101112; color: #f1f1f1; border: 1px solid #3d4448; border-radius: 7px; font: inherit; }
+    .match-player-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 4px; }
+    .match-player-option { display: flex; align-items: center; gap: 7px; padding: 8px; background: #111315; border: 1px solid #2d3337; border-radius: 6px; color: #e6eaec; }
+    .match-player-option input { accent-color: #f4a261; }
+    .match-menu-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+    .match-menu-actions button { border: 1px solid #4d555a; border-radius: 7px; padding: 9px 15px; color: #f1f1f1; background: #25292c; font: inherit; cursor: pointer; }
+    .match-menu-actions .primary { background: #f4a261; border-color: #f4a261; color: #171717; font-weight: 800; }
     @media (max-width: 600px) {
       .heatmap-toolbar { align-items: flex-start; flex-direction: column; }
       .heatmap-boards { grid-template-columns: 1fr; }
@@ -1142,6 +1175,30 @@
   <!-- Winner Overlay -->
   <div class="winner-overlay" id="winnerOverlay"></div>
   <div class="duel-stats-overlay" id="duelStatsOverlay"></div>
+  <div class="match-menu-overlay" id="matchMenuOverlay" role="dialog" aria-modal="true" aria-labelledby="matchMenuTitle">
+    <div class="match-menu-card">
+      <h3 id="matchMenuTitle">Begegnung starten</h3>
+      <p>Wähle Begegnungstyp, Best-of und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.</p>
+      <div class="match-menu-grid">
+        <label class="match-menu-field">Typ
+          <select id="matchTypeSelect"><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">Turniergruppe</option></select>
+        </label>
+        <label class="match-menu-field">Best-of
+          <select id="matchBestOf"><option value="1">Einzelleg</option><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option><option value="9">Best of 9</option></select>
+        </label>
+        <label class="match-menu-field">Spiel
+          <select id="matchMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option></select>
+        </label>
+        <label class="match-menu-field" id="tournamentNameField" hidden>Turniername
+          <input id="matchTournamentName" type="text" maxlength="80" placeholder="z. B. Freitagsturnier" />
+        </label>
+        <div class="match-menu-field full">Teilnehmer
+          <div class="match-player-list" id="matchPlayerList"></div>
+        </div>
+      </div>
+      <div class="match-menu-actions"><button type="button" onclick="closeMatchMenu()">Abbrechen</button><button class="primary" type="button" onclick="startConfiguredMatch()">Begegnung starten</button></div>
+    </div>
+  </div>
   
   <!-- Toast -->
   <div class="toast" id="toast"></div>
@@ -1150,7 +1207,7 @@
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
     <div class="clock" id="clockDisplay">--:--:--</div>
-    <button class="fs-btn" id="duelStatsToggle" onclick="toggleDuelStats()" title="Duell-Statistik aktivieren/deaktivieren">Duell-Stats</button>
+    <button class="fs-btn" id="duelStatsToggle" onclick="openMatchMenu()" title="Begegnung starten oder Duell-Statistik öffnen">Duell-Stats</button>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <button class="restart-btn" id="restartLegBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
@@ -1227,7 +1284,43 @@
     }
 
     function isDuelStatsEligible(state) {
-      return state && state.game && state.game.mode === '501' && Number(state.game.duelId) > 0 && Array.isArray(state.players) && state.players.length === 2;
+      return state && state.game && ['501', '301', '701'].includes(String(state.game.mode)) && Number(state.game.duelId) > 0 && Array.isArray(state.players) && state.players.length >= 2;
+    }
+
+    function openMatchMenu() {
+      const list = document.getElementById('matchPlayerList');
+      const players = Array.isArray(liveState && liveState.players) ? liveState.players : [];
+      list.innerHTML = players.map(player => '<label class="match-player-option"><input type="checkbox" value="' + Number(player.slot) + '" checked />' + escapeHtml(player.name) + '</label>').join('');
+      document.getElementById('matchTypeSelect').value = players.length === 2 ? 'direct' : 'group';
+      updateMatchMenuType();
+      document.getElementById('matchMenuOverlay').classList.add('open');
+    }
+
+    function closeMatchMenu() { document.getElementById('matchMenuOverlay').classList.remove('open'); }
+
+    function updateMatchMenuType() {
+      const type = document.getElementById('matchTypeSelect').value;
+      document.getElementById('tournamentNameField').hidden = type !== 'tournament';
+      document.querySelectorAll('#matchPlayerList input').forEach(input => { input.disabled = type === 'direct' && !input.checked; });
+    }
+
+    async function startConfiguredMatch() {
+      const type = document.getElementById('matchTypeSelect').value;
+      const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
+      if ((type === 'direct' && playerSlots.length !== 2) || playerSlots.length < 2) { showToast('Bitte die passende Anzahl Spieler auswählen.', true); return; }
+      try {
+        const response = await fetch('/api/duels/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+          matchType: type, mode: document.getElementById('matchMode').value, bestOf: Number(document.getElementById('matchBestOf').value), playerSlots, tournamentName: document.getElementById('matchTournamentName').value.trim()
+        }) });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'HTTP ' + response.status);
+        closeMatchMenu();
+        liveState = payload;
+        pendingWinner = null;
+        hideWinnerOverlay();
+        renderState(liveState);
+        showToast('Begegnung gestartet');
+      } catch (error) { showToast('Begegnung konnte nicht gestartet werden: ' + error.message, true); }
     }
 
     function getDuelStatsKey(state) {
@@ -1240,7 +1333,7 @@
       const eligible = isDuelStatsEligible(state);
       button.disabled = false;
       button.classList.toggle('active', eligible && duelStatsEnabled);
-      button.textContent = duelStatsEnabled ? 'Duell-Stats ✓' : 'Duell-Stats ○';
+      button.textContent = 'Duell-Stats ▾';
       button.title = eligible
         ? (duelStatsEnabled ? 'Duell-Statistik deaktivieren' : 'Duell-Statistik aktivieren')
         : 'Für die nächste automatisch erkannte 501-Begegnung aktivieren/deaktivieren';
@@ -1289,7 +1382,7 @@
         row.count140plus += Number(player.count_140plus || 0);
         row.count180 += Number(player.count_180 || 0);
       }));
-      return Array.from(rows.values()).slice(0, 2).map(row => ({
+      return Array.from(rows.values()).map(row => ({
         ...row,
         average: row.darts > 0 ? (row.scored / row.darts * 3).toFixed(2) : '-',
         checkoutRate: row.checkoutAttempts > 0 ? Math.round(row.checkoutSuccess / row.checkoutAttempts * 100) + '%' : '-',
@@ -1319,13 +1412,13 @@
         ['140+', stats[0].count140plus, stats[1].count140plus],
         ['180', stats[0].count180, stats[1].count180]
       ];
+      const gridColumns = 'minmax(110px, 1fr) ' + stats.map(() => 'minmax(105px, 1fr)').join(' ');
       overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">Begegnung · ' + escapeHtml(duel.id) + '</div>' +
-        '<div class="duel-stats-score">501 · ' + stats[0].wins + ':' + stats[1].wins + '</div>' +
+        '<div class="duel-stats-score">' + escapeHtml(state.game.mode || '501') + ' · ' + stats.map(item => item.wins).join(' : ') + '</div>' +
         '<div class="duel-view-tabs"><button class="duel-view-tab active" data-duel-view="stats">Duellstatistik</button><button class="duel-view-tab" data-duel-view="heatmap">Heatmap</button></div>' +
-        '<div class="duel-view-panel" data-duel-panel="stats"><div class="duel-stats-grid"><div class="duel-stats-cell label"> </div>' +
-        '<div class="duel-stats-cell player">' + escapeHtml(stats[0].name) + '</div>' +
-        '<div class="duel-stats-cell player second">' + escapeHtml(stats[1].name) + '</div>' +
-        labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div><div class="duel-stats-cell value">' + row[1] + '</div><div class="duel-stats-cell value">' + row[2] + '</div>').join('') +
+        '<div class="duel-view-panel" data-duel-panel="stats"><div class="duel-stats-grid" style="grid-template-columns:' + gridColumns + '"><div class="duel-stats-cell label"> </div>' +
+        stats.map((item, index) => '<div class="duel-stats-cell player' + (index ? ' second' : '') + '">' + escapeHtml(item.name) + '</div>').join('') +
+        labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div>' + stats.map((item, index) => '<div class="duel-stats-cell value">' + row[index + 1] + '</div>').join('')).join('') +
         '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><button class="duel-stats-close" onclick="hideDuelStatsOverlay()">Schließen</button></div>';
       overlay.style.display = 'flex';
       overlay.querySelectorAll('[data-duel-view]').forEach(button => button.addEventListener('click', () => {
@@ -1389,7 +1482,7 @@
       fetch('/api/duels/' + encodeURIComponent(duelId) + '/segment-analysis?mode=' + encodeURIComponent(state.game.mode || '501'), { cache: 'no-store' })
         .then(response => { if (!response.ok) throw new Error('Heatmap konnte nicht geladen werden'); return response.json(); })
         .then(data => {
-          const players = Array.isArray(data.players) ? data.players.slice(0, 2) : [];
+          const players = Array.isArray(data.players) ? data.players : [];
           if (!players.length) { content.innerHTML = '<div class="heatmap-empty">Für diese Begegnung sind noch keine Wurfsegmente gespeichert.</div>'; return; }
           content.innerHTML = '<div class="heatmap-toolbar"><div class="heatmap-metrics"><button class="heatmap-metric ' + (heatmapMetric === 'accuracy' ? 'active' : '') + '" data-metric="accuracy">Trefferquote</button><button class="heatmap-metric ' + (heatmapMetric === 'frequency' ? 'active' : '') + '" data-metric="frequency">Wurfhäufigkeit</button></div><div class="heatmap-legend"><span>niedrig</span><span class="heatmap-legend-bar"></span><span>hoch</span></div></div><div class="heatmap-boards">' + players.map((player, index) => '<div class="heatmap-player' + (index ? ' second' : '') + '"><div class="heatmap-player-name">' + escapeHtml(player.name) + '</div><div class="heatmap-board-wrap">' + renderDartboard(player, heatmapMetric) + '</div><div class="heatmap-detail" data-detail-for="' + player.slot + '">Segment auswählen</div></div>').join('') + '</div>';
           content.querySelectorAll('[data-metric]').forEach(button => button.addEventListener('click', () => { heatmapMetric = button.dataset.metric; localStorage.setItem('duelHeatmapMetric', heatmapMetric); loadDuelHeatmap(duelId, state); }));
@@ -2357,6 +2450,7 @@
     }
 
     loadGameModes();
+    document.getElementById('matchTypeSelect').addEventListener('change', updateMatchMenuType);
 
     (function() {
       let sse = null;

@@ -1347,12 +1347,14 @@ async function recordDuelLegIfActive(state, winner) {
       busts: throws.filter(item => item.bust).length
     };
   });
+  const legsToWin = Math.max(1, Number(state.game?.legsToWin || 1));
   await dataStore.recordDuelLeg({
     duelId,
     mode,
     winnerSlot: winner.slot,
     startedAt: Number(state.game.startedAt || Date.now()),
-    players
+    players,
+    matchComplete: Number(winner?.legs || 0) >= legsToWin
   });
 }
 
@@ -2495,7 +2497,11 @@ async function getLiveState() {
       throwRound: Number(saved.game?.throwRound || 1),
       currentThrow: Number(saved.game?.currentThrow || 0),
       duelId: Number(saved.game?.duelId || 0) || null,
-      selectedPlayerSlots: mergedPlayers.map(player => Number(player.slot))
+      selectedPlayerSlots: mergedPlayers.map(player => Number(player.slot)),
+      matchType: String(saved.game?.matchType || ''),
+      bestOf: Math.max(1, Number(saved.game?.bestOf || 1)),
+      legsToWin: Math.max(1, Number(saved.game?.legsToWin || 1)),
+      tournamentName: String(saved.game?.tournamentName || '')
     },
     players: mergedPlayers,
     lastAction: saved.lastAction || null,
@@ -2909,8 +2915,32 @@ app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gelöscht werden: ' + err.message }); }
 });
 
-app.post('/api/duels/start', requireAdmin, async (req, res) => {
-  res.status(410).json({ error: 'Begegnungen werden automatisch erkannt und können nicht manuell gestartet werden.' });
+app.post('/api/duels/start', async (req, res) => {
+  try {
+    const matchType = ['direct', 'group', 'tournament'].includes(String(req.body?.matchType)) ? String(req.body.matchType) : 'direct';
+    const mode = String(req.body?.mode || '501');
+    const bestOf = Number(req.body?.bestOf || 1);
+    const slots = [...new Set((Array.isArray(req.body?.playerSlots) ? req.body.playerSlots : []).map(Number).filter(Number.isInteger))];
+    if (!['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'Nur 301, 501 und 701 sind für Begegnungen verfügbar.' });
+    if (!Number.isInteger(bestOf) || bestOf < 1 || bestOf > 15 || bestOf % 2 === 0) return res.status(400).json({ error: 'Best-of muss eine ungerade Zahl zwischen 1 und 15 sein.' });
+    if ((matchType === 'direct' && slots.length !== 2) || slots.length < 2 || slots.length > 8) return res.status(400).json({ error: 'Bitte 2 bis 8 Spieler auswählen; ein Direktduell benötigt genau 2.' });
+    const configuredPlayers = await getPlayers();
+    const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());
+    if (selectedPlayers.length !== slots.length) return res.status(400).json({ error: 'Alle ausgewählten Slots müssen einen Spielernamen haben.' });
+    const profiles = await dataStore.getProfiles();
+    const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
+    const duel = await dataStore.createDuel({ mode, players: selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null })) });
+    const fresh = await defaultLiveState(mode, slots);
+    fresh.game.duelId = duel.id;
+    fresh.game.matchType = matchType;
+    fresh.game.bestOf = bestOf;
+    fresh.game.legsToWin = Math.ceil(bestOf / 2);
+    fresh.game.tournamentName = String(req.body?.tournamentName || '').trim();
+    savedLiveMode = mode;
+    await saveLiveState(fresh);
+    broadcastReload();
+    res.json(fresh);
+  } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gestartet werden: ' + err.message }); }
 });
 
 app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
@@ -2943,6 +2973,12 @@ app.post('/api/live/reset', async (req, res) => {
     const currentSlots = current.players.map(player => Number(player.slot)).sort((a, b) => a - b).join('-');
     const duelSlots = duel ? duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-') : '';
     fresh.game.duelId = duel && duel.status === 'active' && currentSlots === duelSlots ? duel.id : null;
+    if (fresh.game.duelId) {
+      fresh.game.matchType = String(current.game.matchType || 'direct');
+      fresh.game.bestOf = Math.max(1, Number(current.game.bestOf || 1));
+      fresh.game.legsToWin = Math.max(1, Number(current.game.legsToWin || 1));
+      fresh.game.tournamentName = String(current.game.tournamentName || '');
+    }
     await ensureAutomaticEncounter(fresh);
     const saved = await saveLiveState(fresh);
     broadcastReload();
