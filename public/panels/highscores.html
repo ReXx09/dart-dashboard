@@ -141,6 +141,10 @@
     .tab.active { background: #e63946; color: #fff; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .encounter-nav { display: flex; gap: 4px; flex-wrap: wrap; margin: 12px 0; padding: 4px; background: #0f0f0f; border-radius: 8px; }
+    .encounter-nav button { flex: 1 1 140px; border: 0; background: transparent; color: #777; border-radius: 6px; padding: 8px 12px; cursor: pointer; font: inherit; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    .encounter-nav button:hover { color: #ddd; }
+    .encounter-nav button.active { background: #f4a261; color: #111; }
     .encounter-score-grid { overflow-x: auto; border: 1px solid #262626; border-radius: 10px; }
     .encounter-table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: .76rem; }
     .encounter-table th { padding: 9px 10px; background: #151515; color: #666; text-align: left; text-transform: uppercase; letter-spacing: 1px; font-size: .6rem; white-space: nowrap; }
@@ -466,6 +470,12 @@
         <div class="overview-header">
           <div><h2>Begegnungs-Highscores</h2><p>Bestwerte aus 2-Player-Duellen und Gruppen mit 3–8 Spielern</p></div>
         </div>
+        <nav class="encounter-nav" aria-label="Highscore-Kategorien">
+          <button type="button" data-encounter-category="single" onclick="showHighscoreTab('scores')">Einzel</button>
+          <button type="button" data-encounter-category="duel" class="active" onclick="setEncounterCategory('duel')">Duelle</button>
+          <button type="button" data-encounter-category="group" onclick="setEncounterCategory('group')">Begegnungen</button>
+          <button type="button" data-encounter-category="tournament" onclick="setEncounterCategory('tournament')">Turniere</button>
+        </nav>
         <div class="encounter-score-grid" id="encounterScoreGrid">
           <div class="encounter-empty">Begegnungen werden geladen...</div>
         </div>
@@ -539,6 +549,7 @@
     let encounters = [];
     let encounterDetail = null;
     let encounterDetailView = 'duel';
+    let selectedEncounterCategory = 'duel';
 
     const LIST_LABELS = {
       all: 'Best Off – alle Scores',
@@ -598,6 +609,17 @@
       });
     });
 
+    function showHighscoreTab(tabName) {
+      const button = document.querySelector('.tab[data-tab="' + tabName + '"]');
+      if (button) button.click();
+    }
+
+    function setEncounterCategory(category) {
+      selectedEncounterCategory = category;
+      document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
+      renderEncounters();
+    }
+
     function renderOverview() {
       const grid = document.getElementById('metricGrid');
       const mode = document.getElementById('overviewMode').value;
@@ -647,7 +669,9 @@
         grid.innerHTML = '<div class="encounter-empty">Noch keine Duelle oder Gruppen-Begegnungen gespeichert.</div>';
         return;
       }
-      grid.innerHTML = '<table class="encounter-table"><thead><tr><th>Begegnung</th><th>Spieler</th><th>Legs</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Checkout</th><th>Sieger</th><th>Details</th></tr></thead><tbody>' + encounters.map(encounter => {
+      const visible = encounters.filter(encounter => encounter.category === selectedEncounterCategory);
+      if (!visible.length) { grid.innerHTML = '<div class="encounter-empty">Noch keine Einträge in dieser Kategorie.</div>'; return; }
+      grid.innerHTML = '<table class="encounter-table"><thead><tr><th>Begegnung</th><th>Spieler</th><th>Legs</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Checkout</th><th>Sieger</th><th>Details</th></tr></thead><tbody>' + visible.map(encounter => {
         const stats = aggregateEncounterPlayers(encounter);
         const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
         const lines = field => stats.map(player => '<span>' + field(player) + '</span>').join('');

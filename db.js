@@ -13,6 +13,14 @@ function getDuelCategory(participantCount) {
   return { category: 'unknown', categoryLabel: 'Unkategorisierte Begegnung' };
 }
 
+function getMatchCategory(matchType, participantCount) {
+  const type = String(matchType || '').toLowerCase();
+  if (type === 'tournament') return { category: 'tournament', categoryLabel: 'Turnier' };
+  if (type === 'direct') return { category: 'duel', categoryLabel: '2-Player-Duell' };
+  if (type === 'group') return { category: 'group', categoryLabel: 'Gruppen-Begegnung' };
+  return getDuelCategory(participantCount);
+}
+
 function readJson(filePath, fallback) {
   try {
     if (fs.existsSync(filePath)) {
@@ -193,6 +201,8 @@ class DataStore {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           mode TEXT NOT NULL,
           status TEXT NOT NULL DEFAULT 'active',
+                    match_type TEXT,
+                    tournament_name TEXT,
           participant_key TEXT NOT NULL,
           participant_count INTEGER NOT NULL,
           started_at INTEGER NOT NULL,
@@ -241,6 +251,8 @@ class DataStore {
           PRIMARY KEY (duel_leg_id, player_slot)
         );
       `);
+      try { await this.sqlite.run('ALTER TABLE duels ADD COLUMN match_type TEXT'); } catch (_err) { }
+      try { await this.sqlite.run('ALTER TABLE duels ADD COLUMN tournament_name TEXT'); } catch (_err) { }
       try { await this.sqlite.run('ALTER TABLE duel_leg_players ADD COLUMN first_nine_avg REAL NOT NULL DEFAULT 0'); } catch (_err) { }
       return;
     }
@@ -251,6 +263,8 @@ class DataStore {
           id BIGSERIAL PRIMARY KEY,
           mode TEXT NOT NULL,
           status TEXT NOT NULL DEFAULT 'active',
+                    match_type TEXT,
+                    tournament_name TEXT,
           participant_key TEXT NOT NULL,
           participant_count INTEGER NOT NULL,
           started_at BIGINT NOT NULL,
@@ -299,6 +313,8 @@ class DataStore {
           PRIMARY KEY (duel_leg_id, player_slot)
         );
       `);
+      await this.pg.query('ALTER TABLE duels ADD COLUMN IF NOT EXISTS match_type TEXT');
+      await this.pg.query('ALTER TABLE duels ADD COLUMN IF NOT EXISTS tournament_name TEXT');
       try { await this.pg.query('ALTER TABLE duel_leg_players ADD COLUMN IF NOT EXISTS first_nine_avg NUMERIC NOT NULL DEFAULT 0'); } catch (_err) { }
       return;
     }
@@ -307,6 +323,8 @@ class DataStore {
       CREATE TABLE IF NOT EXISTS duels (
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
         mode VARCHAR(64) NOT NULL,
+        match_type VARCHAR(32) NULL,
+        tournament_name VARCHAR(255) NULL,
         status VARCHAR(16) NOT NULL DEFAULT 'active',
         participant_key VARCHAR(512) NOT NULL,
         participant_count INT NOT NULL,
@@ -356,6 +374,8 @@ class DataStore {
         PRIMARY KEY (duel_leg_id, player_slot)
       );`];
     for (const query of mysqlQueries) await this.my.query(query);
+    try { await this.my.query('ALTER TABLE duels ADD COLUMN match_type VARCHAR(32) NULL'); } catch (_err) { }
+    try { await this.my.query('ALTER TABLE duels ADD COLUMN tournament_name VARCHAR(255) NULL'); } catch (_err) { }
     try { await this.my.query('ALTER TABLE duel_leg_players ADD COLUMN first_nine_avg DECIMAL(8,2) NOT NULL DEFAULT 0'); } catch (_err) { }
   }
 
@@ -815,26 +835,26 @@ class DataStore {
     });
   }
 
-  async createDuel({ mode, players, startedAt = Date.now() }) {
+  async createDuel({ mode, players, matchType = null, tournamentName = '', startedAt = Date.now() }) {
     const safePlayers = Array.isArray(players) ? players.slice(0, 8) : [];
     const participantKey = safePlayers.map(player => Number(player.slot)).sort((a, b) => a - b).join('-');
-    const values = [String(mode || '501'), 'active', participantKey, safePlayers.length, startedAt, startedAt, startedAt];
+    const values = [String(mode || '501'), matchType ? String(matchType) : null, String(tournamentName || '').trim() || null, 'active', participantKey, safePlayers.length, startedAt, startedAt, startedAt];
     let duelId;
     if (this.isSQLite()) {
       const result = await this.sqlite.run(
-        'INSERT INTO duels (mode, status, participant_key, participant_count, started_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO duels (mode, match_type, tournament_name, status, participant_key, participant_count, started_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         values
       );
       duelId = Number(result.lastID);
     } else if (this.isPostgres()) {
       const result = await this.pg.query(
-        'INSERT INTO duels (mode, status, participant_key, participant_count, started_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+        'INSERT INTO duels (mode, match_type, tournament_name, status, participant_key, participant_count, started_at, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
         values
       );
       duelId = Number(result.rows[0].id);
     } else {
       const [result] = await this.my.query(
-        'INSERT INTO duels (mode, status, participant_key, participant_count, started_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO duels (mode, match_type, tournament_name, status, participant_key, participant_count, started_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         values
       );
       duelId = Number(result.insertId);

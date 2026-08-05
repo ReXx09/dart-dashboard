@@ -2819,7 +2819,7 @@ app.get('/api/live/state', async (_req, res) => {
 
 app.get('/api/duels', async (req, res) => {
   const category = String(req.query.category || 'all').trim().toLowerCase();
-  if (!['all', 'duel', 'group'].includes(category)) return res.status(400).json({ error: 'category muss all, duel oder group sein.' });
+  if (!['all', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, duel, group oder tournament sein.' });
   try {
     const duels = await dataStore.listDuels(req.query.limit || 20);
     res.json(category === 'all' ? duels : duels.filter(duel => duel.category === category));
@@ -2851,7 +2851,7 @@ app.get('/api/duel-stats', async (req, res) => {
   if (slots.length > 8) return res.status(400).json({ error: 'playerSlots darf höchstens 8 Slots enthalten.' });
   const exactGroup = String(req.query.exact || 'false').toLowerCase() === 'true';
   const category = String(req.query.category || 'all').trim().toLowerCase();
-  if (!['all', 'duel', 'group'].includes(category)) return res.status(400).json({ error: 'category muss all, duel oder group sein.' });
+  if (!['all', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, duel, group oder tournament sein.' });
   try {
     const duels = await dataStore.listDuels(100);
     const wanted = slots.join('-');
@@ -2929,13 +2929,14 @@ app.post('/api/duels/start', async (req, res) => {
     if (selectedPlayers.length !== slots.length) return res.status(400).json({ error: 'Alle ausgewählten Slots müssen einen Spielernamen haben.' });
     const profiles = await dataStore.getProfiles();
     const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
-    const duel = await dataStore.createDuel({ mode, players: selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null })) });
+    const tournamentName = String(req.body?.tournamentName || '').trim();
+    const duel = await dataStore.createDuel({ mode, matchType, tournamentName, players: selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null })) });
     const fresh = await defaultLiveState(mode, slots);
     fresh.game.duelId = duel.id;
     fresh.game.matchType = matchType;
     fresh.game.bestOf = bestOf;
     fresh.game.legsToWin = Math.ceil(bestOf / 2);
-    fresh.game.tournamentName = String(req.body?.tournamentName || '').trim();
+    fresh.game.tournamentName = tournamentName;
     savedLiveMode = mode;
     await saveLiveState(fresh);
     broadcastReload();

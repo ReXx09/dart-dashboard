@@ -265,6 +265,10 @@
     .tab.active { background: #e63946; color: #fff; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .encounter-nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; padding: 4px; background: #0f0f0f; border-radius: 8px; }
+    .encounter-nav button { flex: 1 1 140px; border: 0; background: transparent; color: #777; border-radius: 6px; padding: 8px 12px; cursor: pointer; font: inherit; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    .encounter-nav button:hover { color: #ddd; }
+    .encounter-nav button.active { background: #f4a261; color: #111; }
     .encounter-toolbar {
       display: flex;
       justify-content: space-between;
@@ -444,6 +448,12 @@
 
     <div class="tab-panel" id="tab-encounters">
       <div class="section">
+        <nav class="encounter-nav" aria-label="Statistik-Kategorien">
+          <button type="button" data-encounter-category="single" onclick="showStatisticsTab('overview')">Einzel</button>
+          <button type="button" data-encounter-category="duel" class="active" onclick="setEncounterCategory('duel')">Duelle</button>
+          <button type="button" data-encounter-category="group" onclick="setEncounterCategory('group')">Begegnungen</button>
+          <button type="button" data-encounter-category="tournament" onclick="setEncounterCategory('tournament')">Turniere</button>
+        </nav>
         <div class="encounter-toolbar">
           <div>
             <h2 class="section-title" style="margin-bottom:0">Duelle und Gruppen-Begegnungen</h2>
@@ -451,8 +461,9 @@
           </div>
           <select id="encounterCategory" aria-label="Begegnungskategorie">
             <option value="all">Alle Begegnungen</option>
-            <option value="duel">2-Player-Duelle</option>
+            <option value="duel" selected>2-Player-Duelle</option>
             <option value="group">Gruppen mit 3–8 Spielern</option>
+            <option value="tournament">Turniere</option>
           </select>
         </div>
         <div class="stats-grid" id="encounterStats"></div>
@@ -477,7 +488,7 @@
     let currentPlayerId = null;
     let currentSeason = '2026';
     let encounters = [];
-    let selectedEncounterCategory = 'all';
+    let selectedEncounterCategory = 'duel';
     let segmentAnalysis = null;
     let selectedSegmentType = 'all';
     let encounterDetail = null;
@@ -498,6 +509,19 @@
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
       });
     });
+
+    function showStatisticsTab(tabName) {
+      const button = document.querySelector('.tab[data-tab="' + tabName + '"]');
+      if (button) button.click();
+    }
+
+    function setEncounterCategory(category) {
+      selectedEncounterCategory = category;
+      document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
+      document.getElementById('encounterCategory').value = category;
+      renderEncounters();
+      loadEncounterStats();
+    }
 
     // Clock
     function updateClock() {
@@ -922,6 +946,7 @@
 
     document.getElementById('encounterCategory').addEventListener('change', event => {
       selectedEncounterCategory = event.target.value;
+      document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === selectedEncounterCategory));
       renderEncounters();
       loadEncounterStats();
     });
