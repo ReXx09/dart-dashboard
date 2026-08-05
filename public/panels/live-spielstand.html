@@ -1288,7 +1288,18 @@
     }
 
     function hasActiveMatch(state) {
-      return !!(state && state.game && Number(state.game.duelId) > 0 && ['running', 'leg-finished'].includes(String(state.game.status)));
+      if (!state || !state.game || Number(state.game.duelId) <= 0) return false;
+      if (String(state.game.status) === 'running') return true;
+      if (String(state.game.status) !== 'leg-finished') return false;
+      const winner = Array.isArray(state.players)
+        ? state.players.find(player => Number(player.slot) === Number(state.lastAction && state.lastAction.winnerSlot))
+        : null;
+      return !isMatchComplete(state, winner);
+    }
+
+    function isMatchComplete(state, winner) {
+      const legsToWin = Math.max(1, Number(state && state.game && state.game.legsToWin || 1));
+      return Number(winner && winner.legs || 0) >= legsToWin;
     }
 
     function openMatchMenu() {
@@ -1427,6 +1438,14 @@
       if (!overlay) return;
       const stats = aggregateDuelStats(duel);
       if (stats.length < 2) return;
+      const winner = Array.isArray(state.players)
+        ? state.players.find(player => Number(player.slot) === Number(state.lastAction && state.lastAction.winnerSlot))
+        : null;
+      const matchComplete = isMatchComplete(state, winner);
+      const legsToWin = Math.max(1, Number(state.game && state.game.legsToWin || 1));
+      const progressText = matchComplete
+        ? 'Begegnung beendet · Sieger: ' + escapeHtml(winner ? winner.name : 'unbekannt')
+        : 'Leg beendet · Stand ' + stats.map(item => item.wins).join(' : ') + ' · nächster Schritt: Nächstes Leg starten';
       const labels = [
         ['Legs gewonnen', stats[0].wins, stats[1].wins],
         ['Schnitt', stats[0].average, stats[1].average],
@@ -1444,11 +1463,12 @@
       const gridColumns = 'minmax(110px, 1fr) ' + stats.map(() => 'minmax(105px, 1fr)').join(' ');
       overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">Begegnung · ' + escapeHtml(duel.id) + '</div>' +
         '<div class="duel-stats-score">' + escapeHtml(state.game.mode || '501') + ' · ' + stats.map(item => item.wins).join(' : ') + '</div>' +
+        '<div class="duel-stats-progress">Best of ' + (legsToWin * 2 - 1) + ' · ' + progressText + '</div>' +
         '<div class="duel-view-tabs"><button class="duel-view-tab active" data-duel-view="stats">Duellstatistik</button><button class="duel-view-tab" data-duel-view="heatmap">Heatmap</button></div>' +
         '<div class="duel-view-panel" data-duel-panel="stats"><div class="duel-stats-grid" style="grid-template-columns:' + gridColumns + '"><div class="duel-stats-cell label"> </div>' +
         stats.map((item, index) => '<div class="duel-stats-cell player' + (index ? ' second' : '') + '">' + escapeHtml(item.name) + '</div>').join('') +
         labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div>' + stats.map((item, index) => '<div class="duel-stats-cell value">' + row[index + 1] + '</div>').join('')).join('') +
-        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><button class="duel-stats-close" onclick="hideDuelStatsOverlay()">Schließen</button></div>';
+        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><button class="duel-stats-close" onclick="hideDuelStatsOverlay()">Statistik ausblenden</button></div>';
       overlay.style.display = 'flex';
       overlay.querySelectorAll('[data-duel-view]').forEach(button => button.addEventListener('click', () => {
         const view = button.dataset.duelView;
@@ -2008,7 +2028,10 @@
       const throws = Array.isArray(winner.throws) ? winner.throws : [];
       const dartsThrown = Number(winner.turns) || throws.length;
       const checkoutValue = !isCricket && !isElimination ? (Number(winner.lastCheckoutValue) || 0) : 0;
-      const title = isCricket ? 'CRICKET GEWONNEN' : isElimination ? 'ELIMINATION GEWONNEN' : 'LEG GEWONNEN';
+      const matchComplete = isMatchComplete(state, winner);
+      const title = matchComplete
+        ? (isCricket ? 'BEGEGNUNG GEWONNEN' : isElimination ? 'BEGEGNUNG GEWONNEN' : 'DUELL GEWONNEN')
+        : (isCricket ? 'CRICKET GEWONNEN' : isElimination ? 'ELIMINATION GEWONNEN' : 'LEG GEWONNEN');
       const subtitle = isCricket ? 'Cricket Punkte: ' + (winner.cricketPoints || 0) : isElimination ? 'Punkte: ' + (winner.totalScored || 0) : 'Checkout: ' + (checkoutValue || '-') + ' Punkte';
       const modeStats = isCricket
         ? '<div class="winner-stat"><div class="winner-stat-label">Geschlossene Zahlen</div><div class="winner-stat-value">' + (winner.cricketClosed ? Object.values(winner.cricketClosed).filter(Boolean).length : 0) + '/7</div></div>'
@@ -2024,7 +2047,7 @@
           '<div class="winner-stat"><div class="winner-stat-label">Schnitt</div><div class="winner-stat-value">' + stats.legAverage + '</div></div>' +
           '<div class="winner-stat"><div class="winner-stat-label">Erster-9-AVG</div><div class="winner-stat-value">' + stats.firstNineAverage + '</div></div>' +
           '<div class="winner-stat"><div class="winner-stat-label">Legs</div><div class="winner-stat-value">' + (winner.legs || 0) + '</div></div>' +
-        '</div><button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button></div>';
+        '</div><button class="winner-btn" onclick="hideWinnerOverlay(); ' + (matchComplete ? 'startNewMatch()' : 'nextLeg()') + '">' + (matchComplete ? 'Neue Begegnung starten' : 'Nächstes Leg starten') + '</button></div>';
 
       overlay.classList.add('show');
       overlay.style.display = 'flex';
@@ -2134,6 +2157,22 @@
         renderState(liveState);
         showToast('Nächstes Leg gestartet');
       } catch(e) { showToast('Netzwerkfehler', true); }
+    }
+
+    async function startNewMatch() {
+      try {
+        const response = await fetch('/api/live/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ carryLegs: false })
+        });
+        if (!response.ok) { showToast('Neue Begegnung konnte nicht gestartet werden', true); return; }
+        liveState = await response.json();
+        pendingWinner = null;
+        hideWinnerOverlay();
+        renderState(liveState);
+        showToast('Neue Begegnung gestartet');
+      } catch (error) { showToast('Netzwerkfehler', true); }
     }
 
     // ── Toast ──
