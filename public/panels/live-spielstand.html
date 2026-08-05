@@ -1207,7 +1207,7 @@
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
     <h2>🎯 Live-Spielstand</h2>
     <div class="clock" id="clockDisplay">--:--:--</div>
-    <button class="fs-btn" id="duelStatsToggle" onclick="openMatchMenu()" title="Begegnung starten oder Duell-Statistik öffnen">Duell-Stats</button>
+    <button class="fs-btn" id="duelStatsToggle" onclick="openMatchMenu()" title="Begegnung starten">Begegnung starten</button>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <button class="restart-btn" id="restartLegBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
@@ -1287,7 +1287,15 @@
       return state && state.game && ['501', '301', '701'].includes(String(state.game.mode)) && Number(state.game.duelId) > 0 && Array.isArray(state.players) && state.players.length >= 2;
     }
 
+    function hasActiveMatch(state) {
+      return !!(state && state.game && Number(state.game.duelId) > 0 && ['running', 'leg-finished'].includes(String(state.game.status)));
+    }
+
     function openMatchMenu() {
+      if (hasActiveMatch(liveState)) {
+        if (confirm('Die laufende Begegnung wirklich abbrechen? Die bisherige Begegnung bleibt in der Statistik erhalten.')) abortActiveMatch();
+        return;
+      }
       const list = document.getElementById('matchPlayerList');
       const players = Array.isArray(liveState && liveState.players) ? liveState.players : [];
       list.innerHTML = players.map(player => '<label class="match-player-option"><input type="checkbox" value="' + Number(player.slot) + '" checked />' + escapeHtml(player.name) + '</label>').join('');
@@ -1297,6 +1305,26 @@
     }
 
     function closeMatchMenu() { document.getElementById('matchMenuOverlay').classList.remove('open'); }
+
+    async function abortActiveMatch() {
+      const button = document.getElementById('duelStatsToggle');
+      if (button) button.disabled = true;
+      try {
+        const response = await fetch('/api/duels/' + encodeURIComponent(liveState.game.duelId) + '/cancel', { method: 'POST' });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'HTTP ' + response.status);
+        liveState = payload.state;
+        pendingWinner = null;
+        hideWinnerOverlay();
+        hideDuelStatsOverlay();
+        renderState(liveState);
+        showToast('Begegnung abgebrochen');
+      } catch (error) {
+        showToast('Begegnung konnte nicht abgebrochen werden: ' + error.message, true);
+      } finally {
+        if (button) button.disabled = false;
+      }
+    }
 
     function updateMatchMenuType() {
       const type = document.getElementById('matchTypeSelect').value;
@@ -1331,12 +1359,13 @@
       const button = document.getElementById('duelStatsToggle');
       if (!button) return;
       const eligible = isDuelStatsEligible(state);
+      const activeMatch = hasActiveMatch(state);
       button.disabled = false;
       button.classList.toggle('active', eligible && duelStatsEnabled);
-      button.textContent = 'Duell-Stats ▾';
-      button.title = eligible
-        ? (duelStatsEnabled ? 'Duell-Statistik deaktivieren' : 'Duell-Statistik aktivieren')
-        : 'Für die nächste automatisch erkannte 501-Begegnung aktivieren/deaktivieren';
+      button.textContent = activeMatch ? 'Duell live' : 'Begegnung starten';
+      button.title = activeMatch
+        ? 'Laufende Begegnung abbrechen'
+        : 'Neue Begegnung starten';
     }
 
     function toggleDuelStats() {

@@ -2963,6 +2963,20 @@ app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht beendet werden: ' + err.message }); }
 });
 
+app.post('/api/duels/:id/cancel', async (req, res) => {
+  try {
+    const state = await getLiveState();
+    const duelId = Number(req.params.id);
+    if (Number(state.game?.duelId) !== duelId) return res.status(409).json({ error: 'Diese Begegnung ist nicht aktiv.' });
+    const duel = await dataStore.cancelDuel(duelId);
+    const fresh = await defaultLiveState(String(state.game.mode || DEFAULT_MODE), state.game.selectedPlayerSlots);
+    savedLiveMode = String(state.game.mode || DEFAULT_MODE);
+    await saveLiveState(fresh);
+    broadcastReload();
+    res.json({ duel, state: fresh });
+  } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht abgebrochen werden: ' + err.message }); }
+});
+
 app.post('/api/live/reset', async (req, res) => {
   const carryLegs = !!(req.body && req.body.carryLegs);
   try {

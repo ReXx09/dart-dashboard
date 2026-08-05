@@ -960,6 +960,14 @@ class DataStore {
     return this.getDuel(id);
   }
 
+  async cancelDuel(id, endedAt = Date.now()) {
+    const values = [endedAt, endedAt, Number(id)];
+    if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET status = \'canceled\', ended_at = ?, updated_at = ? WHERE id = ?', values);
+    else if (this.isPostgres()) await this.pg.query('UPDATE duels SET status = \'canceled\', ended_at = $1, updated_at = $2 WHERE id = $3', values);
+    else await this.my.query('UPDATE duels SET status = \'canceled\', ended_at = ?, updated_at = ? WHERE id = ?', values);
+    return this.getDuel(id);
+  }
+
   async deleteDuel(id) {
     const safeId = Number(id);
     if (!Number.isFinite(safeId) || safeId <= 0) throw new Error('Ungültige Begegnungs-ID.');
