@@ -1182,11 +1182,24 @@ function getThrowHitCount(value) {
   return 1;
 }
 
-function getCheckoutValue(player, finalThrowPoints) {
-  const previousThrowPoints = Array.isArray(player && player.currentRoundPoints)
-    ? player.currentRoundPoints.reduce((sum, points) => sum + (Number(points) || 0), 0)
+function getCheckoutValue(player, remainingBeforeThrow) {
+  const previousDartsInTurn = Array.isArray(player && player.currentRoundPoints)
+    ? player.currentRoundPoints.slice(0, -1)
     : 0;
-  return Math.max(0, previousThrowPoints + (Number(finalThrowPoints) || 0));
+  const previousThrowPoints = Array.isArray(previousDartsInTurn)
+    ? previousDartsInTurn.reduce((sum, points) => sum + (Number(points) || 0), 0)
+    : 0;
+  return Math.max(0, Number(remainingBeforeThrow || 0) + previousThrowPoints);
+}
+
+function getTurnScoresFromThrows(throws, includePartial = true) {
+  const scores = [];
+  for (let index = 0; index < throws.length; index += 3) {
+    const turn = throws.slice(index, index + 3);
+    if (turn.length < 3 && !includePartial) continue;
+    scores.push(turn.reduce((sum, item) => sum + (item && item.bust ? 0 : Number(item && item.points || 0)), 0));
+  }
+  return scores;
 }
 
 function clearPendingArduinoThrow() {
@@ -1211,16 +1224,12 @@ async function recordPlayerLegStats(player, state, options = {}) {
     const firstNine = throws.slice(0, 9);
     const firstNineScored = firstNine.reduce((sum, item) => sum + (item && item.bust ? 0 : Number(item && item.points || 0)), 0);
     const firstNineAvg = firstNine.length >= 9 ? (firstNineScored / 9 * 3) : 0;
-    const turns = [];
-    for (let index = 0; index < throws.length; index += 3) {
-      const turn = throws.slice(index, index + 3);
-      if (turn.length === 3) turns.push(turn.reduce((sum, item) => sum + (item && item.bust ? 0 : Number(item && item.points || 0)), 0));
-    }
+    const completeTurns = getTurnScoresFromThrows(throws, false);
     let count180 = 0, count171 = 0, count140 = 0, count100 = 0;
     let maxScore = 0;
     
-    turns.forEach(turn => {
-      const score = Number(turn.points || 0);
+    completeTurns.forEach(turn => {
+      const score = Number(turn || 0);
       if (score === 180) count180++;
       if (score >= 171) count171++;
       if (score >= 140) count140++;
@@ -1318,12 +1327,8 @@ async function recordDuelLegIfActive(state, winner) {
     const firstNine = throws.slice(0, 9);
     const firstNineScored = firstNine.reduce((sum, item) => sum + (item.bust ? 0 : Number(item.points || 0)), 0);
     const firstNineAvg = firstNine.length >= 9 ? roundAverage(firstNineScored / 9 * 3) : 0;
-    const turnScores = [];
-    for (let index = 0; index < throws.length; index += 3) {
-      const turn = throws.slice(index, index + 3);
-      if (turn.length < 3) continue;
-      turnScores.push(turn.reduce((sum, item) => sum + (item.bust ? 0 : Number(item.points || 0)), 0));
-    }
+    const turnScores = getTurnScoresFromThrows(throws);
+    const completeTurnScores = getTurnScoresFromThrows(throws, false);
     return {
       slot: player.slot,
       profileId: profileByName.get(String(player.name || '').trim().toLowerCase()) || null,
@@ -1332,10 +1337,10 @@ async function recordDuelLegIfActive(state, winner) {
       totalScored: player.totalScored,
       average: Number(player.turns || 0) > 0 ? roundAverage(Number(player.totalScored || 0) / Number(player.turns) * 3) : 0,
       firstNineAvg,
-      bestTurn: player.bestTurn,
-      count100plus: turnScores.filter(score => score >= 100).length,
-      count140plus: turnScores.filter(score => score >= 140).length,
-      count180: turnScores.filter(score => score === 180).length,
+      bestTurn: Math.max(...turnScores, 0),
+      count100plus: completeTurnScores.filter(score => score >= 100).length,
+      count140plus: completeTurnScores.filter(score => score >= 140).length,
+      count180: completeTurnScores.filter(score => score === 180).length,
       checkoutAttempts: player.checkoutAttempts,
       checkoutSuccess: player.checkoutSuccess,
       lastCheckoutValue: player.lastCheckoutValue,
@@ -1538,11 +1543,11 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
   if (!isCricket && !isElimination && player.remaining === 0) {
-    player.lastCheckoutValue = getCheckoutValue(player, value);
+    player.lastCheckoutValue = getCheckoutValue(player, remainingBeforeThrow);
     player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
     const ruleStats = getCheckoutRuleStats(player, checkoutRule);
     ruleStats.success += 1;
-    ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, remainingBeforeThrow));
+    ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
     await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode, checkoutRule });
     state.game.status = 'leg-finished';
@@ -1874,11 +1879,11 @@ async function applyArduinoThrowFromMatrix(hit) {
   if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
   if (!isCricket && !isElimination && player.remaining === 0) {
-    player.lastCheckoutValue = getCheckoutValue(player, value);
+    player.lastCheckoutValue = getCheckoutValue(player, remainingBeforeThrow);
     player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
     const ruleStats = getCheckoutRuleStats(player, checkoutRule);
     ruleStats.success += 1;
-    ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, remainingBeforeThrow));
+    ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
     await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode, checkoutRule });
     state.game.status = 'leg-finished';
@@ -3021,11 +3026,11 @@ app.post('/api/live/throw', async (req, res) => {
     if (eliminationAction) Object.assign(state.lastAction, eliminationAction);
 
     if (!isCricket && !isElimination && player.remaining === 0) {
-      player.lastCheckoutValue = getCheckoutValue(player, points);
+      player.lastCheckoutValue = getCheckoutValue(player, remainingBeforeThrow);
       player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
       const ruleStats = getCheckoutRuleStats(player, checkoutRule);
       ruleStats.success += 1;
-      ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, remainingBeforeThrow));
+      ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
       player.legs += 1;
       await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, gameMode: mode, checkoutRule });
       state.game.status = 'leg-finished';
