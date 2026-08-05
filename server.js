@@ -2888,6 +2888,22 @@ app.get('/api/duels/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht geladen werden: ' + err.message }); }
 });
 
+app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
+  const duelId = Number(req.params.id);
+  if (!Number.isInteger(duelId) || duelId <= 0) return res.status(400).json({ error: 'Ungültige Begegnungs-ID.' });
+  try {
+    const duel = await dataStore.getDuel(duelId);
+    if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
+    const state = await getLiveState();
+    if (Number(state.game?.duelId) === duelId && state.game?.status === 'running') {
+      return res.status(409).json({ error: 'Die aktuell laufende Begegnung kann nicht gelöscht werden.' });
+    }
+    const deleted = await dataStore.deleteDuel(duelId);
+    if (!deleted) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
+    res.json({ ok: true, id: duelId });
+  } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gelöscht werden: ' + err.message }); }
+});
+
 app.post('/api/duels/start', requireAdmin, async (req, res) => {
   res.status(410).json({ error: 'Begegnungen werden automatisch erkannt und können nicht manuell gestartet werden.' });
 });

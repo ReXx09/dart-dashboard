@@ -57,6 +57,10 @@
     .duel-list{display:grid;gap:6px;margin-top:12px}
     .duel-row{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#0d0d0d;border:1px solid #202020;border-radius:8px;padding:8px 10px;color:#bbb;font-size:.78rem}
     .duel-row strong{color:#f4a261}
+    .duel-row .duel-meta{display:grid;gap:3px;min-width:0}
+    .duel-row .duel-status{color:#777;font-size:.72rem}
+    .duel-row .duel-delete{background:#8b0000;border:0;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer;font:inherit;font-size:.72rem;white-space:nowrap}
+    .duel-row .duel-delete:hover{background:#b00000}
     @media (max-width:700px){.diagnostic-columns{grid-template-columns:1fr}.storage-status{grid-template-columns:1fr}}
     @media (max-width:600px){.stats-editor{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-player-tools{grid-template-columns:1fr}}
     @media (max-width:600px){.hs-filters{grid-template-columns:1fr}.duel-player-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -125,6 +129,12 @@
       </div>
       <div class="field-hint">Bei mindestens zwei benannten Spielern wird für 301, 501 und 701 automatisch eine Begegnung angelegt und fortlaufend gespeichert.</div>
       <button class="btn-save" id="saveEncounterSettingsBtn">Einstellungen speichern</button>
+    </fieldset>
+    <fieldset>
+      <legend>Begegnungen verwalten</legend>
+      <div class="field-hint" style="margin:0 0 8px">Nicht gewertete oder versehentlich angelegte Begegnungen können hier vollständig entfernt werden.</div>
+      <button class="btn-save" id="refreshDuelsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Begegnungen laden</button>
+      <div class="duel-list" id="adminDuelList"><div class="duel-row">Begegnungen werden geladen...</div></div>
     </fieldset>
   </div>
 
@@ -983,6 +993,45 @@
     } catch (err) { showToast('Fehler: ' + err.message, true); }
     this.disabled = false;
   });
+
+  function formatAdminDuelStatus(duel) {
+    return duel.status === 'finished' ? 'beendet' : 'offen';
+  }
+
+  async function loadAdminDuels() {
+    const list = document.getElementById('adminDuelList');
+    try {
+      const response = await fetch('/api/duels?limit=100', { cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const duels = await response.json();
+      if (!duels.length) {
+        list.innerHTML = '<div class="duel-row">Keine Begegnungen vorhanden.</div>';
+        return;
+      }
+      list.innerHTML = duels.map(duel => {
+        const players = (duel.players || []).map(player => escapeHtml(player.player_name)).join(' · ');
+        const canDelete = !(duel.status === 'active' && Number(duel.total_legs || 0) > 0);
+        return '<div class="duel-row"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div>' + (canDelete ? '<button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '">🗑 Löschen</button>' : '<span class="duel-status">laufend</span>') + '</div>';
+      }).join('');
+      list.querySelectorAll('[data-duel-delete]').forEach(button => button.addEventListener('click', () => deleteAdminDuel(Number(button.dataset.duelDelete))));
+    } catch (err) {
+      list.innerHTML = '<div class="duel-row" style="color:#e63946">Fehler beim Laden: ' + escapeHtml(err.message) + '</div>';
+    }
+  }
+
+  async function deleteAdminDuel(id) {
+    if (!confirm('Begegnung #' + id + ' vollständig löschen? Die gespeicherten Legs und Wurfdaten werden ebenfalls entfernt.')) return;
+    try {
+      const response = await fetch('/api/duels/' + id, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
+      showToast('Begegnung #' + id + ' gelöscht.');
+      await loadAdminDuels();
+    } catch (err) { showToast('Fehler beim Löschen: ' + err.message, true); }
+  }
+
+  document.getElementById('refreshDuelsBtn').addEventListener('click', loadAdminDuels);
+  loadAdminDuels();
 </script>
 </body>
 </html>

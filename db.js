@@ -960,6 +960,60 @@ class DataStore {
     return this.getDuel(id);
   }
 
+  async deleteDuel(id) {
+    const safeId = Number(id);
+    if (!Number.isFinite(safeId) || safeId <= 0) throw new Error('Ungültige Begegnungs-ID.');
+    if (this.isSQLite()) {
+      await this.sqlite.exec('BEGIN TRANSACTION');
+      try {
+        await this.sqlite.run('DELETE FROM duel_leg_players WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM duel_legs WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM duel_players WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
+        const result = await this.sqlite.run('DELETE FROM duels WHERE id = ?', [safeId]);
+        await this.sqlite.exec('COMMIT');
+        return result.changes > 0;
+      } catch (err) {
+        await this.sqlite.exec('ROLLBACK');
+        throw err;
+      }
+    }
+    if (this.isPostgres()) {
+      const client = await this.pg.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM duel_leg_players WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM duel_legs WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM duel_players WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM player_throw_segments WHERE duel_id = $1', [safeId]);
+        const result = await client.query('DELETE FROM duels WHERE id = $1', [safeId]);
+        await client.query('COMMIT');
+        return result.rowCount > 0;
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+    const connection = await this.my.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query('DELETE FROM duel_leg_players WHERE duel_id = ?', [safeId]);
+      await connection.query('DELETE FROM duel_legs WHERE duel_id = ?', [safeId]);
+      await connection.query('DELETE FROM duel_players WHERE duel_id = ?', [safeId]);
+      await connection.query('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
+      const [result] = await connection.query('DELETE FROM duels WHERE id = ?', [safeId]);
+      await connection.commit();
+      return result.affectedRows > 0;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
   async recordDuelLeg({ duelId, mode, winnerSlot, startedAt, endedAt = Date.now(), players }) {
     const duel = await this.getDuel(duelId);
     if (!duel) throw new Error('Begegnung nicht gefunden.');
