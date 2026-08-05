@@ -1245,6 +1245,15 @@
 
   <script>
     let liveState = null;
+    const liveClientDiagnostics = window.liveClientDiagnostics = {
+      reloadCount: 0,
+      lastSseReloadAt: null,
+      lastFetchStartedAt: null,
+      lastFetchFinishedAt: null,
+      lastFetchDurationMs: null,
+      lastServerUpdatedAt: null,
+      lastRenderAt: null
+    };
     let countdownTimer = null;
     let pendingWinner = null;
     let isFirstLoad = true;
@@ -1934,6 +1943,8 @@
 
     function renderState(state) {
       if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
+      liveClientDiagnostics.lastRenderAt = Date.now();
+      liveClientDiagnostics.lastServerUpdatedAt = Number(state.game && state.game.updatedAt) || null;
       const activePlayer = state.game.activePlayer || 0;
       const mode = state.game.mode || '501';
       const active = state.players[activePlayer];
@@ -2612,10 +2623,15 @@
 
     // ── State laden ──
     async function loadAll(retryAttempt = 0) {
+      const fetchStartedAt = Date.now();
+      liveClientDiagnostics.lastFetchStartedAt = fetchStartedAt;
       try {
         const stateRes = await fetch('/api/live/state');
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
+        const fetchFinishedAt = Date.now();
+        liveClientDiagnostics.lastFetchFinishedAt = fetchFinishedAt;
+        liveClientDiagnostics.lastFetchDurationMs = Math.max(0, fetchFinishedAt - fetchStartedAt);
         liveState = state;
         isFirstLoad = false;
         renderState(state);
@@ -2650,6 +2666,8 @@
         };
 
         sse.addEventListener('reload', () => {
+          liveClientDiagnostics.reloadCount += 1;
+          liveClientDiagnostics.lastSseReloadAt = Date.now();
           if (reloadQueued) return;
           reloadQueued = true;
           setTimeout(() => {
