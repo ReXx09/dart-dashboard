@@ -2870,12 +2870,16 @@ app.get('/api/duel-stats', async (req, res) => {
         for (const player of leg.players || []) {
           if (slots.length && !slots.includes(Number(player.player_slot))) continue;
           const key = Number(player.player_slot);
-          const current = aggregate.get(key) || { slot: key, name: player.player_name, legs: 0, wins: 0, darts: 0, scored: 0, average: 0, bestTurn: 0, count100plus: 0, count140plus: 0, count180: 0, checkoutAttempts: 0, checkoutSuccess: 0, busts: 0 };
+          const current = aggregate.get(key) || { slot: key, name: player.player_name, legs: 0, wins: 0, darts: 0, scored: 0, average: 0, bestTurn: 0, bestLeg: null, highestCheckout: 0, count100plus: 0, count140plus: 0, count180: 0, checkoutAttempts: 0, checkoutSuccess: 0, busts: 0 };
           current.legs += 1;
           current.wins += Number(player.won || 0);
           current.darts += Number(player.darts || 0);
           current.scored += Number(player.scored || 0);
           current.bestTurn = Math.max(current.bestTurn, Number(player.best_turn || 0));
+          current.highestCheckout = Math.max(current.highestCheckout, Number(player.checkout_highest || 0));
+          if (Number(player.won || 0) && Number(player.darts || 0) > 0) {
+            current.bestLeg = current.bestLeg === null ? Number(player.darts) : Math.min(current.bestLeg, Number(player.darts));
+          }
           current.count100plus += Number(player.count_100plus || 0);
           current.count140plus += Number(player.count_140plus || 0);
           current.count180 += Number(player.count_180 || 0);

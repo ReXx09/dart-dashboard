@@ -618,7 +618,9 @@
       container.innerHTML = `
         <div class="stat-item"><div class="stat-label">Begegnungen</div><div class="stat-value">${data.duels || 0}</div><div class="stat-sub">${data.legs || 0} Legs</div></div>
         <div class="stat-item"><div class="stat-label">Begegnungs-Average</div><div class="stat-value">${Number(player.average || 0).toFixed(2)}</div><div class="stat-sub">3-Dart</div></div>
-        <div class="stat-item"><div class="stat-label">Siege</div><div class="stat-value">${Number(player.wins || 0)}</div><div class="stat-sub">${winRate}% der Legs</div></div>
+        <div class="stat-item"><div class="stat-label">Legs gewonnen</div><div class="stat-value">${Number(player.wins || 0)}</div><div class="stat-sub">${winRate}% der Legs</div></div>
+        <div class="stat-item"><div class="stat-label">Bestes Leg</div><div class="stat-value">${player.bestLeg || '-'}${player.bestLeg ? ' Darts' : ''}</div><div class="stat-sub">über alle Begegnungen</div></div>
+        <div class="stat-item"><div class="stat-label">Höchstes Finish</div><div class="stat-value">${player.highestCheckout || '-'}</div><div class="stat-sub">über alle Begegnungen</div></div>
         <div class="stat-item"><div class="stat-label">180er</div><div class="stat-value">${Number(player.count180 || 0)}</div><div class="stat-sub">in Begegnungen</div></div>
       `;
       document.getElementById('encounterPlayerStatus').textContent = 'Aggregierte Werte des ausgewählten Spielers aus Duellen und Gruppen.';
