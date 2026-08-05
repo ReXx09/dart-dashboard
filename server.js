@@ -20,6 +20,19 @@ try {
 // ──────────────────────────────────────────────
 const sseClients = new Set();
 let liveDetailWriteQueue = Promise.resolve();
+let liveStateCache = null;
+let liveStateWriteQueue = Promise.resolve();
+
+function cloneLiveState(state) {
+  return state ? JSON.parse(JSON.stringify(state)) : null;
+}
+
+function queueLiveStateWrite(state) {
+  const snapshot = cloneLiveState(state);
+  liveStateWriteQueue = liveStateWriteQueue
+    .then(() => dataStore.saveLiveState(snapshot))
+    .catch(error => console.error('[Live-State] Persistierung fehlgeschlagen:', error));
+}
 
 function queueLiveDetailWrite(task, label) {
   liveDetailWriteQueue = liveDetailWriteQueue
@@ -1393,8 +1406,10 @@ async function advanceAfterBust(state, player, source) {
   state.lastAction.nextPlayerSlot = null;
   state.lastAction.nextSource = source;
 
-  await saveLiveState(state);
-  broadcastReload();
+  if (delayMs > 0) {
+    await saveLiveState(state);
+    broadcastReload();
+  }
 
   if (delayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -1435,9 +1450,11 @@ async function advanceAfterThreeThrows(state, player, source) {
   state.lastAction.nextPlayerSlot = null;
   state.lastAction.nextSource = source;
 
-  // State SOFORT speichern + broadcasten (3. Wurf sichtbar)
-  await saveLiveState(state);
-  broadcastReload();
+  // Bei einer sichtbaren Wechselpause den Zwischenstand separat übertragen.
+  if (delayMs > 0) {
+    await saveLiveState(state);
+    broadcastReload();
+  }
 
   if (delayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -2477,6 +2494,12 @@ let savedLiveMode = DEFAULT_MODE;
 let savedCheckoutRule = DEFAULT_CHECKOUT_RULE;
 
 async function getLiveState() {
+  if (liveStateCache) {
+    const cached = cloneLiveState(liveStateCache);
+    cached.arduino = buildArduinoStateView();
+    return cached;
+  }
+
   const mode = savedLiveMode || DEFAULT_MODE;
   const fallback = await defaultLiveState(mode);
   const saved = await dataStore.getLiveState(fallback);
@@ -2530,6 +2553,8 @@ async function getLiveState() {
     arduino: arduinoView
   };
 
+  liveStateCache = cloneLiveState(state);
+
   return state;
 }
 
@@ -2543,7 +2568,8 @@ async function saveLiveState(state) {
       }
     });
   }
-  await dataStore.saveLiveState(safe);
+  liveStateCache = cloneLiveState(safe);
+  queueLiveStateWrite(safe);
   return safe;
 }
 
