@@ -1023,9 +1023,10 @@
     .match-menu-field { display: flex; flex-direction: column; gap: 5px; color: #cfd6da; font-size: .75rem; }
     .match-menu-field.full { grid-column: 1 / -1; }
     .match-menu-field select, .match-menu-field input { width: 100%; box-sizing: border-box; padding: 9px 10px; background: #101112; color: #f1f1f1; border: 1px solid #3d4448; border-radius: 7px; font: inherit; }
-    .match-player-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 4px; }
-    .match-player-option { display: flex; align-items: center; gap: 7px; padding: 8px; background: #111315; border: 1px solid #2d3337; border-radius: 6px; color: #e6eaec; }
-    .match-player-option input { accent-color: #f4a261; }
+    .match-player-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 4px; min-width: 0; }
+    .match-player-option { display: flex; align-items: center; gap: 7px; min-width: 0; box-sizing: border-box; padding: 8px; background: #111315; border: 1px solid #2d3337; border-radius: 6px; color: #e6eaec; overflow: hidden; }
+    .match-player-option input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: #f4a261; }
+    .match-player-option span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
     .match-menu-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
     .match-menu-actions button { border: 1px solid #4d555a; border-radius: 7px; padding: 9px 15px; color: #f1f1f1; background: #25292c; font: inherit; cursor: pointer; }
     .match-menu-actions .primary { background: #f4a261; border-color: #f4a261; color: #171717; font-weight: 800; }
@@ -1324,12 +1325,28 @@
         if (confirm('Die laufende Begegnung wirklich abbrechen? Die bisherige Begegnung bleibt in der Statistik erhalten.')) abortActiveMatch();
         return;
       }
-      const list = document.getElementById('matchPlayerList');
-      const players = Array.isArray(liveState && liveState.players) ? liveState.players : [];
-      list.innerHTML = players.map(player => '<label class="match-player-option"><input type="checkbox" value="' + Number(player.slot) + '" checked />' + escapeHtml(player.name) + '</label>').join('');
-      document.getElementById('matchTypeSelect').value = players.length === 2 ? 'direct' : 'group';
-      updateMatchMenuType();
       document.getElementById('matchMenuOverlay').classList.add('open');
+      loadMatchPlayers();
+    }
+
+    async function loadMatchPlayers() {
+      const list = document.getElementById('matchPlayerList');
+      if (!list) return;
+      list.innerHTML = '<div class="match-player-loading">Spieler werden geladen ...</div>';
+      try {
+        const response = await fetch('/api/players', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Spieler konnten nicht geladen werden');
+        const players = (await response.json()).filter(player => player && player.active !== false && String(player.name || '').trim());
+        const selectedSlots = Array.isArray(liveState && liveState.game && liveState.game.selectedPlayerSlots)
+          ? liveState.game.selectedPlayerSlots.map(Number)
+          : (Array.isArray(liveState && liveState.players) ? liveState.players.map(player => Number(player.slot)) : []);
+        list.innerHTML = players.map(player => '<label class="match-player-option"><input type="checkbox" value="' + Number(player.slot) + '"' + (selectedSlots.includes(Number(player.slot)) ? ' checked' : '') + ' /><span>' + escapeHtml(player.name) + '</span></label>').join('');
+        document.getElementById('matchTypeSelect').value = selectedSlots.length === 2 ? 'direct' : 'group';
+        updateMatchMenuType();
+      } catch (error) {
+        list.innerHTML = '<div class="match-player-loading">Spieler konnten nicht geladen werden.</div>';
+        showToast(error.message, true);
+      }
     }
 
     function closeMatchMenu() { document.getElementById('matchMenuOverlay').classList.remove('open'); }

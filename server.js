@@ -2323,7 +2323,7 @@ async function defaultLiveState(mode, selectedPlayerSlots = null) {
   const startScore = getStartScoreForMode(m);
 
   return {
-    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0, duelId: null },
+    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0, duelId: null, selectedPlayerSlots: fallbackPlayers.map(player => Number(player.slot)) },
     players: fallbackPlayers.map(p => ({ ...p, remaining: startScore, legs: 0, turns: 0, totalScored: 0, bestTurn: 0, average: 0, throws: [], currentRoundPoints: [], ...defaultPlayerCricketState(m) })),
     lastAction: null,
     arduino: { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
@@ -2937,6 +2937,7 @@ app.post('/api/duels/start', async (req, res) => {
     const duel = await dataStore.createDuel({ mode, matchType, tournamentName, players: selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null })) });
     const fresh = await defaultLiveState(mode, slots);
     fresh.game.duelId = duel.id;
+    fresh.game.selectedPlayerSlots = slots;
     fresh.game.matchType = matchType;
     fresh.game.bestOf = bestOf;
     fresh.game.legsToWin = Math.ceil(bestOf / 2);
