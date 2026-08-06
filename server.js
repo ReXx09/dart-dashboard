@@ -2665,6 +2665,26 @@ app.post('/api/game/mode', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Modus-Wechsel fehlgeschlagen: ' + err.message }); }
 });
 
+app.post('/api/live/start', async (req, res) => {
+  const mode = String(req.body?.mode || DEFAULT_MODE).trim();
+  const checkoutRule = String(req.body?.checkoutRule || DEFAULT_CHECKOUT_RULE).trim();
+  const slots = [...new Set((Array.isArray(req.body?.playerSlots) ? req.body.playerSlots : []).map(Number).filter(Number.isInteger))];
+  if (!GAME_MODES[mode]) return res.status(400).json({ error: `Unbekannter Modus: ${mode}` });
+  if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
+  if (slots.length < 1 || slots.length > 8) return res.status(400).json({ error: 'Bitte 1 bis 8 Spieler auswählen.' });
+  try {
+    const availableSlots = new Set((await getActivePlayersForLive()).map(player => Number(player.slot)));
+    if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
+    const fresh = await defaultLiveState(mode, slots);
+    fresh.game.checkoutRule = checkoutRule;
+    savedLiveMode = mode;
+    savedCheckoutRule = checkoutRule;
+    const saved = await saveLiveState(fresh);
+    broadcastReload();
+    res.json(saved);
+  } catch (err) { res.status(500).json({ error: 'Einzelspiel konnte nicht gestartet werden: ' + err.message }); }
+});
+
 app.post('/api/game/checkout-rule', async (req, res) => {
   const rule = String(req.body?.rule || '').trim();
   if (!CHECKOUT_RULES[rule]) return res.status(400).json({ error: `Unbekannte Regel: ${rule}` });

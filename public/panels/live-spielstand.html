@@ -983,6 +983,7 @@
     .match-menu-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .match-menu-field { display: flex; flex-direction: column; gap: 5px; color: #cfd6da; font-size: .75rem; }
     .match-menu-field.full { grid-column: 1 / -1; }
+    .match-menu-field[hidden] { display: none; }
     .match-menu-field select, .match-menu-field input { width: 100%; box-sizing: border-box; padding: 9px 10px; background: #101112; color: #f1f1f1; border: 1px solid #3d4448; border-radius: 7px; font: inherit; }
     .match-player-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 4px; min-width: 0; }
     .match-player-option { display: flex; align-items: center; gap: 7px; min-width: 0; box-sizing: border-box; padding: 8px; background: #111315; border: 1px solid #2d3337; border-radius: 6px; color: #e6eaec; overflow: hidden; }
@@ -1154,28 +1155,31 @@
   <div class="match-menu-overlay" id="matchMenuOverlay" role="dialog" aria-modal="true" aria-labelledby="matchMenuTitle">
     <div class="match-menu-card">
       <h3 id="matchMenuTitle">Begegnung starten</h3>
-      <p>Wähle Begegnungstyp, Best-of und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.</p>
+      <p id="matchMenuDescription">Wähle Begegnungstyp, Best-of, Finish und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.</p>
       <div class="match-menu-grid">
-        <label class="match-menu-field">Typ
+        <label class="match-menu-field full">Startart
+          <select id="matchStartKind" onchange="updateMatchStartKind()"><option value="encounter">Begegnung mit Statistik</option><option value="single">Einzelspiel ohne Begegnungsstatistik</option></select>
+        </label>
+        <label class="match-menu-field encounter-only">Typ
           <select id="matchTypeSelect"><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">Turniergruppe</option></select>
         </label>
-        <label class="match-menu-field">Best-of
+        <label class="match-menu-field encounter-only">Best-of
           <select id="matchBestOf"><option value="1">Einzelleg</option><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option><option value="9">Best of 9</option></select>
         </label>
         <label class="match-menu-field">Spiel
-          <select id="matchMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option></select>
+          <select id="matchMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option><option value="cricket">Cricket</option><option value="elimination">301-Elimination</option><option value="shanghai">Shanghai</option><option value="atc">Around the Clock</option><option value="split">Split</option></select>
         </label>
-        <label class="match-menu-field">Finish
+        <label class="match-menu-field encounter-only">Finish
           <select id="matchCheckoutRule"><option value="double">Double Out</option><option value="single">Single Out</option><option value="master">Master Out</option></select>
         </label>
-        <label class="match-menu-field" id="tournamentNameField" hidden>Turniername
+        <label class="match-menu-field encounter-only" id="tournamentNameField" hidden>Turniername
           <input id="matchTournamentName" type="text" maxlength="80" placeholder="z. B. Freitagsturnier" />
         </label>
         <div class="match-menu-field full">Teilnehmer
           <div class="match-player-list" id="matchPlayerList"></div>
         </div>
       </div>
-      <div class="match-menu-actions"><button type="button" onclick="closeMatchMenu()">Abbrechen</button><button class="primary" type="button" onclick="startConfiguredMatch()">Begegnung starten</button></div>
+      <div class="match-menu-actions"><button type="button" onclick="closeMatchMenu()">Abbrechen</button><button class="primary" id="matchStartButton" type="button" onclick="startConfiguredMatch()">Begegnung starten</button></div>
     </div>
   </div>
   
@@ -1293,8 +1297,19 @@
       const checkoutSelect = document.getElementById('matchCheckoutRule');
       if (modeSelect && liveState && liveState.game) modeSelect.value = liveState.game.mode || '501';
       if (checkoutSelect && liveState && liveState.game) checkoutSelect.value = liveState.game.checkoutRule || 'double';
+      document.getElementById('matchStartKind').value = 'encounter';
+      updateMatchStartKind();
       document.getElementById('matchMenuOverlay').classList.add('open');
       loadMatchPlayers();
+    }
+
+    function updateMatchStartKind() {
+      const isSingleGame = document.getElementById('matchStartKind').value === 'single';
+      document.querySelectorAll('.encounter-only').forEach(field => { field.hidden = isSingleGame; });
+      document.getElementById('matchMenuDescription').textContent = isSingleGame
+        ? 'Starte ein einzelnes Spiel mit einem beliebigen Modus und den ausgewählten Spielern. Es wird keine Begegnung in der Statistik angelegt.'
+        : 'Wähle Begegnungstyp, Best-of, Finish und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.';
+      document.getElementById('matchStartButton').textContent = isSingleGame ? 'Einzelspiel starten' : 'Begegnung starten';
     }
 
     async function loadMatchPlayers() {
@@ -1341,18 +1356,22 @@
 
     function updateMatchMenuType() {
       const type = document.getElementById('matchTypeSelect').value;
-      document.getElementById('tournamentNameField').hidden = type !== 'tournament';
+      const isSingleGame = document.getElementById('matchStartKind').value === 'single';
+      document.getElementById('tournamentNameField').hidden = isSingleGame || type !== 'tournament';
       document.querySelectorAll('#matchPlayerList input').forEach(input => { input.disabled = type === 'direct' && !input.checked; });
     }
 
     async function startConfiguredMatch() {
+      const startKind = document.getElementById('matchStartKind').value;
       const type = document.getElementById('matchTypeSelect').value;
       const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
-      if ((type === 'direct' && playerSlots.length !== 2) || playerSlots.length < 2) { showToast('Bitte die passende Anzahl Spieler auswählen.', true); return; }
+      if ((startKind === 'encounter' && ((type === 'direct' && playerSlots.length !== 2) || playerSlots.length < 2)) || (startKind === 'single' && playerSlots.length < 1)) { showToast(startKind === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : 'Bitte die passende Anzahl Spieler auswählen.', true); return; }
       try {
-        const response = await fetch('/api/duels/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-          matchType: type, mode: document.getElementById('matchMode').value, checkoutRule: document.getElementById('matchCheckoutRule').value, bestOf: Number(document.getElementById('matchBestOf').value), playerSlots, tournamentName: document.getElementById('matchTournamentName').value.trim()
-        }) });
+        const endpoint = startKind === 'single' ? '/api/live/start' : '/api/duels/start';
+        const body = startKind === 'single'
+          ? { mode: document.getElementById('matchMode').value, checkoutRule: document.getElementById('matchCheckoutRule').value, playerSlots }
+          : { matchType: type, mode: document.getElementById('matchMode').value, checkoutRule: document.getElementById('matchCheckoutRule').value, bestOf: Number(document.getElementById('matchBestOf').value), playerSlots, tournamentName: document.getElementById('matchTournamentName').value.trim() };
+        const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'HTTP ' + response.status);
         closeMatchMenu();
@@ -1360,7 +1379,7 @@
         pendingWinner = null;
         hideWinnerOverlay();
         renderState(liveState);
-        showToast('Begegnung gestartet');
+        showToast(startKind === 'single' ? 'Einzelspiel gestartet' : 'Begegnung gestartet');
       } catch (error) { showToast('Begegnung konnte nicht gestartet werden: ' + error.message, true); }
     }
 
