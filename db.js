@@ -1483,22 +1483,23 @@ class DataStore {
   async getHighscores(limit = 100, gameMode = '') {
     const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
     const safeMode = String(gameMode || '').trim();
+    const validEncounter = "(duel_id IS NULL OR EXISTS (SELECT 1 FROM duels d WHERE d.id = highscores.duel_id AND d.status = 'finished'))";
     let rows = [];
 
     if (this.isSQLite()) {
       rows = await this.sqlite.all(
-        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId FROM highscores ' + (safeMode ? 'WHERE game_mode = ? ' : '') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
     } else if (this.isPostgres()) {
       const result = await this.pg.query(
-        'SELECT id, player, player_slot AS "playerSlot", score, kind, category, game_mode AS "gameMode", checkout_rule AS "checkoutRule", leg_win AS "legWin", ts, duel_id AS "duelId" FROM highscores ' + (safeMode ? 'WHERE game_mode = $1 ' : '') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
+        'SELECT id, player, player_slot AS "playerSlot", score, kind, category, game_mode AS "gameMode", checkout_rule AS "checkoutRule", leg_win AS "legWin", ts, duel_id AS "duelId" FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = $1 ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result.rows;
     } else {
       const result = await this.my.query(
-        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId FROM highscores ' + (safeMode ? 'WHERE game_mode = ? ' : '') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result[0];

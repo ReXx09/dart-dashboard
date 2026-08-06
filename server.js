@@ -1360,6 +1360,7 @@ async function recordPlayerLegStats(player, state, options = {}) {
 async function recordCompletedLegStats(state, winner) {
   const completedPlayers = Array.isArray(state.players) ? state.players.map(player => ({ ...player })) : [];
   const completedDuelId = Number(state.game?.duelId || 0) || null;
+  const completedMatch = !completedDuelId || Number(winner?.legs || 0) >= Math.max(1, Number(state.game?.legsToWin || 1));
   const tournamentAdvance = await recordDuelLegIfActive(state, winner);
   if (tournamentAdvance?.nextDuel) {
     const nextDuel = tournamentAdvance.nextDuel;
@@ -1393,10 +1394,12 @@ async function recordCompletedLegStats(state, winner) {
     state.lastAction.tournamentWaiting = true;
     state.lastAction.tournamentWinnerSlot = winner.slot;
   }
-  for (const player of completedPlayers) {
-    await recordPlayerLegStats(player, state, { skipDuel: true });
+  if (completedMatch) {
+    for (const player of completedPlayers) {
+      await recordPlayerLegStats(player, state, { skipDuel: true });
+    }
   }
-  if (Number(state.game?.duelId || 0) > 0 && winner) {
+  if (completedMatch && completedDuelId && winner) {
     await dataStore.initPlayerStats(winner.slot);
     const winnerStats = await dataStore.getPlayerStats(winner.slot) || {};
     await dataStore.updatePlayerStats(winner.slot, {
@@ -2802,6 +2805,11 @@ app.post('/api/live/start', async (req, res) => {
   if (slots.length < 1 || slots.length > 8) return res.status(400).json({ error: 'Bitte 1 bis 8 Spieler auswählen.' });
   try {
     cancelScheduledAutoAdvance();
+    const currentState = await getLiveState();
+    if (Number(currentState.game?.duelId || 0) > 0) {
+      const currentDuel = await dataStore.getDuel(currentState.game.duelId);
+      if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
+    }
     const availableSlots = new Set((await getActivePlayersForLive()).map(player => Number(player.slot)));
     if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
     const fresh = await defaultLiveState(mode, slots);
@@ -3099,10 +3107,6 @@ app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
     if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
     const state = await getLiveState();
     const isCurrentDuel = Number(state.game?.duelId) === duelId;
-    const isUnplayed = duel.status === 'active' && Number(duel.total_legs || 0) === 0 && (duel.legs || []).length === 0;
-    if (isCurrentDuel && state.game?.status === 'running' && !isUnplayed) {
-      return res.status(409).json({ error: 'Die aktuell laufende Begegnung kann nicht gelöscht werden.' });
-    }
     const deleted = await dataStore.deleteDuel(duelId);
     if (!deleted) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
     if (isCurrentDuel) {
@@ -3117,6 +3121,11 @@ app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
 app.post('/api/duels/start', async (req, res) => {
   try {
     cancelScheduledAutoAdvance();
+    const currentState = await getLiveState();
+    if (Number(currentState.game?.duelId || 0) > 0) {
+      const currentDuel = await dataStore.getDuel(currentState.game.duelId);
+      if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
+    }
     const matchType = ['direct', 'group', 'tournament'].includes(String(req.body?.matchType)) ? String(req.body.matchType) : 'direct';
     const mode = String(req.body?.mode || '501');
     const checkoutRule = String(req.body?.checkoutRule || 'double');
@@ -3211,8 +3220,12 @@ app.post('/api/live/reset', async (req, res) => {
     cancelScheduledAutoAdvance();
     const mode = savedLiveMode || DEFAULT_MODE;
     const current = await getLiveState();
+    if (Number(current.game?.duelId || 0) > 0) {
+      const currentDuel = await dataStore.getDuel(current.game.duelId);
+      if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
+    }
     const fresh = resetLiveState(carryLegs, mode, current);
-    const duel = current.game.duelId ? await dataStore.getDuel(current.game.duelId) : null;
+    const duel = null;
     const currentSlots = current.players.map(player => Number(player.slot)).sort((a, b) => a - b).join('-');
     const duelSlots = duel ? duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-') : '';
     fresh.game.duelId = duel && duel.status === 'active' && currentSlots === duelSlots ? duel.id : null;

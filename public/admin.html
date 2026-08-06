@@ -987,8 +987,7 @@
       }
       list.innerHTML = duels.map(duel => {
         const players = (duel.players || []).map(player => escapeHtml(player.player_name)).join(' · ');
-        const canDelete = !(duel.status === 'active' && Number(duel.total_legs || 0) > 0);
-        return '<div class="duel-row"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div>' + (canDelete ? '<button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '">🗑 Löschen</button>' : '<span class="duel-status">laufend</span>') + '</div>';
+        return '<div class="duel-row"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div><button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '">🗑 Löschen</button></div>';
       }).join('');
       list.querySelectorAll('[data-duel-delete]').forEach(button => button.addEventListener('click', () => deleteAdminDuel(Number(button.dataset.duelDelete))));
     } catch (err) {
