@@ -3179,6 +3179,30 @@ app.get('/api/tournaments/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Turnier konnte nicht geladen werden: ' + err.message }); }
 });
 
+app.post('/api/tournaments/:id/matches/:matchId/start', async (req, res) => {
+  try {
+    const state = await getLiveState();
+    const tournamentId = Number(req.params.id);
+    const matchId = Number(req.params.matchId);
+    if (String(state.game?.matchType) !== 'tournament' || Number(state.game?.tournamentId) !== tournamentId || Number(state.game?.tournamentMatchId) !== matchId) {
+      return res.status(409).json({ error: 'Dieses Turnierduell ist nicht aktiv.' });
+    }
+    if (!Number(state.game?.tournamentMatchStartedAt || 0)) {
+      const ts = Date.now();
+      state.game.tournamentMatchStartedAt = ts;
+      state.lastAction = {
+        type: 'tournament-match-start',
+        tournamentId,
+        tournamentMatchId: matchId,
+        ts
+      };
+      await saveLiveState(state);
+      broadcastReload();
+    }
+    res.json(state);
+  } catch (err) { res.status(500).json({ error: 'Turnierduell konnte nicht gestartet werden: ' + err.message }); }
+});
+
 app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
   try {
     const state = await getLiveState();

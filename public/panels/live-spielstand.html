@@ -1785,12 +1785,23 @@
       if (overlay) overlay.classList.remove('show');
     }
 
-    function startNextTournamentMatch() {
+    async function startNextTournamentMatch() {
       if (!liveState || String(liveState.game && liveState.game.matchType) !== 'tournament') return;
-      closeTournamentBracket();
-      hideDuelStatsOverlay();
-      tournamentIntroKey = '';
-      showTournamentMatchIntro(liveState);
+      const tournamentId = Number(liveState.game.tournamentId || 0);
+      const matchId = Number(liveState.game.tournamentMatchId || 0);
+      if (!tournamentId || !matchId) return;
+      const button = document.querySelector('.tournament-next-button');
+      if (button) button.disabled = true;
+      try {
+        const response = await fetch('/api/tournaments/' + encodeURIComponent(tournamentId) + '/matches/' + encodeURIComponent(matchId) + '/start', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const state = await response.json();
+        if (!response.ok) throw new Error(state.error || 'HTTP ' + response.status);
+        liveState = state;
+        renderState(state);
+      } catch (error) {
+        if (button) button.disabled = false;
+        showToast('Turnierduell konnte nicht gestartet werden: ' + error.message, true);
+      }
     }
 
     function tournamentRoundTitle(round, maxRound) {
@@ -1814,6 +1825,10 @@
         inlineContainer.classList.remove('show');
         if (overlay) overlay.classList.remove('show');
         tournamentBracketKey = '';
+        return;
+      }
+      if (!forceOpen && Number(state.game.tournamentMatchStartedAt || 0) > 0) {
+        if (overlay) overlay.classList.remove('show');
         return;
       }
       if (!forceOpen && state.lastAction && state.lastAction.type === 'tournament-advance') {
@@ -2127,7 +2142,12 @@
       const duelStatsKey = getDuelStatsKey(state);
       updateDuelStatsToggle(state);
       const isTournamentAdvance = state.lastAction && state.lastAction.type === 'tournament-advance';
+      const isTournamentMatchStart = state.lastAction && state.lastAction.type === 'tournament-match-start';
       if (isTournamentAdvance) showTournamentDuelStatsAfterAdvance(state);
+      if (isTournamentMatchStart) {
+        tournamentIntroKey = '';
+        showTournamentMatchIntro(state);
+      }
       if (!isTournamentAdvance && (!duelStatsKey || state.game.status !== 'leg-finished')) {
         if (duelStatsTimer) { clearTimeout(duelStatsTimer); duelStatsTimer = null; }
         duelStatsScheduledFor = '';
