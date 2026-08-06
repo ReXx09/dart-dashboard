@@ -479,6 +479,22 @@
     .focus-controls-card .ctrl-btn.undo:hover { border-color: #ffe27a; background: #ffe27a; color: #241700; }
     .focus-controls-card .ctrl-btn.restart { border-color: #f4a261; color: #f4a261; }
     .focus-controls-card .ctrl-btn.restart:hover { border-color: #e63946; color: #e63946; }
+    .focus-controls-card .ctrl-btn.restart.match-kind-single,
+    .topbar .fs-btn.match-kind-single { border-color: #2a9d8f; color: #2a9d8f; }
+    .focus-controls-card .ctrl-btn.restart.match-kind-single:hover,
+    .topbar .fs-btn.match-kind-single:hover { border-color: #63c9bb; color: #bff5ed; }
+    .focus-controls-card .ctrl-btn.restart.match-kind-duel,
+    .topbar .fs-btn.match-kind-duel { border-color: #e63946; color: #ff7a83; }
+    .focus-controls-card .ctrl-btn.restart.match-kind-duel:hover,
+    .topbar .fs-btn.match-kind-duel:hover { border-color: #ff9aa0; color: #ffd6d9; }
+    .focus-controls-card .ctrl-btn.restart.match-kind-group,
+    .topbar .fs-btn.match-kind-group { border-color: #457b9d; color: #6fa8c7; }
+    .focus-controls-card .ctrl-btn.restart.match-kind-group:hover,
+    .topbar .fs-btn.match-kind-group:hover { border-color: #9bc9e2; color: #d9f0ff; }
+    .focus-controls-card .ctrl-btn.restart.match-kind-tournament,
+    .topbar .fs-btn.match-kind-tournament { border-color: #f4c542; color: #f4c542; }
+    .focus-controls-card .ctrl-btn.restart.match-kind-tournament:hover,
+    .topbar .fs-btn.match-kind-tournament:hover { border-color: #ffe27a; color: #fff0ae; }
     .focus-controls-card .ctrl-btn:disabled { opacity: .4; cursor: default; }
     
     /* Mode/Rule Buttons - gleiche Höhe, nur Label/Value Styling */
@@ -1317,6 +1333,16 @@
       document.getElementById('matchStartButton').textContent = isSingleGame ? 'Einzelspiel starten' : 'Begegnung starten';
     }
 
+    function getMatchActionPresentation(state) {
+      const game = state && state.game ? state.game : {};
+      const isSingleGame = Number(game.duelId || 0) <= 0;
+      const matchType = String(game.matchType || 'direct');
+      if (isSingleGame) return { label: 'Einzelspiel läuft', title: 'Laufendes Einzelspiel', className: 'match-kind-single' };
+      if (matchType === 'tournament') return { label: 'Turnier läuft', title: 'Laufende Turnierbegegnung', className: 'match-kind-tournament' };
+      if (matchType === 'group') return { label: 'Mehrspieler läuft', title: 'Laufende Mehrspielerbegegnung', className: 'match-kind-group' };
+      return { label: 'Duell läuft', title: 'Laufendes Duell', className: 'match-kind-duel' };
+    }
+
     async function loadMatchPlayers() {
       const list = document.getElementById('matchPlayerList');
       if (!list) return;
@@ -1397,12 +1423,14 @@
       if (!button) return;
       const eligible = isDuelStatsEligible(state);
       const activeMatch = hasActiveMatch(state);
+      const presentation = getMatchActionPresentation(state);
+      const isRunningGame = activeMatch || (state && state.game && state.game.status === 'running');
       button.disabled = false;
       button.classList.toggle('active', eligible && duelStatsEnabled);
-      button.textContent = activeMatch ? 'Duell live' : 'Begegnung starten';
-      button.title = activeMatch
-        ? 'Laufende Begegnung abbrechen'
-        : 'Neue Begegnung starten';
+      button.classList.remove('match-kind-single', 'match-kind-duel', 'match-kind-group', 'match-kind-tournament');
+      if (isRunningGame) button.classList.add(presentation.className);
+      button.textContent = isRunningGame ? presentation.label : 'Begegnung starten';
+      button.title = isRunningGame ? presentation.title : 'Neue Begegnung starten';
     }
 
     function toggleDuelStats() {
@@ -1758,13 +1786,15 @@
       if (!state) return '';
       const mode = state.game.mode || '501';
       const rule = state.game.checkoutRule || 'double';
+      const presentation = getMatchActionPresentation(state);
+      const isActiveGame = hasActiveMatch(state) || state.game.status === 'running';
       const modeLabel = mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? '301-Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode;
       const ruleLabel = rule === 'single' ? 'Single Out' : rule === 'double' ? 'Double Out' : rule === 'master' ? 'Master Out' : rule;
       return '<div class="focus-controls-card">' +
         '<div class="ctrl-title">⚙ Steuerung</div>' +
         '<div class="ctrl-row action-row">' +
           '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
-          '<button class="ctrl-btn restart" id="focusMatchBtn" onclick="openMatchMenu()" title="Begegnung starten">⚔ Begegnung starten</button>' +
+          '<button class="ctrl-btn restart' + (isActiveGame ? ' ' + presentation.className : '') + '" id="focusMatchBtn" onclick="openMatchMenu()" title="' + (isActiveGame ? presentation.title : 'Begegnung starten') + '">' + (isActiveGame ? '⚔ ' + presentation.label : '⚔ Begegnung starten') + '</button>' +
           '<button class="ctrl-btn undo" id="focusUndoBtn" onclick="undoLastThrow()" title="Letzten Wurf zurücksetzen">↶ Letzten Wurf</button>' +
         '</div>' +
       '</div>';

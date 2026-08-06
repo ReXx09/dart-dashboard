@@ -200,6 +200,8 @@ const MATRIX_HIT_SUPPRESS_MS = Number(process.env.MATRIX_HIT_SUPPRESS_MS || 0);
 const MATRIX_HIT_CLUSTER_WINDOW_MS = Number(process.env.MATRIX_HIT_CLUSTER_WINDOW_MS || 0);
 const MATRIX_EVT_PAIR_MAX_SKEW_MS = Number(process.env.MATRIX_EVT_PAIR_MAX_SKEW_MS || 220);
 const MATRIX_SAME_KEY_GUARD_MS = Number(process.env.MATRIX_SAME_KEY_GUARD_MS || 50);
+const MATRIX_STICKY_SIGNAL_WINDOW_MS = Number(process.env.MATRIX_STICKY_SIGNAL_WINDOW_MS || 900);
+const MATRIX_STICKY_SIGNAL_REPEAT_LIMIT = Number(process.env.MATRIX_STICKY_SIGNAL_REPEAT_LIMIT || 4);
 const ARDUINO_MATRIX_THROW_LOCK_MS = Number(process.env.ARDUINO_MATRIX_THROW_LOCK_MS || 50);
 const THROW_MIN_INTERVAL_MS = Number(process.env.THROW_MIN_INTERVAL_MS || 0);
 const PLAYER_SWITCH_DELAY_MS = Number(process.env.PLAYER_SWITCH_DELAY_MS || 20000);
@@ -214,6 +216,8 @@ let runtimeTuning = {
   matrixHitClusterWindowMs: MATRIX_HIT_CLUSTER_WINDOW_MS,
   matrixEvtPairMaxSkewMs: MATRIX_EVT_PAIR_MAX_SKEW_MS,
   matrixSameKeyGuardMs: MATRIX_SAME_KEY_GUARD_MS,
+  matrixStickySignalWindowMs: MATRIX_STICKY_SIGNAL_WINDOW_MS,
+  matrixStickySignalRepeatLimit: MATRIX_STICKY_SIGNAL_REPEAT_LIMIT,
   arduinoMatrixThrowLockMs: ARDUINO_MATRIX_THROW_LOCK_MS,
   throwMinIntervalMs: THROW_MIN_INTERVAL_MS,
   playerSwitchDelayMs: PLAYER_SWITCH_DELAY_MS,
@@ -698,6 +702,8 @@ function getSettings() {
     matrixHitClusterWindowMs: runtimeTuning.matrixHitClusterWindowMs,
     matrixEvtPairMaxSkewMs: runtimeTuning.matrixEvtPairMaxSkewMs,
     matrixSameKeyGuardMs: runtimeTuning.matrixSameKeyGuardMs,
+    matrixStickySignalWindowMs: runtimeTuning.matrixStickySignalWindowMs,
+    matrixStickySignalRepeatLimit: runtimeTuning.matrixStickySignalRepeatLimit,
     arduinoMatrixThrowLockMs: runtimeTuning.arduinoMatrixThrowLockMs,
     throwMinIntervalMs: runtimeTuning.throwMinIntervalMs,
     playerSwitchDelayMs: runtimeTuning.playerSwitchDelayMs,
@@ -727,6 +733,8 @@ function refreshRuntimeTuning(settings = getSettings()) {
     matrixHitClusterWindowMs: clampNumber(settings.matrixHitClusterWindowMs, MATRIX_HIT_CLUSTER_WINDOW_MS, 0, 300),
     matrixEvtPairMaxSkewMs: clampNumber(settings.matrixEvtPairMaxSkewMs, MATRIX_EVT_PAIR_MAX_SKEW_MS, 20, 600),
     matrixSameKeyGuardMs: clampNumber(settings.matrixSameKeyGuardMs, MATRIX_SAME_KEY_GUARD_MS, 0, 800),
+    matrixStickySignalWindowMs: clampNumber(settings.matrixStickySignalWindowMs, MATRIX_STICKY_SIGNAL_WINDOW_MS, 200, 3000),
+    matrixStickySignalRepeatLimit: clampNumber(settings.matrixStickySignalRepeatLimit, MATRIX_STICKY_SIGNAL_REPEAT_LIMIT, 3, 12),
     arduinoMatrixThrowLockMs: clampNumber(settings.arduinoMatrixThrowLockMs, ARDUINO_MATRIX_THROW_LOCK_MS, 0, 1500),
     throwMinIntervalMs: clampNumber(settings.throwMinIntervalMs, THROW_MIN_INTERVAL_MS, 0, 1200),
     playerSwitchDelayMs: clampNumber(settings.playerSwitchDelayMs, PLAYER_SWITCH_DELAY_MS, 0, 120000),
@@ -753,6 +761,10 @@ let matrixLastAcceptedHitAt = 0;
 let matrixLastAcceptedKey = '';
 let matrixHitClusterTimer = null;
 let matrixHitClusterHits = [];
+let matrixStickySignalKey = '';
+let matrixStickySignalFirstAt = 0;
+let matrixStickySignalCount = 0;
+let matrixStickySignalBlockedKey = '';
 let lastAppliedThrowAt = 0;
 const arduinoRawEventHistory = [];
 const matrixSniffer = {
@@ -841,6 +853,23 @@ function normalizeArduinoStatePatch(patch) {
 
 function shouldQueueMatrixHit(key, nowMs) {
   const now = Number(nowMs || Date.now());
+  if (key && key === matrixStickySignalBlockedKey) return false;
+
+  if (key !== matrixStickySignalKey || (now - matrixStickySignalFirstAt) > runtimeTuning.matrixStickySignalWindowMs) {
+    matrixStickySignalKey = key;
+    matrixStickySignalFirstAt = now;
+    matrixStickySignalCount = 1;
+  } else {
+    matrixStickySignalCount += 1;
+    if (matrixStickySignalCount >= runtimeTuning.matrixStickySignalRepeatLimit) {
+      matrixStickySignalBlockedKey = key;
+      matrixStickySignalKey = '';
+      matrixStickySignalFirstAt = 0;
+      matrixStickySignalCount = 0;
+      return false;
+    }
+  }
+
   if (key && key === matrixLastAcceptedKey && (now - matrixLastAcceptedHitAt) < runtimeTuning.matrixSameKeyGuardMs) {
     return false;
   }
@@ -1714,10 +1743,17 @@ function updateMatrixSnifferState(row, column, active, evt = {}) {
     return;
   }
 
-  if (matrixSniffer.matrixHitActive && ms - matrixSniffer.lastMatrixHitPairMs >= runtimeTuning.matrixHitReleaseMs) {
+  const releaseElapsed = Number.isFinite(ms) && ms > 0
+    ? ms - matrixSniffer.lastMatrixHitPairMs
+    : now - matrixSniffer.lastMatrixHitMs;
+  if (matrixSniffer.matrixHitActive && releaseElapsed >= runtimeTuning.matrixHitReleaseMs) {
     matrixSniffer.matrixHitActive = false;
     matrixSniffer.lastMatrixHitRow = null;
     matrixSniffer.lastMatrixHitColumn = null;
+    matrixStickySignalBlockedKey = '';
+    matrixStickySignalKey = '';
+    matrixStickySignalFirstAt = 0;
+    matrixStickySignalCount = 0;
     normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: matrixSniffer.lastMatrixHit } });
   }
 }
