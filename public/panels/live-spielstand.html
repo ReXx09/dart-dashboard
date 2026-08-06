@@ -2150,6 +2150,8 @@
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
       const duelStatsKey = getDuelStatsKey(state);
+      const isTournament = String(state.game.matchType || '') === 'tournament';
+      const isTournamentFinal = isTournament && !!(state.lastAction && state.lastAction.tournamentWaiting);
       updateDuelStatsToggle(state);
       const isTournamentAdvance = state.lastAction && state.lastAction.type === 'tournament-advance';
       const isTournamentMatchStart = state.lastAction && state.lastAction.type === 'tournament-match-start';
@@ -2252,11 +2254,13 @@
           hideWinnerOverlay();
           if (duelStatsCacheKey === duelStatsKey && duelStatsCache) renderDuelStatsOverlay(duelStatsCache, state);
         } else {
-          showWinnerOverlay(winner, state);
+          if (!isTournament || isTournamentFinal) showWinnerOverlay(winner, state);
+          else hideWinnerOverlay();
           showDuelStatsAfterWinner(state);
         }
       } else if (pendingWinner) {
-        showWinnerOverlay(pendingWinner, state);
+        if (!isTournament || isTournamentFinal) showWinnerOverlay(pendingWinner, state);
+        else hideWinnerOverlay();
       } else {
         hideWinnerOverlay();
       }
