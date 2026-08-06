@@ -996,8 +996,8 @@ class DataStore {
   }
 
   async createTournament({ mode, tournamentName = '', players, bestOf = 1 }) {
-    const safePlayers = Array.isArray(players) ? players.slice(0, 4) : [];
-    if (safePlayers.length !== 4) throw new Error('Ein K.-o.-Turnier benötigt genau 4 Spieler.');
+    const safePlayers = Array.isArray(players) ? players.slice(0, 16) : [];
+    if (![2, 4, 8, 16].includes(safePlayers.length)) throw new Error('Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.');
     const now = Date.now();
     const slotsJson = JSON.stringify(safePlayers.map(player => Number(player.slot)));
     let tournamentId;
@@ -1006,11 +1006,18 @@ class DataStore {
     else if (this.isPostgres()) tournamentId = Number((await this.pg.query('INSERT INTO tournaments (name, format, status, mode, participant_slots, participant_count, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id', tournamentValues)).rows[0].id);
     else tournamentId = Number((await this.my.query('INSERT INTO tournaments (name, format, status, mode, participant_slots, participant_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', tournamentValues))[0].insertId);
 
-    const matches = [
-      [tournamentId, 1, 1, 'Halbfinale 1', safePlayers[0], safePlayers[1]],
-      [tournamentId, 1, 2, 'Halbfinale 2', safePlayers[2], safePlayers[3]],
-      [tournamentId, 2, 1, 'Finale', null, null]
-    ];
+    const totalRounds = Math.log2(safePlayers.length);
+    const roundLabels = { 1: 'Finale', 2: 'Halbfinale', 3: 'Viertelfinale', 4: 'Achtelfinale' };
+    const matches = [];
+    for (let round = 1; round <= totalRounds; round += 1) {
+      const matchCount = safePlayers.length / (2 ** round);
+      for (let position = 1; position <= matchCount; position += 1) {
+        const first = round === 1 ? safePlayers[(position - 1) * 2] : null;
+        const second = round === 1 ? safePlayers[(position - 1) * 2 + 1] : null;
+        const label = (roundLabels[totalRounds - round + 1] || `Runde ${round}`) + (matchCount > 1 ? ' ' + position : '');
+        matches.push([tournamentId, round, position, label, first, second]);
+      }
+    }
     const matchIds = [];
     for (const [, round, position, label, first, second] of matches) {
       const values = [tournamentId, round, position, label, first ? Number(first.slot) : null, first ? String(first.name || 'Spieler') : null, second ? Number(second.slot) : null, second ? String(second.name || 'Spieler') : null, 'waiting', now, now];
@@ -1076,23 +1083,12 @@ class DataStore {
       else await this.my.query('UPDATE tournaments SET status = \'finished\', winner_slot = ?, updated_at = ? WHERE id = ?', [winner, now, Number(tournament.id)]);
       return this.getTournament(tournament.id);
     }
-    const next = Number(current.round) === 1 && Number(current.position) === 1
-      ? (tournament.matches || []).find(match => Number(match.round) === 1 && Number(match.position) === 2)
-      : (tournament.matches || []).find(match => Number(match.round) === 2 && Number(match.position) === 1);
+    const nextRound = Number(current.round) + 1;
+    const nextPosition = Math.ceil(Number(current.position) / 2);
+    const next = (tournament.matches || []).find(match => Number(match.round) === nextRound && Number(match.position) === nextPosition);
     if (!next) return this.getTournament(tournament.id);
-    const slotColumn = Number(current.round) === 1 && Number(current.position) === 2 ? 'player_two' : 'player_one';
+    const slotColumn = Number(current.position) % 2 === 1 ? 'player_one' : 'player_two';
     const player = (Array.isArray(players) ? players : []).find(item => Number(item.slot) === winner) || {};
-    if (Number(current.round) === 1 && Number(current.position) === 1) {
-      const final = (tournament.matches || []).find(match => Number(match.round) === 2 && Number(match.position) === 1);
-      const finalValues = [winner, String(player.name || 'Spieler'), now, Number(final.id)];
-      const finalSql = this.isPostgres()
-        ? 'UPDATE tournament_matches SET player_one_slot = $1, player_one_name = $2, updated_at = $3 WHERE id = $4'
-        : 'UPDATE tournament_matches SET player_one_slot = ?, player_one_name = ?, updated_at = ? WHERE id = ?';
-      if (this.isSQLite()) await this.sqlite.run(finalSql, finalValues);
-      else if (this.isPostgres()) await this.pg.query(finalSql, finalValues);
-      else await this.my.query(finalSql, finalValues);
-      return this.activateTournamentMatch(tournament, next);
-    }
     const nextValues = [winner, String(player.name || 'Spieler'), now, Number(next.id)];
     const nextSql = this.isPostgres()
       ? `UPDATE tournament_matches SET ${slotColumn}_slot = $1, ${slotColumn}_name = $2, updated_at = $3 WHERE id = $4`

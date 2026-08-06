@@ -3125,8 +3125,8 @@ app.post('/api/duels/start', async (req, res) => {
     if (!['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'Nur 301, 501 und 701 sind für Begegnungen verfügbar.' });
     if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
     if (!Number.isInteger(bestOf) || bestOf < 1 || bestOf > 15 || bestOf % 2 === 0) return res.status(400).json({ error: 'Best-of muss eine ungerade Zahl zwischen 1 und 15 sein.' });
-    if ((matchType === 'direct' && slots.length !== 2) || slots.length < 2 || slots.length > 8) return res.status(400).json({ error: 'Bitte 2 bis 8 Spieler auswählen; ein Direktduell benötigt genau 2.' });
-    if (matchType === 'tournament' && slots.length !== 4) return res.status(400).json({ error: 'Ein K.-o.-Turnier benötigt genau 4 Spieler.' });
+    if ((matchType === 'direct' && slots.length !== 2) || slots.length < 2 || slots.length > (matchType === 'tournament' ? 16 : 8)) return res.status(400).json({ error: 'Bitte 2 bis 16 Spieler auswählen; ein Direktduell benötigt genau 2.' });
+    if (matchType === 'tournament' && ![2, 4, 8, 16].includes(slots.length)) return res.status(400).json({ error: 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.' });
     if (matchType === 'tournament' && !['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'K.-o.-Turniere sind nur für 301, 501 und 701 verfügbar.' });
     const configuredPlayers = await getPlayers();
     const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());
@@ -3152,7 +3152,7 @@ app.post('/api/duels/start', async (req, res) => {
       fresh.game.tournamentId = tournament.id;
       fresh.game.tournamentMatchId = tournament.matchId;
       fresh.game.tournamentRound = 1;
-      fresh.game.tournamentMatchLabel = 'Halbfinale 1';
+      fresh.game.tournamentMatchLabel = tournament.matches?.find(match => Number(match.id) === Number(tournament.matchId))?.label || 'Erste Runde';
     }
     savedLiveMode = mode;
     savedCheckoutRule = checkoutRule;

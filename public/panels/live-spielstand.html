@@ -619,6 +619,25 @@
     .tournament-match-player { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-left: 4px solid var(--player-color); background: #1b2327; }
     .tournament-match-player.winner { color: #7de2b8; }
     .tournament-match-player.loser { color: #e98b91; opacity: .65; }
+    .tournament-bracket { display: none; margin: 12px 0; padding: 12px; background: #11171a; border: 1px solid #3b4a50; border-radius: 10px; overflow-x: auto; }
+    .tournament-bracket.show { display: block; }
+    .tournament-bracket-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .tournament-bracket-title { color: #f4c542; font-weight: 800; }
+    .tournament-next-button { border: 1px solid #f4c542; border-radius: 7px; padding: 7px 11px; background: #2a2520; color: #ffe27a; font-weight: 800; cursor: pointer; white-space: nowrap; }
+    .tournament-next-button:hover { background: #4a3a1d; }
+    .tournament-next-button:disabled { opacity: .5; cursor: default; }
+    .tournament-bracket-grid { display: flex; align-items: stretch; gap: 10px; min-width: max-content; }
+    .tournament-round { display: flex; flex-direction: column; min-width: 190px; gap: 8px; }
+    .tournament-round-title { color: #9aa7ad; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; }
+    .tournament-node { padding: 8px; border: 1px solid #303c41; border-radius: 7px; background: #1b2327; }
+    .tournament-node.active { border-color: #f4c542; box-shadow: 0 0 0 1px rgba(244,197,66,.2); }
+    .tournament-node.waiting { opacity: .65; }
+    .tournament-node.finished { border-color: #2a9d8f; }
+    .tournament-node-label { margin-bottom: 5px; color: #77848a; font-size: .62rem; }
+    .tournament-node-player { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; color: #e7ecee; font-size: .72rem; }
+    .tournament-node-player.winner { color: #7de2b8; font-weight: 800; }
+    .tournament-node-player.loser { color: #e98b91; opacity: .7; }
+    .tournament-node-player.empty { color: #68757a; font-style: italic; }
     .leg-start-count { margin: 16px 0; color: #ffd166; font-size: 4rem; font-weight: 900; }
     .leg-start-cancel { border: 1px solid #6c757d; border-radius: 7px; padding: 9px 18px; background: transparent; color: #fff; cursor: pointer; }
     .leg-list {
@@ -1224,6 +1243,7 @@
   </div>
 
   <main>
+    <section class="tournament-bracket" id="tournamentBracket"></section>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
     <section class="compact-players" id="compactPlayers"></section>
     <!-- Countdown – immer im DOM, feste Höhe, Sichtbarkeit über Klasse -->
@@ -1246,6 +1266,8 @@
     let legStartTimer = null;
     let legStartRemaining = 0;
     let tournamentIntroKey = '';
+    let tournamentBracketKey = '';
+    let tournamentBracketRequest = null;
     let duelStatsEnabled = localStorage.getItem('liveDuelStatsEnabled') !== 'false';
 
     function startCountdown(state) {
@@ -1404,7 +1426,7 @@
       const startKind = document.getElementById('matchStartKind').value;
       const type = document.getElementById('matchTypeSelect').value;
       const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
-      if ((startKind === 'encounter' && ((type === 'direct' && playerSlots.length !== 2) || (type === 'tournament' && playerSlots.length !== 4) || playerSlots.length < 2)) || (startKind === 'single' && playerSlots.length < 1)) { showToast(startKind === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : type === 'tournament' ? 'Ein K.-o.-Turnier benötigt genau 4 Spieler.' : 'Bitte die passende Anzahl Spieler auswählen.', true); return; }
+      if ((startKind === 'encounter' && ((type === 'direct' && playerSlots.length !== 2) || (type === 'tournament' && ![2, 4, 8, 16].includes(playerSlots.length)) || playerSlots.length < 2)) || (startKind === 'single' && playerSlots.length < 1)) { showToast(startKind === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : type === 'tournament' ? 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.' : 'Bitte die passende Anzahl Spieler auswählen.', true); return; }
       try {
         const endpoint = startKind === 'single' ? '/api/live/start' : '/api/duels/start';
         const body = startKind === 'single'
@@ -1543,7 +1565,7 @@
         '<div class="duel-view-panel" data-duel-panel="stats"><div class="duel-stats-grid" style="grid-template-columns:' + gridColumns + '"><div class="duel-stats-cell label"> </div>' +
         stats.map((item, index) => '<div class="duel-stats-cell player' + (index ? ' second' : '') + '">' + escapeHtml(item.name) + '</div>').join('') +
         labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div>' + stats.map((item, index) => '<div class="duel-stats-cell value">' + row[index + 1] + '</div>').join('')).join('') +
-        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><div class="duel-stats-actions">' + (!matchComplete ? '<button class="duel-stats-next" onclick="startNextLegCountdown()">Nächstes Leg starten</button>' : '') + '<button class="duel-stats-close" onclick="hideDuelStatsOverlay()">Statistik ausblenden</button></div></div>';
+        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><div class="duel-stats-actions">' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? '<button class="duel-stats-next" onclick="startNextTournamentMatch()">Nächstes Duell starten</button>' : (!matchComplete ? '<button class="duel-stats-next" onclick="startNextLegCountdown()">Nächstes Leg starten</button>' : '')) + '<button class="duel-stats-close" onclick="hideDuelStatsOverlay()">Statistik ausblenden</button></div></div>';
       overlay.style.display = 'flex';
       overlay.querySelectorAll('[data-duel-view]').forEach(button => button.addEventListener('click', () => {
         const view = button.dataset.duelView;
@@ -1709,7 +1731,7 @@
       if (String(game.matchType) !== 'tournament' || !Array.isArray(state.players)) return '';
       const previousWinnerSlot = Number(state.lastAction && state.lastAction.previousWinnerSlot || 0);
       const previousLoserSlot = Number(state.lastAction && state.lastAction.previousLoserSlot || 0);
-      const roundLabel = Number(game.tournamentRound) === 2 ? 'Finale' : (game.tournamentMatchLabel || 'Halbfinale');
+      const roundLabel = game.tournamentMatchLabel || 'Turnierduell';
       const players = state.players.slice(0, 2).map(player => {
         const slot = Number(player.slot);
         const resultClass = slot === previousWinnerSlot ? ' winner' : slot === previousLoserSlot ? ' loser' : '';
@@ -1735,6 +1757,57 @@
         if (count) count.textContent = String(Math.max(0, remaining));
         if (remaining <= 0) { clearInterval(timer); overlay.classList.remove('show'); }
       }, 1000);
+    }
+
+    function startNextTournamentMatch() {
+      if (!liveState || String(liveState.game && liveState.game.matchType) !== 'tournament') return;
+      hideDuelStatsOverlay();
+      tournamentIntroKey = '';
+      showTournamentMatchIntro(liveState);
+    }
+
+    function tournamentRoundTitle(round, maxRound) {
+      const titles = { 1: 'Achtelfinale', 2: 'Viertelfinale', 3: 'Halbfinale', 4: 'Finale' };
+      return titles[maxRound - round + 1] || ('Runde ' + round);
+    }
+
+    function tournamentNodePlayer(name, slot, match, winnerSlot, loserSlot) {
+      const hasPlayer = Number(slot || 0) > 0 && String(name || '').trim();
+      const resultClass = Number(slot) === Number(winnerSlot) ? ' winner' : Number(slot) === Number(loserSlot) ? ' loser' : '';
+      return '<div class="tournament-node-player' + (hasPlayer ? resultClass : ' empty') + '"><span>' + escapeHtml(hasPlayer ? name : 'wartet auf Sieger') + '</span><strong>' + (hasPlayer && Number(match.round) === 1 ? 'P' + Number(slot) : '') + '</strong></div>';
+    }
+
+    async function renderTournamentBracket(state) {
+      const container = document.getElementById('tournamentBracket');
+      const tournamentId = Number(state && state.game && state.game.tournamentId || 0);
+      if (!container) return;
+      if (!tournamentId || String(state.game.matchType) !== 'tournament') {
+        container.classList.remove('show');
+        tournamentBracketKey = '';
+        return;
+      }
+      const key = String(tournamentId) + ':' + String(state.game.tournamentMatchId || '') + ':' + String(state.lastAction && state.lastAction.ts || '');
+      container.classList.add('show');
+      if (tournamentBracketKey === key || tournamentBracketRequest) return;
+      tournamentBracketKey = key;
+      tournamentBracketRequest = fetch('/api/tournaments/' + encodeURIComponent(tournamentId), { cache: 'no-store' })
+        .then(response => { if (!response.ok) throw new Error('Turnier konnte nicht geladen werden'); return response.json(); })
+        .then(tournament => {
+          const matches = Array.isArray(tournament.matches) ? tournament.matches : [];
+          const maxRound = Math.max(1, ...matches.map(match => Number(match.round || 1)));
+          const rounds = [];
+          for (let round = 1; round <= maxRound; round += 1) rounds.push(matches.filter(match => Number(match.round) === round));
+          const activeId = Number(state.game.tournamentMatchId || 0);
+          container.innerHTML = '<div class="tournament-bracket-head"><span class="tournament-bracket-title">' + escapeHtml(tournament.name || 'K.-o.-Turnier') + '</span><button class="tournament-next-button" type="button" onclick="startNextTournamentMatch()">Nächstes Duell starten</button></div><div class="tournament-bracket-grid">' + rounds.map((roundMatches, index) => '<div class="tournament-round"><div class="tournament-round-title">' + tournamentRoundTitle(index + 1, maxRound) + '</div>' + roundMatches.map(match => {
+            const status = String(match.status || 'waiting');
+            const nodeClass = status + (Number(match.id) === activeId ? ' active' : '');
+            return '<div class="tournament-node ' + nodeClass + '"><div class="tournament-node-label">' + escapeHtml(match.label || 'Duell') + (status === 'active' ? ' · läuft' : status === 'finished' ? ' · beendet' : ' · wartet') + '</div>' + tournamentNodePlayer(match.player_one_name, match.player_one_slot, match, match.winner_slot, match.loser_slot) + tournamentNodePlayer(match.player_two_name, match.player_two_slot, match, match.winner_slot, match.loser_slot) + '</div>';
+          }).join('') + '</div>').join('') + '</div>';
+          const button = container.querySelector('.tournament-next-button');
+          if (button) button.disabled = !matches.some(match => Number(match.id) === activeId && String(match.status) === 'active');
+        })
+        .catch(error => { container.innerHTML = '<div class="tournament-node-label">' + escapeHtml(error.message) + '</div>'; })
+        .finally(() => { tournamentBracketRequest = null; });
     }
 
     function getFocusModeLabel(state) {
@@ -2010,6 +2083,7 @@
 
     function renderState(state) {
       if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
+      renderTournamentBracket(state);
       if (state.lastAction && state.lastAction.type === 'tournament-advance') showTournamentMatchIntro(state);
       const activePlayer = state.game.activePlayer || 0;
       const mode = state.game.mode || '501';
