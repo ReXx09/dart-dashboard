@@ -3214,6 +3214,27 @@ app.post('/api/tournaments/:id/matches/:matchId/start', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Turnierduell konnte nicht gestartet werden: ' + err.message }); }
 });
 
+app.post('/api/tournaments/:id/presentation/bracket', async (req, res) => {
+  try {
+    const state = await getLiveState();
+    const tournamentId = Number(req.params.id);
+    if (String(state.game?.matchType) !== 'tournament' || Number(state.game?.tournamentId) !== tournamentId) {
+      return res.status(409).json({ error: 'Dieses Turnier ist nicht aktiv.' });
+    }
+    const ts = Date.now();
+    state.lastAction = {
+      type: 'tournament-bracket-show',
+      tournamentId,
+      tournamentMatchId: Number(state.game.tournamentMatchId || 0) || null,
+      ts
+    };
+    await saveLiveState(state);
+    broadcastReload();
+    broadcastLiveState(state);
+    res.json(state);
+  } catch (err) { res.status(500).json({ error: 'Turnierbaum konnte nicht angezeigt werden: ' + err.message }); }
+});
+
 app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
   try {
     const state = await getLiveState();

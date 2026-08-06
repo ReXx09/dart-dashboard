@@ -1735,12 +1735,22 @@
       if (overlay) overlay.style.display = 'none';
     }
 
-    function closeTournamentDuelStats() {
-      hideDuelStatsOverlay();
-      duelStatsVisibleFor = '';
-      duelStatsScheduledFor = '';
-      tournamentBracketKey = '';
-      renderTournamentBracket(liveState, true);
+    async function closeTournamentDuelStats() {
+      if (!liveState || String(liveState.game && liveState.game.matchType) !== 'tournament') return;
+      const tournamentId = Number(liveState.game.tournamentId || 0);
+      if (!tournamentId) return;
+      const button = document.querySelector('.duel-stats-close');
+      if (button) button.disabled = true;
+      try {
+        const response = await fetch('/api/tournaments/' + encodeURIComponent(tournamentId) + '/presentation/bracket', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const state = await response.json();
+        if (!response.ok) throw new Error(state.error || 'HTTP ' + response.status);
+        liveState = state;
+        renderState(state);
+      } catch (error) {
+        if (button) button.disabled = false;
+        showToast('Turnierbaum konnte nicht angezeigt werden: ' + error.message, true);
+      }
     }
 
     function getGameModeLabel(mode) {
