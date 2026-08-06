@@ -431,7 +431,11 @@
       text-transform: uppercase;
     }
     .focus-controls-card .ctrl-row.action-row {
-      flex: 0 0 88px;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      gap: 4px;
     }
     .focus-controls-card .ctrl-btn {
       flex: 1;
@@ -462,6 +466,7 @@
     .focus-controls-card .ctrl-btn.undo {
       font-size: 1.20rem !important;
     }
+    .focus-controls-card .ctrl-btn.miss { grid-row: 1 / span 2; }
     .focus-controls-card .ctrl-btn.mode-btn { border-color: #457b9d; }
     .focus-controls-card .ctrl-btn.mode-btn:hover { border-color: #6fa8c7; color: #d9f0ff; }
     .focus-controls-card .ctrl-btn.rule-btn.rule-single { border-color: #2a9d8f; }
@@ -1759,6 +1764,7 @@
         '<div class="ctrl-title">⚙ Steuerung</div>' +
         '<div class="ctrl-row action-row">' +
           '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
+          '<button class="ctrl-btn restart" id="focusMatchBtn" onclick="openMatchMenu()" title="Begegnung starten">⚔ Begegnung starten</button>' +
           '<button class="ctrl-btn undo" id="focusUndoBtn" onclick="undoLastThrow()" title="Letzten Wurf zurücksetzen">↶ Letzten Wurf</button>' +
         '</div>' +
       '</div>';
