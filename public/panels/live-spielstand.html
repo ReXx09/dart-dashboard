@@ -1448,7 +1448,10 @@
         hideWinnerOverlay();
         renderState(liveState);
         if (type === 'tournament') {
+          const bracketOverlay = document.getElementById('tournamentBracketOverlay');
+          if (bracketOverlay) bracketOverlay.classList.add('show');
           tournamentBracketKey = '';
+          tournamentBracketRequest = null;
           renderTournamentBracket(liveState, true);
         }
         showToast(startKind === 'single' ? 'Einzelspiel gestartet' : 'Begegnung gestartet');
