@@ -2955,9 +2955,11 @@ app.post('/api/duels/start', async (req, res) => {
   try {
     const matchType = ['direct', 'group', 'tournament'].includes(String(req.body?.matchType)) ? String(req.body.matchType) : 'direct';
     const mode = String(req.body?.mode || '501');
+    const checkoutRule = String(req.body?.checkoutRule || 'double');
     const bestOf = Number(req.body?.bestOf || 1);
     const slots = [...new Set((Array.isArray(req.body?.playerSlots) ? req.body.playerSlots : []).map(Number).filter(Number.isInteger))];
     if (!['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'Nur 301, 501 und 701 sind für Begegnungen verfügbar.' });
+    if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
     if (!Number.isInteger(bestOf) || bestOf < 1 || bestOf > 15 || bestOf % 2 === 0) return res.status(400).json({ error: 'Best-of muss eine ungerade Zahl zwischen 1 und 15 sein.' });
     if ((matchType === 'direct' && slots.length !== 2) || slots.length < 2 || slots.length > 8) return res.status(400).json({ error: 'Bitte 2 bis 8 Spieler auswählen; ein Direktduell benötigt genau 2.' });
     const configuredPlayers = await getPlayers();
@@ -2969,12 +2971,14 @@ app.post('/api/duels/start', async (req, res) => {
     const duel = await dataStore.createDuel({ mode, matchType, tournamentName, players: selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null })) });
     const fresh = await defaultLiveState(mode, slots);
     fresh.game.duelId = duel.id;
+    fresh.game.checkoutRule = checkoutRule;
     fresh.game.selectedPlayerSlots = slots;
     fresh.game.matchType = matchType;
     fresh.game.bestOf = bestOf;
     fresh.game.legsToWin = Math.ceil(bestOf / 2);
     fresh.game.tournamentName = tournamentName;
     savedLiveMode = mode;
+    savedCheckoutRule = checkoutRule;
     await saveLiveState(fresh);
     broadcastReload();
     res.json(fresh);

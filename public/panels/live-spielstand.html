@@ -24,98 +24,6 @@
       height: 100vh;
       height: -webkit-fill-available;
       height: 100dvh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-    .topbar {
-      background: #111;
-      border-bottom: 3px solid #e63946;
-      padding: 8px 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-    .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
-    .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
-    .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
-    .topbar select { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 4px 8px; border-radius: 8px; cursor: pointer; font-size: .72rem; font-family: inherit; }
-    .topbar select:hover { border-color: #f4a261; }
-    .topbar label { font-size: .68rem; color: #888; display: flex; align-items: center; gap: 4px; }
-    .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
-    .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
-    .topbar .fs-btn.active { border-color: #f4a261; color: #f4a261; }
-    .topbar .miss-btn {
-      background: #8b0000;
-      border: 1px solid #e63946;
-      color: #f1f1f1;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .miss-btn:hover { background: #a00; border-color: #f4a261; color: #f4a261; }
-    .topbar .miss-btn:disabled { opacity: .4; cursor: default; }
-    .daily-hs {
-      font-size: .72rem;
-      color: #f4a261;
-      background: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 8px;
-      padding: 3px 10px;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
-    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
-    .topbar .restart-btn {
-      background: #1a1a1a;
-      border: 1px solid #f4a261;
-      color: #f4a261;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .restart-btn:hover { background: #252525; border-color: #e63946; color: #e63946; }
-    .topbar .undo-btn {
-      background: #1a1a1a;
-      border: 1px solid #888;
-      color: #f1f1f1;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .undo-btn:hover { border-color: #f4a261; color: #f4a261; }
-    .topbar .undo-btn:disabled { opacity: .4; cursor: default; }
-
-    main {
-      padding: 6px;
-      max-width: none;
-      margin: 0;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      flex: 1;
-      min-height: 0;
-      overflow: hidden;
-    }
-    .focus-player {
       flex: 1;
       display: grid;
       grid-template-columns: 1.35fr .65fr;
@@ -1212,6 +1120,9 @@
         <label class="match-menu-field">Spiel
           <select id="matchMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option></select>
         </label>
+        <label class="match-menu-field">Finish
+          <select id="matchCheckoutRule"><option value="double">Double Out</option><option value="single">Single Out</option><option value="master">Master Out</option></select>
+        </label>
         <label class="match-menu-field" id="tournamentNameField" hidden>Turniername
           <input id="matchTournamentName" type="text" maxlength="80" placeholder="z. B. Freitagsturnier" />
         </label>
@@ -1333,6 +1244,10 @@
         if (confirm('Die laufende Begegnung wirklich abbrechen? Die bisherige Begegnung bleibt in der Statistik erhalten.')) abortActiveMatch();
         return;
       }
+      const modeSelect = document.getElementById('matchMode');
+      const checkoutSelect = document.getElementById('matchCheckoutRule');
+      if (modeSelect && liveState && liveState.game) modeSelect.value = liveState.game.mode || '501';
+      if (checkoutSelect && liveState && liveState.game) checkoutSelect.value = liveState.game.checkoutRule || 'double';
       document.getElementById('matchMenuOverlay').classList.add('open');
       loadMatchPlayers();
     }
@@ -1391,7 +1306,7 @@
       if ((type === 'direct' && playerSlots.length !== 2) || playerSlots.length < 2) { showToast('Bitte die passende Anzahl Spieler auswählen.', true); return; }
       try {
         const response = await fetch('/api/duels/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-          matchType: type, mode: document.getElementById('matchMode').value, bestOf: Number(document.getElementById('matchBestOf').value), playerSlots, tournamentName: document.getElementById('matchTournamentName').value.trim()
+          matchType: type, mode: document.getElementById('matchMode').value, checkoutRule: document.getElementById('matchCheckoutRule').value, bestOf: Number(document.getElementById('matchBestOf').value), playerSlots, tournamentName: document.getElementById('matchTournamentName').value.trim()
         }) });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'HTTP ' + response.status);
@@ -1778,37 +1693,9 @@
       const ruleLabel = rule === 'single' ? 'Single Out' : rule === 'double' ? 'Double Out' : rule === 'master' ? 'Master Out' : rule;
       return '<div class="focus-controls-card">' +
         '<div class="ctrl-title">⚙ Steuerung</div>' +
-        '<div class="ctrl-row">' +
-          '<div class="ctrl-choice">' +
-            '<span class="ctrl-choice-label">Modus</span>' +
-            '<button class="ctrl-btn mode-btn" id="ctrlModeBtn" onclick="openModeModal()" title="Spielmodus ändern">' +
-              '<span class="btn-value">' + modeLabel + '</span>' +
-            '</button>' +
-          '</div>' +
-          '<div class="ctrl-choice">' +
-            '<span class="ctrl-choice-label">Finish</span>' +
-            '<button class="ctrl-btn rule-btn rule-' + rule + '" id="ctrlRuleBtn" onclick="openRuleModal()" title="Finish-Regel ändern">' +
-              '<span class="btn-value">' + ruleLabel + '</span>' +
-            '</button>' +
-          '</div>' +
-        '</div>' +
         '<div class="ctrl-row action-row">' +
           '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
           '<button class="ctrl-btn undo" id="focusUndoBtn" onclick="undoLastThrow()" title="Letzten Wurf zurücksetzen">↶ Letzten Wurf</button>' +
-        '</div>' +
-        '<div class="modal-overlay" id="modeModal" onclick="closeModal(this, event)">' +
-          '<div class="modal-content" onclick="event.stopPropagation()">' +
-            '<h4>Spielmodus wählen</h4>' +
-            '<div class="modal-options" id="modeOptions"></div>' +
-            '<button class="modal-close" onclick="closeModal(document.getElementById(\'modeModal\'))">Abbrechen</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="modal-overlay" id="ruleModal" onclick="closeModal(this, event)">' +
-          '<div class="modal-content" onclick="event.stopPropagation()">' +
-            '<h4>Finish-Regel wählen</h4>' +
-            '<div class="modal-options" id="ruleOptions"></div>' +
-            '<button class="modal-close" onclick="closeModal(document.getElementById(\'ruleModal\'))">Abbrechen</button>' +
-          '</div>' +
         '</div>' +
       '</div>';
     }
@@ -1957,14 +1844,6 @@
         duelStatsVisibleFor = '';
         hideDuelStatsOverlay();
       }
-
-      // ── Sync buttons (Control-Kachel) ──
-      const modeBtn = document.getElementById('ctrlModeBtn');
-      const ruleBtn = document.getElementById('ctrlRuleBtn');
-      const modeLabel = mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? 'Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode;
-      const ruleLabel = state.game.checkoutRule === 'single' ? 'Single Out' : state.game.checkoutRule === 'double' ? 'Double Out' : state.game.checkoutRule === 'master' ? 'Master Out' : state.game.checkoutRule;
-      if (modeBtn) modeBtn.querySelector('.btn-value').textContent = modeLabel;
-      if (ruleBtn) ruleBtn.querySelector('.btn-value').textContent = ruleLabel;
 
       // ── Bust detection ──
       const lastThrow = state.lastAction;
@@ -2493,98 +2372,6 @@
       if (btn) { btn.disabled = false; btn.textContent = '↻ Leg-Neustart'; }
     }
 
-    // ── Spielmodus / Checkout-Regel ──
-    async function loadGameModes() {
-      try {
-        const [modesRes, rulesRes, stateRes] = await Promise.all([
-          fetch('/api/game/modes'),
-          fetch('/api/game/checkout-rules'),
-          fetch('/api/live/state')
-        ]);
-        if (stateRes.ok) {
-          const state = await stateRes.json();
-          const modeBtn = document.getElementById('ctrlModeBtn');
-          const ruleBtn = document.getElementById('ctrlRuleBtn');
-          const modeLabel = state.game.mode === '501' ? '501' : state.game.mode === '301' ? '301' : state.game.mode === '701' ? '701' : state.game.mode === 'cricket' ? 'Cricket' : state.game.mode === 'elimination' ? 'Elimination' : state.game.mode === 'shanghai' ? 'Shanghai' : state.game.mode === 'atc' ? 'ATC' : state.game.mode === 'split' ? 'Split' : state.game.mode;
-          const ruleLabel = state.game.checkoutRule === 'single' ? 'Single Out' : state.game.checkoutRule === 'double' ? 'Double Out' : state.game.checkoutRule === 'master' ? 'Master Out' : state.game.checkoutRule;
-          if (modeBtn) modeBtn.querySelector('.btn-value').textContent = modeLabel;
-          if (ruleBtn) ruleBtn.querySelector('.btn-value').textContent = ruleLabel;
-        }
-      } catch {}
-    }
-
-    async function changeMode(mode) {
-      try {
-        const r = await fetch('/api/game/mode', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode })
-        });
-        if (!r.ok) { showToast('Modus-Wechsel fehlgeschlagen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Modus: ' + mode);
-      } catch(e) { showToast('Netzwerkfehler', true); }
-    }
-
-    async function changeCheckoutRule(rule) {
-      try {
-        const r = await fetch('/api/game/checkout-rule', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rule })
-        });
-        if (!r.ok) { showToast('Regel-Wechsel fehlgeschlagen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Finish: ' + rule);
-      } catch(e) { showToast('Netzwerkfehler', true); }
-    }
-
-    // ── Modal Functions ──
-    function openModeModal() {
-      const modal = document.getElementById('modeModal');
-      const options = document.getElementById('modeOptions');
-      if (!modal || !options) return;
-      const modes = {
-        '501': '501', '301': '301', '701': '701',
-        'cricket': 'Cricket', 'elimination': 'Elimination',
-        'shanghai': 'Shanghai', 'atc': 'ATC', 'split': 'Split'
-      };
-      const currentMode = liveState?.game?.mode || '501';
-      options.innerHTML = Object.entries(modes).map(([key, label]) =>
-        '<div class="modal-option' + (key === currentMode ? ' selected' : '') + '" onclick="selectMode(\'' + key + '\')">' + label + '</div>'
-      ).join('');
-      modal.classList.add('show');
-    }
-
-    function openRuleModal() {
-      const modal = document.getElementById('ruleModal');
-      const options = document.getElementById('ruleOptions');
-      if (!modal || !options) return;
-      const rules = {
-        'double': 'Double Out', 'single': 'Single Out', 'master': 'Master Out'
-      };
-      const currentRule = liveState?.game?.checkoutRule || 'double';
-      options.innerHTML = Object.entries(rules).map(([key, label]) =>
-        '<div class="modal-option' + (key === currentRule ? ' selected' : '') + '" onclick="selectRule(\'' + key + '\')">' + label + '</div>'
-      ).join('');
-      modal.classList.add('show');
-    }
-
-    function closeModal(modal, event) {
-      if (event && event.target !== modal) return;
-      modal.classList.remove('show');
-    }
-
-    function selectMode(mode) {
-      closeModal(document.getElementById('modeModal'));
-      changeMode(mode);
-    }
-
-    function selectRule(rule) {
-      closeModal(document.getElementById('ruleModal'));
-      changeCheckoutRule(rule);
-    }
-
     function playBustSound() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2642,7 +2429,6 @@
       loadDailyHighscore();
     }
 
-    loadGameModes();
     document.getElementById('matchTypeSelect').addEventListener('change', updateMatchMenuType);
 
     (function() {
