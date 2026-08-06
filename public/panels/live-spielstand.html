@@ -1724,8 +1724,18 @@
       if (!p) return '';
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const turnScores = [];
-      const hasTurnRounds = throws.some(t => Number.isFinite(Number(t && t.turnRound)));
-      if (hasTurnRounds) {
+      const hasTurnIds = throws.some(t => Number.isFinite(Number(t && t.turnId)));
+      if (hasTurnIds) {
+        throws.forEach((throwData) => {
+          const turnId = Number(throwData && throwData.turnId);
+          const previous = turnScores[turnScores.length - 1];
+          if (!previous || previous.turnId !== turnId) turnScores.push({ turnId, score: 0, busted: false, throws: [] });
+          const turn = turnScores[turnScores.length - 1];
+          turn.score += throwData.bust ? 0 : (Number(throwData.points) || 0);
+          turn.busted = turn.busted || !!throwData.bust;
+          turn.throws.push({ label: throwData.segment || throwData.points, bust: !!throwData.bust });
+        });
+      } else if (throws.some(t => Number.isFinite(Number(t && t.turnRound)))) {
         throws.forEach((throwData) => {
           const turnRound = Number(throwData && throwData.turnRound);
           const previous = turnScores[turnScores.length - 1];

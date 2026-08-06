@@ -123,14 +123,6 @@
   <div class="section" data-admin-panel="game">
     <div class="sec-hd"><span class="sec-title">Erweiterte Spielfunktionen</span><div class="sec-line"></div></div>
     <fieldset>
-      <div class="field-row">
-        <label>Automatische Begegnungen</label>
-        <input type="checkbox" id="automaticEncountersEnabled" />
-      </div>
-      <div class="field-hint">Bei mindestens zwei benannten Spielern wird für 301, 501 und 701 automatisch eine Begegnung angelegt und fortlaufend gespeichert.</div>
-      <button class="btn-save" id="saveEncounterSettingsBtn">Einstellungen speichern</button>
-    </fieldset>
-    <fieldset>
       <legend>Begegnungen verwalten</legend>
       <div class="field-hint" style="margin:0 0 8px">Nicht gewertete oder versehentlich angelegte Begegnungen können hier vollständig entfernt werden.</div>
       <button class="btn-save" id="refreshDuelsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Begegnungen laden</button>
@@ -502,7 +494,6 @@
       document.getElementById('firetvUiScale').value = String(settings.firetvUiScale || 100);
       document.getElementById('firetvShowClock').checked = settings.firetvShowClock !== false;
       document.getElementById('matrixAutoThrowEnabled').checked = settings.matrixAutoThrowEnabled !== false;
-      document.getElementById('automaticEncountersEnabled').checked = settings.automaticEncountersEnabled !== false;
       updateRaspiDiagnostics(diagnostics);
     } catch(e) {
       document.getElementById('si-ip').textContent = 'Offline';
@@ -979,20 +970,6 @@
   document.getElementById('saveStatsBtn').addEventListener('click', saveAdminStats);
   document.getElementById('resetStatsBtn').addEventListener('click', resetAdminStats);
   loadAdminPlayers();
-
-  document.getElementById('saveEncounterSettingsBtn').addEventListener('click', async function() {
-    this.disabled = true;
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ automaticEncountersEnabled: document.getElementById('automaticEncountersEnabled').checked })
-      });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      showToast('Begegnungseinstellungen gespeichert.');
-    } catch (err) { showToast('Fehler: ' + err.message, true); }
-    this.disabled = false;
-  });
 
   function formatAdminDuelStatus(duel) {
     return duel.status === 'finished' ? 'beendet' : 'offen';

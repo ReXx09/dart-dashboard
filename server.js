@@ -708,43 +708,6 @@ function getSettings() {
 }
 function saveSettings(s) { writeJson(SETTINGS_FILE, s); }
 
-let automaticEncounterCreation = null;
-
-async function ensureAutomaticEncounter(state) {
-  if (!state || !state.game || state.game.duelId || state.game.status !== 'running') return state;
-  if (getSettings().automaticEncountersEnabled === false) return state;
-  if (!['501', '301', '701'].includes(String(state.game.mode || ''))) return state;
-  const participants = (Array.isArray(state.players) ? state.players : [])
-    .filter(player => Number(player.slot) > 0 && String(player.name || '').trim())
-    .slice(0, 8);
-  if (participants.length < 2) return state;
-
-  if (!automaticEncounterCreation) {
-    automaticEncounterCreation = (async () => {
-      const profiles = await dataStore.getProfiles();
-      const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
-      return dataStore.createDuel({
-        mode: state.game.mode,
-        players: participants.map(player => ({
-          slot: player.slot,
-          name: player.name,
-          profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null
-        }))
-      });
-    })().finally(() => { automaticEncounterCreation = null; });
-  }
-  const duel = await automaticEncounterCreation;
-  for (const participant of participants) {
-    await dataStore.initPlayerStats(participant.slot);
-    const stats = await dataStore.getPlayerStats(participant.slot) || {};
-    await dataStore.updatePlayerStats(participant.slot, {
-      games_played: Number(stats.games_played || 0) + 1
-    });
-  }
-  state.game.duelId = duel.id;
-  return state;
-}
-
 function clampNumber(value, fallback, min, max) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -1229,6 +1192,19 @@ function clearPendingArduinoThrow() {
   pendingArduinoThrow = null;
 }
 
+function advanceLiveTurn(state) {
+  state.game.turnId = Math.max(1, Number(state.game.turnId || 1) + 1);
+  return state.game.turnId;
+}
+
+function restoreCurrentRoundPoints(player, turnId) {
+  const throws = Array.isArray(player.throws) ? player.throws : [];
+  player.currentRoundPoints = throws
+    .filter(item => Number(item && item.turnId) === Number(turnId) && item.source !== 'manual-miss')
+    .map(item => Number(item.points) || 0);
+  player.turnScoreRecorded = false;
+}
+
 async function recordPlayerLegStats(player, state, options = {}) {
   try {
     if (!options.skipDuel) await recordDuelLegIfActive(state, player);
@@ -1419,6 +1395,7 @@ async function advanceAfterBust(state, player, source) {
   player.turnScoreRecorded = false;
   state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
   state.game.currentThrow = 0;
+  advanceLiveTurn(state);
   state.players[state.game.activePlayer].currentRoundPoints = [];
   state.players[state.game.activePlayer].turnScoreRecorded = false;
   if (state.game.activePlayer === 0) {
@@ -1465,6 +1442,7 @@ async function advanceAfterThreeThrows(state, player, source) {
   player.turnScoreRecorded = false;
   state.game.activePlayer = (state.game.activePlayer + 1) % state.players.length;
   state.game.currentThrow = 0;
+  advanceLiveTurn(state);
   // Neuen aktiven Spieler's currentRoundPoints leeren
   state.players[state.game.activePlayer].currentRoundPoints = [];
   state.players[state.game.activePlayer].turnScoreRecorded = false;
@@ -1482,7 +1460,6 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
   if (value == null) return { ok: false, reason: 'unknown-channel', channel: formatChannel(channel) };
 
   const state = await getLiveState();
-  await ensureAutomaticEncounter(state);
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
   if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
 
@@ -1545,6 +1522,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     bust,
     ts: Date.now(),
     source: 'arduino',
+    turnId: state.game.turnId || 1,
     segment: throwSegment,
     channel: formatChannel(channel),
     raw: evt.line || null
@@ -1626,7 +1604,6 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
 
 async function applyArduinoMiss(evt = {}, reason = 'timeout') {
   const state = await getLiveState();
-  await ensureAutomaticEncounter(state);
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
   if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
 
@@ -1881,6 +1858,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     bust,
     ts: Date.now(),
     source: 'arduino-matrix',
+    turnId: state.game.turnId || 1,
     segment: throwSegment,
     row: hit.row,
     column: hit.column,
@@ -2041,6 +2019,7 @@ function parseArduinoLine(line) {
         const nextIdx = (state.game.activePlayer + 1) % state.players.length;
         state.game.activePlayer = nextIdx;
         state.game.currentThrow = 0;
+        advanceLiveTurn(state);
         state.game.throwRound = (state.game.throwRound || 1) + 1;
         state.lastAction = { type: 'player-switch-btn', player: state.players[nextIdx].name, playerSlot: state.players[nextIdx].slot, ts: Date.now() };
         await saveLiveState(state);
@@ -2483,6 +2462,7 @@ function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
       activePlayer: 0,
       throwRound: 1,
       currentThrow: 0,
+      turnId: 1,
       duelId: null,
       selectedPlayerSlots: players.map(player => Number(player.slot))
     },
@@ -2544,6 +2524,7 @@ async function getLiveState() {
       activePlayer: Math.min(Number(saved.game?.activePlayer || 0), mergedPlayers.length - 1),
       throwRound: Number(saved.game?.throwRound || 1),
       currentThrow: Number(saved.game?.currentThrow || 0),
+      turnId: Math.max(1, Number(saved.game?.turnId || 1)),
       duelId: Number(saved.game?.duelId || 0) || null,
       selectedPlayerSlots: mergedPlayers.map(player => Number(player.slot)),
       matchType: String(saved.game?.matchType || ''),
@@ -2678,7 +2659,6 @@ app.post('/api/game/mode', async (req, res) => {
   try {
     savedLiveMode = mode;
     const fresh = resetLiveState(false, mode);
-    await ensureAutomaticEncounter(fresh);
     const saved = await saveLiveState(fresh);
     broadcastReload();
     res.json(saved);
@@ -2727,7 +2707,6 @@ app.post('/api/live/players', async (req, res) => {
     if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
     const fresh = await defaultLiveState(savedLiveMode, slots);
     fresh.game.selectedPlayerSlots = slots;
-    await ensureAutomaticEncounter(fresh);
     const saved = await saveLiveState(fresh);
     broadcastReload();
     res.json(saved);
@@ -3052,7 +3031,6 @@ app.post('/api/live/reset', async (req, res) => {
       fresh.game.legsToWin = Math.max(1, Number(current.game.legsToWin || 1));
       fresh.game.tournamentName = String(current.game.tournamentName || '');
     }
-    await ensureAutomaticEncounter(fresh);
     const saved = await saveLiveState(fresh);
     broadcastReload();
     res.json(saved);
@@ -3065,17 +3043,25 @@ app.post('/api/live/throw', async (req, res) => {
   const points = Number(req.body && req.body.points);
 
   let targetIndex = -1;
-  if (Number.isInteger(playerSlot) && playerSlot > 0) targetIndex = playerSlot - 1;
+  if (Number.isInteger(playerSlot) && playerSlot > 0) {
+    targetIndex = Number.isInteger(playerIndex) && playerIndex >= 0
+      ? playerIndex
+      : -1;
+  }
   else if (Number.isInteger(playerIndex) && playerIndex >= 0) targetIndex = playerIndex;
 
-  if (targetIndex < 0) return res.status(400).json({ error: 'playerSlot oder playerIndex erforderlich.' });
+  if (!(Number.isInteger(playerSlot) && playerSlot > 0) && targetIndex < 0) {
+    return res.status(400).json({ error: 'playerSlot oder playerIndex erforderlich.' });
+  }
   if (!Number.isFinite(points) || points < 0 || points > 180) return res.status(400).json({ error: 'points muss zwischen 0 und 180 liegen.' });
 
   try {
     const state = await getLiveState();
-    await ensureAutomaticEncounter(state);
+    if (Number.isInteger(playerSlot) && playerSlot > 0) {
+      targetIndex = state.players.findIndex(player => Number(player.slot) === playerSlot);
+    }
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
-    if (targetIndex >= state.players.length) return res.status(400).json({ error: 'Spieler nicht gefunden.' });
+    if (targetIndex < 0 || targetIndex >= state.players.length) return res.status(400).json({ error: 'Spieler nicht gefunden.' });
 
     const player = state.players[targetIndex];
     const mode = state.game.mode || DEFAULT_MODE;
@@ -3120,7 +3106,7 @@ app.post('/api/live/throw', async (req, res) => {
 
     if (!Array.isArray(player.throws)) player.throws = [];
     const throwSegment = incomingSegment;
-    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment });
+    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment, turnId: state.game.turnId || 1 });
     queueLiveDetailWrite(
       () => dataStore.recordThrowSegment(player.slot, throwSegment, points, mode, bust, Date.now(), state.game.duelId),
       'Manueller Wurf'
@@ -3205,13 +3191,15 @@ app.post('/api/live/next-player', async (req, res) => {
           segment: 'MISS',
           source: 'manual-miss',
           ts: Date.now(),
-          mode: state.game.mode
+          mode: state.game.mode,
+          turnId: state.game.turnId || 1
         });
       }
     }
     const nextIndex = (state.game.activePlayer + 1) % state.players.length;
     state.game.activePlayer = nextIndex;
     state.game.currentThrow = 0;
+    advanceLiveTurn(state);
     state.game.throwRound = (state.game.throwRound || 1) + 1;
     // Neuen aktiven Spieler's currentRoundPoints leeren
     state.players[nextIndex].currentRoundPoints = [];
@@ -3227,20 +3215,26 @@ app.post('/api/live/undo', async (req, res) => {
   try {
     const state = await getLiveState();
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
-    let lastThrowTime = 0, lastThrowPlayer = -1;
+    let lastThrowTime = 0, lastThrowPlayer = -1, lastThrowIndex = -1;
 
     state.players.forEach((player, idx) => {
-      if (Array.isArray(player.throws) && player.throws.length > 0) {
-        const lastT = player.throws[player.throws.length - 1];
-        if (lastT.ts > lastThrowTime) { lastThrowTime = lastT.ts; lastThrowPlayer = idx; }
+      const throws = Array.isArray(player.throws) ? player.throws : [];
+      for (let throwIndex = throws.length - 1; throwIndex >= 0; throwIndex -= 1) {
+        const candidate = throws[throwIndex];
+        if (candidate && candidate.source === 'manual-miss') continue;
+        if (candidate && Number(candidate.ts || 0) > lastThrowTime) {
+          lastThrowTime = Number(candidate.ts || 0);
+          lastThrowPlayer = idx;
+          lastThrowIndex = throwIndex;
+        }
+        break;
       }
     });
 
     if (lastThrowPlayer === -1) return res.status(400).json({ error: 'Kein Wurf zum Rückgängigmachen vorhanden.' });
 
     const player = state.players[lastThrowPlayer];
-    const lastThrow = player.throws.pop();
-    const roundIndex = player.currentRoundPoints ? player.currentRoundPoints.length - 1 : -1;
+    const lastThrow = player.throws.splice(lastThrowIndex, 1)[0];
 
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
@@ -3254,9 +3248,17 @@ app.post('/api/live/undo', async (req, res) => {
     player.turns = Math.max(0, player.turns - 1);
     player.average = calculateCurrentRoundAverage(player);
 
-    if (roundIndex >= 0 && player.currentRoundPoints) player.currentRoundPoints.pop();
+    if (Number.isFinite(Number(lastThrow.turnId))) {
+      restoreCurrentRoundPoints(player, lastThrow.turnId);
+    } else if (Array.isArray(player.currentRoundPoints) && player.currentRoundPoints.length > 0) {
+      player.currentRoundPoints.pop();
+      player.turnScoreRecorded = false;
+    } else {
+      player.currentRoundPoints = [];
+      player.turnScoreRecorded = false;
+    }
 
-    state.game.currentThrow = Math.max(0, (state.game.currentThrow || 1) - 1);
+    state.game.currentThrow = player.currentRoundPoints.length;
     state.game.activePlayer = lastThrowPlayer;
     state.lastAction = { type: 'undo', player: player.name, points: lastThrow.points, ts: Date.now() };
 
