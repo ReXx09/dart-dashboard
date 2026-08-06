@@ -1359,6 +1359,7 @@ async function recordPlayerLegStats(player, state, options = {}) {
 
 async function recordCompletedLegStats(state, winner) {
   const completedPlayers = Array.isArray(state.players) ? state.players.map(player => ({ ...player })) : [];
+  const completedDuelId = Number(state.game?.duelId || 0) || null;
   const tournamentAdvance = await recordDuelLegIfActive(state, winner);
   if (tournamentAdvance?.nextDuel) {
     const nextDuel = tournamentAdvance.nextDuel;
@@ -1378,6 +1379,7 @@ async function recordCompletedLegStats(state, winner) {
     fresh.lastAction = {
       type: 'tournament-advance',
       tournamentId: state.game.tournamentId,
+      completedDuelId,
       previousWinnerSlot: winner.slot,
       previousWinner: winner.name,
       previousLoserSlot: (state.players || []).find(player => Number(player.slot) !== Number(winner.slot))?.slot || null,
@@ -3137,10 +3139,11 @@ app.post('/api/duels/start', async (req, res) => {
       ? await dataStore.createTournament({ mode, tournamentName, players: tournamentPlayers, bestOf })
       : null;
     const duel = tournament ? tournament.duel : await dataStore.createDuel({ mode, matchType, tournamentName, players: tournamentPlayers });
-    const fresh = await defaultLiveState(mode, slots);
+    const activeSlots = tournament ? duel.players.map(player => Number(player.player_slot)) : slots;
+    const fresh = await defaultLiveState(mode, activeSlots);
     fresh.game.duelId = duel.id;
     fresh.game.checkoutRule = checkoutRule;
-    fresh.game.selectedPlayerSlots = slots;
+    fresh.game.selectedPlayerSlots = activeSlots;
     fresh.game.matchType = matchType;
     fresh.game.bestOf = bestOf;
     fresh.game.legsToWin = Math.ceil(bestOf / 2);

@@ -1299,7 +1299,7 @@
         const [modesRes, rulesRes, stateRes] = await Promise.all([
           fetch('/api/game/modes'),
           fetch('/api/game/checkout-rules'),
-          fetch('/api/live/state')
+          fetch('/api/live/state', { cache: 'no-store' })
         ]);
         if (modesRes.ok) {
           const modes = await modesRes.json();
@@ -1452,7 +1452,7 @@
 
     async function loadAll(retryAttempt = 0) {
       try {
-        const stateRes = await fetch('/api/live/state');
+        const stateRes = await fetch('/api/live/state', { cache: 'no-store' });
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;

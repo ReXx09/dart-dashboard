@@ -1241,6 +1241,7 @@
     let duelStatsVisibleFor = '';
     let duelStatsCache = null;
     let duelStatsCacheKey = '';
+    let duelStatsRenderState = null;
     let duelStatsLegIndex = -1;
     let legStartTimer = null;
     let legStartRemaining = 0;
@@ -1500,6 +1501,7 @@
     function renderDuelStatsOverlay(duel, state) {
       const overlay = document.getElementById('duelStatsOverlay');
       if (!overlay) return;
+      duelStatsRenderState = state;
       const legs = Array.isArray(duel && duel.legs) ? duel.legs.slice().sort((a, b) => Number(a.leg_number || 0) - Number(b.leg_number || 0)) : [];
       if (!legs.length) return;
       if (duelStatsLegIndex >= legs.length) duelStatsLegIndex = -1;
@@ -1559,7 +1561,7 @@
       } else if (direction < 0) {
         duelStatsLegIndex = duelStatsLegIndex <= 0 ? -1 : duelStatsLegIndex - 1;
       }
-      renderDuelStatsOverlay(duelStatsCache, liveState);
+      renderDuelStatsOverlay(duelStatsCache, duelStatsRenderState || liveState);
     }
 
     let heatmapMetric = localStorage.getItem('duelHeatmapMetric') || 'accuracy';
@@ -1652,6 +1654,42 @@
           duelStatsVisibleFor = key;
           hideWinnerOverlay();
         } catch {
+          duelStatsScheduledFor = '';
+        }
+      }, 5000);
+    }
+
+    async function showTournamentDuelStatsAfterAdvance(state) {
+      const action = state && state.lastAction;
+      const duelId = Number(action && action.completedDuelId || 0);
+      const key = action && action.type === 'tournament-advance' ? 'tournament:' + duelId + ':' + String(action.ts || '') : '';
+      if (!key || !duelId || duelStatsVisibleFor === key || duelStatsScheduledFor === key) return;
+      duelStatsScheduledFor = key;
+      duelStatsTimer = setTimeout(async () => {
+        duelStatsTimer = null;
+        try {
+          const response = await fetch('/api/duels/' + encodeURIComponent(duelId), { cache: 'no-store' });
+          if (!response.ok) throw new Error('Turnierduell konnte nicht geladen werden');
+          const duel = await response.json();
+          if (!duel || !Array.isArray(duel.players) || duel.players.length < 2 || !Array.isArray(duel.legs) || duel.legs.length < 1) return;
+          const previousPlayers = duel.players.map(player => ({
+            slot: Number(player.player_slot),
+            name: player.player_name,
+            legs: duel.legs.filter(leg => (leg.players || []).some(item => Number(item.player_slot) === Number(player.player_slot) && Number(item.won || 0))).length
+          }));
+          const statsState = {
+            ...state,
+            players: previousPlayers,
+            game: { ...state.game, duelId, status: 'leg-finished' },
+            lastAction: { ...state.lastAction, winnerSlot: Number(duel.winner_slot || 0) || null }
+          };
+          duelStatsLegIndex = -1;
+          duelStatsCache = duel;
+          duelStatsCacheKey = key;
+          renderDuelStatsOverlay(duel, statsState);
+          duelStatsVisibleFor = key;
+          hideWinnerOverlay();
+        } catch (_error) {
           duelStatsScheduledFor = '';
         }
       }, 5000);
@@ -1980,7 +2018,9 @@
       const compactPlayers = document.getElementById('compactPlayers');
       const duelStatsKey = getDuelStatsKey(state);
       updateDuelStatsToggle(state);
-      if (!duelStatsKey || state.game.status !== 'leg-finished') {
+      const isTournamentAdvance = state.lastAction && state.lastAction.type === 'tournament-advance';
+      if (isTournamentAdvance) showTournamentDuelStatsAfterAdvance(state);
+      if (!isTournamentAdvance && (!duelStatsKey || state.game.status !== 'leg-finished')) {
         if (duelStatsTimer) { clearTimeout(duelStatsTimer); duelStatsTimer = null; }
         duelStatsScheduledFor = '';
         duelStatsVisibleFor = '';
