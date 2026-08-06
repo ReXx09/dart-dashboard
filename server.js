@@ -1630,7 +1630,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     ruleStats.success += 1;
     ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode, checkoutRule });
+    await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
     state.lastAction.winner = player.name;
@@ -1639,7 +1639,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     await recordCompletedLegStats(state, player);
   } else if (isCricket && checkCricketWin(player, state.players)) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino', gameMode: mode });
+    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino', gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot });
     state.game.status = 'leg-finished';
     state.lastAction.cricketWin = true;
     state.lastAction.winner = player.name;
@@ -1650,7 +1650,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     const winner = getEliminationWinner(state);
     if (winner) {
       winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
-      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino', gameMode: mode });
+      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino', gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot });
       state.game.status = 'leg-finished';
       state.lastAction.eliminationWin = true;
       state.lastAction.winner = winner.name;
@@ -1982,7 +1982,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     ruleStats.success += 1;
     ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode, checkoutRule });
+    await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
     state.lastAction.winner = player.name;
@@ -1991,7 +1991,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     await recordCompletedLegStats(state, player);
   } else if (isCricket && checkCricketWin(player, state.players)) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix', gameMode: mode });
+    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix', gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot });
     state.game.status = 'leg-finished';
     state.lastAction.cricketWin = true;
     state.lastAction.winner = player.name;
@@ -2002,7 +2002,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     const winner = getEliminationWinner(state);
     if (winner) {
       winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
-      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino-matrix', gameMode: mode });
+      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino-matrix', gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot });
       state.game.status = 'leg-finished';
       state.lastAction.eliminationWin = true;
       state.lastAction.winner = winner.name;
@@ -2466,7 +2466,7 @@ async function addTurnScoreHighscoreIfNeeded(player, state, source = 'live') {
 
   player.turnScoreRecorded = true;
   queueLiveDetailWrite(
-    () => addHighscore(player.name, turnScore, { kind, source, gameMode: state.game.mode }),
+    () => addHighscore(player.name, turnScore, { kind, source, gameMode: state.game.mode, duelId: state.game.duelId, playerSlot: player.slot }),
     'Turn-Highscore'
   );
 }
@@ -2646,7 +2646,12 @@ async function addHighscore(playerName, score, meta = {}) {
   const safeName = String(playerName || '').trim();
   const safeScore = Number(score || 0);
   if (!safeName || !Number.isFinite(safeScore) || safeScore <= 0) return;
-  await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, gameMode: meta.gameMode || meta.mode || null, ...meta });
+  let playerSlot = Number(meta.playerSlot) > 0 ? Number(meta.playerSlot) : null;
+  if (!playerSlot) {
+    const matches = (await dataStore.getPlayers()).filter(player => String(player.name || '').trim().toLowerCase() === safeName.toLowerCase());
+    if (matches.length === 1) playerSlot = Number(matches[0].slot) || null;
+  }
+  await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, gameMode: meta.gameMode || meta.mode || null, ...meta, playerSlot });
 }
 
 // ──────────────────────────────────────────────
@@ -2957,9 +2962,11 @@ app.get('/api/live/state', async (_req, res) => {
 
 app.get('/api/duels', async (req, res) => {
   const category = String(req.query.category || 'all').trim().toLowerCase();
+  const status = String(req.query.status || '').trim().toLowerCase();
   if (!['all', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, duel, group oder tournament sein.' });
+  if (status && !['active', 'finished', 'canceled'].includes(status)) return res.status(400).json({ error: 'status muss active, finished oder canceled sein.' });
   try {
-    const duels = await dataStore.listDuels(req.query.limit || 20);
+    const duels = await dataStore.listDuels(req.query.limit || 20, status);
     res.json(category === 'all' ? duels : duels.filter(duel => duel.category === category));
   }
   catch (err) { res.status(500).json({ error: 'Begegnungen konnten nicht geladen werden: ' + err.message }); }
@@ -2975,7 +2982,7 @@ app.get('/api/duels/current', async (_req, res) => {
 
 app.get('/api/duels/top', async (req, res) => {
   try {
-    const duels = await dataStore.listDuels(100);
+    const duels = await dataStore.listDuels(100, 'finished');
     const top = duels
       .filter(duel => ['501', '301', '701'].includes(String(duel.mode)))
       .sort((a, b) => Number(b.total_legs || 0) - Number(a.total_legs || 0) || Number(b.participant_count || 0) - Number(a.participant_count || 0))
@@ -2989,9 +2996,11 @@ app.get('/api/duel-stats', async (req, res) => {
   if (slots.length > 8) return res.status(400).json({ error: 'playerSlots darf höchstens 8 Slots enthalten.' });
   const exactGroup = String(req.query.exact || 'false').toLowerCase() === 'true';
   const category = String(req.query.category || 'all').trim().toLowerCase();
+  const status = String(req.query.status || 'finished').trim().toLowerCase();
   if (!['all', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, duel, group oder tournament sein.' });
+  if (!['active', 'finished', 'canceled'].includes(status)) return res.status(400).json({ error: 'status muss active, finished oder canceled sein.' });
   try {
-    const duels = await dataStore.listDuels(100);
+    const duels = await dataStore.listDuels(100, status);
     const wanted = slots.join('-');
     const matching = duels.filter(duel => {
       if (category !== 'all' && duel.category !== category) return false;
@@ -3050,11 +3059,18 @@ app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
     const duel = await dataStore.getDuel(duelId);
     if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
     const state = await getLiveState();
-    if (Number(state.game?.duelId) === duelId && state.game?.status === 'running') {
+    const isCurrentDuel = Number(state.game?.duelId) === duelId;
+    const isUnplayed = duel.status === 'active' && Number(duel.total_legs || 0) === 0 && (duel.legs || []).length === 0;
+    if (isCurrentDuel && state.game?.status === 'running' && !isUnplayed) {
       return res.status(409).json({ error: 'Die aktuell laufende Begegnung kann nicht gelöscht werden.' });
     }
     const deleted = await dataStore.deleteDuel(duelId);
     if (!deleted) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
+    if (isCurrentDuel) {
+      const fresh = await defaultLiveState(String(state.game?.mode || DEFAULT_MODE), state.game?.selectedPlayerSlots);
+      await saveLiveState(fresh);
+      broadcastReload();
+    }
     res.json({ ok: true, id: duelId });
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gelöscht werden: ' + err.message }); }
 });
@@ -3245,7 +3261,7 @@ app.post('/api/live/throw', async (req, res) => {
       ruleStats.success += 1;
       ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
       player.legs += 1;
-      await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, gameMode: mode, checkoutRule });
+      await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot });
       state.game.status = 'leg-finished';
       state.lastAction.legWin = true;
       state.lastAction.winner = player.name;
@@ -3254,7 +3270,7 @@ app.post('/api/live/throw', async (req, res) => {
       await recordCompletedLegStats(state, player);
     } else if (isCricket && checkCricketWin(player, state.players)) {
       player.legs += 1;
-      await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, gameMode: mode });
+      await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot });
       state.game.status = 'leg-finished';
       state.lastAction.cricketWin = true;
       state.lastAction.winner = player.name;
@@ -3265,7 +3281,7 @@ app.post('/api/live/throw', async (req, res) => {
       const winner = getEliminationWinner(state);
       if (winner) {
         winner.legs += 1;
-        await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, gameMode: mode });
+        await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot });
         state.game.status = 'leg-finished';
         state.lastAction.eliminationWin = true;
         state.lastAction.winner = winner.name;

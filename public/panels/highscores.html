@@ -258,6 +258,15 @@
     .player { font-weight: 700; color: #f1f1f1; }
     .muted { color: #666; font-style: italic; }
     .time { color: #666; white-space: nowrap; }
+    .score-context { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .score-badge { display: inline-block; border: 1px solid #2d2d2d; border-radius: 4px; padding: 2px 5px; color: #aaa; background: #101010; font-size: .62rem; white-space: nowrap; }
+    .score-badge.category { color: #f4a261; border-color: #5b3d28; }
+    .score-actions { display: flex; gap: 5px; justify-content: flex-end; }
+    .score-action { border: 1px solid #2d2d2d; background: #1b1b1b; color: #bbb; border-radius: 5px; padding: 4px 6px; cursor: pointer; font: inherit; font-size: .65rem; white-space: nowrap; }
+    .score-action:hover { border-color: #f4a261; color: #f4a261; }
+    .compact-table th, .compact-table td { padding: 6px 8px; }
+    .compact-table th { font-size: .62rem; }
+    .compact-table td { font-size: .78rem; }
     .empty {
       padding: 34px 16px;
       text-align: center;
@@ -472,7 +481,7 @@
           <div><h2>Begegnungs-Highscores</h2><p>Bestwerte aus 2-Player-Duellen und Gruppen mit 3–8 Spielern</p></div>
         </div>
         <nav class="encounter-nav" aria-label="Highscore-Kategorien">
-          <button type="button" data-encounter-category="single" onclick="showHighscoreTab('scores')">Einzel</button>
+          <button type="button" data-encounter-category="single" onclick="setScoreCategory('single')">Einzel</button>
           <button type="button" data-encounter-category="duel" class="active" onclick="setEncounterCategory('duel')">Duelle</button>
           <button type="button" data-encounter-category="group" onclick="setEncounterCategory('group')">Begegnungen</button>
           <button type="button" data-encounter-category="tournament" onclick="setEncounterCategory('tournament')">Turniere</button>
@@ -485,7 +494,7 @@
 
     <div class="tab-panel" id="tab-players" role="tabpanel">
       <div class="tables-grid">
-        <section class="panel">
+          <section class="panel">
           <div class="panel-header">
             <div>
               <div class="panel-title">Best Off</div>
@@ -512,11 +521,20 @@
               <div class="panel-title" id="listTitle">Best Off</div>
               <div class="panel-subtitle" id="listSubtitle">Alle gespeicherten Scores</div>
             </div>
-            <div class="legend" id="legend"></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+              <select id="scoreCategorySelect" aria-label="Highscore-Kategorie" style="width:auto;min-width:150px;padding:7px 9px;font-size:.75rem">
+                <option value="all">Alle Kategorien</option>
+                <option value="single">Einzel</option>
+                <option value="duel">Duelle</option>
+                <option value="group">Begegnungen</option>
+                <option value="tournament">Turniere</option>
+              </select>
+              <div class="legend" id="legend"></div>
+            </div>
           </div>
-          <table>
+          <table class="compact-table">
             <thead>
-              <tr><th class="rank">#</th><th>Spieler</th><th>Score</th><th>Typ</th><th>Zeit</th><th></th></tr>
+              <tr><th class="rank">#</th><th>Spieler</th><th>Score</th><th>Kontext</th><th>Zeit</th><th>Aktionen</th></tr>
             </thead>
             <tbody id="scoreBody">
               <tr><td colspan="6" class="empty">Lade Highscores...</td></tr>
@@ -545,6 +563,7 @@
     let allScores = [];
     let selectedFilter = 'all';
     let selectedGameMode = '';
+    let selectedScoreCategory = 'all';
     let overviewData = null;
     let selectedOverviewPlayer = 'all';
     let encounters = [];
@@ -575,6 +594,7 @@
       finish: 'Finishes',
       manual: 'Manuelle Scores'
     };
+    const CATEGORY_LABELS = { single: 'Einzel', duel: 'Duell', group: 'Begegnung', tournament: 'Turnier' };
 
     updateClock();
     setInterval(updateClock, 1000);
@@ -615,7 +635,18 @@
       if (button) button.click();
     }
 
+    function setScoreCategory(category) {
+      selectedScoreCategory = category;
+      document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
+      document.getElementById('scoreCategorySelect').value = category;
+      selectedFilter = 'all';
+      document.getElementById('scoreSelect').value = 'all';
+      showHighscoreTab('scores');
+      render();
+    }
+
     function setEncounterCategory(category) {
+      selectedScoreCategory = category;
       selectedEncounterCategory = category;
       document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
       renderEncounters();
@@ -808,6 +839,7 @@
     function filterScores() {
       const player = document.getElementById('playerFilter').value;
       return allScores
+        .filter(entry => selectedScoreCategory === 'all' || String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single')) === selectedScoreCategory)
         .filter(entry => !selectedGameMode || String(entry.gameMode || '').toLowerCase() === selectedGameMode)
         .filter(entry => scoreMatchesFilter(entry, selectedFilter))
         .filter(entry => !player || String(entry.player) === player)
@@ -861,11 +893,12 @@
     }
 
     function renderSummary(list, bestByPlayer) {
-      document.getElementById('totalEntries').textContent = allScores.length;
+      const categoryScores = selectedScoreCategory === 'all' ? allScores : allScores.filter(entry => String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single')) === selectedScoreCategory);
+      document.getElementById('totalEntries').textContent = categoryScores.length;
       document.getElementById('visibleEntries').textContent = list.length;
       document.getElementById('visibleMeta').textContent = LIST_LABELS[selectedFilter] || 'Liste';
 
-      const best = allScores.slice().sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0))[0];
+      const best = categoryScores.slice().sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0))[0];
       document.getElementById('bestScore').textContent = best ? best.score : '-';
       document.getElementById('bestScoreMeta').textContent = best ? (best.player + ' · ' + formatTime(best.ts)) : '-';
 
@@ -898,9 +931,9 @@
           '<td class="rank">' + (idx + 1) + '</td>' +
           '<td class="player">' + escapeHtml(entry.player) + '</td>' +
           '<td class="score">' + entry.score + '</td>' +
-          '<td>' + escapeHtml(kind) + (entry.checkoutRule ? ' / ' + escapeHtml(entry.checkoutRule) : '') + (entry.legWin ? ' / LegWin' : '') + '</td>' +
-          '<td class="time">' + formatTime(entry.ts) + '</td>' +
-          '<td><button class="btn delete" type="button" data-delete-id="' + Number(entry.id || 0) + '" title="Highscore löschen">Löschen</button></td>' +
+          '<td><div class="score-context"><span class="score-badge category">' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Einzel') + '</span><span class="score-badge">' + escapeHtml(entry.gameMode || '-') + '</span><span class="score-badge">' + escapeHtml(kind) + (entry.checkoutRule ? ' / ' + escapeHtml(entry.checkoutRule) : '') + (entry.legWin ? ' / Leg' : '') + '</span></div></td>' +
+          '<td class="time" title="' + escapeHtml(formatTime(entry.ts)) + '">' + escapeHtml(formatRelativeTime(entry.ts)) + '</td>' +
+          '<td><div class="score-actions"><button class="score-action" type="button" data-detail-id="' + Number(entry.id || 0) + '" title="Score-Details öffnen">Details</button><button class="score-action" type="button" data-delete-id="' + Number(entry.id || 0) + '" title="Highscore löschen">Löschen</button></div></td>' +
         '</tr>';
       }).join('');
     }
@@ -925,11 +958,14 @@
     function render() {
       renderPlayerFilter();
       const list = filterScores();
-      const bestByPlayer = buildBestByPlayer(allScores);
+      const categoryScores = selectedScoreCategory === 'all' ? allScores : allScores.filter(entry => String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single')) === selectedScoreCategory);
+      const bestByPlayer = buildBestByPlayer(categoryScores);
       renderSummary(list, bestByPlayer);
       renderLegend();
       document.getElementById('listTitle').textContent = LIST_LABELS[selectedFilter] || 'Liste';
-      document.getElementById('listSubtitle').textContent = selectedFilter === 'all' ? 'Alle gespeicherten Scores' : 'Gefilterte Datenbank-Einträge';
+      document.getElementById('listSubtitle').textContent = selectedScoreCategory !== 'all'
+        ? 'Scores aus ' + (CATEGORY_LABELS[selectedScoreCategory] || selectedScoreCategory)
+        : selectedFilter === 'all' ? 'Alle gespeicherten Scores' : 'Gefilterte Datenbank-Einträge';
       renderTable(list);
       renderBestByPlayer(bestByPlayer);
     }
@@ -959,6 +995,35 @@
       }
     }
 
+    function formatRelativeTime(ts) {
+      if (!ts) return '-';
+      const seconds = Math.max(0, Math.round((Date.now() - Number(ts)) / 1000));
+      if (seconds < 60) return 'gerade eben';
+      if (seconds < 3600) return 'vor ' + Math.floor(seconds / 60) + ' Min.';
+      if (seconds < 86400) return 'vor ' + Math.floor(seconds / 3600) + ' Std.';
+      return 'vor ' + Math.floor(seconds / 86400) + ' Tg.';
+    }
+
+    function openScoreDetail(id) {
+      const entry = allScores.find(item => Number(item.id) === Number(id));
+      if (!entry) return;
+      if (Number(entry.duelId || 0) > 0) {
+        openEncounterDetail(entry.duelId, 'duel');
+        return;
+      }
+      document.getElementById('encounterDialog').classList.add('is-open');
+      document.getElementById('encounterDialogTitle').textContent = 'Score-Details · ' + String(entry.player || 'Spieler');
+      document.getElementById('encounterDialogTabs').innerHTML = '';
+      document.getElementById('encounterDialogContent').innerHTML = '<div class="encounter-detail-table"><table><tbody>' +
+        '<tr><th>Spieler</th><td class="accent">' + escapeHtml(entry.player) + '</td></tr>' +
+        '<tr><th>Score</th><td class="accent">' + Number(entry.score || 0) + '</td></tr>' +
+        '<tr><th>Kategorie</th><td>' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Einzel') + '</td></tr>' +
+        '<tr><th>Spielmodus</th><td>' + escapeHtml(entry.gameMode || '-') + '</td></tr>' +
+        '<tr><th>Typ</th><td>' + escapeHtml(normalizeKind(entry.kind)) + '</td></tr>' +
+        '<tr><th>Zeitpunkt</th><td>' + escapeHtml(formatTime(entry.ts)) + '</td></tr>' +
+        '</tbody></table></div>';
+    }
+
     function showToast(message, isError) {
       const toast = document.getElementById('toast');
       toast.textContent = message;
@@ -982,8 +1047,17 @@
 
     document.getElementById('playerFilter').addEventListener('change', render);
     document.getElementById('scoreBody').addEventListener('click', event => {
+      const detailButton = event.target.closest('[data-detail-id]');
+      if (detailButton) openScoreDetail(detailButton.dataset.detailId);
       const button = event.target.closest('[data-delete-id]');
       if (button) deleteHighscore(button.dataset.deleteId);
+    });
+    document.getElementById('scoreCategorySelect').addEventListener('change', event => setScoreCategory(event.target.value));
+    document.getElementById('encounterDialog').addEventListener('click', event => {
+      if (event.target.id === 'encounterDialog') closeEncounterDialog();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeEncounterDialog();
     });
     document.getElementById('refreshBtn').addEventListener('click', () => loadScores());
 

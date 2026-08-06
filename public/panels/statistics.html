@@ -447,7 +447,7 @@
     <div class="tab-panel" id="tab-encounters">
       <div class="section">
         <nav class="encounter-nav" aria-label="Statistik-Kategorien">
-          <button type="button" data-encounter-category="single" onclick="showStatisticsTab('overview')">Einzel</button>
+          <button type="button" data-encounter-category="single" onclick="setEncounterCategory('single')">Einzel</button>
           <button type="button" data-encounter-category="duel" class="active" onclick="setEncounterCategory('duel')">Duelle</button>
           <button type="button" data-encounter-category="group" onclick="setEncounterCategory('group')">Begegnungen</button>
           <button type="button" data-encounter-category="tournament" onclick="setEncounterCategory('tournament')">Turniere</button>
@@ -516,6 +516,10 @@
     function setEncounterCategory(category) {
       selectedEncounterCategory = category;
       document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
+      if (category === 'single') {
+        showStatisticsTab('overview');
+        return;
+      }
       document.getElementById('encounterCategory').value = category;
       renderEncounters();
       loadEncounterStats();
@@ -587,9 +591,10 @@
         const history = await historyRes.json();
         segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
         const highscores = highscoresRes.ok ? await highscoresRes.json() : [];
-        const playerName = (playerSelect.options[playerSelect.selectedIndex] || {}).textContent || '';
+        const selectedPlayerLabel = (playerSelect.options[playerSelect.selectedIndex] || {}).textContent || '';
+        const playerName = selectedPlayerLabel.split(' · ').pop().trim();
         const maxHighscore = highscores
-          .filter(entry => String(entry.player || '') === playerName && entry.kind !== 'checkout' && entry.kind !== 'cricket' && entry.kind !== 'elimination')
+          .filter(entry => (Number(entry.playerSlot || 0) === Number(currentPlayerId) || String(entry.player || '') === playerName) && entry.kind !== 'checkout' && entry.kind !== 'cricket' && entry.kind !== 'elimination')
           .reduce((max, entry) => Math.max(max, Number(entry.score || 0)), 0);
         stats.max_score = maxHighscore > 0 ? maxHighscore : Number(stats.max_score || 0);
         renderSummary(stats);
@@ -627,7 +632,7 @@
     async function loadEncounterStats() {
       if (!currentPlayerId) { renderEncounterStats(null); return; }
       try {
-        const response = await fetch(`${API_BASE}/duel-stats?playerSlots=${currentPlayerId}&category=${selectedEncounterCategory}`, { cache: 'no-store' });
+        const response = await fetch(`${API_BASE}/duel-stats?playerSlots=${currentPlayerId}&category=${selectedEncounterCategory}&status=finished`, { cache: 'no-store' });
         renderEncounterStats(response.ok ? await response.json() : null);
       } catch (_error) { renderEncounterStats(null); }
     }
@@ -753,7 +758,7 @@
 
     async function loadEncounters() {
       try {
-        const response = await fetch(API_BASE + '/duels?limit=100', { cache: 'no-store' });
+        const response = await fetch(API_BASE + '/duels?limit=100&status=finished', { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounters = await response.json();
         renderEncounters();
