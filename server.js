@@ -22,12 +22,6 @@ const sseClients = new Set();
 let liveDetailWriteQueue = Promise.resolve();
 let liveStateCache = null;
 let liveStateWriteQueue = Promise.resolve();
-let liveDetailWriteQueuePending = 0;
-let liveStateWriteQueuePending = 0;
-const queueDiagnostics = {
-  liveState: { pending: 0, lastWaitMs: null, lastDurationMs: null, maxWaitMs: 0, maxDurationMs: 0, lastError: null },
-  liveDetail: { pending: 0, lastWaitMs: null, lastDurationMs: null, maxWaitMs: 0, maxDurationMs: 0, lastError: null }
-};
 
 function cloneLiveState(state) {
   return state ? JSON.parse(JSON.stringify(state)) : null;
@@ -35,55 +29,15 @@ function cloneLiveState(state) {
 
 function queueLiveStateWrite(state) {
   const snapshot = cloneLiveState(state);
-  const queuedAt = Date.now();
-  liveStateWriteQueuePending += 1;
-  queueDiagnostics.liveState.pending = liveStateWriteQueuePending;
   liveStateWriteQueue = liveStateWriteQueue
-    .then(async () => {
-      const startedAt = Date.now();
-      const waitMs = Math.max(0, startedAt - queuedAt);
-      queueDiagnostics.liveState.lastWaitMs = waitMs;
-      queueDiagnostics.liveState.maxWaitMs = Math.max(queueDiagnostics.liveState.maxWaitMs, waitMs);
-      try {
-        await dataStore.saveLiveState(snapshot);
-        queueDiagnostics.liveState.lastError = null;
-      } catch (error) {
-        queueDiagnostics.liveState.lastError = error.message;
-        console.error('[Live-State] Persistierung fehlgeschlagen:', error);
-      } finally {
-        const durationMs = Math.max(0, Date.now() - startedAt);
-        liveStateWriteQueuePending = Math.max(0, liveStateWriteQueuePending - 1);
-        queueDiagnostics.liveState.pending = liveStateWriteQueuePending;
-        queueDiagnostics.liveState.lastDurationMs = durationMs;
-        queueDiagnostics.liveState.maxDurationMs = Math.max(queueDiagnostics.liveState.maxDurationMs, durationMs);
-      }
-    });
+    .then(() => dataStore.saveLiveState(snapshot))
+    .catch(error => console.error('[Live-State] Persistierung fehlgeschlagen:', error));
 }
 
 function queueLiveDetailWrite(task, label) {
-  const queuedAt = Date.now();
-  liveDetailWriteQueuePending += 1;
-  queueDiagnostics.liveDetail.pending = liveDetailWriteQueuePending;
   liveDetailWriteQueue = liveDetailWriteQueue
-    .then(async () => {
-      const startedAt = Date.now();
-      const waitMs = Math.max(0, startedAt - queuedAt);
-      queueDiagnostics.liveDetail.lastWaitMs = waitMs;
-      queueDiagnostics.liveDetail.maxWaitMs = Math.max(queueDiagnostics.liveDetail.maxWaitMs, waitMs);
-      try {
-        await task();
-        queueDiagnostics.liveDetail.lastError = null;
-      } catch (error) {
-        queueDiagnostics.liveDetail.lastError = error.message;
-        console.error('[Live-Detail] ' + label + ' fehlgeschlagen:', error);
-      } finally {
-        const durationMs = Math.max(0, Date.now() - startedAt);
-        liveDetailWriteQueuePending = Math.max(0, liveDetailWriteQueuePending - 1);
-        queueDiagnostics.liveDetail.pending = liveDetailWriteQueuePending;
-        queueDiagnostics.liveDetail.lastDurationMs = durationMs;
-        queueDiagnostics.liveDetail.maxDurationMs = Math.max(queueDiagnostics.liveDetail.maxDurationMs, durationMs);
-      }
-    });
+    .then(() => task())
+    .catch(error => console.error('[Live-Detail] ' + label + ' fehlgeschlagen:', error));
 }
 
 function broadcastReload() {
@@ -148,7 +102,6 @@ function getSystemDiagnostics() {
       usedPercent: totalMemory ? Math.round(memoryUsed / totalMemory * 1000) / 10 : null
     },
     disk,
-    queues: getPipelineDiagnostics(),
     temperatureC: readRaspberryTemperature(),
     sampledAt: Date.now()
   };
@@ -832,8 +785,6 @@ let pendingArduinoThrow = null;
 let pendingArduinoThrowTimer = null;
 let arduinoThrowLockUntil = 0;
 let arduinoProcessingPromise = Promise.resolve();
-let arduinoProcessingPending = 0;
-let arduinoPipelineSequence = 0;
 let matrixHitSuppressUntil = 0;
 let matrixLastAcceptedHitAt = 0;
 let matrixLastAcceptedKey = '';
@@ -884,33 +835,10 @@ const arduinoState = {
   rawHistory: [],
   error: null,
   channelAutoDetect: null,
-  pipeline: null,
   activeStateMode: ARDUINO_EVENT_ACTIVE_STATE_MODE,
   activeStateResolved: arduinoResolvedActiveState,
   matrixMappingUpdatedAt: null
 };
-
-function getPipelineDiagnostics() {
-  return {
-    arduinoProcessing: {
-      pending: arduinoProcessingPending,
-      last: arduinoState.pipeline || null
-    },
-    liveState: { ...queueDiagnostics.liveState, pending: liveStateWriteQueuePending },
-    liveDetail: { ...queueDiagnostics.liveDetail, pending: liveDetailWriteQueuePending }
-  };
-}
-
-function enqueueArduinoProcessing(task) {
-  arduinoProcessingPending += 1;
-  arduinoProcessingPromise = arduinoProcessingPromise
-    .catch(() => {})
-    .then(task)
-    .finally(() => {
-      arduinoProcessingPending = Math.max(0, arduinoProcessingPending - 1);
-    });
-  return arduinoProcessingPromise;
-}
 
 function isArduinoActiveState(state) {
   const normalized = String(state || '').trim().toUpperCase();
@@ -1029,7 +957,6 @@ function flushMatrixHitCluster() {
   const acceptedHit = {
     ...winner.bestHit,
     ts: now,
-    receivedAt: Number(winner.bestHit.receivedAt || winner.bestHit.ts || now),
     clusterSize: ranked.reduce((sum, g) => sum + g.count, 0),
     clusterCount: winner.count
   };
@@ -1081,7 +1008,6 @@ function summarizeMatrixHit(hit) {
     mapped: !!hit.mapped,
     ms: Number.isFinite(ms) ? ms : null,
     ts: Number.isFinite(ts) ? ts : null,
-    receivedAt: Number.isFinite(Number(hit.receivedAt)) ? Number(hit.receivedAt) : null,
     line: String(hit.line || ''),
     source: String(hit.source || 'arduino-matrix'),
     label: row && column ? `${row}/${column}` : row || column || '-'
@@ -1129,7 +1055,6 @@ function buildArduinoStateView() {
 
   const automation = {
     pendingThrow: !!arduinoState.pendingThrow,
-    pipeline: arduinoState.pipeline || null,
     lastAutoThrow: arduinoState.lastAutoThrow || null,
     lastMiss: arduinoState.lastMiss || null,
     lastAutoThrowError: arduinoState.lastAutoThrowError || null,
@@ -1802,7 +1727,6 @@ function updateMatrixSnifferState(row, column, active, evt = {}) {
           points,
           ms,
           ts: now,
-          receivedAt: Number(evt.receivedAt || now),
           line: evt.line || '',
           mapped: !!mapped,
           source: 'arduino-matrix-evt'
@@ -1833,43 +1757,18 @@ function handleArduinoMatrixHit(hit) {
     return;
   }
 
-  const trace = {
-    id: ++arduinoPipelineSequence,
-    receivedAt: Number(hit.receivedAt || hit.ts || Date.now()),
-    queuedAt: Date.now(),
-    processingStartedAt: null,
-    processingFinishedAt: null,
-    broadcastAt: null,
-    queueWaitMs: null,
-    processingMs: null,
-    totalMs: null,
-    hitMs: Number.isFinite(Number(hit.ms)) ? Number(hit.ms) : null,
-    source: String(hit.source || 'arduino-matrix'),
-    queuePending: arduinoProcessingPending + 1
-  };
-
-  enqueueArduinoProcessing(async () => {
-    trace.processingStartedAt = Date.now();
-    trace.queueWaitMs = Math.max(0, trace.processingStartedAt - trace.queuedAt);
-    normalizeArduinoStatePatch({ pipeline: { ...trace, pending: arduinoProcessingPending } });
-    try {
-      const result = await applyArduinoThrowFromMatrix(hit, trace);
+  arduinoProcessingPromise = arduinoProcessingPromise
+    .catch(() => {})
+    .then(() => applyArduinoThrowFromMatrix(hit))
+    .then((result) => {
       if (result && result.ok) {
         const now = Date.now();
         lastAppliedThrowAt = now;
         arduinoThrowLockUntil = now + Math.max(0, runtimeTuning.arduinoMatrixThrowLockMs);
       }
-      trace.processingFinishedAt = Date.now();
-      trace.processingMs = Math.max(0, trace.processingFinishedAt - trace.processingStartedAt);
-      trace.totalMs = Math.max(0, trace.processingFinishedAt - trace.receivedAt);
-      normalizeArduinoStatePatch({ pipeline: { ...trace, pending: Math.max(0, arduinoProcessingPending - 1) }, lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason });
-    } catch (err) {
-      trace.processingFinishedAt = Date.now();
-      trace.processingMs = Math.max(0, trace.processingFinishedAt - trace.processingStartedAt);
-      trace.totalMs = Math.max(0, trace.processingFinishedAt - trace.receivedAt);
-      normalizeArduinoStatePatch({ pipeline: { ...trace, pending: Math.max(0, arduinoProcessingPending - 1) }, lastAutoThrow: { ok: false, reason: err.message }, lastAutoThrowError: err.message });
-    }
-  });
+      normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason });
+    })
+    .catch((err) => normalizeArduinoStatePatch({ lastAutoThrow: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
 }
 
 function resetChannelAutoDetect() {
@@ -1909,7 +1808,7 @@ function handleChannelActiveEvent(evt) {
   runChannelAutoDetect();
 }
 
-async function applyArduinoThrowFromMatrix(hit, pipelineTrace = null) {
+async function applyArduinoThrowFromMatrix(hit) {
   const rawCode = Number(hit && hit.code);
   const rawPoints = Number(hit && hit.points);
   const hasCode = Number.isFinite(rawCode) && rawCode >= 0 && rawCode <= 999;
@@ -2063,7 +1962,6 @@ async function applyArduinoThrowFromMatrix(hit, pipelineTrace = null) {
   }
 
   const saved = await saveLiveState(state);
-  if (pipelineTrace) pipelineTrace.broadcastAt = Date.now();
   broadcastReload();
   return { ok: true, value, player: player.name, playerSlot: player.slot, hit, bust, remaining: player.remaining, state: saved };
 }
@@ -2082,14 +1980,11 @@ function handleArduinoTrigger(evt) {
     pendingArduinoThrowTimer = null;
     normalizeArduinoStatePatch({ pendingThrow: false });
 
-    enqueueArduinoProcessing(async () => {
-      try {
-        const result = await applyArduinoMiss({ line: pending.line || '', ms: pending.triggerMs }, 'timeout');
-        normalizeArduinoStatePatch({ lastMiss: result.ok ? result : { ok: false, reason: result.reason } });
-      } catch (err) {
-        normalizeArduinoStatePatch({ lastMiss: { ok: false, reason: err.message }, lastAutoThrowError: err.message });
-      }
-    });
+    arduinoProcessingPromise = arduinoProcessingPromise
+      .catch(() => {})
+      .then(() => applyArduinoMiss({ line: pending.line || '', ms: pending.triggerMs }, 'timeout'))
+      .then((result) => normalizeArduinoStatePatch({ lastMiss: result.ok ? result : { ok: false, reason: result.reason } }))
+      .catch((err) => normalizeArduinoStatePatch({ lastMiss: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
   }, runtimeTuning.arduinoThrowWindowMs);
   pendingArduinoThrowTimer = pendingArduinoThrow.timer;
   normalizeArduinoStatePatch({ pendingThrow: true, lastAutoThrow: null, lastMiss: null, lastAutoThrowError: null });
@@ -2104,20 +1999,20 @@ function handleArduinoActiveEvent(evt) {
   clearPendingArduinoThrow();
   normalizeArduinoStatePatch({ pendingThrow: false, lastAutoThrowError: null });
 
-  enqueueArduinoProcessing(async () => {
-    try {
-      const result = await applyArduinoThrowFromChannel(evt.channel, evt);
+  arduinoProcessingPromise = arduinoProcessingPromise
+    .catch(() => {})
+    .then(() => applyArduinoThrowFromChannel(evt.channel, evt))
+    .then((result) => {
       if (pending) pending.applied = result.ok;
       normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason });
-    } catch (err) {
+    })
+    .catch((err) => {
       if (pending) pending.applied = false;
       normalizeArduinoStatePatch({ lastAutoThrow: { ok: false, reason: err.message }, lastAutoThrowError: err.message });
-    }
-  });
+    });
 }
 
 function parseArduinoLine(line) {
-  const receivedAt = Date.now();
   const clean = String(line || '').trim();
   if (!clean) return;
 
@@ -2138,7 +2033,9 @@ function parseArduinoLine(line) {
   if (psMatch) {
     const playerSwitchEvt = { ms: Number(psMatch[1]), ts: Date.now(), line: clean };
     normalizeArduinoStatePatch({ playerSwitch: playerSwitchEvt, lastLine: clean });
-    enqueueArduinoProcessing(async () => {
+    arduinoProcessingPromise = arduinoProcessingPromise
+      .catch(() => {})
+      .then(async () => {
         const state = await getLiveState();
         if (!Array.isArray(state.players) || state.players.length === 0) return;
         const nextIdx = (state.game.activePlayer + 1) % state.players.length;
@@ -2148,7 +2045,7 @@ function parseArduinoLine(line) {
         state.lastAction = { type: 'player-switch-btn', player: state.players[nextIdx].name, playerSlot: state.players[nextIdx].slot, ts: Date.now() };
         await saveLiveState(state);
         broadcastReload();
-      }).catch((err) => console.error('[Arduino] Player-Switch fehlgeschlagen:', err.message));
+      });
     return;
   }
 
@@ -2185,7 +2082,7 @@ function parseArduinoLine(line) {
     const index = Number(matrixEvtMatch[3]);
     const state = matrixEvtMatch[4].toUpperCase();
     const active = isArduinoActiveState(state);
-    const evt = { ms: Number(matrixEvtMatch[1]), kind, index, state: matrixEvtMatch[4].toUpperCase(), receivedAt, line: clean };
+    const evt = { ms: Number(matrixEvtMatch[1]), kind, index, state: matrixEvtMatch[4].toUpperCase(), line: clean };
     normalizeArduinoStatePatch({
       lastEvent: { ...evt },
       lastTrigger: active ? { ...evt, ts: Date.now() } : arduinoState.lastTrigger,
@@ -2214,7 +2111,6 @@ function parseArduinoLine(line) {
       code: Number.isFinite(rawCode) ? rawCode : (mapped ? mapped.code : null),
       points: Number.isFinite(rawPoints) ? rawPoints : (mapped ? mapped.points : 0),
       ts: Date.now(),
-      receivedAt,
       line: clean,
       mapped: !!mapped,
       source: 'arduino-matrix-raw'
@@ -2247,7 +2143,6 @@ function parseArduinoLine(line) {
       code: Number.isFinite(rawCode) ? rawCode : (mapped ? mapped.code : null),
       points: Number.isFinite(rawPoints) ? rawPoints : (mapped ? mapped.points : 0),
       ts: Date.now(),
-      receivedAt,
       line: clean,
       mapped: !!mapped,
       source: 'arduino-matrix-raw'
