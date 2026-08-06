@@ -24,13 +24,58 @@
       height: 100vh;
       height: -webkit-fill-available;
       height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      background: #111;
+      border-bottom: 3px solid #e63946;
+      padding: 7px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
+    .topbar a:hover { color: #fff; }
+    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
+    .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
+    .topbar .fs-btn,
+    .topbar .restart-btn {
+      background: #1a1a1a;
+      border: 1px solid #444;
+      color: #f1f1f1;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .78rem;
+      font-family: inherit;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .topbar .fs-btn:hover,
+    .topbar .restart-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
+    .topbar .restart-btn { border-color: #f4a261; color: #f4a261; }
+    .daily-hs { font-size: .72rem; color: #f4a261; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 3px 10px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
+    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+    main {
+      padding: 6px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-height: 0;
+    }
+    .focus-player {
       flex: 1;
       display: grid;
       grid-template-columns: 1.35fr .65fr;
       gap: 4px;
       align-items: stretch;
       min-height: 0;
-      overflow: hidden;
     }
     .focus-player.single { grid-template-columns: 1fr; }
     .focus-player.has-others { flex: 1; max-height: 70%; min-height: 0; }
