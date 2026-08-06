@@ -132,10 +132,10 @@ class DataStore {
       throw new Error(`Unbekannter DB_CLIENT: ${this.client}`);
     }
 
+    await this.ensureDuelSchema();
     await this.ensureHighscoreModeColumn();
     await this.ensureCheckoutRuleColumns();
     await this.ensureCheckoutStatsVersion();
-    await this.ensureDuelSchema();
     await this.ensureThrowSegmentSchema();
     await this.seedFromLegacyJson();
   }
@@ -252,6 +252,38 @@ class DataStore {
           won INTEGER NOT NULL DEFAULT 0,
           PRIMARY KEY (duel_leg_id, player_slot)
         );
+        CREATE TABLE IF NOT EXISTS tournaments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT,
+          format TEXT NOT NULL DEFAULT 'single-elimination',
+          status TEXT NOT NULL DEFAULT 'active',
+          mode TEXT NOT NULL,
+          participant_slots TEXT NOT NULL,
+          participant_count INTEGER NOT NULL,
+          winner_slot INTEGER,
+          current_match_id INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS tournament_matches (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tournament_id INTEGER NOT NULL,
+          round INTEGER NOT NULL,
+          position INTEGER NOT NULL,
+          label TEXT NOT NULL,
+          player_one_slot INTEGER,
+          player_one_name TEXT,
+          player_two_slot INTEGER,
+          player_two_name TEXT,
+          duel_id INTEGER,
+          status TEXT NOT NULL DEFAULT 'waiting',
+          winner_slot INTEGER,
+          loser_slot INTEGER,
+          next_match_id INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          UNIQUE (tournament_id, round, position)
+        );
       `);
       try { await this.sqlite.run('ALTER TABLE duels ADD COLUMN match_type TEXT'); } catch (_err) { }
       try { await this.sqlite.run('ALTER TABLE duels ADD COLUMN tournament_name TEXT'); } catch (_err) { }
@@ -318,6 +350,38 @@ class DataStore {
           won INTEGER NOT NULL DEFAULT 0,
           PRIMARY KEY (duel_leg_id, player_slot)
         );
+        CREATE TABLE IF NOT EXISTS tournaments (
+          id BIGSERIAL PRIMARY KEY,
+          name TEXT,
+          format TEXT NOT NULL DEFAULT 'single-elimination',
+          status TEXT NOT NULL DEFAULT 'active',
+          mode TEXT NOT NULL,
+          participant_slots TEXT NOT NULL,
+          participant_count INTEGER NOT NULL,
+          winner_slot INTEGER,
+          current_match_id BIGINT,
+          created_at BIGINT NOT NULL,
+          updated_at BIGINT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS tournament_matches (
+          id BIGSERIAL PRIMARY KEY,
+          tournament_id BIGINT NOT NULL,
+          round INTEGER NOT NULL,
+          position INTEGER NOT NULL,
+          label TEXT NOT NULL,
+          player_one_slot INTEGER,
+          player_one_name TEXT,
+          player_two_slot INTEGER,
+          player_two_name TEXT,
+          duel_id BIGINT,
+          status TEXT NOT NULL DEFAULT 'waiting',
+          winner_slot INTEGER,
+          loser_slot INTEGER,
+          next_match_id BIGINT,
+          created_at BIGINT NOT NULL,
+          updated_at BIGINT NOT NULL,
+          UNIQUE (tournament_id, round, position)
+        );
       `);
       await this.pg.query('ALTER TABLE duels ADD COLUMN IF NOT EXISTS match_type TEXT');
       await this.pg.query('ALTER TABLE duels ADD COLUMN IF NOT EXISTS tournament_name TEXT');
@@ -382,6 +446,38 @@ class DataStore {
         busts INT NOT NULL DEFAULT 0,
         won INT NOT NULL DEFAULT 0,
         PRIMARY KEY (duel_leg_id, player_slot)
+      );`, `
+      CREATE TABLE IF NOT EXISTS tournaments (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        name VARCHAR(255) NULL,
+        format VARCHAR(64) NOT NULL DEFAULT 'single-elimination',
+        status VARCHAR(16) NOT NULL DEFAULT 'active',
+        mode VARCHAR(64) NOT NULL,
+        participant_slots TEXT NOT NULL,
+        participant_count INT NOT NULL,
+        winner_slot INT NULL,
+        current_match_id BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL
+      );`, `
+      CREATE TABLE IF NOT EXISTS tournament_matches (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        tournament_id BIGINT NOT NULL,
+        round INT NOT NULL,
+        position INT NOT NULL,
+        label VARCHAR(64) NOT NULL,
+        player_one_slot INT NULL,
+        player_one_name VARCHAR(255) NULL,
+        player_two_slot INT NULL,
+        player_two_name VARCHAR(255) NULL,
+        duel_id BIGINT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'waiting',
+        winner_slot INT NULL,
+        loser_slot INT NULL,
+        next_match_id BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        UNIQUE KEY tournament_match_position (tournament_id, round, position)
       );`];
     for (const query of mysqlQueries) await this.my.query(query);
     try { await this.my.query('ALTER TABLE duels ADD COLUMN match_type VARCHAR(32) NULL'); } catch (_err) { }
@@ -899,6 +995,133 @@ class DataStore {
     return this.getDuel(duelId);
   }
 
+  async createTournament({ mode, tournamentName = '', players, bestOf = 1 }) {
+    const safePlayers = Array.isArray(players) ? players.slice(0, 4) : [];
+    if (safePlayers.length !== 4) throw new Error('Ein K.-o.-Turnier benötigt genau 4 Spieler.');
+    const now = Date.now();
+    const slotsJson = JSON.stringify(safePlayers.map(player => Number(player.slot)));
+    let tournamentId;
+    const tournamentValues = [String(tournamentName || '').trim() || null, 'single-elimination', 'active', String(mode || '501'), slotsJson, safePlayers.length, now, now];
+    if (this.isSQLite()) tournamentId = Number((await this.sqlite.run('INSERT INTO tournaments (name, format, status, mode, participant_slots, participant_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', tournamentValues)).lastID);
+    else if (this.isPostgres()) tournamentId = Number((await this.pg.query('INSERT INTO tournaments (name, format, status, mode, participant_slots, participant_count, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id', tournamentValues)).rows[0].id);
+    else tournamentId = Number((await this.my.query('INSERT INTO tournaments (name, format, status, mode, participant_slots, participant_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', tournamentValues))[0].insertId);
+
+    const matches = [
+      [tournamentId, 1, 1, 'Halbfinale 1', safePlayers[0], safePlayers[1]],
+      [tournamentId, 1, 2, 'Halbfinale 2', safePlayers[2], safePlayers[3]],
+      [tournamentId, 2, 1, 'Finale', null, null]
+    ];
+    const matchIds = [];
+    for (const [, round, position, label, first, second] of matches) {
+      const values = [tournamentId, round, position, label, first ? Number(first.slot) : null, first ? String(first.name || 'Spieler') : null, second ? Number(second.slot) : null, second ? String(second.name || 'Spieler') : null, 'waiting', now, now];
+      let matchId;
+      if (this.isSQLite()) matchId = Number((await this.sqlite.run('INSERT INTO tournament_matches (tournament_id, round, position, label, player_one_slot, player_one_name, player_two_slot, player_two_name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', values)).lastID);
+      else if (this.isPostgres()) matchId = Number((await this.pg.query('INSERT INTO tournament_matches (tournament_id, round, position, label, player_one_slot, player_one_name, player_two_slot, player_two_name, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id', values)).rows[0].id);
+      else matchId = Number((await this.my.query('INSERT INTO tournament_matches (tournament_id, round, position, label, player_one_slot, player_one_name, player_two_slot, player_two_name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', values))[0].insertId);
+      matchIds.push(matchId);
+    }
+    const firstMatchPlayers = safePlayers.slice(0, 2).map(player => ({ ...player }));
+    const duel = await this.createDuel({ mode, matchType: 'tournament', tournamentName, players: firstMatchPlayers, startedAt: now });
+    if (this.isSQLite()) {
+      await this.sqlite.run('UPDATE tournament_matches SET duel_id = ?, status = \'active\', updated_at = ? WHERE id = ?', [duel.id, now, matchIds[0]]);
+      await this.sqlite.run('UPDATE tournaments SET current_match_id = ?, updated_at = ? WHERE id = ?', [matchIds[0], now, tournamentId]);
+    } else if (this.isPostgres()) {
+      await this.pg.query('UPDATE tournament_matches SET duel_id = $1, status = \'active\', updated_at = $2 WHERE id = $3', [duel.id, now, matchIds[0]]);
+      await this.pg.query('UPDATE tournaments SET current_match_id = $1, updated_at = $2 WHERE id = $3', [matchIds[0], now, tournamentId]);
+    } else {
+      await this.my.query('UPDATE tournament_matches SET duel_id = ?, status = \'active\', updated_at = ? WHERE id = ?', [duel.id, now, matchIds[0]]);
+      await this.my.query('UPDATE tournaments SET current_match_id = ?, updated_at = ? WHERE id = ?', [matchIds[0], now, tournamentId]);
+    }
+    return { id: tournamentId, matchId: matchIds[0], duel, bestOf, matches: await this.getTournamentMatches(tournamentId) };
+  }
+
+  async getTournamentMatches(tournamentId) {
+    const id = Number(tournamentId);
+    if (!Number.isFinite(id) || id <= 0) return [];
+    if (this.isSQLite()) return this.sqlite.all('SELECT * FROM tournament_matches WHERE tournament_id = ? ORDER BY round, position', [id]);
+    if (this.isPostgres()) return (await this.pg.query('SELECT * FROM tournament_matches WHERE tournament_id = $1 ORDER BY round, position', [id])).rows;
+    const [rows] = await this.my.query('SELECT * FROM tournament_matches WHERE tournament_id = ? ORDER BY round, position', [id]);
+    return rows;
+  }
+
+  async getTournament(tournamentId) {
+    const id = Number(tournamentId);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    let tournament;
+    if (this.isSQLite()) tournament = await this.sqlite.get('SELECT * FROM tournaments WHERE id = ?', [id]);
+    else if (this.isPostgres()) tournament = (await this.pg.query('SELECT * FROM tournaments WHERE id = $1', [id])).rows[0];
+    else tournament = (await this.my.query('SELECT * FROM tournaments WHERE id = ?', [id]))[0][0];
+    if (!tournament) return null;
+    return { ...tournament, id: Number(tournament.id), participantSlots: JSON.parse(tournament.participant_slots || '[]'), matches: await this.getTournamentMatches(id) };
+  }
+
+  async advanceTournament(tournamentId, matchId, winnerSlot, players) {
+    const tournament = await this.getTournament(tournamentId);
+    const current = (tournament?.matches || []).find(match => Number(match.id) === Number(matchId));
+    if (!tournament || !current || current.status === 'finished') return tournament;
+    const winner = Number(winnerSlot || 0) || null;
+    const loser = [current.player_one_slot, current.player_two_slot].find(slot => Number(slot) !== winner) || null;
+    const now = Date.now();
+    const updateMatch = [now, winner, loser, Number(current.id)];
+    const update = this.isPostgres()
+      ? 'UPDATE tournament_matches SET status = \'finished\', updated_at = $1, winner_slot = $2, loser_slot = $3 WHERE id = $4'
+      : 'UPDATE tournament_matches SET status = \'finished\', updated_at = ?, winner_slot = ?, loser_slot = ? WHERE id = ?';
+    if (this.isSQLite()) await this.sqlite.run(update, updateMatch);
+    else if (this.isPostgres()) await this.pg.query(update, updateMatch);
+    else await this.my.query(update, updateMatch);
+    if (Number(current.round) === 2) {
+      const finishValues = [now, winner, now, Number(tournament.id)];
+      if (this.isSQLite()) await this.sqlite.run('UPDATE tournaments SET status = \'finished\', winner_slot = ?, updated_at = ? WHERE id = ?', [winner, now, Number(tournament.id)]);
+      else if (this.isPostgres()) await this.pg.query('UPDATE tournaments SET status = \'finished\', winner_slot = $1, updated_at = $2 WHERE id = $3', finishValues.slice(1));
+      else await this.my.query('UPDATE tournaments SET status = \'finished\', winner_slot = ?, updated_at = ? WHERE id = ?', [winner, now, Number(tournament.id)]);
+      return this.getTournament(tournament.id);
+    }
+    const next = Number(current.round) === 1 && Number(current.position) === 1
+      ? (tournament.matches || []).find(match => Number(match.round) === 1 && Number(match.position) === 2)
+      : (tournament.matches || []).find(match => Number(match.round) === 2 && Number(match.position) === 1);
+    if (!next) return this.getTournament(tournament.id);
+    const slotColumn = Number(current.round) === 1 && Number(current.position) === 2 ? 'player_two' : 'player_one';
+    const player = (Array.isArray(players) ? players : []).find(item => Number(item.slot) === winner) || {};
+    if (Number(current.round) === 1 && Number(current.position) === 1) {
+      const final = (tournament.matches || []).find(match => Number(match.round) === 2 && Number(match.position) === 1);
+      const finalValues = [winner, String(player.name || 'Spieler'), now, Number(final.id)];
+      const finalSql = this.isPostgres()
+        ? 'UPDATE tournament_matches SET player_one_slot = $1, player_one_name = $2, updated_at = $3 WHERE id = $4'
+        : 'UPDATE tournament_matches SET player_one_slot = ?, player_one_name = ?, updated_at = ? WHERE id = ?';
+      if (this.isSQLite()) await this.sqlite.run(finalSql, finalValues);
+      else if (this.isPostgres()) await this.pg.query(finalSql, finalValues);
+      else await this.my.query(finalSql, finalValues);
+      return this.activateTournamentMatch(tournament, next);
+    }
+    const nextValues = [winner, String(player.name || 'Spieler'), now, Number(next.id)];
+    const nextSql = this.isPostgres()
+      ? `UPDATE tournament_matches SET ${slotColumn}_slot = $1, ${slotColumn}_name = $2, updated_at = $3 WHERE id = $4`
+      : `UPDATE tournament_matches SET ${slotColumn}_slot = ?, ${slotColumn}_name = ?, updated_at = ? WHERE id = ?`;
+    if (this.isSQLite()) await this.sqlite.run(nextSql, nextValues);
+    else if (this.isPostgres()) await this.pg.query(nextSql, nextValues);
+    else await this.my.query(nextSql, nextValues);
+    const refreshed = await this.getTournamentMatches(tournament.id);
+    const ready = refreshed.find(match => Number(match.id) === Number(next.id));
+    if (ready && ready.player_one_slot && ready.player_two_slot && ready.status === 'waiting') return this.activateTournamentMatch(tournament, ready);
+    return this.getTournament(tournament.id);
+  }
+
+  async activateTournamentMatch(tournament, match) {
+    const now = Date.now();
+    const duel = await this.createDuel({ mode: tournament.mode, tournamentName: tournament.name, players: [{ slot: match.player_one_slot, name: match.player_one_name }, { slot: match.player_two_slot, name: match.player_two_name }] });
+    const values = [duel.id, now, Number(match.id)];
+    const sql = this.isPostgres()
+      ? 'UPDATE tournament_matches SET duel_id = $1, status = \'active\', updated_at = $2 WHERE id = $3'
+      : 'UPDATE tournament_matches SET duel_id = ?, status = \'active\', updated_at = ? WHERE id = ?';
+    if (this.isSQLite()) await this.sqlite.run(sql, values);
+    else if (this.isPostgres()) await this.pg.query(sql, values);
+    else await this.my.query(sql, values);
+    if (this.isSQLite()) await this.sqlite.run('UPDATE tournaments SET current_match_id = ?, updated_at = ? WHERE id = ?', [Number(match.id), now, Number(tournament.id)]);
+    else if (this.isPostgres()) await this.pg.query('UPDATE tournaments SET current_match_id = $1, updated_at = $2 WHERE id = $3', [Number(match.id), now, Number(tournament.id)]);
+    else await this.my.query('UPDATE tournaments SET current_match_id = ?, updated_at = ? WHERE id = ?', [Number(match.id), now, Number(tournament.id)]);
+    return { ...(await this.getTournament(tournament.id)), nextDuel: duel, nextMatch: match };
+  }
+
   async getDuel(id) {
     const safeId = Number(id);
     if (!Number.isFinite(safeId) || safeId <= 0) return null;
@@ -930,7 +1153,7 @@ class DataStore {
       if (!legPlayersById.has(key)) legPlayersById.set(key, []);
       legPlayersById.get(key).push(player);
     }
-    const categoryInfo = getDuelCategory(duel.participant_count || players.length);
+    const categoryInfo = getMatchCategory(duel.match_type, duel.participant_count || players.length);
     return { ...duel, id: Number(duel.id), ...categoryInfo, players, legs: legs.map(leg => ({ ...leg, players: legPlayersById.get(String(leg.id)) || [] })) };
   }
 

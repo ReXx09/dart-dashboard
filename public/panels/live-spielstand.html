@@ -613,6 +613,12 @@
     .leg-start-overlay.show { display: flex; }
     .leg-start-card { width: min(440px, 100%); padding: 28px; border: 2px solid #f4a261; border-radius: 16px; background: #1c2023; color: #fff; text-align: center; box-shadow: 0 0 40px rgba(244, 162, 97, .2); }
     .leg-start-card h2 { margin: 0 0 8px; color: #f4a261; }
+    .tournament-match-card { margin: 14px 0; padding: 12px; background: #11171a; border: 1px solid #3b4a50; border-radius: 10px; text-align: left; }
+    .tournament-match-card strong { color: #f4c542; }
+    .tournament-match-players { display: grid; gap: 6px; margin-top: 8px; }
+    .tournament-match-player { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-left: 4px solid var(--player-color); background: #1b2327; }
+    .tournament-match-player.winner { color: #7de2b8; }
+    .tournament-match-player.loser { color: #e98b91; opacity: .65; }
     .leg-start-count { margin: 16px 0; color: #ffd166; font-size: 4rem; font-weight: 900; }
     .leg-start-cancel { border: 1px solid #6c757d; border-radius: 7px; padding: 9px 18px; background: transparent; color: #fff; cursor: pointer; }
     .leg-list {
@@ -1182,7 +1188,7 @@
           <select id="matchStartKind" onchange="updateMatchStartKind()"><option value="encounter">Begegnung mit Statistik</option><option value="single">Einzelspiel ohne Begegnungsstatistik</option></select>
         </label>
         <label class="match-menu-field encounter-only">Typ
-          <select id="matchTypeSelect"><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">Turniergruppe</option></select>
+          <select id="matchTypeSelect"><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">K.-o.-Turnier</option></select>
         </label>
         <label class="match-menu-field encounter-only">Best-of
           <select id="matchBestOf"><option value="1">Einzelleg</option><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option><option value="9">Best of 9</option></select>
@@ -1238,6 +1244,7 @@
     let duelStatsLegIndex = -1;
     let legStartTimer = null;
     let legStartRemaining = 0;
+    let tournamentIntroKey = '';
     let duelStatsEnabled = localStorage.getItem('liveDuelStatsEnabled') !== 'false';
 
     function startCountdown(state) {
@@ -1396,7 +1403,7 @@
       const startKind = document.getElementById('matchStartKind').value;
       const type = document.getElementById('matchTypeSelect').value;
       const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
-      if ((startKind === 'encounter' && ((type === 'direct' && playerSlots.length !== 2) || playerSlots.length < 2)) || (startKind === 'single' && playerSlots.length < 1)) { showToast(startKind === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : 'Bitte die passende Anzahl Spieler auswählen.', true); return; }
+      if ((startKind === 'encounter' && ((type === 'direct' && playerSlots.length !== 2) || (type === 'tournament' && playerSlots.length !== 4) || playerSlots.length < 2)) || (startKind === 'single' && playerSlots.length < 1)) { showToast(startKind === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : type === 'tournament' ? 'Ein K.-o.-Turnier benötigt genau 4 Spieler.' : 'Bitte die passende Anzahl Spieler auswählen.', true); return; }
       try {
         const endpoint = startKind === 'single' ? '/api/live/start' : '/api/duels/start';
         const body = startKind === 'single'
@@ -1410,6 +1417,7 @@
         pendingWinner = null;
         hideWinnerOverlay();
         renderState(liveState);
+        if (type === 'tournament') showTournamentMatchIntro(liveState);
         showToast(startKind === 'single' ? 'Einzelspiel gestartet' : 'Begegnung gestartet');
       } catch (error) { showToast('Begegnung konnte nicht gestartet werden: ' + error.message, true); }
     }
@@ -1656,6 +1664,39 @@
 
     function getGameModeLabel(mode) {
       return mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? '301-Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode || '501';
+    }
+
+    function getTournamentMatchMarkup(state) {
+      const game = state && state.game ? state.game : {};
+      if (String(game.matchType) !== 'tournament' || !Array.isArray(state.players)) return '';
+      const previousWinnerSlot = Number(state.lastAction && state.lastAction.previousWinnerSlot || 0);
+      const previousLoserSlot = Number(state.lastAction && state.lastAction.previousLoserSlot || 0);
+      const roundLabel = Number(game.tournamentRound) === 2 ? 'Finale' : (game.tournamentMatchLabel || 'Halbfinale');
+      const players = state.players.slice(0, 2).map(player => {
+        const slot = Number(player.slot);
+        const resultClass = slot === previousWinnerSlot ? ' winner' : slot === previousLoserSlot ? ' loser' : '';
+        const resultLabel = slot === previousWinnerSlot ? ' · Sieger' : slot === previousLoserSlot ? ' · Verlierer' : '';
+        return '<div class="tournament-match-player' + resultClass + '" style="--player-color:' + escapeAttr(player.color || '#f4a261') + '"><span>' + escapeHtml(player.name) + '</span><strong>' + Number(player.legs || 0) + '</strong><span>' + resultLabel + '</span></div>';
+      }).join('');
+      return '<div class="tournament-match-card"><strong>' + escapeHtml(game.tournamentName || 'K.-o.-Turnier') + '</strong><div>' + escapeHtml(roundLabel) + ' · Duell ' + Number(game.tournamentMatchId || 0) + ' · BO' + Number(game.bestOf || 1) + '</div><div class="tournament-match-players">' + players + '</div></div>';
+    }
+
+    function showTournamentMatchIntro(state) {
+      if (!state || String(state.game && state.game.matchType) !== 'tournament') return;
+      const key = String(state.game.tournamentMatchId || state.game.duelId || '') + ':' + String(state.game.tournamentRound || '');
+      if (!key || tournamentIntroKey === key) return;
+      tournamentIntroKey = key;
+      const overlay = document.getElementById('legStartOverlay');
+      if (!overlay) return;
+      let remaining = 5;
+      overlay.innerHTML = '<div class="leg-start-card"><h2 id="legStartTitle">Turnierduell startet</h2><div>' + escapeHtml(getGameModeLabel(state.game.mode)) + ' · Leg 1</div>' + getTournamentMatchMarkup(state) + '<div class="leg-start-count" id="legStartCount">' + remaining + '</div><div>Bitte bereit machen</div></div>';
+      overlay.classList.add('show');
+      const timer = setInterval(() => {
+        remaining -= 1;
+        const count = document.getElementById('legStartCount');
+        if (count) count.textContent = String(Math.max(0, remaining));
+        if (remaining <= 0) { clearInterval(timer); overlay.classList.remove('show'); }
+      }, 1000);
     }
 
     function getFocusModeLabel(state) {
@@ -1931,6 +1972,7 @@
 
     function renderState(state) {
       if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
+      if (state.lastAction && state.lastAction.type === 'tournament-advance') showTournamentMatchIntro(state);
       const activePlayer = state.game.activePlayer || 0;
       const mode = state.game.mode || '501';
       const active = state.players[activePlayer];
@@ -2205,7 +2247,7 @@
       if (!overlay) return;
       const mode = getGameModeLabel(liveState.game.mode);
       const nextLegNumber = Number(liveState.players && liveState.players[0] && liveState.players[0].legs || 0) + Number(liveState.players && liveState.players[1] && liveState.players[1].legs || 0) + 1;
-      overlay.innerHTML = '<div class="leg-start-card"><h2 id="legStartTitle">Nächstes Leg startet</h2><div>' + escapeHtml(mode) + ' · Leg ' + nextLegNumber + '</div><div class="leg-start-count" id="legStartCount">' + legStartRemaining + '</div><div>Bitte bereit machen</div><button class="leg-start-cancel" type="button" onclick="cancelNextLegCountdown()">Abbrechen</button></div>';
+      overlay.innerHTML = '<div class="leg-start-card"><h2 id="legStartTitle">Nächstes Leg startet</h2><div>' + escapeHtml(mode) + ' · Leg ' + nextLegNumber + '</div>' + getTournamentMatchMarkup(liveState) + '<div class="leg-start-count" id="legStartCount">' + legStartRemaining + '</div><div>Bitte bereit machen</div><button class="leg-start-cancel" type="button" onclick="cancelNextLegCountdown()">Abbrechen</button></div>';
       overlay.classList.add('show');
       legStartTimer = setInterval(() => {
         legStartRemaining -= 1;

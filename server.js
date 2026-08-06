@@ -1358,8 +1358,40 @@ async function recordPlayerLegStats(player, state, options = {}) {
 }
 
 async function recordCompletedLegStats(state, winner) {
-  await recordDuelLegIfActive(state, winner);
-  for (const player of Array.isArray(state.players) ? state.players : []) {
+  const completedPlayers = Array.isArray(state.players) ? state.players.map(player => ({ ...player })) : [];
+  const tournamentAdvance = await recordDuelLegIfActive(state, winner);
+  if (tournamentAdvance?.nextDuel) {
+    const nextDuel = tournamentAdvance.nextDuel;
+    const nextSlots = nextDuel.players.map(player => Number(player.player_slot));
+    const fresh = await defaultLiveState(state.game.mode, nextSlots);
+    fresh.game.duelId = nextDuel.id;
+    fresh.game.checkoutRule = state.game.checkoutRule;
+    fresh.game.selectedPlayerSlots = nextSlots;
+    fresh.game.matchType = 'tournament';
+    fresh.game.bestOf = state.game.bestOf;
+    fresh.game.legsToWin = state.game.legsToWin;
+    fresh.game.tournamentId = state.game.tournamentId;
+    fresh.game.tournamentMatchId = tournamentAdvance.nextMatch.id;
+    fresh.game.tournamentRound = tournamentAdvance.nextMatch.round;
+    fresh.game.tournamentMatchLabel = tournamentAdvance.nextMatch.label;
+    fresh.game.tournamentName = state.game.tournamentName;
+    fresh.lastAction = {
+      type: 'tournament-advance',
+      tournamentId: state.game.tournamentId,
+      previousWinnerSlot: winner.slot,
+      previousWinner: winner.name,
+      previousLoserSlot: (state.players || []).find(player => Number(player.slot) !== Number(winner.slot))?.slot || null,
+      nextMatchLabel: tournamentAdvance.nextMatch.label,
+      ts: Date.now()
+    };
+    state.game = fresh.game;
+    state.players = fresh.players;
+    state.lastAction = fresh.lastAction;
+  } else if (state.game?.tournamentId && Number(winner?.legs || 0) >= Math.max(1, Number(state.game.legsToWin || 1))) {
+    state.lastAction.tournamentWaiting = true;
+    state.lastAction.tournamentWinnerSlot = winner.slot;
+  }
+  for (const player of completedPlayers) {
     await recordPlayerLegStats(player, state, { skipDuel: true });
   }
   if (Number(state.game?.duelId || 0) > 0 && winner) {
@@ -1405,14 +1437,19 @@ async function recordDuelLegIfActive(state, winner) {
     };
   });
   const legsToWin = Math.max(1, Number(state.game?.legsToWin || 1));
+  const matchComplete = Number(winner?.legs || 0) >= legsToWin;
   await dataStore.recordDuelLeg({
     duelId,
     mode,
     winnerSlot: winner.slot,
     startedAt: Number(state.game.startedAt || Date.now()),
     players,
-    matchComplete: Number(winner?.legs || 0) >= legsToWin
+    matchComplete
   });
+  if (matchComplete && state.game?.tournamentId && state.game?.tournamentMatchId) {
+    return dataStore.advanceTournament(state.game.tournamentId, state.game.tournamentMatchId, winner.slot, state.players);
+  }
+  return null;
 }
 
 function cancelScheduledAutoAdvance() {
@@ -3087,13 +3124,19 @@ app.post('/api/duels/start', async (req, res) => {
     if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
     if (!Number.isInteger(bestOf) || bestOf < 1 || bestOf > 15 || bestOf % 2 === 0) return res.status(400).json({ error: 'Best-of muss eine ungerade Zahl zwischen 1 und 15 sein.' });
     if ((matchType === 'direct' && slots.length !== 2) || slots.length < 2 || slots.length > 8) return res.status(400).json({ error: 'Bitte 2 bis 8 Spieler auswählen; ein Direktduell benötigt genau 2.' });
+    if (matchType === 'tournament' && slots.length !== 4) return res.status(400).json({ error: 'Ein K.-o.-Turnier benötigt genau 4 Spieler.' });
+    if (matchType === 'tournament' && !['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'K.-o.-Turniere sind nur für 301, 501 und 701 verfügbar.' });
     const configuredPlayers = await getPlayers();
     const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());
     if (selectedPlayers.length !== slots.length) return res.status(400).json({ error: 'Alle ausgewählten Slots müssen einen Spielernamen haben.' });
     const profiles = await dataStore.getProfiles();
     const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
     const tournamentName = String(req.body?.tournamentName || '').trim();
-    const duel = await dataStore.createDuel({ mode, matchType, tournamentName, players: selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null })) });
+    const tournamentPlayers = selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null }));
+    const tournament = matchType === 'tournament'
+      ? await dataStore.createTournament({ mode, tournamentName, players: tournamentPlayers, bestOf })
+      : null;
+    const duel = tournament ? tournament.duel : await dataStore.createDuel({ mode, matchType, tournamentName, players: tournamentPlayers });
     const fresh = await defaultLiveState(mode, slots);
     fresh.game.duelId = duel.id;
     fresh.game.checkoutRule = checkoutRule;
@@ -3102,12 +3145,26 @@ app.post('/api/duels/start', async (req, res) => {
     fresh.game.bestOf = bestOf;
     fresh.game.legsToWin = Math.ceil(bestOf / 2);
     fresh.game.tournamentName = tournamentName;
+    if (tournament) {
+      fresh.game.tournamentId = tournament.id;
+      fresh.game.tournamentMatchId = tournament.matchId;
+      fresh.game.tournamentRound = 1;
+      fresh.game.tournamentMatchLabel = 'Halbfinale 1';
+    }
     savedLiveMode = mode;
     savedCheckoutRule = checkoutRule;
     await saveLiveState(fresh);
     broadcastReload();
     res.json(fresh);
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gestartet werden: ' + err.message }); }
+});
+
+app.get('/api/tournaments/:id', async (req, res) => {
+  try {
+    const tournament = await dataStore.getTournament(req.params.id);
+    if (!tournament) return res.status(404).json({ error: 'Turnier nicht gefunden.' });
+    res.json(tournament);
+  } catch (err) { res.status(500).json({ error: 'Turnier konnte nicht geladen werden: ' + err.message }); }
 });
 
 app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
