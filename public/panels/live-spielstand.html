@@ -2510,7 +2510,7 @@
     // ── State laden ──
     async function loadAll(retryAttempt = 0) {
       try {
-        const stateRes = await fetch('/api/live/state');
+        const stateRes = await fetch('/api/live/state', { cache: 'no-store' });
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
@@ -2545,14 +2545,7 @@
           reconnectAttempts = 0;
         };
 
-        sse.addEventListener('reload', () => {
-          if (reloadQueued) return;
-          reloadQueued = true;
-          setTimeout(() => {
-            reloadQueued = false;
-            loadAll().catch(() => {});
-          }, 120);
-        });
+        sse.addEventListener('reload', requestReload);
 
         sse.onerror = (err) => {
           console.error('[SSE] Error:', err);
@@ -2570,7 +2563,25 @@
         };
       }
 
-      let reloadQueued = false;
+      let reloadTimer = null;
+      let reloadInFlight = false;
+      let reloadRequested = false;
+      function requestReload() {
+        reloadRequested = true;
+        if (reloadTimer || reloadInFlight) return;
+        reloadTimer = setTimeout(async () => {
+          reloadTimer = null;
+          if (!reloadRequested) return;
+          reloadRequested = false;
+          reloadInFlight = true;
+          try { await loadAll(); }
+          catch (_) { }
+          finally {
+            reloadInFlight = false;
+            if (reloadRequested) requestReload();
+          }
+        }, 120);
+      }
       connectSSE();
     })();
 
