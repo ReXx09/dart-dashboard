@@ -2756,6 +2756,14 @@
         };
 
         sse.addEventListener('reload', requestReload);
+        sse.addEventListener('live-state', event => {
+          try {
+            const state = JSON.parse(event.data);
+            if (!state || !Array.isArray(state.players)) return;
+            liveState = state;
+            renderState(state);
+          } catch (error) { console.error('[SSE] Live-State konnte nicht verarbeitet werden:', error); }
+        });
 
         sse.onerror = (err) => {
           console.error('[SSE] Error:', err);

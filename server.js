@@ -57,6 +57,11 @@ function broadcastReload() {
   sseClients.forEach(res => { try { res.write('event: reload\ndata: 1\n\n'); } catch { sseClients.delete(res); } });
 }
 
+function broadcastLiveState(state) {
+  const payload = JSON.stringify(state);
+  sseClients.forEach(res => { try { res.write('event: live-state\ndata: ' + payload + '\n\n'); } catch { sseClients.delete(res); } });
+}
+
 function getLocalIP() {
   if (process.env.SERVER_IP) return process.env.SERVER_IP;
   for (const iface of Object.values(os.networkInterfaces())) {
@@ -2655,7 +2660,12 @@ async function getLiveState() {
       matchType: String(saved.game?.matchType || ''),
       bestOf: Math.max(1, Number(saved.game?.bestOf || 1)),
       legsToWin: Math.max(1, Number(saved.game?.legsToWin || 1)),
-      tournamentName: String(saved.game?.tournamentName || '')
+      tournamentName: String(saved.game?.tournamentName || ''),
+      tournamentId: Number(saved.game?.tournamentId || 0) || null,
+      tournamentMatchId: Number(saved.game?.tournamentMatchId || 0) || null,
+      tournamentRound: Number(saved.game?.tournamentRound || 0) || null,
+      tournamentMatchLabel: String(saved.game?.tournamentMatchLabel || ''),
+      tournamentMatchStartedAt: Number(saved.game?.tournamentMatchStartedAt || 0) || null
     },
     players: mergedPlayers,
     lastAction: saved.lastAction || null,
@@ -3198,6 +3208,7 @@ app.post('/api/tournaments/:id/matches/:matchId/start', async (req, res) => {
       };
       await saveLiveState(state);
       broadcastReload();
+      broadcastLiveState(state);
     }
     res.json(state);
   } catch (err) { res.status(500).json({ error: 'Turnierduell konnte nicht gestartet werden: ' + err.message }); }
