@@ -1944,7 +1944,6 @@
       const bigScoreValue = isElimination ? totalScored : p.remaining;
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name"><span class="focus-mode-label">' + escapeHtml(modeLabel) + '</span><span class="focus-title">Live-Spielstand</span><span class="focus-checkout-label">' + escapeHtml(checkoutLabel) + '</span></div>' +
         '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
@@ -2083,7 +2082,6 @@
       const legStats = getLiveLegStats(p);
       
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name"><span class="focus-mode-label">' + escapeHtml(getGameModeLabel(state && state.game && state.game.mode)) + '</span><span class="focus-title">Live-Spielstand</span><span class="focus-checkout-label">' + escapeHtml(getFocusCheckoutLabel(state)) + '</span></div>' +
         '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
