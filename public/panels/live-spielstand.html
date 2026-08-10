@@ -1589,7 +1589,7 @@
         '<div class="duel-view-panel" data-duel-panel="stats"><div class="duel-stats-grid" style="grid-template-columns:' + gridColumns + '"><div class="duel-stats-cell label"> </div>' +
         stats.map((item, index) => '<div class="duel-stats-cell player' + (index ? ' second' : '') + '">' + escapeHtml(item.name) + '</div>').join('') +
         labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div>' + stats.map((item, index) => '<div class="duel-stats-cell value">' + row[index + 1] + '</div>').join('')).join('') +
-        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><div class="duel-stats-actions">' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? '' : (!matchComplete ? '<button class="duel-stats-next" onclick="startNextLegCountdown()">Nächstes Leg starten</button>' : '')) + '<button class="duel-stats-close" onclick="' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? 'closeTournamentDuelStats()' : 'closeDuelStats()') + '">' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? 'Statistik schließen und Baum anzeigen' : 'Statistik ausblenden') + '</button></div></div>';
+        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><div class="duel-stats-actions">' + (String(state.game && state.game.matchType) === 'tournament' ? '' : (!matchComplete ? '<button class="duel-stats-next" onclick="startNextLegCountdown()">Nächstes Leg starten</button>' : '')) + '<button class="duel-stats-close" onclick="' + (String(state.game && state.game.matchType) === 'tournament' ? 'closeTournamentDuelStats()' : 'closeDuelStats()') + '">' + (String(state.game && state.game.matchType) === 'tournament' ? 'Statistik schließen' : 'Statistik ausblenden') + '</button></div></div>';
       overlay.style.display = 'flex';
       overlay.querySelectorAll('[data-duel-view]').forEach(button => button.addEventListener('click', () => {
         const view = button.dataset.duelView;
@@ -1708,7 +1708,8 @@
     async function showTournamentDuelStatsAfterAdvance(state) {
       const action = state && state.lastAction;
       const duelId = Number(action && action.completedDuelId || 0);
-      const key = action && action.type === 'tournament-advance' ? 'tournament:' + duelId + ':' + String(action.ts || '') : '';
+      const isTournamentMatchFinished = action && ['tournament-advance', 'tournament-match-finished'].includes(action.type);
+      const key = isTournamentMatchFinished ? 'tournament:' + Number(action.tournamentId || 0) + ':' + duelId + ':' + String(action.ts || '') : '';
       if (!key || !duelId || duelStatsVisibleFor === key || duelStatsScheduledFor === key) return;
       duelStatsScheduledFor = key;
       duelStatsTimer = setTimeout(async () => {
@@ -2210,9 +2211,9 @@
       const isTournamentFinal = isTournament && !!(state.lastAction && state.lastAction.tournamentWaiting);
       const duelStatsDismissed = state.lastAction && state.lastAction.type === 'duel-stats-hide' && Number(state.lastAction.duelId) === Number(state.game.duelId);
       updateDuelStatsToggle(state);
-      const isTournamentAdvance = state.lastAction && state.lastAction.type === 'tournament-advance';
+      const isTournamentPresentation = state.lastAction && ['tournament-advance', 'tournament-match-finished'].includes(state.lastAction.type);
       const isTournamentMatchStart = state.lastAction && state.lastAction.type === 'tournament-match-start';
-      if (isTournamentAdvance) showTournamentDuelStatsAfterAdvance(state);
+      if (isTournamentPresentation) showTournamentDuelStatsAfterAdvance(state);
       if (duelStatsDismissed) {
         if (duelStatsTimer) { clearTimeout(duelStatsTimer); duelStatsTimer = null; }
         duelStatsScheduledFor = '';
@@ -2223,7 +2224,7 @@
         tournamentIntroKey = '';
         showTournamentMatchIntro(state);
       }
-      if (!isTournamentAdvance && (!duelStatsKey || state.game.status !== 'leg-finished')) {
+      if (!isTournamentPresentation && (!duelStatsKey || state.game.status !== 'leg-finished')) {
         if (duelStatsTimer) { clearTimeout(duelStatsTimer); duelStatsTimer = null; }
         duelStatsScheduledFor = '';
         duelStatsVisibleFor = '';

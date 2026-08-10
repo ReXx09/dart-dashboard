@@ -1076,7 +1076,8 @@ class DataStore {
     if (this.isSQLite()) await this.sqlite.run(update, updateMatch);
     else if (this.isPostgres()) await this.pg.query(update, updateMatch);
     else await this.my.query(update, updateMatch);
-    if (Number(current.round) === 2) {
+    const maxRound = Math.max(1, ...(tournament.matches || []).map(match => Number(match.round || 1)));
+    if (Number(current.round) === maxRound) {
       const finishValues = [now, winner, now, Number(tournament.id)];
       if (this.isSQLite()) await this.sqlite.run('UPDATE tournaments SET status = \'finished\', winner_slot = ?, updated_at = ? WHERE id = ?', [winner, now, Number(tournament.id)]);
       else if (this.isPostgres()) await this.pg.query('UPDATE tournaments SET status = \'finished\', winner_slot = $1, updated_at = $2 WHERE id = $3', finishValues.slice(1));
@@ -1086,18 +1087,21 @@ class DataStore {
     const nextRound = Number(current.round) + 1;
     const nextPosition = Math.ceil(Number(current.position) / 2);
     const next = (tournament.matches || []).find(match => Number(match.round) === nextRound && Number(match.position) === nextPosition);
-    if (!next) return this.getTournament(tournament.id);
-    const slotColumn = Number(current.position) % 2 === 1 ? 'player_one' : 'player_two';
     const player = (Array.isArray(players) ? players : []).find(item => Number(item.slot) === winner) || {};
-    const nextValues = [winner, String(player.name || 'Spieler'), now, Number(next.id)];
-    const nextSql = this.isPostgres()
-      ? `UPDATE tournament_matches SET ${slotColumn}_slot = $1, ${slotColumn}_name = $2, updated_at = $3 WHERE id = $4`
-      : `UPDATE tournament_matches SET ${slotColumn}_slot = ?, ${slotColumn}_name = ?, updated_at = ? WHERE id = ?`;
-    if (this.isSQLite()) await this.sqlite.run(nextSql, nextValues);
-    else if (this.isPostgres()) await this.pg.query(nextSql, nextValues);
-    else await this.my.query(nextSql, nextValues);
+    if (next) {
+      const slotColumn = Number(current.position) % 2 === 1 ? 'player_one' : 'player_two';
+      const nextValues = [winner, String(player.name || 'Spieler'), now, Number(next.id)];
+      const nextSql = this.isPostgres()
+        ? `UPDATE tournament_matches SET ${slotColumn}_slot = $1, ${slotColumn}_name = $2, updated_at = $3 WHERE id = $4`
+        : `UPDATE tournament_matches SET ${slotColumn}_slot = ?, ${slotColumn}_name = ?, updated_at = ? WHERE id = ?`;
+      if (this.isSQLite()) await this.sqlite.run(nextSql, nextValues);
+      else if (this.isPostgres()) await this.pg.query(nextSql, nextValues);
+      else await this.my.query(nextSql, nextValues);
+    }
     const refreshed = await this.getTournamentMatches(tournament.id);
-    const ready = refreshed.find(match => Number(match.id) === Number(next.id));
+    const nextSameRound = refreshed.find(match => Number(match.round) === Number(current.round) && String(match.status) === 'waiting' && match.player_one_slot && match.player_two_slot);
+    if (nextSameRound) return this.activateTournamentMatch(tournament, nextSameRound);
+    const ready = next && refreshed.find(match => Number(match.id) === Number(next.id));
     if (ready && ready.player_one_slot && ready.player_two_slot && ready.status === 'waiting') return this.activateTournamentMatch(tournament, ready);
     return this.getTournament(tournament.id);
   }

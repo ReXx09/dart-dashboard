@@ -1395,9 +1395,29 @@ async function recordCompletedLegStats(state, winner) {
     state.game = fresh.game;
     state.players = fresh.players;
     state.lastAction = fresh.lastAction;
-  } else if (state.game?.tournamentId && Number(winner?.legs || 0) >= Math.max(1, Number(state.game.legsToWin || 1))) {
-    state.lastAction.tournamentWaiting = true;
-    state.lastAction.tournamentWinnerSlot = winner.slot;
+  } else if (state.game?.tournamentId && tournamentAdvance?.status === 'finished' && Number(winner?.legs || 0) >= Math.max(1, Number(state.game?.legsToWin || 1))) {
+    state.lastAction = {
+      ...(state.lastAction || {}),
+      type: 'tournament-match-finished',
+      tournamentId: state.game.tournamentId,
+      tournamentMatchId: state.game.tournamentMatchId,
+      completedDuelId,
+      previousWinnerSlot: winner?.slot || null,
+      previousWinner: winner?.name || '',
+      tournamentWaiting: true,
+      tournamentWinnerSlot: winner.slot,
+      ts: Date.now()
+    };
+  } else if (state.game?.tournamentId && completedMatch) {
+    state.lastAction = {
+      type: 'tournament-match-finished',
+      tournamentId: state.game.tournamentId,
+      tournamentMatchId: state.game.tournamentMatchId,
+      completedDuelId,
+      previousWinnerSlot: winner?.slot || null,
+      previousWinner: winner?.name || '',
+      ts: Date.now()
+    };
   }
   if (completedMatch) {
     for (const player of completedPlayers) {
