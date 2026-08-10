@@ -177,9 +177,12 @@
       pointer-events: none;
     }
     .focus-card > * { position: relative; }
-    .focus-name { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; font-size: 2rem; font-weight: 800; margin-bottom: 2px; flex-shrink: 0; }
-    .focus-player-name { justify-self: start; min-width: 0; }
-    .focus-mode-label { justify-self: center; max-width: 45vw; overflow: hidden; text-overflow: ellipsis; color: #f4a261; font-size: .8rem; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; }
+    .focus-name { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 2px; flex-shrink: 0; }
+    .focus-title { justify-self: center; color: #f1f1f1; font-size: 1rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; }
+    .focus-mode-label { justify-self: start; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #f4a261; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; }
+    .focus-checkout-label { justify-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #2a9d8f; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; }
+    .focus-player-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 2px; min-width: 0; flex-shrink: 0; }
+    .focus-player-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 2rem; font-weight: 800; white-space: nowrap; }
     .focus-switch-timer { display: inline-flex; visibility: hidden; justify-self: end; align-items: center; flex: 0 0 auto; color: #f4a261; background: rgba(244,162,97,.1); border: 1px solid rgba(244,162,97,.45); border-radius: 8px; padding: 6px 12px; font-size: .72rem; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
     .focus-switch-timer.visible { visibility: visible; }
     .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; flex-shrink: 0; }
@@ -1877,9 +1880,16 @@
       const typeLabel = typeLabels[String(game.matchType || '')];
       if (!typeLabel) return baseLabel;
       const bestOf = Number(game.bestOf || 1);
+      const checkoutLabels = { single: 'Single-Out', double: 'Double-Out', master: 'Master-Out' };
       const details = [typeLabel, bestOf > 1 ? 'BO' + bestOf : 'Einzelleg'];
+      details.push(checkoutLabels[String(game.checkoutRule || 'double')] || 'Double-Out');
       if (typeLabel === 'Turnier' && String(game.tournamentName || '').trim()) details.push(String(game.tournamentName).trim());
       return baseLabel + ' · ' + details.join(' · ');
+    }
+
+    function getFocusCheckoutLabel(state) {
+      const rule = String(state && state.game && state.game.checkoutRule || 'double');
+      return ({ single: 'Single-Out', double: 'Double-Out', master: 'Master-Out' })[rule] || 'Double-Out';
     }
 
     function renderFocusPlayer(p, idx, state) {
@@ -1893,7 +1903,8 @@
       const legStats = getLiveLegStats(p);
       const aufnahmeScore = getPointsPerAufnahme(p);
       const isElimination = state.game.mode === 'elimination';
-      const modeLabel = getFocusModeLabel(state);
+      const modeLabel = getGameModeLabel(state && state.game && state.game.mode);
+      const checkoutLabel = getFocusCheckoutLabel(state);
       
       const throwsHtml = displayThrows.map((pt, ti) => {
         const throwData = currentRoundThrows[ti];
@@ -1919,7 +1930,8 @@
       const bigScoreValue = isElimination ? totalScored : p.remaining;
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-mode-label">' + escapeHtml(modeLabel) + '</span><span class="focus-switch-timer"></span></div>' +
+        '<div class="focus-name"><span class="focus-mode-label">' + escapeHtml(modeLabel) + '</span><span class="focus-title">Live-Spielstand</span><span class="focus-checkout-label">' + escapeHtml(checkoutLabel) + '</span></div>' +
+        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe / Zahlen</h4>' +
@@ -2057,7 +2069,8 @@
       const legStats = getLiveLegStats(p);
       
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-name"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-mode-label">' + escapeHtml(getFocusModeLabel(state)) + '</span><span class="focus-switch-timer"></span></div>' +
+        '<div class="focus-name"><span class="focus-mode-label">' + escapeHtml(getGameModeLabel(state && state.game && state.game.mode)) + '</span><span class="focus-title">Live-Spielstand</span><span class="focus-checkout-label">' + escapeHtml(getFocusCheckoutLabel(state)) + '</span></div>' +
+        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Letzte Würfe</h4>' +
