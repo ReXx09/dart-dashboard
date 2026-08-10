@@ -2326,6 +2326,8 @@
         pendingWinner = winner;
         if (duelStatsDismissed) {
           hideDuelStatsOverlay();
+          if (isMatchComplete(state, winner)) showWinnerOverlay(winner, state);
+          else hideWinnerOverlay();
         } else if (duelStatsVisibleFor === duelStatsKey) {
           hideWinnerOverlay();
           if (duelStatsCacheKey === duelStatsKey && duelStatsCache) renderDuelStatsOverlay(duelStatsCache, state);
