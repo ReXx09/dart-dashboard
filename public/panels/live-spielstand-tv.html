@@ -31,7 +31,10 @@
     }
     .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
+    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; min-width: 0; }
+    .topbar-info { min-width: 72px; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+    .topbar-mode { color: #f4a261; text-align: left; }
+    .topbar-checkout { color: #2a9d8f; text-align: right; }
     .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
     .topbar select { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 12px 8px !important; border-radius: 8px; cursor: pointer; font-size: .72rem; font-family: inherit; }
     .topbar select:hover { border-color: #f4a261; }
@@ -703,10 +706,11 @@
   
   <div class="topbar">
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
+    <span class="topbar-info topbar-mode" id="topbarModeInfo">501</span>
     <h2>🎯 Live-Spielstand</h2>
-    <label>Modus <select id="gameModeSelect" onchange="changeMode(this.value)"></select></label>
-    <label>Finish <select id="checkoutRuleSelect" onchange="changeCheckoutRule(this.value)"></select></label>
-    <div class="clock" id="clockDisplay">--:--:--</div>
+    <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
+    <label hidden>Modus <select id="gameModeSelect" onchange="changeMode(this.value)"></select></label>
+    <label hidden>Finish <select id="checkoutRuleSelect" onchange="changeCheckoutRule(this.value)"></select></label>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
@@ -777,6 +781,10 @@
 
     function getGameModeLabel(mode) {
       return mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? '301-Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode || '501';
+    }
+
+    function getCheckoutRuleLabel(rule) {
+      return ({ single: 'Single-Out', double: 'Double-Out', master: 'Master-Out' })[String(rule || 'double')] || 'Double-Out';
     }
 
     function getFocusModeLabel(state) {
@@ -1006,6 +1014,10 @@
 
     function renderState(state) {
       if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
+      const modeInfo = document.getElementById('topbarModeInfo');
+      const checkoutInfo = document.getElementById('topbarCheckoutInfo');
+      if (modeInfo) modeInfo.textContent = getGameModeLabel(state.game.mode);
+      if (checkoutInfo) checkoutInfo.textContent = getCheckoutRuleLabel(state.game.checkoutRule);
       const activePlayer = state.game.activePlayer || 0;
       const mode = state.game.mode || '501';
       const active = state.players[activePlayer];

@@ -39,7 +39,10 @@
     }
     .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
+    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; min-width: 0; }
+    .topbar-info { min-width: 72px; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+    .topbar-mode { color: #f4a261; text-align: left; }
+    .topbar-checkout { color: #2a9d8f; text-align: right; }
     .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
     .topbar .fs-btn,
     .topbar .restart-btn {
@@ -1241,9 +1244,9 @@
   
   <div class="topbar">
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
+    <span class="topbar-info topbar-mode" id="topbarModeInfo">501</span>
     <h2>🎯 Live-Spielstand</h2>
-    <div class="clock" id="clockDisplay">--:--:--</div>
-    <button class="fs-btn" id="duelStatsToggle" onclick="openMatchMenu()" title="Begegnung starten">Begegnung starten</button>
+    <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <button class="restart-btn" id="restartLegBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
@@ -1749,7 +1752,14 @@
         const state = await response.json();
         if (!response.ok) throw new Error(state.error || 'HTTP ' + response.status);
         liveState = state;
+        duelStatsScheduledFor = '';
+        duelStatsVisibleFor = '';
+        hideDuelStatsOverlay();
+        hideWinnerOverlay();
+        tournamentBracketKey = '';
+        tournamentBracketRequest = null;
         renderState(state);
+        renderTournamentBracket(state, true);
       } catch (error) {
         if (button) button.disabled = false;
         showToast('Turnierbaum konnte nicht angezeigt werden: ' + error.message, true);
@@ -1758,6 +1768,10 @@
 
     function getGameModeLabel(mode) {
       return mode === '501' ? '501' : mode === '301' ? '301' : mode === '701' ? '701' : mode === 'cricket' ? 'Cricket' : mode === 'elimination' ? '301-Elimination' : mode === 'shanghai' ? 'Shanghai' : mode === 'atc' ? 'ATC' : mode === 'split' ? 'Split' : mode || '501';
+    }
+
+    function getCheckoutRuleLabel(rule) {
+      return ({ single: 'Single-Out', double: 'Double-Out', master: 'Master-Out' })[String(rule || 'double')] || 'Double-Out';
     }
 
     function getTournamentMatchMarkup(state) {
@@ -2156,6 +2170,10 @@
 
     function renderState(state) {
       if (!state || !Array.isArray(state.players) || state.players.length === 0) return;
+      const modeInfo = document.getElementById('topbarModeInfo');
+      const checkoutInfo = document.getElementById('topbarCheckoutInfo');
+      if (modeInfo) modeInfo.textContent = getGameModeLabel(state.game.mode);
+      if (checkoutInfo) checkoutInfo.textContent = getCheckoutRuleLabel(state.game.checkoutRule);
       renderTournamentBracket(state);
       const activePlayer = state.game.activePlayer || 0;
       const mode = state.game.mode || '501';
@@ -2310,6 +2328,7 @@
 
     // ── Winner Overlay ──
     function showWinnerOverlay(winner, state) {
+      if (state && state.game && String(state.game.matchType) === 'tournament') return;
       const overlay = document.getElementById('winnerOverlay');
       if (!overlay) return;
       const mode = state.game.mode;
