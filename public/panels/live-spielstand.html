@@ -634,6 +634,11 @@
     .tournament-bracket-close { border: 1px solid #65747a; border-radius: 7px; padding: 7px 11px; background: transparent; color: #d7e0e3; cursor: pointer; white-space: nowrap; }
     .tournament-bracket-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
     .tournament-bracket-title { color: #f4c542; font-weight: 800; }
+    .tournament-winner-banner { display: flex; align-items: center; gap: 14px; margin: -2px 0 16px; padding: 16px 18px; border: 1px solid #f4c542; border-radius: 10px; background: linear-gradient(135deg, #2b2412, #171b1d); box-shadow: 0 0 24px rgba(244, 197, 66, .14); }
+    .tournament-winner-icon { font-size: 2rem; }
+    .tournament-winner-banner div { display: grid; gap: 3px; }
+    .tournament-winner-banner strong { color: #ffe27a; font-size: 1rem; text-transform: uppercase; letter-spacing: .08em; }
+    .tournament-winner-banner span:not(.tournament-winner-icon) { color: #f4f6f7; font-size: 1.35rem; font-weight: 900; }
     .tournament-next-button { border: 1px solid #f4c542; border-radius: 7px; padding: 7px 11px; background: #2a2520; color: #ffe27a; font-weight: 800; cursor: pointer; white-space: nowrap; }
     .tournament-next-button:hover { background: #4a3a1d; }
     .tournament-next-button:disabled { opacity: .5; cursor: default; }
@@ -1881,11 +1886,12 @@
         tournamentBracketKey = '';
         return;
       }
-      if (!forceOpen && Number(state.game.tournamentMatchStartedAt || 0) > 0) {
+      const isTournamentFinished = state.lastAction && state.lastAction.type === 'tournament-finished';
+      if (!forceOpen && !isTournamentFinished && Number(state.game.tournamentMatchStartedAt || 0) > 0) {
         if (overlay) overlay.classList.remove('show');
         return;
       }
-      if (!forceOpen && state.lastAction && state.lastAction.type === 'tournament-advance') {
+      if (!forceOpen && !isTournamentFinished && state.lastAction && state.lastAction.type === 'tournament-advance') {
         if (overlay) overlay.classList.remove('show');
         return;
       }
@@ -1902,7 +1908,11 @@
           const rounds = [];
           for (let round = 1; round <= maxRound; round += 1) rounds.push(matches.filter(match => Number(match.round) === round));
           const activeId = Number(state.game.tournamentMatchId || 0);
-          container.innerHTML = '<div class="tournament-bracket-head"><span class="tournament-bracket-title" id="tournamentBracketTitle">' + escapeHtml(tournament.name || 'K.-o.-Turnier') + '</span><div><button class="tournament-bracket-close" type="button" onclick="closeTournamentBracket()">Schließen</button><button class="tournament-next-button" type="button" onclick="startNextTournamentMatch()">Nächstes Duell starten</button></div></div><div class="tournament-bracket-grid">' + rounds.map((roundMatches, index) => '<div class="tournament-round"><div class="tournament-round-title">' + tournamentRoundTitle(index + 1, maxRound) + '</div>' + roundMatches.map(match => {
+          const winnerSlot = Number(state.lastAction && state.lastAction.tournamentWinnerSlot || 0);
+          const winner = (state.players || []).find(player => Number(player.slot) === winnerSlot);
+          const winnerHeader = isTournamentFinished ? '<div class="tournament-winner-banner"><span class="tournament-winner-icon">🏆</span><div><strong>Turnier beendet</strong><span>Sieger: ' + escapeHtml(winner ? winner.name : 'Unbekannt') + '</span></div></div>' : '';
+          const actionButtons = isTournamentFinished ? '<button class="tournament-bracket-close" type="button" onclick="closeTournamentBracket()">Schließen</button>' : '<button class="tournament-bracket-close" type="button" onclick="closeTournamentBracket()">Schließen</button><button class="tournament-next-button" type="button" onclick="startNextTournamentMatch()">Nächstes Duell starten</button>';
+          container.innerHTML = winnerHeader + '<div class="tournament-bracket-head"><span class="tournament-bracket-title" id="tournamentBracketTitle">' + escapeHtml(tournament.name || 'K.-o.-Turnier') + '</span><div>' + actionButtons + '</div></div><div class="tournament-bracket-grid">' + rounds.map((roundMatches, index) => '<div class="tournament-round"><div class="tournament-round-title">' + tournamentRoundTitle(index + 1, maxRound) + '</div>' + roundMatches.map(match => {
             const status = String(match.status || 'waiting');
             const nodeClass = status + (Number(match.id) === activeId ? ' active' : '');
             return '<div class="tournament-node ' + nodeClass + '"><div class="tournament-node-label">' + escapeHtml(match.label || 'Duell') + (status === 'active' ? ' · läuft' : status === 'finished' ? ' · beendet' : ' · wartet') + '</div>' + tournamentNodePlayer(match.player_one_name, match.player_one_slot, match, match.winner_slot, match.loser_slot) + tournamentNodePlayer(match.player_two_name, match.player_two_slot, match, match.winner_slot, match.loser_slot) + '</div>';
@@ -2208,6 +2218,7 @@
       const duelStatsKey = getDuelStatsKey(state);
       const isTournament = String(state.game.matchType || '') === 'tournament';
       const isTournamentFinal = isTournament && !!(state.lastAction && state.lastAction.tournamentWaiting);
+      const isTournamentFinished = isTournament && state.lastAction && state.lastAction.type === 'tournament-finished';
       const duelStatsDismissed = state.lastAction && state.lastAction.type === 'duel-stats-hide' && Number(state.lastAction.duelId) === Number(state.game.duelId);
       updateDuelStatsToggle(state);
       const isTournamentPresentation = state.lastAction && ['tournament-advance', 'tournament-match-finished'].includes(state.lastAction.type);
@@ -2319,12 +2330,12 @@
           hideWinnerOverlay();
           if (duelStatsCacheKey === duelStatsKey && duelStatsCache) renderDuelStatsOverlay(duelStatsCache, state);
         } else {
-          if (!isTournament || isTournamentFinal) showWinnerOverlay(winner, state);
+          if ((!isTournament || isTournamentFinal) && !isTournamentFinished) showWinnerOverlay(winner, state);
           else hideWinnerOverlay();
-          showDuelStatsAfterWinner(state);
+          if (!isTournamentFinished) showDuelStatsAfterWinner(state);
         }
       } else if (pendingWinner) {
-        if (!isTournament || isTournamentFinal) showWinnerOverlay(pendingWinner, state);
+        if ((!isTournament || isTournamentFinal) && !isTournamentFinished) showWinnerOverlay(pendingWinner, state);
         else hideWinnerOverlay();
       } else {
         hideWinnerOverlay();

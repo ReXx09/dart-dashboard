@@ -3242,10 +3242,13 @@ app.post('/api/tournaments/:id/presentation/bracket', async (req, res) => {
       return res.status(409).json({ error: 'Dieses Turnier ist nicht aktiv.' });
     }
     const ts = Date.now();
+    const previousAction = state.lastAction || {};
     state.lastAction = {
-      type: 'tournament-bracket-show',
+      ...previousAction,
+      type: previousAction.tournamentWaiting ? 'tournament-finished' : 'tournament-bracket-show',
       tournamentId,
       tournamentMatchId: Number(state.game.tournamentMatchId || 0) || null,
+      presentation: previousAction.tournamentWaiting ? 'winner-bracket' : 'bracket',
       ts
     };
     await saveLiveState(state);
