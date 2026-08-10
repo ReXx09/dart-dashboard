@@ -31,10 +31,11 @@
     }
     .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; min-width: 0; }
-    .topbar-info { min-width: 72px; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
-    .topbar-mode { color: #f4a261; text-align: left; }
-    .topbar-checkout { color: #2a9d8f; text-align: right; }
+    .topbar-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: clamp(10px, 2vw, 28px); }
+    .topbar h2 { font-size: 1rem; font-weight: 700; text-align: center; min-width: 0; white-space: nowrap; }
+    .topbar-info { min-width: auto; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+    .topbar-mode, .topbar-checkout { text-align: center; }
+    .topbar-separator { color: #d7e0e5; font-size: 1.55rem; font-weight: 400; line-height: .7; }
     .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
     .topbar select { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 12px 8px !important; border-radius: 8px; cursor: pointer; font-size: .72rem; font-family: inherit; }
     .topbar select:hover { border-color: #f4a261; }
@@ -706,9 +707,13 @@
   
   <div class="topbar">
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
-    <span class="topbar-info topbar-mode" id="topbarModeInfo">501</span>
-    <h2>🎯 Live-Spielstand</h2>
-    <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
+    <div class="topbar-center">
+      <span class="topbar-info topbar-mode" id="topbarModeInfo">501</span>
+      <span class="topbar-separator" aria-hidden="true">·</span>
+      <h2>🎯 Live-Spielstand</h2>
+      <span class="topbar-separator" aria-hidden="true">·</span>
+      <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
+    </div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>

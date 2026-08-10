@@ -3235,6 +3235,27 @@ app.post('/api/tournaments/:id/presentation/bracket', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Turnierbaum konnte nicht angezeigt werden: ' + err.message }); }
 });
 
+app.post('/api/duels/:id/presentation/stats-hidden', async (req, res) => {
+  try {
+    const state = await getLiveState();
+    const duelId = Number(req.params.id);
+    if (Number(state.game?.duelId) !== duelId) {
+      return res.status(409).json({ error: 'Diese Begegnung ist nicht aktiv.' });
+    }
+    const ts = Date.now();
+    state.lastAction = {
+      ...(state.lastAction || {}),
+      type: 'duel-stats-hide',
+      duelId,
+      ts
+    };
+    await saveLiveState(state);
+    broadcastReload();
+    broadcastLiveState(state);
+    res.json(state);
+  } catch (err) { res.status(500).json({ error: 'Duellstatistik konnte nicht ausgeblendet werden: ' + err.message }); }
+});
+
 app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
   try {
     const state = await getLiveState();

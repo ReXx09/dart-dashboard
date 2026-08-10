@@ -39,10 +39,11 @@
     }
     .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
-    .topbar h2 { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; min-width: 0; }
-    .topbar-info { min-width: 72px; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
-    .topbar-mode { color: #f4a261; text-align: left; }
-    .topbar-checkout { color: #2a9d8f; text-align: right; }
+    .topbar-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: clamp(10px, 2vw, 28px); }
+    .topbar h2 { font-size: 1rem; font-weight: 700; text-align: center; min-width: 0; white-space: nowrap; }
+    .topbar-info { min-width: auto; font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+    .topbar-mode, .topbar-checkout { text-align: center; }
+    .topbar-separator { color: #d7e0e5; font-size: 1.55rem; font-weight: 400; line-height: .7; }
     .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
     .topbar .fs-btn,
     .topbar .restart-btn {
@@ -1244,9 +1245,13 @@
   
   <div class="topbar">
     <a href="/" title="Zurück zur Übersicht">← Zurück</a>
-    <span class="topbar-info topbar-mode" id="topbarModeInfo">501</span>
-    <h2>🎯 Live-Spielstand</h2>
-    <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
+    <div class="topbar-center">
+      <span class="topbar-info topbar-mode" id="topbarModeInfo">501</span>
+      <span class="topbar-separator" aria-hidden="true">·</span>
+      <h2>🎯 Live-Spielstand</h2>
+      <span class="topbar-separator" aria-hidden="true">·</span>
+      <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
+    </div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
     <button class="restart-btn" id="restartLegBtn" onclick="restartLeg()" title="Leg zurücksetzen">↻ Leg-Neustart</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
@@ -1584,7 +1589,7 @@
         '<div class="duel-view-panel" data-duel-panel="stats"><div class="duel-stats-grid" style="grid-template-columns:' + gridColumns + '"><div class="duel-stats-cell label"> </div>' +
         stats.map((item, index) => '<div class="duel-stats-cell player' + (index ? ' second' : '') + '">' + escapeHtml(item.name) + '</div>').join('') +
         labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div>' + stats.map((item, index) => '<div class="duel-stats-cell value">' + row[index + 1] + '</div>').join('')).join('') +
-        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><div class="duel-stats-actions">' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? '' : (!matchComplete ? '<button class="duel-stats-next" onclick="startNextLegCountdown()">Nächstes Leg starten</button>' : '')) + '<button class="duel-stats-close" onclick="' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? 'closeTournamentDuelStats()' : 'hideDuelStatsOverlay()') + '">' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? 'Statistik schließen und Baum anzeigen' : 'Statistik ausblenden') + '</button></div></div>';
+        '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><div class="duel-stats-actions">' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? '' : (!matchComplete ? '<button class="duel-stats-next" onclick="startNextLegCountdown()">Nächstes Leg starten</button>' : '')) + '<button class="duel-stats-close" onclick="' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? 'closeTournamentDuelStats()' : 'closeDuelStats()') + '">' + (state.lastAction && state.lastAction.type === 'tournament-advance' ? 'Statistik schließen und Baum anzeigen' : 'Statistik ausblenden') + '</button></div></div>';
       overlay.style.display = 'flex';
       overlay.querySelectorAll('[data-duel-view]').forEach(button => button.addEventListener('click', () => {
         const view = button.dataset.duelView;
@@ -1739,6 +1744,28 @@
     function hideDuelStatsOverlay() {
       const overlay = document.getElementById('duelStatsOverlay');
       if (overlay) overlay.style.display = 'none';
+    }
+
+    async function closeDuelStats() {
+      if (!liveState || !liveState.game || !Number(liveState.game.duelId)) {
+        hideDuelStatsOverlay();
+        return;
+      }
+      const button = document.querySelector('.duel-stats-close');
+      if (button) button.disabled = true;
+      try {
+        const response = await fetch('/api/duels/' + encodeURIComponent(liveState.game.duelId) + '/presentation/stats-hidden', { method: 'POST' });
+        const state = await response.json();
+        if (!response.ok) throw new Error(state.error || 'HTTP ' + response.status);
+        liveState = state;
+        duelStatsScheduledFor = '';
+        duelStatsVisibleFor = getDuelStatsKey(state);
+        hideDuelStatsOverlay();
+        renderState(state);
+      } catch (error) {
+        if (button) button.disabled = false;
+        showToast('Statistik konnte nicht ausgeblendet werden: ' + error.message, true);
+      }
     }
 
     async function closeTournamentDuelStats() {
@@ -2181,10 +2208,17 @@
       const duelStatsKey = getDuelStatsKey(state);
       const isTournament = String(state.game.matchType || '') === 'tournament';
       const isTournamentFinal = isTournament && !!(state.lastAction && state.lastAction.tournamentWaiting);
+      const duelStatsDismissed = state.lastAction && state.lastAction.type === 'duel-stats-hide' && Number(state.lastAction.duelId) === Number(state.game.duelId);
       updateDuelStatsToggle(state);
       const isTournamentAdvance = state.lastAction && state.lastAction.type === 'tournament-advance';
       const isTournamentMatchStart = state.lastAction && state.lastAction.type === 'tournament-match-start';
       if (isTournamentAdvance) showTournamentDuelStatsAfterAdvance(state);
+      if (duelStatsDismissed) {
+        if (duelStatsTimer) { clearTimeout(duelStatsTimer); duelStatsTimer = null; }
+        duelStatsScheduledFor = '';
+        duelStatsVisibleFor = duelStatsKey;
+        hideDuelStatsOverlay();
+      }
       if (isTournamentMatchStart) {
         tournamentIntroKey = '';
         showTournamentMatchIntro(state);
@@ -2279,7 +2313,9 @@
 
       if (winner && state.game.status === 'leg-finished') {
         pendingWinner = winner;
-        if (duelStatsVisibleFor === duelStatsKey) {
+        if (duelStatsDismissed) {
+          hideDuelStatsOverlay();
+        } else if (duelStatsVisibleFor === duelStatsKey) {
           hideWinnerOverlay();
           if (duelStatsCacheKey === duelStatsKey && duelStatsCache) renderDuelStatsOverlay(duelStatsCache, state);
         } else {
