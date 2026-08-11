@@ -985,7 +985,7 @@
       if (!picker || !options) return;
       picker.classList.toggle('visible', segmentComparison);
       options.innerHTML = availablePlayers.length
-        ? [0, 1].map(index => '<label class="segment-player-option">Spieler ' + (index + 1) + '<select data-comparison-player-index="' + index + '">' + availablePlayers.map(player => '<option value="' + escapeAttr(player.slot) + '"' + (selectedComparisonPlayerOrder[index] === String(player.slot) ? ' selected' : '') + '>' + escapeHtml(player.name) + '</option>').join('') + '</select></label>').join('')
+        ? [0, 1].map(index => '<label class="segment-player-option">Spieler ' + (index + 1) + '<select data-comparison-player-index="' + index + '">' + availablePlayers.map(player => '<option value="' + escapeHtml(player.slot) + '"' + (selectedComparisonPlayerOrder[index] === String(player.slot) ? ' selected' : '') + '>' + escapeHtml(player.name) + '</option>').join('') + '</select></label>').join('')
         : '<span class="segment-player-picker-title">Keine benannten Spieler verfügbar.</span>';
       options.querySelectorAll('[data-comparison-player-index]').forEach(select => select.addEventListener('change', async event => {
         const index = Number(event.currentTarget.dataset.comparisonPlayerIndex);
