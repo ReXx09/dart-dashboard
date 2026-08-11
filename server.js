@@ -2473,6 +2473,12 @@ async function getActivePlayersForLive() {
   }));
 }
 
+function chooseStartingPlayer(players) {
+  if (!Array.isArray(players) || players.length === 0) return { index: 0, slot: null };
+  const index = Math.floor(Math.random() * players.length);
+  return { index, slot: Number(players[index].slot) };
+}
+
 async function defaultLiveState(mode, selectedPlayerSlots = null) {
   const m = mode || DEFAULT_MODE;
   const active = await getActivePlayersForLive();
@@ -2485,9 +2491,10 @@ async function defaultLiveState(mode, selectedPlayerSlots = null) {
       ? active
       : [{ slot: 1, name: 'Spieler 1', color: '#e63946' }, { slot: 2, name: 'Spieler 2', color: '#f4a261' }];
   const startScore = getStartScoreForMode(m);
+  const startingPlayer = chooseStartingPlayer(fallbackPlayers);
 
   return {
-    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: 0, throwRound: 1, currentThrow: 0, duelId: null, selectedPlayerSlots: fallbackPlayers.map(player => Number(player.slot)) },
+    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: startingPlayer.index, startingPlayerSlot: startingPlayer.slot, throwRound: 1, currentThrow: 0, duelId: null, selectedPlayerSlots: fallbackPlayers.map(player => Number(player.slot)) },
     players: fallbackPlayers.map(p => ({ ...p, remaining: startScore, legs: 0, turns: 0, totalScored: 0, bestTurn: 0, average: 0, throws: [], currentRoundPoints: [], ...defaultPlayerCricketState(m) })),
     lastAction: null,
     arduino: { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
@@ -2600,6 +2607,7 @@ function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
     currentRoundPoints: [],
     ...defaultPlayerCricketState(mode)
   }));
+  const startingPlayer = chooseStartingPlayer(players);
 
   return {
     game: {
@@ -2608,7 +2616,8 @@ function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
       status: 'running',
       startedAt: now,
       updatedAt: now,
-      activePlayer: 0,
+      activePlayer: startingPlayer.index,
+      startingPlayerSlot: startingPlayer.slot,
       throwRound: 1,
       currentThrow: 0,
       turnId: 1,
