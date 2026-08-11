@@ -1238,13 +1238,13 @@
         <label class="match-menu-field encounter-only">Typ
           <select id="matchTypeSelect"><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">K.-o.-Turnier</option></select>
         </label>
-        <label class="match-menu-field encounter-only">Best-of
+        <label class="match-menu-field encounter-only" id="matchBestOfField">Best-of
           <select id="matchBestOf"><option value="1">Einzelleg</option><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option><option value="9">Best of 9</option></select>
         </label>
         <label class="match-menu-field">Spiel
           <select id="matchMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option><option value="cricket">Cricket</option><option value="elimination">301-Elimination</option><option value="shanghai">Shanghai</option><option value="atc">Around the Clock</option><option value="split">Split</option></select>
         </label>
-        <label class="match-menu-field encounter-only">Finish
+        <label class="match-menu-field encounter-only" id="matchCheckoutField">Finish
           <select id="matchCheckoutRule"><option value="double">Double Out</option><option value="single">Single Out</option><option value="master">Master Out</option></select>
         </label>
         <label class="match-menu-field encounter-only" id="tournamentNameField" hidden>Turniername
@@ -1356,7 +1356,7 @@
     }
 
     function isDuelStatsEligible(state) {
-      return state && state.game && ['501', '301', '701'].includes(String(state.game.mode)) && Number(state.game.duelId) > 0 && Array.isArray(state.players) && state.players.length >= 2;
+      return state && state.game && ['501', '301', '701', 'cricket', 'elimination', 'shanghai', 'atc', 'split'].includes(String(state.game.mode)) && Number(state.game.duelId) > 0 && Array.isArray(state.players) && state.players.length >= 2;
     }
 
     function hasActiveMatch(state) {
@@ -1392,10 +1392,25 @@
     function updateMatchStartKind() {
       const isSingleGame = document.getElementById('matchStartKind').value === 'single';
       document.querySelectorAll('.encounter-only').forEach(field => { field.hidden = isSingleGame; });
+      updateMatchModeAvailability();
       document.getElementById('matchMenuDescription').textContent = isSingleGame
         ? 'Starte ein einzelnes Spiel mit einem beliebigen Modus und den ausgewählten Spielern. Es wird keine Begegnung in der Statistik angelegt.'
-        : 'Wähle Begegnungstyp, Best-of, Finish und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.';
+        : 'Wähle Begegnungstyp, Spielmodus, Best-of, Finish und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.';
       document.getElementById('matchStartButton').textContent = isSingleGame ? 'Einzelspiel starten' : 'Begegnung starten';
+    }
+
+    function updateMatchModeAvailability() {
+      const startKind = document.getElementById('matchStartKind').value;
+      const modeSelect = document.getElementById('matchMode');
+      const checkoutField = document.getElementById('matchCheckoutField');
+      const bestOfField = document.getElementById('matchBestOfField');
+      const isEncounter = startKind === 'encounter';
+      Array.from(modeSelect.options).forEach(option => {
+        option.hidden = false;
+      });
+      const finishAvailable = ['301', '501', '701'].includes(modeSelect.value) && isEncounter;
+      checkoutField.hidden = !finishAvailable;
+      bestOfField.hidden = !isEncounter;
     }
 
     function getMatchActionPresentation(state) {
@@ -1454,6 +1469,7 @@
       const type = document.getElementById('matchTypeSelect').value;
       const isSingleGame = document.getElementById('matchStartKind').value === 'single';
       document.getElementById('tournamentNameField').hidden = isSingleGame || type !== 'tournament';
+      updateMatchModeAvailability();
       document.querySelectorAll('#matchPlayerList input').forEach(input => { input.disabled = false; });
     }
 
@@ -2855,6 +2871,7 @@
     }
 
     document.getElementById('matchTypeSelect').addEventListener('change', updateMatchMenuType);
+    document.getElementById('matchMode').addEventListener('change', updateMatchModeAvailability);
 
     (function() {
       let sse = null;

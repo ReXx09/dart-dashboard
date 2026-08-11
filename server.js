@@ -1435,7 +1435,7 @@ async function recordCompletedLegStats(state, winner) {
 async function recordDuelLegIfActive(state, winner) {
   const duelId = Number(state.game?.duelId || 0);
   const mode = String(state.game?.mode || '');
-  if (!duelId || !['501', '301', '701'].includes(mode)) return;
+  if (!duelId || !GAME_MODES[mode]) return;
   const profiles = await dataStore.getProfiles();
   const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
   const players = (Array.isArray(state.players) ? state.players : []).map(player => {
@@ -3169,12 +3169,11 @@ app.post('/api/duels/start', async (req, res) => {
     const checkoutRule = String(req.body?.checkoutRule || 'double');
     const bestOf = Number(req.body?.bestOf || 1);
     const slots = [...new Set((Array.isArray(req.body?.playerSlots) ? req.body.playerSlots : []).map(Number).filter(Number.isInteger))];
-    if (!['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'Nur 301, 501 und 701 sind für Begegnungen verfügbar.' });
+    if (!GAME_MODES[mode]) return res.status(400).json({ error: 'Unbekannter Spielmodus für die Begegnung.' });
     if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
     if (!Number.isInteger(bestOf) || bestOf < 1 || bestOf > 15 || bestOf % 2 === 0) return res.status(400).json({ error: 'Best-of muss eine ungerade Zahl zwischen 1 und 15 sein.' });
     if ((matchType === 'direct' && slots.length !== 2) || slots.length < 2 || slots.length > (matchType === 'tournament' ? 16 : 8)) return res.status(400).json({ error: 'Bitte 2 bis 16 Spieler auswählen; ein Direktduell benötigt genau 2.' });
     if (matchType === 'tournament' && ![2, 4, 8, 16].includes(slots.length)) return res.status(400).json({ error: 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.' });
-    if (matchType === 'tournament' && !['501', '301', '701'].includes(mode)) return res.status(400).json({ error: 'K.-o.-Turniere sind nur für 301, 501 und 701 verfügbar.' });
     const configuredPlayers = await getPlayers();
     const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());
     if (selectedPlayers.length !== slots.length) return res.status(400).json({ error: 'Alle ausgewählten Slots müssen einen Spielernamen haben.' });
