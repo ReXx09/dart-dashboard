@@ -395,6 +395,7 @@
             <option value="triple">Triples</option>
             <option value="bull">Bulls</option>
           </select>
+          <button class="btn" id="segmentCompareBtn" type="button">Spielervergleich</button>
         </div>
         <div class="stats-grid" id="segmentSummaryStats"></div>
         <div style="overflow-x:auto;margin-top:12px">
@@ -488,6 +489,9 @@
     let encounters = [];
     let selectedEncounterCategory = 'duel';
     let segmentAnalysis = null;
+    let segmentComparison = false;
+    let segmentComparisonData = [];
+    let availablePlayers = [];
     let selectedSegmentType = 'all';
     let encounterDetail = null;
     let encounterDetailView = 'duel';
@@ -543,6 +547,7 @@
         const players = await playersRes.json();
         const profiles = profilesRes ? await profilesRes.json() : [];
         const namedPlayers = Array.isArray(players) ? players.filter(p => String(p.name || '').trim()) : [];
+        availablePlayers = namedPlayers;
         const assignedNames = new Set(namedPlayers.map(p => String(p.name).trim().toLowerCase()));
 
         playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
@@ -590,6 +595,7 @@
         const stats = await statsRes.json();
         const history = await historyRes.json();
         segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
+        if (segmentComparison) await loadSegmentComparison();
         const highscores = highscoresRes.ok ? await highscoresRes.json() : [];
         const selectedPlayerLabel = (playerSelect.options[playerSelect.selectedIndex] || {}).textContent || '';
         const playerName = selectedPlayerLabel.split(' · ').pop().trim();
@@ -884,8 +890,14 @@
     function renderSegmentAnalysis() {
       const summary = document.getElementById('segmentSummaryStats');
       const tableBody = document.querySelector('#segmentTable tbody');
+      const tableHead = document.querySelector('#segmentTable thead');
       const data = segmentAnalysis;
-      if (!summary || !tableBody) return;
+      if (!summary || !tableBody || !tableHead) return;
+      if (segmentComparison) {
+        renderSegmentComparison(summary, tableHead, tableBody);
+        return;
+      }
+      tableHead.innerHTML = '<tr><th>Segment</th><th>Würfe</th><th>Treffer (ohne Bust)</th><th>Quote</th><th>Bust / Überworfen</th><th>Punkte</th></tr>';
       const filtered = (data && Array.isArray(data.segments) ? data.segments : [])
         .filter(item => selectedSegmentType === 'all' || segmentCategory(item.segment) === selectedSegmentType);
       const throws = filtered.reduce((sum, item) => sum + Number(item.throws || 0), 0);
@@ -905,6 +917,45 @@
             return '<tr><td>' + escapeHtml(item.segment) + '</td><td>' + item.throws + '</td><td>' + item.hits + '</td><td>' + quote + '%</td><td>' + Number(item.busts || 0) + '</td><td>' + item.points + '</td></tr>';
           }).join('')
         : '<tr><td colspan="6" style="text-align:center;color:#555;padding:24px">Noch keine Segmentwürfe gespeichert.</td></tr>';
+    }
+
+    function renderSegmentComparison(summary, tableHead, tableBody) {
+      const analyses = segmentComparisonData.filter(item => item.analysis);
+      const segmentNames = new Set();
+      analyses.forEach(player => (player.analysis.segments || []).forEach(item => {
+        if (selectedSegmentType === 'all' || segmentCategory(item.segment) === selectedSegmentType) segmentNames.add(String(item.segment).toUpperCase());
+      }));
+      const segments = Array.from(segmentNames).sort((a, b) => a.localeCompare(b));
+      tableHead.innerHTML = '<tr><th rowspan="2">Segment</th>' + analyses.map(player => '<th colspan="3">' + escapeHtml(player.name) + '</th>').join('') + '</tr>'
+        + '<tr>' + analyses.map(() => '<th>Würfe</th><th>Quote</th><th>Punkte</th>').join('') + '</tr>';
+      const lookups = analyses.map(player => new Map((player.analysis.segments || []).map(item => [String(item.segment).toUpperCase(), item])));
+      tableBody.innerHTML = segments.length
+        ? segments.map(segment => '<tr><td>' + escapeHtml(segment) + '</td>' + lookups.map(items => {
+            const item = items.get(segment) || { throws: 0, hits: 0, points: 0 };
+            const quote = item.throws > 0 ? (item.hits / item.throws * 100).toFixed(1) : '0.0';
+            return '<td>' + item.throws + '</td><td>' + quote + '%</td><td>' + item.points + '</td>';
+          }).join('') + '</tr>').join('')
+        : '<tr><td colspan="' + (1 + analyses.length * 3) + '" style="text-align:center;color:#555;padding:24px">Keine Segmentwürfe für den Vergleich gespeichert.</td></tr>';
+      const totals = analyses.reduce((result, player) => {
+        const filtered = (player.analysis.segments || []).filter(item => selectedSegmentType === 'all' || segmentCategory(item.segment) === selectedSegmentType);
+        result.throws += filtered.reduce((sum, item) => sum + Number(item.throws || 0), 0);
+        result.hits += filtered.reduce((sum, item) => sum + Number(item.hits || 0), 0);
+        result.points += filtered.reduce((sum, item) => sum + Number(item.points || 0), 0);
+        return result;
+      }, { throws: 0, hits: 0, points: 0 });
+      const quote = totals.throws > 0 ? (totals.hits / totals.throws * 100).toFixed(1) : '0.0';
+      summary.innerHTML = '<div class="stat-item"><div class="stat-label">Spieler</div><div class="stat-value">' + analyses.length + '</div><div class="stat-sub">Vergleich: ' + segmentLabel(selectedSegmentType) + '</div></div>'
+        + '<div class="stat-item"><div class="stat-label">Würfe gesamt</div><div class="stat-value">' + totals.throws + '</div><div class="stat-sub">Alle Vergleichsspieler</div></div>'
+        + '<div class="stat-item"><div class="stat-label">Trefferquote</div><div class="stat-value">' + quote + '%</div><div class="stat-sub">gültige Würfe</div></div>'
+        + '<div class="stat-item"><div class="stat-label">Punkte gesamt</div><div class="stat-value">' + totals.points + '</div><div class="stat-sub">ohne Bust-Punkte</div></div>';
+    }
+
+    async function loadSegmentComparison() {
+      segmentComparisonData = await Promise.all(availablePlayers.map(async player => {
+        const response = await fetch(`${API_BASE}/players/${player.slot}/segment-analysis`, { cache: 'no-store' });
+        return { name: player.name, slot: player.slot, analysis: response.ok ? await response.json() : null };
+      }));
+      renderSegmentAnalysis();
     }
 
     function segmentCategory(segment) {
@@ -961,6 +1012,23 @@
     document.getElementById('segmentTypeSelect').addEventListener('change', event => {
       selectedSegmentType = event.target.value;
       renderSegmentAnalysis();
+    });
+
+    document.getElementById('segmentCompareBtn').addEventListener('click', async event => {
+      segmentComparison = !segmentComparison;
+      event.currentTarget.classList.toggle('primary', segmentComparison);
+      event.currentTarget.textContent = segmentComparison ? 'Einzelspieler anzeigen' : 'Spielervergleich';
+      if (segmentComparison) {
+        try {
+          await loadSegmentComparison();
+        } catch (error) {
+          console.error('Segmentvergleich konnte nicht geladen werden:', error);
+          segmentComparisonData = [];
+          renderSegmentAnalysis();
+        }
+      } else {
+        renderSegmentAnalysis();
+      }
     });
 
     refreshBtn.addEventListener('click', loadStats);
