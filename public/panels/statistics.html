@@ -312,6 +312,13 @@
     .heatmap-player-card h4 { color:#f1f1f1; margin-bottom:8px; }
     .heatmap-cell { display:flex; justify-content:space-between; gap:8px; padding:5px 7px; margin-top:3px; border-radius:4px; color:#ddd; font-size:.7rem; }
     .heatmap-cell strong { color:#f4a261; }
+    .segment-player-picker { display:none; margin-top:10px; padding:10px; border:1px solid #2d2d2d; border-radius:6px; background:#111; }
+    .segment-player-picker.visible { display:block; }
+    .segment-player-picker-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    .segment-player-picker-title { color:#aaa; font-size:.72rem; }
+    .segment-player-picker-options { display:flex; flex-wrap:wrap; gap:8px 14px; }
+    .segment-player-option { display:flex; align-items:center; gap:6px; color:#ddd; font-size:.78rem; }
+    .segment-player-option input { accent-color:#f4a261; }
     @media (max-width: 768px) {
       .encounter-toolbar { align-items: stretch; flex-direction: column; }
       .encounter-toolbar select { width: 100%; }
@@ -396,6 +403,13 @@
             <option value="bull">Bulls</option>
           </select>
           <button class="btn" id="segmentCompareBtn" type="button">Spielervergleich</button>
+        </div>
+        <div class="segment-player-picker" id="segmentPlayerPicker">
+          <div class="segment-player-picker-head">
+            <span class="segment-player-picker-title">Spieler für den Vergleich</span>
+            <button class="btn" id="segmentSelectAllBtn" type="button">Alle auswählen</button>
+          </div>
+          <div class="segment-player-picker-options" id="segmentPlayerOptions"></div>
         </div>
         <div class="stats-grid" id="segmentSummaryStats"></div>
         <div style="overflow-x:auto;margin-top:12px">
@@ -492,6 +506,7 @@
     let segmentComparison = false;
     let segmentComparisonData = [];
     let availablePlayers = [];
+    let selectedComparisonPlayerSlots = new Set();
     let selectedSegmentType = 'all';
     let encounterDetail = null;
     let encounterDetailView = 'duel';
@@ -548,6 +563,7 @@
         const profiles = profilesRes ? await profilesRes.json() : [];
         const namedPlayers = Array.isArray(players) ? players.filter(p => String(p.name || '').trim()) : [];
         availablePlayers = namedPlayers;
+        selectedComparisonPlayerSlots = new Set(namedPlayers.map(player => String(player.slot)));
         const assignedNames = new Set(namedPlayers.map(p => String(p.name).trim().toLowerCase()));
 
         playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
@@ -951,11 +967,30 @@
     }
 
     async function loadSegmentComparison() {
-      segmentComparisonData = await Promise.all(availablePlayers.map(async player => {
+      const selectedPlayers = availablePlayers.filter(player => selectedComparisonPlayerSlots.has(String(player.slot)));
+      segmentComparisonData = await Promise.all(selectedPlayers.map(async player => {
         const response = await fetch(`${API_BASE}/players/${player.slot}/segment-analysis`, { cache: 'no-store' });
         return { name: player.name, slot: player.slot, analysis: response.ok ? await response.json() : null };
       }));
       renderSegmentAnalysis();
+    }
+
+    function renderSegmentPlayerPicker() {
+      const picker = document.getElementById('segmentPlayerPicker');
+      const options = document.getElementById('segmentPlayerOptions');
+      if (!picker || !options) return;
+      picker.classList.toggle('visible', segmentComparison);
+      options.innerHTML = availablePlayers.length
+        ? availablePlayers.map(player => '<label class="segment-player-option"><input type="checkbox" data-comparison-player="' + escapeAttr(player.slot) + '"' + (selectedComparisonPlayerSlots.has(String(player.slot)) ? ' checked' : '') + '> ' + escapeHtml(player.name) + '</label>').join('')
+        : '<span class="segment-player-picker-title">Keine benannten Spieler verfügbar.</span>';
+      options.querySelectorAll('[data-comparison-player]').forEach(input => input.addEventListener('change', async event => {
+        const slot = String(event.currentTarget.dataset.comparisonPlayer);
+        if (event.currentTarget.checked) selectedComparisonPlayerSlots.add(slot);
+        else if (selectedComparisonPlayerSlots.size > 1) selectedComparisonPlayerSlots.delete(slot);
+        else event.currentTarget.checked = true;
+        await loadSegmentComparison();
+      }));
+      document.getElementById('segmentSelectAllBtn').textContent = selectedComparisonPlayerSlots.size === availablePlayers.length ? 'Auswahl aufheben' : 'Alle auswählen';
     }
 
     function segmentCategory(segment) {
@@ -1018,6 +1053,7 @@
       segmentComparison = !segmentComparison;
       event.currentTarget.classList.toggle('primary', segmentComparison);
       event.currentTarget.textContent = segmentComparison ? 'Einzelspieler anzeigen' : 'Spielervergleich';
+      renderSegmentPlayerPicker();
       if (segmentComparison) {
         try {
           await loadSegmentComparison();
@@ -1029,6 +1065,13 @@
       } else {
         renderSegmentAnalysis();
       }
+    });
+
+    document.getElementById('segmentSelectAllBtn').addEventListener('click', async event => {
+      if (selectedComparisonPlayerSlots.size === availablePlayers.length) selectedComparisonPlayerSlots = new Set(availablePlayers.slice(0, 1).map(player => String(player.slot)));
+      else selectedComparisonPlayerSlots = new Set(availablePlayers.map(player => String(player.slot)));
+      renderSegmentPlayerPicker();
+      if (segmentComparison) await loadSegmentComparison();
     });
 
     refreshBtn.addEventListener('click', loadStats);
