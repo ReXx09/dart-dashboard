@@ -950,7 +950,7 @@
         const isBust = !!(throwData && throwData.bust);
         const pointsLabel = isBust ? 'BUST' : (points === null ? 'offen' : (points === 0 ? '0' : '+' + points));
         const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
-        return '<div class="throw-seg' + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>';
+        return '<div class="throw-seg' + (points === null ? '' : ' thrown') + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>';
       }).join('');
       const legStats = getLiveLegStats(p);
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +

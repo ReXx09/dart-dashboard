@@ -2147,7 +2147,7 @@
         const throwData = currentRoundThrows[index];
         const pointsLabel = points === null ? 'offen' : (points === 0 ? '0' : '+' + points);
         const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
-        return '<div class="throw-seg" style="--pc:' + escapeAttr(p.color || '#e63946') + '">' +
+        return '<div class="throw-seg' + (points === null ? '' : ' thrown') + '" style="--pc:' + escapeAttr(p.color || '#e63946') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
           '<div class="seg">' + segmentLabel + '</div>' +
         '</div>';
