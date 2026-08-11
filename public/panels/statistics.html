@@ -188,11 +188,9 @@
     .segment-table td {
       padding: 8px 10px;
       border-bottom: 1px solid #1f1f1f;
-      text-align: right;
+      text-align: center;
       font-variant-numeric: tabular-nums;
     }
-    .segment-table th:first-child,
-    .segment-table td:first-child { text-align: left; }
     .segment-table th {
       color: #666;
       font-size: .62rem;
@@ -200,6 +198,10 @@
       letter-spacing: 1px;
     }
     .segment-table td:first-child { color: #f4a261; font-weight: 800; }
+    .segment-table .comparison-player-a { background: rgba(255,255,255,.035); }
+    .segment-table .comparison-player-b { background: rgba(255,255,255,.075); }
+    .segment-table th.comparison-player-a,
+    .segment-table th.comparison-player-b { color: #aaa; }
     .history-table {
       width: 100%;
       border-collapse: collapse;
@@ -414,7 +416,6 @@
           </div>
           <div class="segment-player-picker" id="segmentPlayerPicker">
             <div class="segment-player-picker-head">
-              <span class="segment-player-picker-title" id="segmentPlayerPickerTitle">Zwei Spieler zum Vergleich auswählen</span>
               <button class="btn" id="segmentSelectAllBtn" type="button">Auswahl zurücksetzen</button>
             </div>
             <div class="segment-player-picker-options" id="segmentPlayerOptions"></div>
@@ -953,14 +954,15 @@
         if (selectedSegmentType === 'all' || segmentCategory(item.segment) === selectedSegmentType) segmentNames.add(String(item.segment).toUpperCase());
       }));
       const segments = Array.from(segmentNames).sort((a, b) => a.localeCompare(b));
-      tableHead.innerHTML = '<tr><th rowspan="2">Segment</th>' + analyses.map(player => '<th colspan="3">' + escapeHtml(player.name) + '</th>').join('') + '</tr>'
-        + '<tr>' + analyses.map(() => '<th>Würfe</th><th>Quote</th><th>Punkte</th>').join('') + '</tr>';
+      tableHead.innerHTML = '<tr><th rowspan="2">Segment</th>' + analyses.map((player, index) => '<th class="comparison-player-' + (index === 0 ? 'a' : 'b') + '" colspan="3">' + escapeHtml(player.name) + '</th>').join('') + '</tr>'
+        + '<tr>' + analyses.map((_player, index) => '<th class="comparison-player-' + (index === 0 ? 'a' : 'b') + '">Würfe</th><th class="comparison-player-' + (index === 0 ? 'a' : 'b') + '">Quote</th><th class="comparison-player-' + (index === 0 ? 'a' : 'b') + '">Punkte</th>').join('') + '</tr>';
       const lookups = analyses.map(player => new Map((player.analysis.segments || []).map(item => [String(item.segment).toUpperCase(), item])));
       tableBody.innerHTML = segments.length
-        ? segments.map(segment => '<tr><td>' + escapeHtml(segment) + '</td>' + lookups.map(items => {
+        ? segments.map(segment => '<tr><td>' + escapeHtml(segment) + '</td>' + lookups.map((items, index) => {
             const item = items.get(segment) || { throws: 0, hits: 0, points: 0 };
             const quote = item.throws > 0 ? (item.hits / item.throws * 100).toFixed(1) : '0.0';
-            return '<td>' + item.throws + '</td><td>' + quote + '%</td><td>' + item.points + '</td>';
+          const playerClass = 'comparison-player-' + (index === 0 ? 'a' : 'b');
+          return '<td class="' + playerClass + '">' + item.throws + '</td><td class="' + playerClass + '">' + quote + '%</td><td class="' + playerClass + '">' + item.points + '</td>';
           }).join('') + '</tr>').join('')
         : '<tr><td colspan="' + (1 + analyses.length * 3) + '" style="text-align:center;color:#555;padding:24px">Keine Segmentwürfe für den Vergleich gespeichert.</td></tr>';
       const totals = analyses.reduce((result, player) => {
@@ -1007,7 +1009,6 @@
         selectedComparisonPlayerSlots = new Set(selectedComparisonPlayerOrder);
         await loadSegmentComparison();
       }));
-      document.getElementById('segmentPlayerPickerTitle').textContent = selectedComparisonPlayerOrder.length === 2 ? 'Zwei Spieler ausgewählt' : 'Zwei Spieler zum Vergleich auswählen';
     }
 
     function segmentCategory(segment) {
