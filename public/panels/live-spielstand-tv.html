@@ -142,6 +142,7 @@
       text-align: center;
     }
     .compact-players .score-card .sc-color-bar { display: none; }
+    .compact-players .score-card.compact-non-cricket .sc-score { font-size: 2.15rem; }
     .compact-players .score-card .sc-last-throws { margin-top: 0; }
     .compact-players .score-card .sc-last-throws,
     .compact-players .score-card .cricket-grid,
@@ -644,6 +645,7 @@
       .compact-players .score-card .sc-color-bar { display: none !important; }
       .compact-players .score-card .sc-name { font-size: .65rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-score { font-size: 1.1rem; white-space: nowrap; flex-shrink: 0; }
+      .compact-players .score-card.compact-non-cricket .sc-score { font-size: 1.25rem; }
       .compact-players .score-card .sc-stats { font-size: .5rem; white-space: nowrap; flex-shrink: 0; }
       .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
       .compact-players .score-card .sc-throw-chip { font-size: .55rem; padding: 1px 3px; min-width: 16px; border-radius: 4px; }
@@ -868,8 +870,18 @@
       if (!p) return '';
       const throws = Array.isArray(p.throws) ? p.throws : [];
       const turnScores = [];
-      const hasTurnRounds = throws.some(t => Number.isFinite(Number(t && t.turnRound)));
-      if (hasTurnRounds) {
+      const hasTurnIds = throws.some(t => Number.isFinite(Number(t && t.turnId)));
+      if (hasTurnIds) {
+        throws.forEach((throwData) => {
+          const turnId = Number(throwData && throwData.turnId);
+          const previous = turnScores[turnScores.length - 1];
+          if (!previous || previous.turnId !== turnId) turnScores.push({ turnId, score: 0, busted: false, throws: [] });
+          const turn = turnScores[turnScores.length - 1];
+          turn.score += throwData.bust ? 0 : (Number(throwData.points) || 0);
+          turn.busted = turn.busted || !!throwData.bust;
+          turn.throws.push({ label: throwData.segment || throwData.points, bust: !!throwData.bust });
+        });
+      } else if (throws.some(t => Number.isFinite(Number(t && t.turnRound)))) {
         throws.forEach((throwData) => {
           const turnRound = Number(throwData && throwData.turnRound);
           const previous = turnScores[turnScores.length - 1];
@@ -990,7 +1002,7 @@
         }).join('') + '</div>';
       }
       
-      return '<div class="score-card' + (crowded && isCricket ? ' compact-crowded' : '') + '" data-tv style="--pc:' + playerColor + '">' +
+      return '<div class="score-card ' + (isCricket ? 'compact-cricket' : 'compact-non-cricket') + (crowded && isCricket ? ' compact-crowded' : '') + '" data-tv style="--pc:' + playerColor + '">' +
         '<div class="sc-color-bar" style="--pc:' + playerColor + '"></div>' +
         '<div class="sc-name">P' + p.slot + ' · ' + escapeHtml(shortName) + '</div>' +
         '<div class="sc-score">' + displayScore + '</div>' +
