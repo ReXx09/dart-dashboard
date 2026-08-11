@@ -1667,10 +1667,10 @@
         const angle = (start + end) / 2; const radians = (angle - 90) * Math.PI / 180;
         svg += '<text class="dartboard-number" x="' + (180 + 169 * Math.cos(radians)).toFixed(1) + '" y="' + (180 + 169 * Math.sin(radians)).toFixed(1) + '">' + number + '</text>';
       });
-      const bull = items.get('SBULL') || { throws: 0, hits: 0, points: 0, average: 0, busts: 0 };
+      const bull = items.get('S25') || items.get('SBULL') || { throws: 0, hits: 0, points: 0, average: 0, busts: 0 };
       const dbull = items.get('DBULL') || { throws: 0, hits: 0, points: 0, average: 0, busts: 0 };
       const bullValue = item => metric === 'accuracy' ? (item.throws ? item.hits / item.throws : 0) : Number(item.throws || 0);
-      svg += '<circle class="dartboard-zone" data-segment="SBULL" cx="180" cy="180" r="30" fill="' + heatmapColor(bullValue(bull), max) + '" /><circle class="dartboard-zone" data-segment="DBULL" cx="180" cy="180" r="14" fill="' + heatmapColor(bullValue(dbull), max) + '" /><circle cx="180" cy="180" r="156" fill="none" stroke="#d7e0e5" stroke-width="1.5" /></svg>';
+      svg += '<circle class="dartboard-zone" data-segment="S25" cx="180" cy="180" r="30" fill="' + heatmapColor(bullValue(bull), max) + '" /><circle class="dartboard-zone" data-segment="DBULL" cx="180" cy="180" r="14" fill="' + heatmapColor(bullValue(dbull), max) + '" /><circle cx="180" cy="180" r="156" fill="none" stroke="#d7e0e5" stroke-width="1.5" /></svg>';
       return svg;
     }
 

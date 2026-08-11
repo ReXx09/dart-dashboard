@@ -912,7 +912,7 @@
       if (/^S(?:[1-9]|1[0-9]|20)$/.test(value)) return 'single';
       if (/^D(?:[1-9]|1[0-9]|20)$/.test(value)) return 'double';
       if (/^T(?:[1-9]|1[0-9]|20)$/.test(value)) return 'triple';
-      if (value.includes('BULL')) return 'bull';
+      if (value === 'S25' || value.includes('BULL')) return 'bull';
       return 'other';
     }
 

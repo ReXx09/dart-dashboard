@@ -1214,7 +1214,7 @@ class DataStore {
     const category = (segment) => /^S(?:[1-9]|1[0-9]|20)$/.test(segment) ? 'single'
       : /^D(?:[1-9]|1[0-9]|20)$/.test(segment) ? 'double'
         : /^T(?:[1-9]|1[0-9]|20)$/.test(segment) ? 'triple'
-          : /BULL/.test(segment) ? 'bull' : 'other';
+          : (segment === 'S25' || /BULL/.test(segment)) ? 'bull' : 'other';
     const categories = {};
     for (const item of segments) {
       const key = category(item.segment);
