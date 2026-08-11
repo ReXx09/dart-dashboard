@@ -3934,7 +3934,18 @@ function startFireTvServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('[Start] Fehlgeschlagen:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  startServer().catch((err) => {
+    console.error('[Start] Fehlgeschlagen:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  CHECKOUT_RULES,
+  DEFAULT_CHECKOUT_RULE,
+  getCheckoutRuleStats,
+  getCheckoutValue,
+  isCheckoutAttempt,
+  isValidCheckout
+};

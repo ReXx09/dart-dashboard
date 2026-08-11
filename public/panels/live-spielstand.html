@@ -1185,10 +1185,15 @@
 
     /* Tablet-Auflösungen – Buttons hoch genug */
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) {
+      :root {
+        --tablet-menu-control-height: 52px;
+        --tablet-player-tile-height: 52px;
+      }
       .focus-controls-card { height: 236px !important; }
       .focus-controls-card .ctrl-btn { padding: 24px 8px !important; min-height: 52px !important; height: 100% !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .82rem; }
       .match-menu-field { font-size: .82rem; }
-      .match-menu-field select, .match-menu-field input { min-height: 52px; padding: 13px 12px; font-size: .9rem; }
+      .match-menu-field select, .match-menu-field input:not([type="checkbox"]) { min-height: var(--tablet-menu-control-height); padding: 13px 12px; font-size: .9rem; }
+      .match-player-option { min-height: var(--tablet-player-tile-height); }
     }
 
     /* Fallback für alle Touch-Geräte */
@@ -1199,7 +1204,8 @@
       .focus-name { font-size: 1.5rem; }
       .focus-big-score { font-size: clamp(6rem, 9.6vw, 9.6rem); }
       .match-menu-field { font-size: .82rem; }
-      .match-menu-field select, .match-menu-field input { min-height: 52px; padding: 13px 12px; font-size: .9rem; }
+      .match-menu-field select, .match-menu-field input:not([type="checkbox"]) { min-height: var(--tablet-menu-control-height, 52px); padding: 13px 12px; font-size: .9rem; }
+      .match-player-option { min-height: var(--tablet-player-tile-height, 52px); }
       .focus-controls-card { height: 236px !important; }
       .focus-controls-card .ctrl-btn { min-height: 52px !important; padding: 24px 8px !important; height: 100% !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .82rem; }
     }
