@@ -283,13 +283,15 @@ function isValidCheckout(remaining, points, rule, segment = null) {
     // Checkout attempt – validate the finishing dart
     if (rule === 'single') return true; // any dart can finish
     if (rule === 'double') {
-      // Prefer the real segment; point-only requests retain legacy parity behavior.
-      return segment ? (/^D\d+$/.test(segment) || segment === 'DBULL') : points % 2 === 0;
+      // Prefer the real segment; point-only requests use valid dart values.
+      const normalizedSegment = String(segment || '').toUpperCase();
+      return segment ? (/^D(?:[1-9]|1[0-9]|20)$/.test(normalizedSegment) || normalizedSegment === 'DBULL') : isDoublePoints(points);
     }
     if (rule === 'master') {
+      const normalizedSegment = String(segment || '').toUpperCase();
       return segment
-        ? (/^[DT]\d+$/.test(segment) || segment === 'DBULL')
-        : points % 2 === 0 || points % 3 === 0;
+        ? (/^[DT](?:[1-9]|1[0-9]|20)$/.test(normalizedSegment) || normalizedSegment === 'DBULL')
+        : isMasterPoints(points);
     }
     return true;
   }
@@ -1230,13 +1232,10 @@ function getThrowHitCount(value) {
 }
 
 function getCheckoutValue(player, remainingBeforeThrow) {
-  const previousDartsInTurn = Array.isArray(player && player.currentRoundPoints)
-    ? player.currentRoundPoints.slice(0, -1)
-    : 0;
-  const previousThrowPoints = Array.isArray(previousDartsInTurn)
-    ? previousDartsInTurn.reduce((sum, points) => sum + (Number(points) || 0), 0)
-    : 0;
-  return Math.max(0, Number(remainingBeforeThrow || 0) + previousThrowPoints);
+  const dartsInTurn = Array.isArray(player && player.currentRoundPoints)
+    ? player.currentRoundPoints
+    : [];
+  return Math.max(0, dartsInTurn.reduce((sum, points) => sum + (Number(points) || 0), 0));
 }
 
 function getTurnScoresFromThrows(throws, includePartial = true) {
