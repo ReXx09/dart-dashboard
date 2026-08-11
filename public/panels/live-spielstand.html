@@ -2121,7 +2121,7 @@
       const cricketHits = p.cricketHits || {};
       const cricketClosed = p.cricketClosed || {};
       const cricketPoints = p.cricketPoints || 0;
-      const nums = [15,16,17,18,19,20,25];
+      const nums = [20,19,18,17,16,15,25];
       
       // Zahlen-Grid mit visuellen Hit-Markern (wie TV)
       const gridHtml = nums.map(n => {
@@ -2207,7 +2207,7 @@
       if (isCricket) {
         const cricketHits = p.cricketHits || {};
         const cricketClosed = p.cricketClosed || {};
-        const nums = [15, 16, 17, 18, 19, 20, 25];
+        const nums = [20, 19, 18, 17, 16, 15, 25];
         compactCricketHtml = '<div class="compact-cricket-status" aria-label="Cricket Status">' + nums.map(n => {
           const hits = cricketHits[n] || 0;
           const closed = !!cricketClosed[n];
