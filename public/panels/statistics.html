@@ -406,8 +406,8 @@
         </div>
         <div class="segment-player-picker" id="segmentPlayerPicker">
           <div class="segment-player-picker-head">
-            <span class="segment-player-picker-title">Spieler für den Vergleich</span>
-            <button class="btn" id="segmentSelectAllBtn" type="button">Alle auswählen</button>
+            <span class="segment-player-picker-title" id="segmentPlayerPickerTitle">Bis zu 2 Spieler auswählen</span>
+            <button class="btn" id="segmentSelectAllBtn" type="button">Auswahl zurücksetzen</button>
           </div>
           <div class="segment-player-picker-options" id="segmentPlayerOptions"></div>
         </div>
@@ -563,7 +563,7 @@
         const profiles = profilesRes ? await profilesRes.json() : [];
         const namedPlayers = Array.isArray(players) ? players.filter(p => String(p.name || '').trim()) : [];
         availablePlayers = namedPlayers;
-        selectedComparisonPlayerSlots = new Set(namedPlayers.map(player => String(player.slot)));
+        selectedComparisonPlayerSlots = new Set(namedPlayers.slice(0, 2).map(player => String(player.slot)));
         const assignedNames = new Set(namedPlayers.map(p => String(p.name).trim().toLowerCase()));
 
         playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
@@ -985,12 +985,17 @@
         : '<span class="segment-player-picker-title">Keine benannten Spieler verfügbar.</span>';
       options.querySelectorAll('[data-comparison-player]').forEach(input => input.addEventListener('change', async event => {
         const slot = String(event.currentTarget.dataset.comparisonPlayer);
+        if (event.currentTarget.checked && selectedComparisonPlayerSlots.size >= 2) {
+          event.currentTarget.checked = false;
+          document.getElementById('segmentPlayerPickerTitle').textContent = 'Maximal 2 Spieler auswählen';
+          return;
+        }
         if (event.currentTarget.checked) selectedComparisonPlayerSlots.add(slot);
         else if (selectedComparisonPlayerSlots.size > 1) selectedComparisonPlayerSlots.delete(slot);
         else event.currentTarget.checked = true;
         await loadSegmentComparison();
       }));
-      document.getElementById('segmentSelectAllBtn').textContent = selectedComparisonPlayerSlots.size === availablePlayers.length ? 'Auswahl aufheben' : 'Alle auswählen';
+      document.getElementById('segmentPlayerPickerTitle').textContent = selectedComparisonPlayerSlots.size === 2 ? '2 Spieler ausgewählt' : 'Noch 1 Spieler auswählen';
     }
 
     function segmentCategory(segment) {
@@ -1068,8 +1073,7 @@
     });
 
     document.getElementById('segmentSelectAllBtn').addEventListener('click', async event => {
-      if (selectedComparisonPlayerSlots.size === availablePlayers.length) selectedComparisonPlayerSlots = new Set(availablePlayers.slice(0, 1).map(player => String(player.slot)));
-      else selectedComparisonPlayerSlots = new Set(availablePlayers.map(player => String(player.slot)));
+      selectedComparisonPlayerSlots = new Set(availablePlayers.slice(0, 2).map(player => String(player.slot)));
       renderSegmentPlayerPicker();
       if (segmentComparison) await loadSegmentComparison();
     });
