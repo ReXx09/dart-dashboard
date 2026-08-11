@@ -399,7 +399,7 @@
         <div class="stats-grid" id="segmentSummaryStats"></div>
         <div style="overflow-x:auto;margin-top:12px">
           <table class="segment-table" id="segmentTable">
-            <thead><tr><th>Segment</th><th>Würfe</th><th>Treffer</th><th>Quote</th><th>Punkte</th></tr></thead>
+            <thead><tr><th>Segment</th><th>Würfe</th><th>Treffer (ohne Bust)</th><th>Quote</th><th>Bust / Überworfen</th><th>Punkte</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -751,7 +751,7 @@
         content.innerHTML = players.length ? '<div class="encounter-heatmap">' + players.map(player => {
           const segments = (player.analysis && player.analysis.segments || []).slice().sort((a, b) => Number(b.throws || 0) - Number(a.throws || 0)).slice(0, 20);
           const max = Math.max(1, ...segments.map(item => Number(item.throws || 0)));
-          return '<div class="heatmap-player-card"><h4>' + escapeHtml(player.name) + '</h4>' + (segments.length ? segments.map(item => '<div class="heatmap-cell" style="background:rgba(230,57,70,' + (0.12 + Number(item.throws || 0) / max * 0.55).toFixed(2) + ')"><strong>' + escapeHtml(item.segment) + '</strong><span>' + item.throws + ' Würfe · ' + (item.throws ? (item.hits / item.throws * 100).toFixed(1) : '0.0') + '% · ' + item.points + ' P</span></div>').join('') : '<div class="encounter-empty">Keine Wurfsegmente gespeichert.</div>') + '</div>';
+          return '<div class="heatmap-player-card"><h4>' + escapeHtml(player.name) + '</h4><div class="stat-sub">Trefferquote = gültige Würfe; BUST zählt als Fehlwurf.</div>' + (segments.length ? segments.map(item => '<div class="heatmap-cell" style="background:rgba(230,57,70,' + (0.12 + Number(item.throws || 0) / max * 0.55).toFixed(2) + ')"><strong>' + escapeHtml(item.segment) + '</strong><span>' + item.throws + ' Würfe · ' + item.hits + ' gültige Treffer · ' + (item.throws ? (item.hits / item.throws * 100).toFixed(1) : '0.0') + '% · ' + item.points + ' P' + (Number(item.busts || 0) ? ' · ' + item.busts + ' Bust' + (Number(item.busts || 0) === 1 ? '' : 's') : '') + '</span></div>').join('') : '<div class="encounter-empty">Keine Wurfsegmente gespeichert.</div>') + '</div>';
         }).join('') + '</div>' : '<div class="encounter-empty">Für diese Begegnung sind noch keine Wurfsegmente gespeichert.</div>';
       } catch (_error) { content.innerHTML = '<div class="encounter-empty">Heatmap-Daten konnten nicht geladen werden.</div>'; }
     }
@@ -902,9 +902,9 @@
       tableBody.innerHTML = filtered.length
         ? filtered.slice(0, 30).map(item => {
             const quote = item.throws > 0 ? (item.hits / item.throws * 100).toFixed(1) : '0.0';
-            return '<tr><td>' + escapeHtml(item.segment) + '</td><td>' + item.throws + '</td><td>' + item.hits + '</td><td>' + quote + '%</td><td>' + item.points + '</td></tr>';
+            return '<tr><td>' + escapeHtml(item.segment) + '</td><td>' + item.throws + '</td><td>' + item.hits + '</td><td>' + quote + '%</td><td>' + Number(item.busts || 0) + '</td><td>' + item.points + '</td></tr>';
           }).join('')
-        : '<tr><td colspan="5" style="text-align:center;color:#555;padding:24px">Noch keine Segmentwürfe gespeichert.</td></tr>';
+        : '<tr><td colspan="6" style="text-align:center;color:#555;padding:24px">Noch keine Segmentwürfe gespeichert.</td></tr>';
     }
 
     function segmentCategory(segment) {

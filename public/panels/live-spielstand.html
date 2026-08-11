@@ -1582,20 +1582,20 @@
       const viewLabel = duelStatsLegIndex < 0 ? 'Alle Legs' : 'Leg ' + Number(legs[duelStatsLegIndex].leg_number || duelStatsLegIndex + 1);
       const legNavigation = '<div class="duel-leg-nav"><button type="button" onclick="changeDuelStatsLeg(-1)" ' + (duelStatsLegIndex < 0 ? 'disabled' : '') + '>‹ Zurück</button><strong>' + viewLabel + '</strong><button type="button" onclick="changeDuelStatsLeg(1)" ' + (duelStatsLegIndex >= legs.length - 1 ? 'disabled' : '') + '>Vor ›</button></div>';
       const labels = [
-        [duelStatsLegIndex < 0 ? 'Legs gewonnen' : 'Leg gewonnen', stats[0].wins, stats[1].wins],
-        ['Schnitt', stats[0].average, stats[1].average],
-        ['Scoring', stats[0].scoring, stats[1].scoring],
-        ['Erster-9-AVG', stats[0].firstNineAverage, stats[1].firstNineAverage],
-        ['Checkout', stats[0].checkoutRate, stats[1].checkoutRate],
-        ['Checkout-Rate', stats[0].checkoutCount, stats[1].checkoutCount],
-        ['Höchstes Finish', stats[0].highestCheckout || '-', stats[1].highestCheckout || '-'],
-        ['Würfe', stats[0].darts, stats[1].darts],
-        ['Bestes Leg', stats[0].bestLeg, stats[1].bestLeg],
-        ['60+', stats[0].count60plus, stats[1].count60plus],
-        ['80+', stats[0].count80plus, stats[1].count80plus],
-        ['100+', stats[0].count100plus, stats[1].count100plus],
-        ['140+', stats[0].count140plus, stats[1].count140plus],
-        ['180', stats[0].count180, stats[1].count180]
+        [duelStatsLegIndex < 0 ? 'Legs gewonnen' : 'Leg gewonnen', item => item.wins],
+        ['Schnitt', item => item.average],
+        ['Scoring', item => item.scoring],
+        ['Erster-9-AVG', item => item.firstNineAverage],
+        ['Checkout', item => item.checkoutRate],
+        ['Checkout-Rate', item => item.checkoutCount],
+        ['Höchstes Finish', item => item.highestCheckout || '-'],
+        ['Würfe', item => item.darts],
+        ['Bestes Leg', item => item.bestLeg],
+        ['60+', item => item.count60plus],
+        ['80+', item => item.count80plus],
+        ['100+', item => item.count100plus],
+        ['140+', item => item.count140plus],
+        ['180', item => item.count180]
       ];
       const gridColumns = 'minmax(110px, 1fr) ' + stats.map(() => 'minmax(105px, 1fr)').join(' ');
       overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">Begegnung · ' + escapeHtml(duel.id) + '</div>' +
@@ -1605,7 +1605,7 @@
         '<div class="duel-view-tabs"><button class="duel-view-tab active" data-duel-view="stats">Duellstatistik</button><button class="duel-view-tab" data-duel-view="heatmap">Heatmap</button></div>' +
         '<div class="duel-view-panel" data-duel-panel="stats"><div class="duel-stats-grid" style="grid-template-columns:' + gridColumns + '"><div class="duel-stats-cell label"> </div>' +
         stats.map((item, index) => '<div class="duel-stats-cell player' + (index ? ' second' : '') + '">' + escapeHtml(item.name) + '</div>').join('') +
-        labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div>' + stats.map((item, index) => '<div class="duel-stats-cell value">' + row[index + 1] + '</div>').join('')).join('') +
+        labels.map(row => '<div class="duel-stats-cell label">' + row[0] + '</div>' + stats.map(item => '<div class="duel-stats-cell value">' + row[1](item) + '</div>').join('')).join('') +
         '</div></div><div class="duel-view-panel" data-duel-panel="heatmap" hidden><div id="duelHeatmapContent"><div class="heatmap-empty">Heatmap wird geladen ...</div></div></div><div class="duel-stats-actions">' + (String(state.game && state.game.matchType) === 'tournament' ? '' : (!matchComplete ? '<button class="duel-stats-next" onclick="startNextLegCountdown()">Nächstes Leg starten</button>' : '')) + '<button class="duel-stats-close" onclick="' + (String(state.game && state.game.matchType) === 'tournament' ? 'closeTournamentDuelStats()' : 'closeDuelStats()') + '">' + (String(state.game && state.game.matchType) === 'tournament' ? 'Statistik schließen' : 'Statistik ausblenden') + '</button></div></div>';
       overlay.style.display = 'flex';
       overlay.querySelectorAll('[data-duel-view]').forEach(button => button.addEventListener('click', () => {
@@ -1682,13 +1682,13 @@
         .then(data => {
           const players = Array.isArray(data.players) ? data.players : [];
           if (!players.length) { content.innerHTML = '<div class="heatmap-empty">Für diese Begegnung sind noch keine Wurfsegmente gespeichert.</div>'; return; }
-          content.innerHTML = '<div class="heatmap-toolbar"><div class="heatmap-metrics"><button class="heatmap-metric ' + (heatmapMetric === 'accuracy' ? 'active' : '') + '" data-metric="accuracy">Trefferquote</button><button class="heatmap-metric ' + (heatmapMetric === 'frequency' ? 'active' : '') + '" data-metric="frequency">Wurfhäufigkeit</button></div><div class="heatmap-legend"><span>niedrig</span><span class="heatmap-legend-bar"></span><span>hoch</span></div></div><div class="heatmap-boards">' + players.map((player, index) => '<div class="heatmap-player' + (index ? ' second' : '') + '"><div class="heatmap-player-name">' + escapeHtml(player.name) + '</div><div class="heatmap-board-wrap">' + renderDartboard(player, heatmapMetric) + '</div><div class="heatmap-detail" data-detail-for="' + player.slot + '">Segment auswählen</div></div>').join('') + '</div>';
+          content.innerHTML = '<div class="heatmap-toolbar"><div class="heatmap-metrics"><button class="heatmap-metric ' + (heatmapMetric === 'accuracy' ? 'active' : '') + '" data-metric="accuracy">Trefferquote</button><button class="heatmap-metric ' + (heatmapMetric === 'frequency' ? 'active' : '') + '" data-metric="frequency">Wurfhäufigkeit</button></div><div class="heatmap-legend"><span>niedrig</span><span class="heatmap-legend-bar"></span><span>hoch</span></div></div><div class="heatmap-note">Trefferquote = gültige Würfe. Ein Wurf mit BUST zählt als Fehlwurf.</div><div class="heatmap-boards">' + players.map((player, index) => '<div class="heatmap-player' + (index ? ' second' : '') + '"><div class="heatmap-player-name">' + escapeHtml(player.name) + '</div><div class="heatmap-board-wrap">' + renderDartboard(player, heatmapMetric) + '</div><div class="heatmap-detail" data-detail-for="' + player.slot + '">Segment auswählen</div></div>').join('') + '</div>';
           content.querySelectorAll('[data-metric]').forEach(button => button.addEventListener('click', () => { heatmapMetric = button.dataset.metric; localStorage.setItem('duelHeatmapMetric', heatmapMetric); loadDuelHeatmap(duelId, state); }));
           content.querySelectorAll('.heatmap-player').forEach((board, index) => board.querySelectorAll('[data-segment]').forEach(zoneElement => zoneElement.addEventListener('click', () => {
             board.querySelectorAll('.selected').forEach(item => item.classList.remove('selected')); zoneElement.classList.add('selected');
             const player = players[index]; const item = (player.analysis.segments || []).find(segment => String(segment.segment).toUpperCase() === zoneElement.dataset.segment) || { throws: 0, hits: 0, points: 0, average: 0 };
             const quote = item.throws ? (item.hits / item.throws * 100).toFixed(1) : '0.0';
-            board.querySelector('.heatmap-detail').textContent = zoneElement.dataset.segment + ': ' + item.throws + ' Würfe · ' + quote + '% Treffer · ' + item.points + ' Punkte';
+            board.querySelector('.heatmap-detail').textContent = zoneElement.dataset.segment + ': ' + item.throws + ' Würfe · ' + item.hits + ' gültige Treffer · ' + quote + '% · ' + item.points + ' Punkte' + (item.busts ? ' · ' + item.busts + ' Bust' + (item.busts === 1 ? '' : 's') : '');
           })));
         }).catch(() => { content.innerHTML = '<div class="heatmap-empty">Heatmap-Daten konnten nicht geladen werden.</div>'; });
     }

@@ -1202,9 +1202,9 @@ class DataStore {
       const segment = String(row.segment || 'MISS').toUpperCase();
       const current = bySegment.get(segment) || { segment, throws: 0, hits: 0, points: 0, busts: 0 };
       current.throws += 1;
-      current.points += Number(row.points || 0);
       if (row.bust) current.busts += 1;
       else current.hits += 1;
+      if (!row.bust) current.points += Number(row.points || 0);
       bySegment.set(segment, current);
     }
     const segments = Array.from(bySegment.values()).map(item => ({
