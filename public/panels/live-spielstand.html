@@ -1647,7 +1647,7 @@
       };
       let svg = '<svg class="dartboard-svg" viewBox="0 0 360 360" role="img" aria-label="Dartboard-Heatmap für ' + escapeAttr(player.name) + '">';
       DARTBOARD_ORDER.forEach((number, index) => {
-        const start = index * 18 + 0.7; const end = (index + 1) * 18 - 0.7;
+        const start = index * 18 - 8.3; const end = (index + 1) * 18 - 9.7;
         svg += zone('S' + number, 32, 142, start, end);
         svg += zone('T' + number, 78, 92, start, end);
         svg += zone('D' + number, 142, 156, start, end);
@@ -2386,8 +2386,9 @@
       const dartsThrown = Number(winner.turns) || throws.length;
       const checkoutValue = !isCricket && !isElimination ? (Number(winner.lastCheckoutValue) || 0) : 0;
       const matchComplete = isMatchComplete(state, winner);
+      const isGroupMatch = String(state.game && state.game.matchType) === 'group';
       const title = matchComplete
-        ? (isCricket ? 'BEGEGNUNG GEWONNEN' : isElimination ? 'BEGEGNUNG GEWONNEN' : 'DUELL GEWONNEN')
+        ? (isCricket || isElimination || isGroupMatch ? 'BEGEGNUNG GEWONNEN' : 'DUELL GEWONNEN')
         : (isCricket ? 'CRICKET GEWONNEN' : isElimination ? 'ELIMINATION GEWONNEN' : 'LEG GEWONNEN');
       const subtitle = isCricket ? 'Cricket Punkte: ' + (winner.cricketPoints || 0) : isElimination ? 'Punkte: ' + (winner.totalScored || 0) : 'Checkout: ' + (checkoutValue || '-') + ' Punkte';
       const modeStats = isCricket
@@ -2507,7 +2508,7 @@
       const overlay = document.getElementById('legStartOverlay');
       if (!overlay) return;
       const mode = getGameModeLabel(liveState.game.mode);
-      const nextLegNumber = Number(liveState.players && liveState.players[0] && liveState.players[0].legs || 0) + Number(liveState.players && liveState.players[1] && liveState.players[1].legs || 0) + 1;
+      const nextLegNumber = (Array.isArray(liveState.players) ? liveState.players : []).reduce((total, player) => total + Number(player.legs || 0), 0) + 1;
       overlay.innerHTML = '<div class="leg-start-card"><h2 id="legStartTitle">Nächstes Leg startet</h2><div>' + escapeHtml(mode) + ' · Leg ' + nextLegNumber + '</div>' + getTournamentMatchMarkup(liveState) + '<div class="leg-start-count" id="legStartCount">' + legStartRemaining + '</div><div>Bitte bereit machen</div><button class="leg-start-cancel" type="button" onclick="cancelNextLegCountdown()">Abbrechen</button></div>';
       overlay.classList.add('show');
       legStartTimer = setInterval(() => {

@@ -3320,20 +3320,25 @@ app.post('/api/live/reset', async (req, res) => {
     cancelScheduledAutoAdvance();
     const mode = savedLiveMode || DEFAULT_MODE;
     const current = await getLiveState();
-    if (Number(current.game?.duelId || 0) > 0) {
+    if (!carryLegs && Number(current.game?.duelId || 0) > 0) {
       const currentDuel = await dataStore.getDuel(current.game.duelId);
       if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
     }
     const fresh = resetLiveState(carryLegs, mode, current);
-    const duel = null;
-    const currentSlots = current.players.map(player => Number(player.slot)).sort((a, b) => a - b).join('-');
-    const duelSlots = duel ? duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-') : '';
-    fresh.game.duelId = duel && duel.status === 'active' && currentSlots === duelSlots ? duel.id : null;
-    if (fresh.game.duelId) {
+    if (carryLegs && Number(current.game?.duelId || 0) > 0) {
+      fresh.game.duelId = Number(current.game.duelId);
       fresh.game.matchType = String(current.game.matchType || 'direct');
       fresh.game.bestOf = Math.max(1, Number(current.game.bestOf || 1));
       fresh.game.legsToWin = Math.max(1, Number(current.game.legsToWin || 1));
+      fresh.game.checkoutRule = String(current.game.checkoutRule || savedCheckoutRule || DEFAULT_CHECKOUT_RULE);
+      fresh.game.selectedPlayerSlots = Array.isArray(current.game.selectedPlayerSlots)
+        ? current.game.selectedPlayerSlots.map(Number)
+        : fresh.players.map(player => Number(player.slot));
       fresh.game.tournamentName = String(current.game.tournamentName || '');
+      fresh.game.tournamentId = Number(current.game.tournamentId || 0) || null;
+      fresh.game.tournamentMatchId = Number(current.game.tournamentMatchId || 0) || null;
+      fresh.game.tournamentRound = Number(current.game.tournamentRound || 0) || null;
+      fresh.game.tournamentMatchLabel = String(current.game.tournamentMatchLabel || '');
     }
     const saved = await saveLiveState(fresh);
     broadcastReload();

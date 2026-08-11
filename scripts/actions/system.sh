@@ -79,12 +79,29 @@ run_raspi_update() {
   if ! command_exists raspi-update; then
     msg_fail 'raspi-update wurde auf diesem System nicht gefunden.'
     local os_release=''
+    local device_model=''
     if [[ -r /etc/os-release ]]; then
       os_release="$(cat /etc/os-release 2>/dev/null || true)"
     fi
-    if printf '%s\n' "$os_release" | grep -Eiq 'PRETTY_NAME=.*(Raspberry Pi OS|Raspbian)'; then
-      msg_info 'Auf Raspberry Pi OS kann das Werkzeug installiert werden mit:'
-      msg_info 'sudo apt-get update && sudo apt-get install -y rpi-update'
+    if [[ -r /proc/device-tree/model ]]; then
+      device_model="$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || true)"
+    fi
+    if printf '%s\n' "$device_model" | grep -Eiq 'Raspberry Pi|Compute Module' || command_exists raspi-config || printf '%s\n' "$os_release" | grep -Eiq 'PRETTY_NAME=.*(Raspberry Pi OS|Raspbian)'; then
+      msg_info "Raspberry-Pi-Hardware erkannt: ${device_model:-Modell unbekannt}"
+      if command_exists apt-get && ask_yes_no 'Fehlendes Paket rpi-update jetzt installieren?' 'y'; then
+        ensure_sudo
+        sudo apt-get update
+        sudo apt-get install -y rpi-update
+        if ! command_exists raspi-update; then
+          msg_fail 'rpi-update konnte nicht installiert werden.'
+          return 1
+        fi
+        msg_ok 'rpi-update wurde installiert.'
+      else
+        msg_info 'Installiere das Werkzeug manuell mit:'
+        msg_info 'sudo apt-get update && sudo apt-get install -y rpi-update'
+        return 1
+      fi
     elif printf '%s\n' "$os_release" | grep -q 'ID=debian'; then
       msg_info 'Dieses System ist Debian, nicht Raspberry Pi OS.'
       msg_info 'Verwende fuer regulare System- und Paketupdates:'
