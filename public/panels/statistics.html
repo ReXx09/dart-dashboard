@@ -177,6 +177,8 @@
       margin-bottom: 12px;
     }
     .segment-toolbar select { width: auto; min-width: 180px; }
+    .segment-controls { display:flex; align-items:flex-end; justify-content:flex-end; gap:10px; margin-bottom:12px; }
+    .segment-controls .segment-toolbar { margin-bottom:0; }
     .segment-table {
       width: 100%;
       border-collapse: collapse;
@@ -313,8 +315,8 @@
     .heatmap-cell { display:flex; justify-content:space-between; gap:8px; padding:5px 7px; margin-top:3px; border-radius:4px; color:#ddd; font-size:.7rem; }
     .heatmap-cell strong { color:#f4a261; }
     .segment-player-picker { display:none; margin-top:10px; padding:10px; border:1px solid #2d2d2d; border-radius:6px; background:#111; }
-    .segment-player-picker.visible { display:block; }
-    .segment-player-picker-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    .segment-player-picker.visible { display:flex; align-items:flex-end; gap:10px; margin-top:0; padding:0; border:0; background:transparent; }
+    .segment-player-picker-head { display:flex; align-items:flex-end; gap:10px; margin:0; }
     .segment-player-picker-title { color:#aaa; font-size:.72rem; }
     .segment-player-picker-options { display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); gap:10px; }
     .segment-player-option { display:flex; flex-direction:column; gap:5px; color:#aaa; font-size:.68rem; text-transform:uppercase; letter-spacing:.7px; }
@@ -328,6 +330,11 @@
       .toolbar { grid-template-columns: 1fr; }
       .summary-grid { grid-template-columns: 1fr 1fr; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
+      .segment-controls { align-items:stretch; flex-wrap:wrap; justify-content:stretch; }
+      .segment-controls .segment-toolbar,
+      .segment-player-picker.visible { width:100%; }
+      .segment-player-picker-options { flex:1; grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .segment-player-picker-head { flex:1; }
     }
   </style>
 </head>
@@ -394,22 +401,24 @@
       </div>
       <div class="section">
         <h2 class="section-title">Segmentanalyse</h2>
-        <div class="segment-toolbar">
-          <select id="segmentTypeSelect" aria-label="Segmentanalyse auswählen">
-            <option value="all">Alle Segmente</option>
-            <option value="single">Singles</option>
-            <option value="double">Doubles</option>
-            <option value="triple">Triples</option>
-            <option value="bull">Bulls</option>
-          </select>
-          <button class="btn" id="segmentCompareBtn" type="button">Spielervergleich</button>
-        </div>
-        <div class="segment-player-picker" id="segmentPlayerPicker">
-          <div class="segment-player-picker-head">
-            <span class="segment-player-picker-title" id="segmentPlayerPickerTitle">Zwei Spieler zum Vergleich auswählen</span>
-            <button class="btn" id="segmentSelectAllBtn" type="button">Auswahl zurücksetzen</button>
+        <div class="segment-controls">
+          <div class="segment-toolbar">
+            <select id="segmentTypeSelect" aria-label="Segmentanalyse auswählen">
+              <option value="all">Alle Segmente</option>
+              <option value="single">Singles</option>
+              <option value="double">Doubles</option>
+              <option value="triple">Triples</option>
+              <option value="bull">Bulls</option>
+            </select>
+            <button class="btn" id="segmentCompareBtn" type="button">Spielervergleich</button>
           </div>
-          <div class="segment-player-picker-options" id="segmentPlayerOptions"></div>
+          <div class="segment-player-picker" id="segmentPlayerPicker">
+            <div class="segment-player-picker-head">
+              <span class="segment-player-picker-title" id="segmentPlayerPickerTitle">Zwei Spieler zum Vergleich auswählen</span>
+              <button class="btn" id="segmentSelectAllBtn" type="button">Auswahl zurücksetzen</button>
+            </div>
+            <div class="segment-player-picker-options" id="segmentPlayerOptions"></div>
+          </div>
         </div>
         <div class="stats-grid" id="segmentSummaryStats"></div>
         <div style="overflow-x:auto;margin-top:12px">
