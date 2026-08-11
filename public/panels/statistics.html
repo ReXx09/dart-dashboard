@@ -316,9 +316,9 @@
     .segment-player-picker.visible { display:block; }
     .segment-player-picker-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
     .segment-player-picker-title { color:#aaa; font-size:.72rem; }
-    .segment-player-picker-options { display:flex; flex-wrap:wrap; gap:8px 14px; }
-    .segment-player-option { display:flex; align-items:center; gap:6px; color:#ddd; font-size:.78rem; }
-    .segment-player-option input { accent-color:#f4a261; }
+    .segment-player-picker-options { display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); gap:10px; }
+    .segment-player-option { display:flex; flex-direction:column; gap:5px; color:#aaa; font-size:.68rem; text-transform:uppercase; letter-spacing:.7px; }
+    .segment-player-option select { width:100%; }
     @media (max-width: 768px) {
       .encounter-toolbar { align-items: stretch; flex-direction: column; }
       .encounter-toolbar select { width: 100%; }
@@ -406,7 +406,7 @@
         </div>
         <div class="segment-player-picker" id="segmentPlayerPicker">
           <div class="segment-player-picker-head">
-            <span class="segment-player-picker-title" id="segmentPlayerPickerTitle">Bis zu 2 Spieler auswählen</span>
+            <span class="segment-player-picker-title" id="segmentPlayerPickerTitle">Zwei Spieler zum Vergleich auswählen</span>
             <button class="btn" id="segmentSelectAllBtn" type="button">Auswahl zurücksetzen</button>
           </div>
           <div class="segment-player-picker-options" id="segmentPlayerOptions"></div>
@@ -507,6 +507,7 @@
     let segmentComparisonData = [];
     let availablePlayers = [];
     let selectedComparisonPlayerSlots = new Set();
+    let selectedComparisonPlayerOrder = [];
     let selectedSegmentType = 'all';
     let encounterDetail = null;
     let encounterDetailView = 'duel';
@@ -563,7 +564,8 @@
         const profiles = profilesRes ? await profilesRes.json() : [];
         const namedPlayers = Array.isArray(players) ? players.filter(p => String(p.name || '').trim()) : [];
         availablePlayers = namedPlayers;
-        selectedComparisonPlayerSlots = new Set(namedPlayers.slice(0, 2).map(player => String(player.slot)));
+        selectedComparisonPlayerOrder = namedPlayers.slice(0, 2).map(player => String(player.slot));
+        selectedComparisonPlayerSlots = new Set(selectedComparisonPlayerOrder);
         const assignedNames = new Set(namedPlayers.map(p => String(p.name).trim().toLowerCase()));
 
         playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
@@ -967,7 +969,9 @@
     }
 
     async function loadSegmentComparison() {
-      const selectedPlayers = availablePlayers.filter(player => selectedComparisonPlayerSlots.has(String(player.slot)));
+      const selectedPlayers = selectedComparisonPlayerOrder
+        .map(slot => availablePlayers.find(player => String(player.slot) === slot))
+        .filter(Boolean);
       segmentComparisonData = await Promise.all(selectedPlayers.map(async player => {
         const response = await fetch(`${API_BASE}/players/${player.slot}/segment-analysis`, { cache: 'no-store' });
         return { name: player.name, slot: player.slot, analysis: response.ok ? await response.json() : null };
@@ -981,21 +985,20 @@
       if (!picker || !options) return;
       picker.classList.toggle('visible', segmentComparison);
       options.innerHTML = availablePlayers.length
-        ? availablePlayers.map(player => '<label class="segment-player-option"><input type="checkbox" data-comparison-player="' + escapeAttr(player.slot) + '"' + (selectedComparisonPlayerSlots.has(String(player.slot)) ? ' checked' : '') + '> ' + escapeHtml(player.name) + '</label>').join('')
+        ? [0, 1].map(index => '<label class="segment-player-option">Spieler ' + (index + 1) + '<select data-comparison-player-index="' + index + '">' + availablePlayers.map(player => '<option value="' + escapeAttr(player.slot) + '"' + (selectedComparisonPlayerOrder[index] === String(player.slot) ? ' selected' : '') + '>' + escapeHtml(player.name) + '</option>').join('') + '</select></label>').join('')
         : '<span class="segment-player-picker-title">Keine benannten Spieler verfügbar.</span>';
-      options.querySelectorAll('[data-comparison-player]').forEach(input => input.addEventListener('change', async event => {
-        const slot = String(event.currentTarget.dataset.comparisonPlayer);
-        if (event.currentTarget.checked && selectedComparisonPlayerSlots.size >= 2) {
-          event.currentTarget.checked = false;
-          document.getElementById('segmentPlayerPickerTitle').textContent = 'Maximal 2 Spieler auswählen';
+      options.querySelectorAll('[data-comparison-player-index]').forEach(select => select.addEventListener('change', async event => {
+        const index = Number(event.currentTarget.dataset.comparisonPlayerIndex);
+        const slot = String(event.currentTarget.value);
+        if (selectedComparisonPlayerOrder.some((selectedSlot, selectedIndex) => selectedIndex !== index && selectedSlot === slot)) {
+          event.currentTarget.value = selectedComparisonPlayerOrder[index];
           return;
         }
-        if (event.currentTarget.checked) selectedComparisonPlayerSlots.add(slot);
-        else if (selectedComparisonPlayerSlots.size > 1) selectedComparisonPlayerSlots.delete(slot);
-        else event.currentTarget.checked = true;
+        selectedComparisonPlayerOrder[index] = slot;
+        selectedComparisonPlayerSlots = new Set(selectedComparisonPlayerOrder);
         await loadSegmentComparison();
       }));
-      document.getElementById('segmentPlayerPickerTitle').textContent = selectedComparisonPlayerSlots.size === 2 ? '2 Spieler ausgewählt' : 'Noch 1 Spieler auswählen';
+      document.getElementById('segmentPlayerPickerTitle').textContent = selectedComparisonPlayerOrder.length === 2 ? 'Zwei Spieler ausgewählt' : 'Zwei Spieler zum Vergleich auswählen';
     }
 
     function segmentCategory(segment) {
@@ -1073,7 +1076,8 @@
     });
 
     document.getElementById('segmentSelectAllBtn').addEventListener('click', async event => {
-      selectedComparisonPlayerSlots = new Set(availablePlayers.slice(0, 2).map(player => String(player.slot)));
+      selectedComparisonPlayerOrder = availablePlayers.slice(0, 2).map(player => String(player.slot));
+      selectedComparisonPlayerSlots = new Set(selectedComparisonPlayerOrder);
       renderSegmentPlayerPicker();
       if (segmentComparison) await loadSegmentComparison();
     });
