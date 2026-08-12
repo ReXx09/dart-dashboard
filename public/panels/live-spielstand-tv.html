@@ -36,27 +36,8 @@
     .topbar-info { min-width: auto; font-size: 1.1rem; font-weight: 1000; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
     .topbar-mode, .topbar-checkout { text-align: center; }
     .topbar-separator { color: #d7e0e5; font-size: 1.55rem; font-weight: 400; line-height: .7; }
-    .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
-    .topbar select { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 12px 8px !important; border-radius: 8px; cursor: pointer; font-size: .72rem; font-family: inherit; }
-    .topbar select:hover { border-color: #f4a261; }
-    .topbar label { font-size: .68rem; color: #888; display: flex; align-items: center; gap: 4px; }
     .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
     .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
-    .topbar .fs-btn.active { border-color: #f4a261; color: #f4a261; }
-    .topbar .miss-btn {
-      background: #8b0000;
-      border: 1px solid #e63946;
-      color: #f1f1f1;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .miss-btn:hover { background: #a00; border-color: #f4a261; color: #f4a261; }
-    .topbar .miss-btn:disabled { opacity: .4; cursor: default; }
     .daily-hs {
       font-size: .72rem;
       color: #f4a261;
@@ -71,32 +52,6 @@
     }
     .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
     .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
-    .topbar .restart-btn {
-      background: #1a1a1a;
-      border: 1px solid #f4a261;
-      color: #f4a261;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .restart-btn:hover { background: #252525; border-color: #e63946; color: #e63946; }
-    .topbar .restart-btn {
-      background: #1a1a1a;
-      border: 1px solid #f4a261;
-      color: #f4a261;
-      padding: 5px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: .78rem;
-      font-family: inherit;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .topbar .restart-btn:hover { background: #252525; border-color: #e63946; color: #e63946; }
     main {
       padding: 6px;
       max-width: none;
@@ -688,16 +643,13 @@
         font-size: 10px;
         color: #2a9d8f;
       }
-      .topbar select { padding: 8px 8px !important; }
     }
 
-    /* Tablet-Auflösungen – Selects in Topbar hoch genug */
     @media (min-width: 768px) and (max-width: 1366px) and (min-height: 768px) and (max-height: 1024px) {
       .focus-player.single { grid-template-rows: minmax(0, 1fr); }
       .focus-card { min-height: 0; padding: 6px; }
       .focus-name { font-size: 1.5rem; }
       .focus-big-score { font-size: clamp(5rem, 8vw, 8rem); }
-      .topbar select { padding: 12px 8px !important; }
     }
   </style>
 </head>
@@ -1038,12 +990,6 @@
       const focusPlayer = document.getElementById('focusPlayer');
       const compactPlayers = document.getElementById('compactPlayers');
 
-      // ── Sync selectors ──
-      const modeSel = document.getElementById('gameModeSelect');
-      const ruleSel = document.getElementById('checkoutRuleSelect');
-      if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
-      if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
-
       // ── Bust detection ──
       const lastThrow = state.lastAction;
       if (state.game.mode === 'cricket' && lastThrow && Number(lastThrow.cricketPointsAwarded) > 0) {
@@ -1213,14 +1159,6 @@
       setTimeout(() => t.className = 'toast', 2500);
     }
 
-    // ── Uhrzeit aktualisieren ──
-    function updateClock() {
-      const el = document.getElementById('clockDisplay');
-      if (el) el.textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
     // ── Vollbild ein-/ausschalten ──
     function toggleFullscreen() {
       const doc = document;
@@ -1275,28 +1213,12 @@
     document.addEventListener('mozfullscreenchange', updateFullscreenButton);
     document.addEventListener('MSFullscreenChange', updateFullscreenButton);
 
-    // ── Fehlwurf – nächster Spieler ──
-    async function skipPlayer() {
-      const btn = document.getElementById('missBtn');
-      if (btn) btn.disabled = true;
-      try {
-        const r = await fetch('/api/live/next-player', { method: 'POST' });
-        if (!r.ok) { showToast('Wechsel fehlgeschlagen', true); if (btn) btn.disabled = false; return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('➡ Fehlwurf – weiter mit ' + (liveState.players[liveState.game.activePlayer]?.name || 'nächstem Spieler'));
-      } catch(e) { showToast('Netzwerkfehler', true); }
-      if (btn) setTimeout(() => btn.disabled = false, 1000);
-    }
-
     // ── Täglicher Höchstwert ──
-    let dailyHighscoreCache = null;
     async function loadDailyHighscore() {
       try {
         const r = await fetch('/api/highscores/daily');
         if (!r.ok) return;
         const data = await r.json();
-        dailyHighscoreCache = data;
         renderDailyHighscore(data);
       } catch {}
     }
@@ -1310,82 +1232,6 @@
         el.querySelector('.hs-val').textContent = '–';
         el.title = data && data.count ? data.count + ' Einträge' : 'Keine Einträge heute';
       }
-    }
-
-    // ── Leg-Neustart ──
-    async function restartLeg() {
-      const btn = document.getElementById('restartLegBtn');
-      if (btn) { btn.disabled = true; btn.textContent = '…'; }
-      try {
-        const r = await fetch('/api/live/reset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ carryLegs: false })
-        });
-        if (!r.ok) { showToast('Neustart fehlgeschlagen', true); if (btn) { btn.disabled = false; btn.textContent = '↻ Leg-Neustart'; } return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('↻ Leg zurückgesetzt');
-      } catch(e) { showToast('Netzwerkfehler', true); }
-      if (btn) { btn.disabled = false; btn.textContent = '↻ Leg-Neustart'; }
-    }
-
-    // ── Spielmodus / Checkout-Regel ──
-    async function loadGameModes() {
-      try {
-        const [modesRes, rulesRes, stateRes] = await Promise.all([
-          fetch('/api/game/modes'),
-          fetch('/api/game/checkout-rules'),
-          fetch('/api/live/state', { cache: 'no-store' })
-        ]);
-        if (modesRes.ok) {
-          const modes = await modesRes.json();
-          const sel = document.getElementById('gameModeSelect');
-          sel.innerHTML = Object.entries(modes).map(([key, m]) =>
-            '<option value="' + key + '">' + m.label + '</option>'
-          ).join('');
-        }
-        if (rulesRes.ok) {
-          const rules = await rulesRes.json();
-          const sel = document.getElementById('checkoutRuleSelect');
-          sel.innerHTML = Object.entries(rules).map(([key, r]) =>
-            '<option value="' + key + '">' + r.label + '</option>'
-          ).join('');
-        }
-        if (stateRes.ok) {
-          const state = await stateRes.json();
-          const modeSel = document.getElementById('gameModeSelect');
-          const ruleSel = document.getElementById('checkoutRuleSelect');
-          if (modeSel && state.game.mode) modeSel.value = state.game.mode;
-          if (ruleSel && state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
-        }
-      } catch {}
-    }
-
-    async function changeMode(mode) {
-      try {
-        const r = await fetch('/api/game/mode', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode })
-        });
-        if (!r.ok) { showToast('Modus-Wechsel fehlgeschlagen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Modus: ' + mode);
-      } catch(e) { showToast('Netzwerkfehler', true); }
-    }
-
-    async function changeCheckoutRule(rule) {
-      try {
-        const r = await fetch('/api/game/checkout-rule', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rule })
-        });
-        if (!r.ok) { showToast('Regel-Wechsel fehlgeschlagen', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        showToast('Finish: ' + rule);
-      } catch(e) { showToast('Netzwerkfehler', true); }
     }
 
     // ── Bust / Audio ──
@@ -1493,10 +1339,6 @@
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
-        const modeSel = document.getElementById('gameModeSelect');
-        const ruleSel = document.getElementById('checkoutRuleSelect');
-        if (modeSel && modeSel.value !== state.game.mode) modeSel.value = state.game.mode;
-        if (ruleSel && ruleSel.value !== state.game.checkoutRule) ruleSel.value = state.game.checkoutRule;
         // Auto-Recovery NUR beim ersten Laden (nicht bei SSE-Updates)
         if (isFirstLoad && state.game.status === 'leg-finished') {
           isFirstLoad = false;
@@ -1509,10 +1351,6 @@
             if (resetRes.ok) {
               const freshState = await resetRes.json();
               liveState = freshState;
-              const modeSel2 = document.getElementById('gameModeSelect');
-              const ruleSel2 = document.getElementById('checkoutRuleSelect');
-              if (modeSel2 && modeSel2.value !== freshState.game.mode) modeSel2.value = freshState.game.mode;
-              if (ruleSel2 && ruleSel2.value !== freshState.game.checkoutRule) ruleSel2.value = freshState.game.checkoutRule;
               renderState(freshState);
               showToast('↻ Neues Leg automatisch gestartet');
               return;
@@ -1532,8 +1370,6 @@
       }
       loadDailyHighscore();
     }
-
-    loadGameModes();
 
     (function() {
       const sse = new EventSource('/api/events');
