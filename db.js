@@ -33,6 +33,8 @@ function readJson(filePath, fallback) {
   return fallback;
 }
 
+const DEFAULT_STATS_SEASON = String(process.env.DART_SEASON || '2026');
+
 function toBool(value) {
   if (value === true || value === 1 || value === '1') return true;
   if (typeof value === 'string') {
@@ -138,8 +140,42 @@ class DataStore {
     await this.ensureCheckoutRuleColumns();
     await this.ensureCheckoutStatsVersion();
     await this.ensureThrowSegmentSchema();
+    await this.ensureSeasonSchema();
     await this.ensurePerformanceIndexes();
     await this.seedFromLegacyJson();
+  }
+
+  async ensureSeasonSchema() {
+    if (this.isSQLite()) {
+      const historyColumns = await this.sqlite.all('PRAGMA table_info(leg_history)');
+      if (!historyColumns.some(column => column.name === 'season')) {
+        await this.sqlite.run("ALTER TABLE leg_history ADD COLUMN season TEXT NOT NULL DEFAULT '2026'");
+      }
+      const statsColumns = await this.sqlite.all('PRAGMA table_info(player_stats)');
+      const playerIdKey = statsColumns.find(column => column.name === 'player_id');
+      const seasonKey = statsColumns.find(column => column.name === 'season');
+      if (playerIdKey && seasonKey && Number(playerIdKey.pk) === 1 && Number(seasonKey.pk) === 0) {
+        await this.sqlite.exec(`
+          PRAGMA foreign_keys = OFF;
+          ALTER TABLE player_stats RENAME TO player_stats_legacy;
+          CREATE TABLE player_stats AS SELECT * FROM player_stats_legacy;
+          DROP TABLE player_stats_legacy;
+          CREATE UNIQUE INDEX IF NOT EXISTS player_stats_player_season ON player_stats (player_id, season);
+          PRAGMA foreign_keys = ON;
+        `);
+      }
+      return;
+    }
+    if (this.isPostgres()) {
+      await this.pg.query("ALTER TABLE leg_history ADD COLUMN IF NOT EXISTS season TEXT NOT NULL DEFAULT '2026'");
+      await this.pg.query('ALTER TABLE player_stats DROP CONSTRAINT IF EXISTS player_stats_pkey');
+      await this.pg.query('ALTER TABLE player_stats ADD PRIMARY KEY (player_id, season)');
+      return;
+    }
+    await this.my.query("ALTER TABLE leg_history ADD COLUMN season VARCHAR(32) NOT NULL DEFAULT '2026'").catch(error => {
+      if (!/duplicate column/i.test(String(error.message || ''))) throw error;
+    });
+    await this.my.query('ALTER TABLE player_stats DROP PRIMARY KEY, ADD PRIMARY KEY (player_id, season)');
   }
 
   async ensurePerformanceIndexes() {
@@ -176,11 +212,13 @@ class DataStore {
           mode TEXT,
           bust INTEGER NOT NULL DEFAULT 0,
           thrown_at INTEGER NOT NULL,
-          duel_id INTEGER
+          duel_id INTEGER,
+          season TEXT NOT NULL DEFAULT '2026'
         );
         CREATE INDEX IF NOT EXISTS idx_throw_segments_player ON player_throw_segments (player_slot, thrown_at);
       `);
       try { await this.sqlite.run('ALTER TABLE player_throw_segments ADD COLUMN duel_id INTEGER'); } catch (_err) { }
+      try { await this.sqlite.run("ALTER TABLE player_throw_segments ADD COLUMN season TEXT NOT NULL DEFAULT '2026'"); } catch (_err) { }
       await this.sqlite.exec('CREATE INDEX IF NOT EXISTS idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at);');
       return;
     }
@@ -193,7 +231,8 @@ class DataStore {
           mode TEXT,
           bust INTEGER NOT NULL DEFAULT 0,
           thrown_at BIGINT NOT NULL,
-          duel_id INTEGER
+          duel_id INTEGER,
+          season TEXT NOT NULL DEFAULT '2026'
         );
         CREATE INDEX IF NOT EXISTS idx_throw_segments_player ON player_throw_segments (player_slot, thrown_at);`
       : `CREATE TABLE IF NOT EXISTS player_throw_segments (
@@ -205,6 +244,7 @@ class DataStore {
           bust TINYINT NOT NULL DEFAULT 0,
           thrown_at BIGINT NOT NULL,
           duel_id BIGINT NULL,
+          season VARCHAR(32) NOT NULL DEFAULT '2026',
           INDEX idx_throw_segments_player (player_slot, thrown_at),
           INDEX idx_throw_segments_duel (duel_id, player_slot, thrown_at)
         );`;
@@ -212,9 +252,11 @@ class DataStore {
     else await this.my.query(query);
     if (this.isPostgres()) {
       try { await this.pg.query('ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS duel_id INTEGER'); } catch (_err) { }
+      await this.pg.query("ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS season TEXT NOT NULL DEFAULT '2026'");
       await this.pg.query('CREATE INDEX IF NOT EXISTS idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at)');
     } else {
       try { await this.my.query('ALTER TABLE player_throw_segments ADD COLUMN duel_id BIGINT NULL'); } catch (_err) { }
+      try { await this.my.query("ALTER TABLE player_throw_segments ADD COLUMN season VARCHAR(32) NOT NULL DEFAULT '2026'"); } catch (_err) { }
       try { await this.my.query('CREATE INDEX idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at)'); } catch (_err) { }
     }
   }
@@ -615,7 +657,7 @@ class DataStore {
       );
 
       CREATE TABLE IF NOT EXISTS player_stats (
-        player_id INTEGER PRIMARY KEY,
+        player_id INTEGER NOT NULL,
         season TEXT DEFAULT '2026',
         games_played INTEGER DEFAULT 0,
         games_won INTEGER DEFAULT 0,
@@ -650,12 +692,14 @@ class DataStore {
         cricket_mpr REAL DEFAULT 0,
         checkout_stats_version INTEGER DEFAULT 1,
         updated_at INTEGER DEFAULT 0,
+        PRIMARY KEY (player_id, season),
         FOREIGN KEY (player_id) REFERENCES players(slot)
       );
 
       CREATE TABLE IF NOT EXISTS leg_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL,
+        season TEXT NOT NULL DEFAULT '2026',
         leg_avg REAL DEFAULT 0,
         checkout INTEGER DEFAULT 0,
         won INTEGER DEFAULT 0,
@@ -699,7 +743,7 @@ class DataStore {
       );
 
       CREATE TABLE IF NOT EXISTS player_stats (
-        player_id INTEGER PRIMARY KEY,
+        player_id INTEGER NOT NULL,
         season TEXT DEFAULT '2026',
         games_played INTEGER DEFAULT 0,
         games_won INTEGER DEFAULT 0,
@@ -734,12 +778,14 @@ class DataStore {
         cricket_mpr NUMERIC DEFAULT 0,
         checkout_stats_version INTEGER DEFAULT 1,
         updated_at BIGINT DEFAULT 0,
+        PRIMARY KEY (player_id, season),
         FOREIGN KEY (player_id) REFERENCES players(slot)
       );
 
       CREATE TABLE IF NOT EXISTS leg_history (
         id BIGSERIAL PRIMARY KEY,
         player_id INTEGER NOT NULL,
+        season TEXT NOT NULL DEFAULT '2026',
         leg_avg NUMERIC DEFAULT 0,
         checkout INTEGER DEFAULT 0,
         won BOOLEAN DEFAULT FALSE,
@@ -791,7 +837,7 @@ class DataStore {
 
     await this.my.query(`
       CREATE TABLE IF NOT EXISTS player_stats (
-        player_id INT PRIMARY KEY,
+        player_id INT NOT NULL,
         season VARCHAR(32) DEFAULT '2026',
         games_played INT DEFAULT 0,
         games_won INT DEFAULT 0,
@@ -826,6 +872,7 @@ class DataStore {
         cricket_mpr DECIMAL(6,2) DEFAULT 0,
         checkout_stats_version INT DEFAULT 1,
         updated_at BIGINT DEFAULT 0,
+        PRIMARY KEY (player_id, season),
         FOREIGN KEY (player_id) REFERENCES players(slot)
       );
     `);
@@ -834,6 +881,7 @@ class DataStore {
       CREATE TABLE IF NOT EXISTS leg_history (
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
         player_id INT NOT NULL,
+        season VARCHAR(32) NOT NULL DEFAULT '2026',
         leg_avg DECIMAL(6,2) DEFAULT 0,
         checkout INT DEFAULT 0,
         won TINYINT(1) DEFAULT 0,
@@ -1198,28 +1246,28 @@ class DataStore {
     return Promise.all(rows.map(row => this.getDuel(row.id)));
   }
 
-  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now(), duelId = null) {
-    const values = [Number(playerSlot), String(segment || 'MISS').toUpperCase(), Number(points || 0), mode ? String(mode) : null, bust ? 1 : 0, Number(thrownAt) || Date.now(), Number(duelId) > 0 ? Number(duelId) : null];
-    if (this.isSQLite()) await this.sqlite.run('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id) VALUES (?, ?, ?, ?, ?, ?, ?)', values);
-    else if (this.isPostgres()) await this.pg.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', values);
-    else await this.my.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id) VALUES (?, ?, ?, ?, ?, ?, ?)', values);
+  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now(), duelId = null, season = DEFAULT_STATS_SEASON) {
+    const values = [Number(playerSlot), String(segment || 'MISS').toUpperCase(), Number(points || 0), mode ? String(mode) : null, bust ? 1 : 0, Number(thrownAt) || Date.now(), Number(duelId) > 0 ? Number(duelId) : null, season];
+    if (this.isSQLite()) await this.sqlite.run('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values);
+    else if (this.isPostgres()) await this.pg.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', values);
+    else await this.my.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values);
   }
 
-  async getSegmentAnalysis(playerSlot, mode = '', duelId = null) {
+  async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON) {
     const slot = Number(playerSlot);
     const encounterId = Number(duelId) > 0 ? Number(duelId) : null;
     let rows;
     if (this.isSQLite()) rows = await this.sqlite.all(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) ORDER BY thrown_at ASC',
-      [slot, String(mode || ''), String(mode || ''), encounterId, encounterId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId]
     );
     else if (this.isPostgres()) rows = (await this.pg.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND ($2 = \'\' OR mode = $2) AND ($3 IS NULL OR duel_id = $3) ORDER BY thrown_at ASC',
-      [slot, String(mode || ''), encounterId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND season = $2 AND ($3 = \'\' OR mode = $3) AND ($4 IS NULL OR duel_id = $4) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), encounterId]
     )).rows;
     else rows = (await this.my.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) ORDER BY thrown_at ASC',
-      [slot, String(mode || ''), String(mode || ''), encounterId, encounterId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId]
     ))[0];
 
     const bySegment = new Map();
@@ -1633,8 +1681,7 @@ class DataStore {
     await this.my.query('DELETE FROM highscores');
   }
 
-  async initPlayerStats(playerId) {
-    const season = '2026';
+  async initPlayerStats(playerId, season = DEFAULT_STATS_SEASON) {
     const ts = Date.now();
 
     if (this.isSQLite()) {
@@ -1659,42 +1706,42 @@ class DataStore {
     );
   }
 
-  async getPlayerStats(playerId) {
+  async getPlayerStats(playerId, season = DEFAULT_STATS_SEASON) {
     if (this.isSQLite()) {
       return await this.sqlite.get(
-        'SELECT * FROM player_stats WHERE player_id = ?',
-        [playerId]
+        'SELECT * FROM player_stats WHERE player_id = ? AND season = ?',
+        [playerId, season]
       );
     }
 
     if (this.isPostgres()) {
       const result = await this.pg.query(
-        'SELECT * FROM player_stats WHERE player_id = $1',
-        [playerId]
+        'SELECT * FROM player_stats WHERE player_id = $1 AND season = $2',
+        [playerId, season]
       );
       return result.rows[0];
     }
 
     const [rows] = await this.my.query(
-      'SELECT * FROM player_stats WHERE player_id = ?',
-      [playerId]
+      'SELECT * FROM player_stats WHERE player_id = ? AND season = ?',
+      [playerId, season]
     );
     return rows[0];
   }
 
-  async deletePlayerLegHistory(playerId) {
+  async deletePlayerLegHistory(playerId, season = DEFAULT_STATS_SEASON) {
     if (this.isSQLite()) {
-      await this.sqlite.run('DELETE FROM leg_history WHERE player_id = ?', [playerId]);
+      await this.sqlite.run('DELETE FROM leg_history WHERE player_id = ? AND season = ?', [playerId, season]);
       return;
     }
     if (this.isPostgres()) {
-      await this.pg.query('DELETE FROM leg_history WHERE player_id = $1', [playerId]);
+      await this.pg.query('DELETE FROM leg_history WHERE player_id = $1 AND season = $2', [playerId, season]);
       return;
     }
-    await this.my.query('DELETE FROM leg_history WHERE player_id = ?', [playerId]);
+    await this.my.query('DELETE FROM leg_history WHERE player_id = ? AND season = ?', [playerId, season]);
   }
 
-  async updatePlayerStats(playerId, updates) {
+  async updatePlayerStats(playerId, updates, season = DEFAULT_STATS_SEASON) {
     const ts = Date.now();
     const updateFields = Object.keys(updates);
     const values = Object.values(updates);
@@ -1702,8 +1749,8 @@ class DataStore {
     if (this.isSQLite()) {
       const cols = updateFields.map(f => `${f} = ?`).join(', ');
       await this.sqlite.run(
-        `UPDATE player_stats SET ${cols}, updated_at = ? WHERE player_id = ?`,
-        [...values, ts, playerId]
+        `UPDATE player_stats SET ${cols}, updated_at = ? WHERE player_id = ? AND season = ?`,
+        [...values, ts, playerId, season]
       );
       return;
     }
@@ -1711,86 +1758,86 @@ class DataStore {
     if (this.isPostgres()) {
       const setClauses = updateFields.map((f, i) => `${f} = $${i + 1}`).join(', ');
       await this.pg.query(
-        `UPDATE player_stats SET ${setClauses}, updated_at = $${updateFields.length + 1} WHERE player_id = $${updateFields.length + 2}`,
-        [...values, ts, playerId]
+        `UPDATE player_stats SET ${setClauses}, updated_at = $${updateFields.length + 1} WHERE player_id = $${updateFields.length + 2} AND season = $${updateFields.length + 3}`,
+        [...values, ts, playerId, season]
       );
       return;
     }
 
     const setClauses = updateFields.map(f => `${f} = ?`).join(', ');
     await this.my.query(
-      `UPDATE player_stats SET ${setClauses}, updated_at = ? WHERE player_id = ?`,
-      [...values, ts, playerId]
+      `UPDATE player_stats SET ${setClauses}, updated_at = ? WHERE player_id = ? AND season = ?`,
+      [...values, ts, playerId, season]
     );
   }
 
-  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn) {
+  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn, season = DEFAULT_STATS_SEASON) {
     const ts = Date.now();
 
     if (this.isSQLite()) {
       await this.sqlite.run(
-        `INSERT INTO leg_history (player_id, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?)`,
-        [playerId, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
+        `INSERT INTO leg_history (player_id, season, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [playerId, season, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
       );
       // Keep rolling 50 legs
       await this.sqlite.run(
         `DELETE FROM leg_history WHERE player_id = ? AND id NOT IN (
-          SELECT id FROM leg_history WHERE player_id = ? ORDER BY ts DESC LIMIT 50
+          SELECT id FROM leg_history WHERE player_id = ? AND season = ? ORDER BY ts DESC LIMIT 50
         )`,
-        [playerId, playerId]
+        [playerId, playerId, season]
       );
       return;
     }
 
     if (this.isPostgres()) {
       await this.pg.query(
-        `INSERT INTO leg_history (player_id, leg_avg, checkout, won, darts_thrown, ts) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [playerId, legAvg, checkout, won, dartsThrawn, ts]
+        `INSERT INTO leg_history (player_id, season, leg_avg, checkout, won, darts_thrown, ts) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [playerId, season, legAvg, checkout, won, dartsThrawn, ts]
       );
       // Keep rolling 50 legs
       await this.pg.query(
-        `DELETE FROM leg_history WHERE player_id = $1 AND id NOT IN (
-          SELECT id FROM leg_history WHERE player_id = $1 ORDER BY ts DESC LIMIT 50
+        `DELETE FROM leg_history WHERE player_id = $1 AND season = $2 AND id NOT IN (
+          SELECT id FROM leg_history WHERE player_id = $1 AND season = $2 ORDER BY ts DESC LIMIT 50
         )`,
-        [playerId]
+        [playerId, season]
       );
       return;
     }
 
     await this.my.query(
-      `INSERT INTO leg_history (player_id, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?)`,
-      [playerId, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
+      `INSERT INTO leg_history (player_id, season, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [playerId, season, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
     );
     // Keep rolling 50 legs
     await this.my.query(
       `DELETE FROM leg_history WHERE player_id = ? AND id NOT IN (
         SELECT id FROM (
-          SELECT id FROM leg_history WHERE player_id = ? ORDER BY ts DESC LIMIT 50
+          SELECT id FROM leg_history WHERE player_id = ? AND season = ? ORDER BY ts DESC LIMIT 50
         ) AS subquery
       )`,
-      [playerId, playerId]
+      [playerId, playerId, season]
     );
   }
 
-  async getLegHistory(playerId, limit = 50) {
+  async getLegHistory(playerId, limit = 50, season = DEFAULT_STATS_SEASON) {
     if (this.isSQLite()) {
       return await this.sqlite.all(
-        'SELECT * FROM leg_history WHERE player_id = ? ORDER BY ts DESC LIMIT ?',
-        [playerId, limit]
+        'SELECT * FROM leg_history WHERE player_id = ? AND season = ? ORDER BY ts DESC LIMIT ?',
+        [playerId, season, limit]
       );
     }
 
     if (this.isPostgres()) {
       const result = await this.pg.query(
-        'SELECT * FROM leg_history WHERE player_id = $1 ORDER BY ts DESC LIMIT $2',
-        [playerId, limit]
+        'SELECT * FROM leg_history WHERE player_id = $1 AND season = $2 ORDER BY ts DESC LIMIT $3',
+        [playerId, season, limit]
       );
       return result.rows;
     }
 
     const [rows] = await this.my.query(
-      'SELECT * FROM leg_history WHERE player_id = ? ORDER BY ts DESC LIMIT ?',
-      [playerId, limit]
+      'SELECT * FROM leg_history WHERE player_id = ? AND season = ? ORDER BY ts DESC LIMIT ?',
+      [playerId, season, limit]
     );
     return rows;
   }

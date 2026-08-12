@@ -24,6 +24,8 @@ const {
   applyCricketHit,
   checkCricketWin
 } = require('./modes/cricket');
+
+const DEFAULT_STATS_SEASON = String(process.env.DART_SEASON || '2026');
 const {
   calculateEliminationPoints,
   checkEliminationWin,
@@ -3627,13 +3629,15 @@ app.get('/api/highscores/overview', async (_req, res) => {
 app.get('/api/players/:id/stats', async (req, res) => {
   try {
     const playerId = Number(req.params.id);
+    const season = String(req.query.season || '2026').trim();
+    if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
     if (!Number.isInteger(playerId) || playerId < 0) {
       return res.status(400).json({ error: 'Invalid player ID' });
     }
-    let stats = await dataStore.getPlayerStats(playerId);
+    let stats = await dataStore.getPlayerStats(playerId, season);
     if (!stats) {
-      await dataStore.initPlayerStats(playerId);
-      stats = await dataStore.getPlayerStats(playerId);
+      await dataStore.initPlayerStats(playerId, season);
+      stats = await dataStore.getPlayerStats(playerId, season);
     }
     res.json(stats || {});
   } catch (err) {
@@ -3647,7 +3651,9 @@ app.get('/api/players/:id/segment-analysis', async (req, res) => {
     if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
     const mode = String(req.query.mode || '').trim();
     const duelId = Number(req.query.duelId || 0) || null;
-    res.json(await dataStore.getSegmentAnalysis(playerId, mode, duelId));
+    const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
+    if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
+    res.json(await dataStore.getSegmentAnalysis(playerId, mode, duelId, season));
   } catch (err) {
     res.status(500).json({ error: 'Segmentanalyse konnte nicht geladen werden: ' + err.message });
   }
@@ -3660,10 +3666,12 @@ app.get('/api/duels/:id/segment-analysis', async (req, res) => {
     const duel = await dataStore.getDuel(duelId);
     if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden' });
     const mode = String(req.query.mode || duel.mode || '').trim();
+    const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
+    if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
     const players = await Promise.all((duel.players || []).map(async player => ({
       slot: Number(player.player_slot),
       name: player.player_name || 'Spieler',
-      analysis: await dataStore.getSegmentAnalysis(Number(player.player_slot), mode, duelId)
+      analysis: await dataStore.getSegmentAnalysis(Number(player.player_slot), mode, duelId, season)
     })));
     res.json({ duelId, mode, players });
   } catch (err) {
@@ -3683,9 +3691,11 @@ const EDITABLE_PLAYER_STAT_FIELDS = [
 
 app.put('/api/players/:id/stats', requireAdmin, async (req, res) => {
   const playerId = Number(req.params.id);
+  const season = String(req.query.season || req.body?.season || DEFAULT_STATS_SEASON).trim();
   if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
+  if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
   try {
-    await dataStore.initPlayerStats(playerId);
+    await dataStore.initPlayerStats(playerId, season);
     const updates = {};
     for (const field of EDITABLE_PLAYER_STAT_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(req.body || {}, field)) {
@@ -3695,8 +3705,8 @@ app.put('/api/players/:id/stats', requireAdmin, async (req, res) => {
       }
     }
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Keine Statistikfelder angegeben' });
-    await dataStore.updatePlayerStats(playerId, updates);
-    res.json(await dataStore.getPlayerStats(playerId));
+    await dataStore.updatePlayerStats(playerId, updates, season);
+    res.json(await dataStore.getPlayerStats(playerId, season));
   } catch (err) {
     res.status(500).json({ error: 'Statistik konnte nicht gespeichert werden: ' + err.message });
   }
@@ -3704,13 +3714,15 @@ app.put('/api/players/:id/stats', requireAdmin, async (req, res) => {
 
 app.post('/api/players/:id/stats/reset', requireAdmin, async (req, res) => {
   const playerId = Number(req.params.id);
+  const season = String(req.query.season || req.body?.season || DEFAULT_STATS_SEASON).trim();
   if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
+  if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
   try {
-    await dataStore.initPlayerStats(playerId);
+    await dataStore.initPlayerStats(playerId, season);
     const reset = Object.fromEntries(EDITABLE_PLAYER_STAT_FIELDS.map(field => [field, 0]));
-    await dataStore.updatePlayerStats(playerId, reset);
-    await dataStore.deletePlayerLegHistory(playerId);
-    res.json(await dataStore.getPlayerStats(playerId));
+    await dataStore.updatePlayerStats(playerId, reset, season);
+    await dataStore.deletePlayerLegHistory(playerId, season);
+    res.json(await dataStore.getPlayerStats(playerId, season));
   } catch (err) {
     res.status(500).json({ error: 'Statistik konnte nicht zurückgesetzt werden: ' + err.message });
   }
@@ -3720,10 +3732,12 @@ app.get('/api/players/:id/history', async (req, res) => {
   try {
     const playerId = Number(req.params.id);
     const limit = Number(req.query.limit || 50);
+    const season = String(req.query.season || '2026').trim();
+    if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
     if (!Number.isInteger(playerId) || playerId < 0) {
       return res.status(400).json({ error: 'Invalid player ID' });
     }
-    const history = await dataStore.getLegHistory(playerId, Math.min(limit, 100));
+    const history = await dataStore.getLegHistory(playerId, Math.min(limit, 100), season);
     res.json(history || []);
   } catch (err) {
     res.status(500).json({ error: 'History konnte nicht geladen werden: ' + err.message });

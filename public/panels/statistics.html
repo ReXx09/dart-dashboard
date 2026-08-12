@@ -256,11 +256,12 @@
       background: transparent;
       border: none;
       color: #777;
-      font-size: .7rem;
+      font-size: .8rem;
       text-transform: uppercase;
       letter-spacing: 1px;
       font-weight: 700;
-      padding: 8px 12px;
+      padding: 11px 12px;
+      min-height: 42px;
       border-radius: 6px;
       cursor: pointer;
       transition: all .15s;
@@ -282,7 +283,7 @@
     }
     .encounter-toolbar select { width: auto; min-width: 190px; }
     .encounter-grid { overflow-x: auto; border: 1px solid #262626; border-radius: 10px; }
-    .encounter-table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: .76rem; }
+    .encounter-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: .76rem; }
     .encounter-table th { padding: 9px 10px; background: #151515; color: #666; text-align: left; text-transform: uppercase; letter-spacing: 1px; font-size: .6rem; white-space: nowrap; }
     .encounter-table td { padding: 8px 10px; border-top: 1px solid #202020; color: #bbb; vertical-align: middle; white-space: nowrap; }
     .encounter-table tbody tr:hover td { background: #171717; }
@@ -301,7 +302,7 @@
     .encounter-dialog-card { width: min(1100px, 100%); max-height: min(820px, 92vh); overflow: auto; background: #141414; border: 1px solid #333; border-top: 3px solid #f4a261; border-radius: 12px; padding: 16px; }
     .encounter-dialog-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
     .encounter-dialog-head h3 { font-size: 1rem; color:#f1f1f1; }
-    .encounter-dialog-close { border:1px solid #333; background:#1b1b1b; color:#bbb; border-radius:6px; padding:5px 9px; cursor:pointer; }
+    .encounter-dialog-close { border:1px solid #333; background:#1b1b1b; color:#bbb; border-radius:6px; padding:9px 12px; min-height:42px; cursor:pointer; }
     .encounter-dialog-tabs { display:flex; gap:5px; margin-bottom:12px; }
     .encounter-dialog-tab { border:1px solid #2d2d2d; background:#101010; color:#888; border-radius:6px; padding:7px 10px; cursor:pointer; font:inherit; font-size:.72rem; }
     .encounter-dialog-tab.active { background:#f4a261; border-color:#f4a261; color:#111; font-weight:800; }
@@ -313,6 +314,16 @@
     .encounter-detail-table .accent { color:#f4a261; font-weight:800; }
     .encounter-heatmap { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
     .heatmap-player-card { background:#0f0f0f; border:1px solid #262626; border-radius:8px; padding:10px; }
+    @media (max-width: 900px) {
+      .encounter-table th:nth-child(5),
+      .encounter-table td:nth-child(5),
+      .encounter-table th:nth-child(6),
+      .encounter-table td:nth-child(6) { display:none; }
+      .encounter-table { min-width: 0; font-size: .7rem; }
+      .encounter-table th, .encounter-table td { padding: 7px 6px; }
+      .encounter-actions { flex-direction: column; }
+      .encounter-action { min-height: 36px; }
+    }
     .heatmap-player-card h4 { color:#f1f1f1; margin-bottom:8px; }
     .heatmap-cell { display:flex; justify-content:space-between; gap:8px; padding:5px 7px; margin-top:3px; border-radius:4px; color:#ddd; font-size:.7rem; }
     .heatmap-cell strong { color:#f4a261; }
@@ -364,6 +375,20 @@
         <label for="seasonSelect">Saison</label>
         <select id="seasonSelect">
           <option value="2026">2026</option>
+        </select>
+      </div>
+      <div>
+        <label for="statsModeSelect">Spielmodus</label>
+        <select id="statsModeSelect">
+          <option value="">Alle Modi</option>
+          <option value="501">501</option>
+          <option value="301">301</option>
+          <option value="701">701</option>
+          <option value="cricket">Cricket</option>
+          <option value="elimination">301-Elimination</option>
+          <option value="shanghai">Shanghai</option>
+          <option value="atc">Around the Clock</option>
+          <option value="split">Split Score</option>
         </select>
       </div>
       <button class="btn primary" id="refreshBtn">🔄 Aktualisieren</button>
@@ -444,7 +469,7 @@
 
     <div class="tab-panel" id="tab-history">
       <div class="section">
-        <h2 class="section-title">Leg-History (letzte 50)</h2>
+        <h2 class="section-title">Leg-History (letzte 10)</h2>
         <div style="overflow-x:auto">
           <table class="history-table" id="historyTable">
             <thead>
@@ -511,6 +536,7 @@
     const API_BASE = '/api';
     let currentPlayerId = null;
     let currentSeason = '2026';
+    let currentStatsMode = '';
     let encounters = [];
     let selectedEncounterCategory = 'duel';
     let segmentAnalysis = null;
@@ -526,6 +552,7 @@
     // DOM Elements
     const playerSelect = document.getElementById('playerSelect');
     const seasonSelect = document.getElementById('seasonSelect');
+    const statsModeSelect = document.getElementById('statsModeSelect');
     const refreshBtn = document.getElementById('refreshBtn');
     const summaryGrid = document.getElementById('summaryGrid');
 
@@ -613,8 +640,8 @@
       try {
         const [statsRes, historyRes, segmentRes, highscoresRes] = await Promise.all([
           fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${currentSeason}`, { cache: 'no-store' }),
-          fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=50`, { cache: 'no-store' }),
-          fetch(`${API_BASE}/players/${currentPlayerId}/segment-analysis`, { cache: 'no-store' }),
+          fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=10&season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' }),
+          fetch(`${API_BASE}/players/${currentPlayerId}/segment-analysis?mode=${encodeURIComponent(currentStatsMode)}&season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' }),
           fetch('/api/highscores', { cache: 'no-store' })
         ]);
         const stats = await statsRes.json();
@@ -775,7 +802,7 @@
       const content = document.getElementById('encounterDialogContent');
       content.innerHTML = '<div class="encounter-empty">Heatmap wird geladen...</div>';
       try {
-        const response = await fetch(API_BASE + '/duels/' + encodeURIComponent(encounterDetail.id) + '/segment-analysis?mode=' + encodeURIComponent(encounterDetail.mode || '501'), { cache: 'no-store' });
+        const response = await fetch(API_BASE + '/duels/' + encodeURIComponent(encounterDetail.id) + '/segment-analysis?mode=' + encodeURIComponent(encounterDetail.mode || '501') + '&season=' + encodeURIComponent(currentSeason), { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const data = await response.json();
         const players = data.players || [];
@@ -981,7 +1008,7 @@
         .map(slot => availablePlayers.find(player => String(player.slot) === slot))
         .filter(Boolean);
       segmentComparisonData = await Promise.all(selectedPlayers.map(async player => {
-        const response = await fetch(`${API_BASE}/players/${player.slot}/segment-analysis`, { cache: 'no-store' });
+        const response = await fetch(`${API_BASE}/players/${player.slot}/segment-analysis?mode=${encodeURIComponent(currentStatsMode)}&season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' });
         return { name: player.name, slot: player.slot, analysis: response.ok ? await response.json() : null };
       }));
       renderSegmentAnalysis();
@@ -1049,6 +1076,11 @@
 
     seasonSelect.addEventListener('change', () => {
       currentSeason = seasonSelect.value;
+      loadStats();
+    });
+
+    statsModeSelect.addEventListener('change', () => {
+      currentStatsMode = statsModeSelect.value;
       loadStats();
     });
 
