@@ -23,13 +23,57 @@ let liveDetailWriteQueue = Promise.resolve();
 let liveStateCache = null;
 let liveStateWritePending = null;
 let liveStateWriteRunning = false;
+let liveStateWriteKey = null;
+let liveStateBroadcastKey = null;
 
 function cloneLiveState(state) {
   return state ? JSON.parse(JSON.stringify(state)) : null;
 }
 
+function getLiveStateSignature(state) {
+  const normalized = normalizeLiveStateSnapshot(state || {});
+  const players = Array.isArray(normalized.players)
+    ? normalized.players.map(player => ({
+        slot: Number(player.slot || 0),
+        remaining: Number(player.remaining || 0),
+        legs: Number(player.legs || 0),
+        turns: Number(player.turns || 0),
+        totalScored: Number(player.totalScored || 0),
+        bestTurn: Number(player.bestTurn || 0),
+        currentRoundPoints: Array.isArray(player.currentRoundPoints) ? player.currentRoundPoints.slice(-3) : [],
+        throwsLength: Array.isArray(player.throws) ? player.throws.length : 0,
+        turnScoreRecorded: !!player.turnScoreRecorded,
+        cricketPoints: Number(player.cricketPoints || 0)
+      }))
+    : [];
+  const game = normalized.game || {};
+  return JSON.stringify({
+    game: {
+      mode: game.mode,
+      status: game.status,
+      activePlayer: game.activePlayer,
+      currentThrow: game.currentThrow,
+      throwRound: game.throwRound,
+      turnId: game.turnId,
+      duelId: game.duelId,
+      tournamentId: game.tournamentId,
+      tournamentMatchId: game.tournamentMatchId,
+      matchType: game.matchType,
+      bestOf: game.bestOf,
+      legsToWin: game.legsToWin
+    },
+    players,
+    lastAction: normalized.lastAction || null
+  });
+}
+
 function queueLiveStateWrite(state) {
-  liveStateWritePending = cloneLiveState(state);
+  const normalized = normalizeLiveStateSnapshot(state || {});
+  const key = getLiveStateSignature(normalized);
+  if (key === liveStateWriteKey && !liveStateWritePending) return;
+
+  liveStateWritePending = normalized;
+  liveStateWriteKey = key;
   if (liveStateWriteRunning) return;
 
   liveStateWriteRunning = true;
@@ -37,8 +81,10 @@ function queueLiveStateWrite(state) {
     while (liveStateWritePending) {
       const snapshot = liveStateWritePending;
       liveStateWritePending = null;
+      const snapshotKey = getLiveStateSignature(snapshot);
       try {
         await dataStore.saveLiveState(snapshot);
+        liveStateWriteKey = snapshotKey;
       } catch (error) {
         console.error('[Live-State] Persistierung fehlgeschlagen:', error);
       }
@@ -58,7 +104,11 @@ function broadcastReload() {
 }
 
 function broadcastLiveState(state) {
-  const payload = JSON.stringify(state);
+  const normalized = normalizeLiveStateSnapshot(state || {});
+  const signature = getLiveStateSignature(normalized);
+  if (signature === liveStateBroadcastKey) return;
+  liveStateBroadcastKey = signature;
+  const payload = JSON.stringify(normalized);
   sseClients.forEach(res => { try { res.write('event: live-state\ndata: ' + payload + '\n\n'); } catch { sseClients.delete(res); } });
 }
 
