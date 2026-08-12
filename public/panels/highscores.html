@@ -223,6 +223,7 @@
       padding: 14px 16px;
       border-bottom: 1px solid #1e1e1e;
     }
+    #tab-scores .panel { width: 125%; }
     .panel-title {
       font-size: .72rem;
       text-transform: uppercase;
@@ -268,12 +269,14 @@
     .score-action:hover { border-color: #f4a261; color: #f4a261; }
     .score-table { table-layout: fixed; }
     .score-table .score-rank-col { width: 7%; }
-    .score-table .score-player-col { width: 17%; }
-    .score-table .score-value-col { width: 12%; }
-    .score-table .score-context-col { width: 34%; }
-    .score-table .score-time-col { width: 15%; }
-    .score-table .score-details-col { width: 15%; }
+    .score-table .score-player-col { width: 16%; }
+    .score-table .score-value-col { width: 10%; }
+    .score-table .score-context-col { width: 40%; }
+    .score-table .score-time-col { width: 14%; }
+    .score-table .score-details-col { width: 13%; }
     .score-table td { vertical-align: middle; }
+    .score-table .score-value-col,
+    .score-table td.score { text-align: center; }
     .score-table .player,
     .score-table .time { overflow: hidden; text-overflow: ellipsis; }
     .score-table .score-context { min-width: 0; }
@@ -358,6 +361,7 @@
     }
     @media (max-width: 900px) {
       .toolbar, .tables-grid, .summary-grid { grid-template-columns: 1fr; }
+      #tab-scores .panel { width: 100%; }
       .game-highscore-grid, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .toolbar { display: flex; flex-direction: column; }
       .tabs { overflow-x: auto; }
