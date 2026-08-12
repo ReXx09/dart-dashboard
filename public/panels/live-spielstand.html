@@ -1823,7 +1823,7 @@
           const response = await fetch('/api/duels/' + encodeURIComponent(duelId), { cache: 'no-store' });
           if (!response.ok) throw new Error('Duell konnte nicht geladen werden');
           const duel = await response.json();
-          if (!duel || !Array.isArray(duel.players) || duel.players.length < 2 || !Array.isArray(duel.legs) || duel.legs.length < 1) {
+          if (!duel || !Array.isArray(duel.players) || duel.players.length < 1 || !Array.isArray(duel.legs) || duel.legs.length < 1) {
             duelStatsScheduledFor = '';
             return;
           }
