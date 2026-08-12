@@ -158,10 +158,19 @@ ensure_docker_ready() {
 }
 
 show_network_hint() {
-  local port ip_address count=0
+  local port ip_address count=0 attempt
   port="$(get_env_value PUBLIC_PORT 3100)"
 
-  if command_exists curl && curl -fsS --max-time 5 "http://localhost:${port}/api/server-info" >/dev/null 2>&1; then
+  if command_exists curl; then
+    for attempt in {1..15}; do
+      if curl -fsS --max-time 2 "http://localhost:${port}/api/server-info" >/dev/null 2>&1; then
+        break
+      fi
+      [[ "$attempt" -eq 15 ]] || sleep 2
+    done
+  fi
+
+  if command_exists curl && curl -fsS --max-time 2 "http://localhost:${port}/api/server-info" >/dev/null 2>&1; then
     msg_info ''
     msg_info '=== Dashboard ist bereit ==='
     msg_info "Lokaler Zugriff: http://localhost:${port}"
