@@ -266,6 +266,18 @@
     .score-actions { display: flex; gap: 5px; justify-content: flex-end; }
     .score-action { border: 1px solid #2d2d2d; background: #1b1b1b; color: #bbb; border-radius: 5px; padding: 4px 6px; cursor: pointer; font: inherit; font-size: .65rem; white-space: nowrap; }
     .score-action:hover { border-color: #f4a261; color: #f4a261; }
+    .score-table { table-layout: fixed; }
+    .score-table .score-rank-col { width: 7%; }
+    .score-table .score-player-col { width: 17%; }
+    .score-table .score-value-col { width: 12%; }
+    .score-table .score-context-col { width: 34%; }
+    .score-table .score-time-col { width: 15%; }
+    .score-table .score-details-col { width: 15%; }
+    .score-table td { vertical-align: middle; }
+    .score-table .player,
+    .score-table .time { overflow: hidden; text-overflow: ellipsis; }
+    .score-table .score-context { min-width: 0; }
+    .score-table .score-actions { justify-content: flex-start; }
     .compact-table th, .compact-table td { padding: 6px 8px; }
     .compact-table th { font-size: .62rem; }
     .compact-table td { font-size: .78rem; }
@@ -549,7 +561,15 @@
               <div class="legend" id="legend"></div>
             </div>
           </div>
-          <table class="compact-table">
+          <table class="compact-table score-table">
+            <colgroup>
+              <col class="score-rank-col" />
+              <col class="score-player-col" />
+              <col class="score-value-col" />
+              <col class="score-context-col" />
+              <col class="score-time-col" />
+              <col class="score-details-col" />
+            </colgroup>
             <thead>
               <tr><th class="rank">#</th><th>Spieler</th><th>Score</th><th>Kontext</th><th>Zeit</th><th>Details</th></tr>
             </thead>
