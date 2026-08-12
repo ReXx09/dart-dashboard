@@ -1196,7 +1196,11 @@ async function recordPlayerLegStats(player, state, options = {}) {
 async function recordCompletedLegStats(state, winner) {
   const completedPlayers = Array.isArray(state.players) ? state.players.map(player => ({ ...player })) : [];
   const completedDuelId = Number(state.game?.duelId || 0) || null;
-  const completedMatch = !completedDuelId || Number(winner?.legs || 0) >= Math.max(1, Number(state.game?.legsToWin || 1));
+  const currentDuel = completedDuelId ? await dataStore.getDuel(completedDuelId) : null;
+  const isSingleMatch = String(state.game?.matchType || '') === 'single';
+  const completedMatch = !completedDuelId || (isSingleMatch
+    ? Number(currentDuel?.total_legs || 0) + 1 >= Math.max(1, Number(state.game?.bestOf || 1))
+    : Number(winner?.legs || 0) >= Math.max(1, Number(state.game?.legsToWin || 1)));
   const tournamentAdvance = await recordDuelLegIfActive(state, winner);
   if (tournamentAdvance?.nextDuel) {
     const nextDuel = tournamentAdvance.nextDuel;
@@ -1268,6 +1272,7 @@ async function recordDuelLegIfActive(state, winner) {
   const duelId = Number(state.game?.duelId || 0);
   const mode = String(state.game?.mode || '');
   if (!duelId || !GAME_MODES[mode]) return;
+  const currentDuel = await dataStore.getDuel(duelId);
   const profiles = await dataStore.getProfiles();
   const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
   const players = (Array.isArray(state.players) ? state.players : []).map(player => {
@@ -1298,7 +1303,10 @@ async function recordDuelLegIfActive(state, winner) {
     };
   });
   const legsToWin = Math.max(1, Number(state.game?.legsToWin || 1));
-  const matchComplete = Number(winner?.legs || 0) >= legsToWin;
+  const isSingleMatch = String(state.game?.matchType || '') === 'single';
+  const matchComplete = isSingleMatch
+    ? Number(currentDuel?.total_legs || 0) + 1 >= Math.max(1, Number(state.game?.bestOf || 1))
+    : Number(winner?.legs || 0) >= legsToWin;
   await dataStore.recordDuelLeg({
     duelId,
     mode,
