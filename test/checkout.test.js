@@ -5,7 +5,8 @@ const {
   getCheckoutRuleStats,
   getCheckoutValue,
   isCheckoutAttempt,
-  isValidCheckout
+  isValidCheckout,
+  normalizeLiveStateSnapshot
 } = require('../server');
 
 test('Single-Out erlaubt jeden gültigen Abschlussdart', () => {
@@ -54,4 +55,57 @@ test('Checkout-Statistik wird je Regel getrennt geführt', () => {
   const masterStats = getCheckoutRuleStats(player, 'master');
   assert.deepEqual(doubleStats, { attempts: 1, success: 1, highest: 101 });
   assert.deepEqual(masterStats, { attempts: 0, success: 0, highest: 0 });
+});
+
+test('normalizeLiveStateSnapshot normalisiert den State für Persistenz und reduziert Overhead', () => {
+  const state = {
+    game: {
+      mode: '501',
+      status: 'running',
+      activePlayer: '1',
+      currentThrow: '7',
+      throwRound: '2',
+      turnId: '3',
+      duelId: '0'
+    },
+    players: [
+      {
+        slot: 1,
+        name: 'Alice',
+        remaining: 123,
+        turns: '4',
+        totalScored: '420',
+        bestTurn: '180',
+        throws: Array.from({ length: 160 }, (_, index) => ({ points: index + 1, bust: index % 17 === 0 })),
+        currentRoundPoints: ['20', '40', '60', '80'],
+        turnScoreRecorded: 'yes',
+        checkoutByRule: {
+          single: { attempts: '2', success: '1', highest: '40' },
+          double: { attempts: '1', success: '0', highest: '50' },
+          master: { attempts: '0', success: '0', highest: '0' }
+        },
+        cricketHits: null,
+        cricketClosed: null,
+        cricketPoints: '0'
+      }
+    ],
+    lastAction: { type: 'throw', points: 20 }
+  };
+
+  const normalized = normalizeLiveStateSnapshot(state);
+
+  assert.equal(normalized.game.mode, '501');
+  assert.equal(normalized.game.status, 'running');
+  assert.equal(normalized.game.activePlayer, 1);
+  assert.equal(normalized.game.currentThrow, 7);
+  assert.equal(normalized.game.turnId, 3);
+  assert.equal(normalized.game.duelId, null);
+  assert.equal(Array.isArray(normalized.players), true);
+  assert.equal(normalized.players[0].throws.length, 150);
+  assert.deepEqual(normalized.players[0].currentRoundPoints, [40, 60, 80]);
+  assert.equal(normalized.players[0].turnScoreRecorded, true);
+  assert.deepEqual(normalized.players[0].checkoutByRule.single, { attempts: 2, success: 1, highest: 40 });
+  assert.deepEqual(normalized.players[0].checkoutByRule.double, { attempts: 1, success: 0, highest: 50 });
+  assert.deepEqual(normalized.players[0].checkoutByRule.master, { attempts: 0, success: 0, highest: 0 });
+  assert.deepEqual(normalized.lastAction, { type: 'throw', points: 20 });
 });

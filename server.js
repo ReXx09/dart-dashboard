@@ -2554,11 +2554,13 @@ function sanitizePlayerState(player, fallback) {
   const bestTurn = Math.max(0, Number(player?.bestTurn || base.bestTurn || 0));
   const remaining = Math.max(0, Number(player?.remaining || base.remaining || 501));
   const color = String(player?.color || base.color || '#e63946');
-  const throws = Array.isArray(player?.throws) ? player.throws : [];
-  const currentRoundPoints = Array.isArray(player?.currentRoundPoints) ? player.currentRoundPoints : [];
+  const throws = Array.isArray(player?.throws) ? player.throws.slice(-150) : [];
+  const currentRoundPoints = Array.isArray(player?.currentRoundPoints)
+    ? player.currentRoundPoints.map(value => Number(value)).filter(value => Number.isFinite(value)).slice(-3)
+    : [];
   const average = calculateCurrentRoundAverage({ currentRoundPoints });
-  const cricketHits = player?.cricketHits || {};
-  const cricketClosed = player?.cricketClosed || {};
+  const cricketHits = player?.cricketHits && typeof player.cricketHits === 'object' ? player.cricketHits : {};
+  const cricketClosed = player?.cricketClosed && typeof player.cricketClosed === 'object' ? player.cricketClosed : {};
   const cricketPoints = Number(player?.cricketPoints ?? player?.totalScored ?? 0);
   const checkoutAttempts = Math.max(0, Number(player?.checkoutAttempts || base.checkoutAttempts || 0));
   const checkoutSuccess = Math.max(0, Number(player?.checkoutSuccess || base.checkoutSuccess || 0));
@@ -2572,7 +2574,77 @@ function sanitizePlayerState(player, fallback) {
       highest: Math.max(0, Math.min(170, Number(source.highest || 0)))
     };
   }
-  return { slot, name, color, remaining, legs, turns, totalScored, bestTurn, throws, currentRoundPoints, average, checkoutAttempts, checkoutSuccess, lastCheckoutValue, checkoutByRule, cricketHits, cricketClosed, cricketPoints, turnScoreRecorded: !!player?.turnScoreRecorded };
+  return {
+    slot,
+    name,
+    color,
+    remaining,
+    legs,
+    turns,
+    totalScored,
+    bestTurn,
+    throws,
+    currentRoundPoints,
+    average,
+    checkoutAttempts,
+    checkoutSuccess,
+    lastCheckoutValue,
+    checkoutByRule,
+    cricketHits,
+    cricketClosed,
+    cricketPoints,
+    turnScoreRecorded: !!player?.turnScoreRecorded || String(player?.turnScoreRecorded || '').toLowerCase() === 'true'
+  };
+}
+
+function normalizeLiveStateSnapshot(state) {
+  const source = state && typeof state === 'object' ? state : {};
+  const mode = String(source.game?.mode || DEFAULT_MODE).trim();
+  const safeMode = GAME_MODES[mode] ? mode : DEFAULT_MODE;
+  const game = source.game && typeof source.game === 'object' ? source.game : {};
+  const players = Array.isArray(source.players)
+    ? source.players.map((player, index) => sanitizePlayerState(player, {
+        slot: index + 1,
+        name: `Spieler ${index + 1}`,
+        color: ['#e63946', '#f4a261', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'][index % 6],
+        remaining: getStartScoreForMode(safeMode),
+        legs: 0,
+        turns: 0,
+        totalScored: 0,
+        bestTurn: 0,
+        average: 0,
+        currentRoundPoints: [],
+        throws: [],
+        checkoutByRule: {
+          single: { attempts: 0, success: 0, highest: 0 },
+          double: { attempts: 0, success: 0, highest: 0 },
+          master: { attempts: 0, success: 0, highest: 0 }
+        },
+        cricketHits: {},
+        cricketClosed: {},
+        cricketPoints: 0
+      }))
+    : [];
+
+  const normalizedGame = {
+    ...(game || {}),
+    mode: safeMode,
+    status: String(game.status || 'running'),
+    activePlayer: Number.isFinite(Number(game.activePlayer)) ? Math.max(0, Number(game.activePlayer)) : 0,
+    currentThrow: Math.max(0, Number(game.currentThrow || 0)),
+    throwRound: Math.max(1, Number(game.throwRound || 1)),
+    turnId: Math.max(1, Number(game.turnId || 1)),
+    duelId: Number(game.duelId || 0) || null,
+    selectedPlayerSlots: players.map(player => Number(player.slot))
+  };
+
+  return {
+    ...(source || {}),
+    game: normalizedGame,
+    players,
+    lastAction: source.lastAction || null,
+    arduino: source.arduino || { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
+  };
 }
 
 function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
@@ -2706,15 +2778,7 @@ async function getLiveState() {
 }
 
 async function saveLiveState(state) {
-  const safe = { ...state, game: { ...(state.game || {}), updatedAt: Date.now() } };
-  // throws[] begrenzen, damit State nicht unendlich wächst (max 150 Würfe pro Spieler)
-  if (Array.isArray(safe.players)) {
-    safe.players.forEach(p => {
-      if (Array.isArray(p.throws) && p.throws.length > 150) {
-        p.throws = p.throws.slice(-150);
-      }
-    });
-  }
+  const safe = normalizeLiveStateSnapshot({ ...(state || {}), game: { ...((state && state.game) || {}), updatedAt: Date.now() } });
   liveStateCache = cloneLiveState(safe);
   queueLiveStateWrite(safe);
   return safe;
@@ -3955,5 +4019,6 @@ module.exports = {
   getCheckoutRuleStats,
   getCheckoutValue,
   isCheckoutAttempt,
-  isValidCheckout
+  isValidCheckout,
+  normalizeLiveStateSnapshot
 };
