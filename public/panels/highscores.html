@@ -525,13 +525,26 @@
               <div class="panel-subtitle" id="listSubtitle">Alle gespeicherten Scores</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-              <input id="scoreSearch" type="search" aria-label="Alle Scores durchsuchen" placeholder="Scores durchsuchen..." autocomplete="off" style="width:220px;padding:7px 9px;font-size:.75rem" />
+              <select id="scoreTypeSelect" aria-label="Score-Typ auswählen" style="width:auto;min-width:135px;padding:7px 9px;font-size:.75rem">
+                <option value="all">Alle Typen</option>
+                <option value="score">Würfe / Scores</option>
+                <option value="checkout">Checkouts</option>
+                <option value="finish">Leg-Finishes</option>
+                <option value="manual">Manuelle Scores</option>
+              </select>
               <select id="scoreCategorySelect" aria-label="Highscore-Kategorie" style="width:auto;min-width:150px;padding:7px 9px;font-size:.75rem">
                 <option value="all">Alle Kategorien</option>
                 <option value="single">Einzel</option>
                 <option value="duel">Duelle</option>
                 <option value="group">Begegnungen</option>
                 <option value="tournament">Turniere</option>
+              </select>
+              <select id="scoreSortSelect" aria-label="Scores sortieren" style="width:auto;min-width:145px;padding:7px 9px;font-size:.75rem">
+                <option value="score-desc">Score absteigend</option>
+                <option value="score-asc">Score aufsteigend</option>
+                <option value="newest">Neueste zuerst</option>
+                <option value="oldest">Älteste zuerst</option>
+                <option value="player">Spieler A–Z</option>
               </select>
               <div class="legend" id="legend"></div>
             </div>
@@ -568,6 +581,8 @@
     let selectedFilter = 'all';
     let selectedGameMode = '';
     let selectedScoreCategory = 'all';
+    let selectedScoreType = 'all';
+    let selectedScoreSort = 'score-desc';
     let overviewData = null;
     let selectedOverviewPlayer = 'all';
     let selectedOverviewCategory = 'all';
@@ -847,34 +862,34 @@
       return true;
     }
 
-    function scoreMatchesSearch(entry, search) {
-      const terms = String(search || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
-      if (!terms.length) return true;
-      const category = String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single'));
-      const searchable = [
-        entry.player,
-        entry.score,
-        entry.gameMode,
-        category,
-        CATEGORY_LABELS[category],
-        normalizeKind(entry.kind),
-        entry.checkoutRule,
-        entry.id,
-        entry.duelId
-      ].filter(value => value !== null && value !== undefined).join(' ').toLowerCase();
-      return terms.every(term => searchable.includes(term));
+    function scoreMatchesType(entry, type) {
+      const kind = normalizeKind(entry.kind);
+      if (type === 'all') return true;
+      if (type === 'checkout') return kind === 'checkout';
+      if (type === 'finish') return !!entry.legWin && kind !== 'checkout';
+      if (type === 'manual') return kind === 'manual';
+      return kind !== 'checkout' && kind !== 'manual' && !entry.legWin;
+    }
+
+    function compareScores(a, b) {
+      const scoreDifference = Number(b.score || 0) - Number(a.score || 0);
+      const timeDifference = Number(b.ts || 0) - Number(a.ts || 0);
+      if (selectedScoreSort === 'score-asc') return -scoreDifference || timeDifference;
+      if (selectedScoreSort === 'newest') return timeDifference || scoreDifference;
+      if (selectedScoreSort === 'oldest') return -timeDifference || scoreDifference;
+      if (selectedScoreSort === 'player') return String(a.player || '').localeCompare(String(b.player || ''), 'de') || -scoreDifference;
+      return scoreDifference || timeDifference;
     }
 
     function filterScores() {
       const player = document.getElementById('playerFilter').value;
-      const search = document.getElementById('scoreSearch').value;
       return allScores
         .filter(entry => selectedScoreCategory === 'all' || String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single')) === selectedScoreCategory)
         .filter(entry => !selectedGameMode || String(entry.gameMode || '').toLowerCase() === selectedGameMode)
+        .filter(entry => scoreMatchesType(entry, selectedScoreType))
         .filter(entry => scoreMatchesFilter(entry, selectedFilter))
-        .filter(entry => scoreMatchesSearch(entry, search))
         .filter(entry => !player || String(entry.player) === player)
-        .sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0));
+        .sort(compareScores);
     }
 
     function isGameHighscoreEntry(entry, mode) {
@@ -1081,7 +1096,14 @@
     });
 
     document.getElementById('playerFilter').addEventListener('change', render);
-    document.getElementById('scoreSearch').addEventListener('input', render);
+    document.getElementById('scoreTypeSelect').addEventListener('change', event => {
+      selectedScoreType = event.target.value;
+      render();
+    });
+    document.getElementById('scoreSortSelect').addEventListener('change', event => {
+      selectedScoreSort = event.target.value;
+      render();
+    });
     document.getElementById('scoreBody').addEventListener('click', event => {
       const detailButton = event.target.closest('[data-detail-id]');
       if (detailButton) openScoreDetail(detailButton.dataset.detailId);
