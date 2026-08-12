@@ -1254,10 +1254,8 @@ async function recordCompletedLegStats(state, winner) {
       ts: Date.now()
     };
   }
-  if (completedMatch) {
-    for (const player of completedPlayers) {
-      await recordPlayerLegStats(player, state, { skipDuel: true });
-    }
+  for (const player of completedPlayers) {
+    await recordPlayerLegStats(player, state, { skipDuel: true });
   }
   if (completedMatch && completedDuelId && winner) {
     await dataStore.initPlayerStats(winner.slot);
