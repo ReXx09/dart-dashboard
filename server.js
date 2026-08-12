@@ -3712,8 +3712,8 @@ async function startServer() {
   console.log('[Storage] client=' + storageInfo.client + ' external=' + storageInfo.external);
   if (storageInfo.sqliteFile) console.log('[Storage] sqlite=' + storageInfo.sqliteFile);
 
-  app.listen(BROWSER_PORT, () => {
-    console.log('Dashboard (Browser): http://localhost:' + BROWSER_PORT);
+  app.listen(BROWSER_PORT, '0.0.0.0', () => {
+    console.log('Dashboard (Browser): http://localhost:' + BROWSER_PORT + ' | http://' + getLocalIP() + ':' + BROWSER_PORT);
     startFireTvServer();
     startArduinoMonitor();
   });
@@ -3792,8 +3792,8 @@ function startFireTvServer() {
     return;
   }
   const fireTvApp = createFireTvServer();
-  fireTvApp.listen(FIRETV_PORT, () => {
-    console.log('Dashboard (Fire TV): http://localhost:' + FIRETV_PORT + '/panels/firetv-dashboard.html');
+  fireTvApp.listen(FIRETV_PORT, '0.0.0.0', () => {
+    console.log('Dashboard (Fire TV): http://localhost:' + FIRETV_PORT + '/panels/firetv-dashboard.html | http://' + getLocalIP() + ':' + FIRETV_PORT + '/panels/firetv-dashboard.html');
   });
 }
 
