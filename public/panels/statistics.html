@@ -484,6 +484,7 @@
           </div>
           <select id="encounterCategory" aria-label="Begegnungskategorie">
             <option value="all">Alle Begegnungen</option>
+            <option value="single">Einzelspiele</option>
             <option value="duel" selected>2-Player-Duelle</option>
             <option value="group">Gruppen mit 3–8 Spielern</option>
             <option value="tournament">Turniere</option>
@@ -546,10 +547,6 @@
     function setEncounterCategory(category) {
       selectedEncounterCategory = category;
       document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
-      if (category === 'single') {
-        showStatisticsTab('overview');
-        return;
-      }
       document.getElementById('encounterCategory').value = category;
       renderEncounters();
       loadEncounterStats();

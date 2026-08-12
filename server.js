@@ -2942,7 +2942,7 @@ app.get('/api/live/state', async (_req, res) => {
 app.get('/api/duels', async (req, res) => {
   const category = String(req.query.category || 'all').trim().toLowerCase();
   const status = String(req.query.status || '').trim().toLowerCase();
-  if (!['all', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, duel, group oder tournament sein.' });
+  if (!['all', 'single', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, single, duel, group oder tournament sein.' });
   if (status && !['active', 'finished', 'canceled'].includes(status)) return res.status(400).json({ error: 'status muss active, finished oder canceled sein.' });
   try {
     const duels = await dataStore.listDuels(req.query.limit || 20, status);
@@ -3020,7 +3020,7 @@ app.post('/api/duels/start', async (req, res) => {
       const currentDuel = await dataStore.getDuel(currentState.game.duelId);
       if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
     }
-    const matchType = ['direct', 'group', 'tournament'].includes(String(req.body?.matchType)) ? String(req.body.matchType) : 'direct';
+    const matchType = ['single', 'direct', 'group', 'tournament'].includes(String(req.body?.matchType)) ? String(req.body.matchType) : 'direct';
     const mode = String(req.body?.mode || '501');
     const checkoutRule = String(req.body?.checkoutRule || 'double');
     const bestOf = Number(req.body?.bestOf || 1);
@@ -3028,7 +3028,7 @@ app.post('/api/duels/start', async (req, res) => {
     if (!GAME_MODES[mode]) return res.status(400).json({ error: 'Unbekannter Spielmodus für die Begegnung.' });
     if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
     if (!Number.isInteger(bestOf) || bestOf < 1 || bestOf > 15 || bestOf % 2 === 0) return res.status(400).json({ error: 'Best-of muss eine ungerade Zahl zwischen 1 und 15 sein.' });
-    if ((matchType === 'direct' && slots.length !== 2) || slots.length < 2 || slots.length > (matchType === 'tournament' ? 16 : 8)) return res.status(400).json({ error: 'Bitte 2 bis 16 Spieler auswählen; ein Direktduell benötigt genau 2.' });
+    if ((matchType === 'single' && slots.length < 1) || (matchType === 'direct' && slots.length !== 2) || (matchType !== 'single' && slots.length < 2) || slots.length > (matchType === 'tournament' ? 16 : 8)) return res.status(400).json({ error: matchType === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : 'Bitte 2 bis 16 Spieler auswählen; ein Direktduell benötigt genau 2.' });
     if (matchType === 'tournament' && ![2, 4, 8, 16].includes(slots.length)) return res.status(400).json({ error: 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.' });
     const configuredPlayers = await getPlayers();
     const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());

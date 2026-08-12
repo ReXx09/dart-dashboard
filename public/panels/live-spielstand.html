@@ -1233,7 +1233,7 @@
       <p id="matchMenuDescription">Wähle Begegnungstyp, Best-of, Finish und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.</p>
       <div class="match-menu-grid">
         <label class="match-menu-field full">Startart
-          <select id="matchStartKind" onchange="updateMatchStartKind()"><option value="encounter">Begegnung mit Statistik</option><option value="single">Einzelspiel ohne Begegnungsstatistik</option></select>
+          <select id="matchStartKind" onchange="updateMatchStartKind()"><option value="encounter">Begegnung mit Statistik</option><option value="single">Einzelspiel mit Statistik</option></select>
         </label>
         <label class="match-menu-field encounter-only">Typ
           <select id="matchTypeSelect" onchange="updateMatchMenuType()"><option value="single">Einzelspiel</option><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">K.-o.-Turnier</option></select>
@@ -1356,7 +1356,7 @@
     }
 
     function isDuelStatsEligible(state) {
-      return state && state.game && ['501', '301', '701', 'cricket', 'elimination', 'shanghai', 'atc', 'split'].includes(String(state.game.mode)) && Number(state.game.duelId) > 0 && Array.isArray(state.players) && state.players.length >= 2;
+      return state && state.game && ['501', '301', '701', 'cricket', 'elimination', 'shanghai', 'atc', 'split'].includes(String(state.game.mode)) && Number(state.game.duelId) > 0 && Array.isArray(state.players) && state.players.length >= 1;
     }
 
     function hasActiveMatch(state) {
@@ -1399,7 +1399,7 @@
       });
       updateMatchModeAvailability();
       document.getElementById('matchMenuDescription').textContent = isSingleGame
-        ? 'Starte ein einzelnes Spiel mit einem beliebigen Modus und den ausgewählten Spielern. Es wird keine Begegnung in der Statistik angelegt.'
+        ? 'Starte ein einzelnes Spiel mit einem beliebigen Modus. Die Spiel- und Leg-Statistik wird unter Einzelspiel gespeichert.'
         : 'Wähle Begegnungstyp, Spielmodus, Best-of, Finish und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.';
       document.getElementById('matchStartButton').textContent = isSingleGame ? 'Einzelspiel starten' : 'Begegnung starten';
     }
@@ -1486,10 +1486,8 @@
       const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
       if ((startKind === 'encounter' && ((type === 'direct' && playerSlots.length !== 2) || (type === 'tournament' && ![2, 4, 8, 16].includes(playerSlots.length)) || playerSlots.length < 2)) || (startKind === 'single' && playerSlots.length < 1)) { showToast(startKind === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : type === 'tournament' ? 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.' : 'Bitte die passende Anzahl Spieler auswählen.', true); return; }
       try {
-        const endpoint = startKind === 'single' ? '/api/live/start' : '/api/duels/start';
-        const body = startKind === 'single'
-          ? { mode: document.getElementById('matchMode').value, checkoutRule: document.getElementById('matchCheckoutRule').value, playerSlots }
-          : { matchType: type, mode: document.getElementById('matchMode').value, checkoutRule: document.getElementById('matchCheckoutRule').value, bestOf: Number(document.getElementById('matchBestOf').value), playerSlots, tournamentName: document.getElementById('matchTournamentName').value.trim() };
+        const endpoint = '/api/duels/start';
+        const body = { matchType: startKind === 'single' ? 'single' : type, mode: document.getElementById('matchMode').value, checkoutRule: document.getElementById('matchCheckoutRule').value, bestOf: Number(document.getElementById('matchBestOf').value), playerSlots, tournamentName: document.getElementById('matchTournamentName').value.trim() };
         const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'HTTP ' + response.status);

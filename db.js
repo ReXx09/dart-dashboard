@@ -15,6 +15,7 @@ function getDuelCategory(participantCount) {
 
 function getMatchCategory(matchType, participantCount) {
   const type = String(matchType || '').toLowerCase();
+  if (type === 'single') return { category: 'single', categoryLabel: 'Einzelspiel' };
   if (type === 'tournament') return { category: 'tournament', categoryLabel: 'Turnier' };
   if (type === 'direct') return { category: 'duel', categoryLabel: '2-Player-Duell' };
   if (type === 'group') return { category: 'group', categoryLabel: 'Gruppen-Begegnung' };
