@@ -140,6 +140,7 @@ class DataStore {
     await this.ensureCheckoutRuleColumns();
     await this.ensureCheckoutStatsVersion();
     await this.ensureThrowSegmentSchema();
+    await this.ensurePersistenceColumns();
     await this.ensureSeasonSchema();
     await this.ensurePerformanceIndexes();
     await this.seedFromLegacyJson();
@@ -176,6 +177,40 @@ class DataStore {
       if (!/duplicate column/i.test(String(error.message || ''))) throw error;
     });
     await this.my.query('ALTER TABLE player_stats DROP PRIMARY KEY, ADD PRIMARY KEY (player_id, season)');
+  }
+
+  async ensurePersistenceColumns() {
+    const queries = this.isSQLite()
+      ? [
+        'ALTER TABLE highscores ADD COLUMN event_key TEXT',
+        'ALTER TABLE leg_history ADD COLUMN duel_id INTEGER',
+        'ALTER TABLE player_throw_segments ADD COLUMN duel_leg_id INTEGER'
+      ]
+      : this.isPostgres()
+        ? [
+          'ALTER TABLE highscores ADD COLUMN IF NOT EXISTS event_key TEXT',
+          'ALTER TABLE leg_history ADD COLUMN IF NOT EXISTS duel_id BIGINT',
+          'ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS duel_leg_id BIGINT'
+        ]
+        : [
+          'ALTER TABLE highscores ADD COLUMN event_key VARCHAR(255) NULL',
+          'ALTER TABLE leg_history ADD COLUMN duel_id BIGINT NULL',
+          'ALTER TABLE player_throw_segments ADD COLUMN duel_leg_id BIGINT NULL'
+        ];
+    for (const query of queries) {
+      try {
+        if (this.isSQLite()) await this.sqlite.run(query);
+        else if (this.isPostgres()) await this.pg.query(query);
+        else await this.my.query(query);
+      } catch (err) {
+        if (!/duplicate|already exists/i.test(String(err.message || ''))) throw err;
+      }
+    }
+    if (this.isSQLite()) await this.sqlite.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_highscores_event_key ON highscores (event_key) WHERE event_key IS NOT NULL');
+    else if (this.isPostgres()) await this.pg.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_highscores_event_key ON highscores (event_key) WHERE event_key IS NOT NULL');
+    else {
+      try { await this.my.query('CREATE UNIQUE INDEX idx_highscores_event_key ON highscores (event_key)'); } catch (_err) { }
+    }
   }
 
   async ensurePerformanceIndexes() {
@@ -1259,21 +1294,22 @@ class DataStore {
     else await this.my.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values);
   }
 
-  async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON) {
+  async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON, duelLegId = null) {
     const slot = Number(playerSlot);
     const encounterId = Number(duelId) > 0 ? Number(duelId) : null;
+    const legId = Number(duelLegId) > 0 ? Number(duelLegId) : null;
     let rows;
     if (this.isSQLite()) rows = await this.sqlite.all(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) ORDER BY thrown_at ASC',
-      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId]
     );
     else if (this.isPostgres()) rows = (await this.pg.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND season = $2 AND ($3 = \'\' OR mode = $3) AND ($4 IS NULL OR duel_id = $4) ORDER BY thrown_at ASC',
-      [slot, season, String(mode || ''), encounterId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND season = $2 AND ($3 = \'\' OR mode = $3) AND ($4 IS NULL OR duel_id = $4) AND ($5 IS NULL OR duel_leg_id = $5) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), encounterId, legId]
     )).rows;
     else rows = (await this.my.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) ORDER BY thrown_at ASC',
-      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId]
     ))[0];
 
     const bySegment = new Map();
@@ -1303,7 +1339,7 @@ class DataStore {
       categories[key].points += item.points;
       categories[key].busts += item.busts;
     }
-    return { playerSlot: slot, mode: String(mode || ''), duelId: encounterId, totalThrows: rows.length, segments, categories: Object.values(categories) };
+    return { playerSlot: slot, mode: String(mode || ''), duelId: encounterId, duelLegId: legId, totalThrows: rows.length, segments, categories: Object.values(categories) };
   }
 
   async finishDuel(id, winnerSlot = null, endedAt = Date.now()) {
@@ -1320,6 +1356,10 @@ class DataStore {
     else if (this.isPostgres()) await this.pg.query('UPDATE duels SET status = \'canceled\', ended_at = $1, updated_at = $2 WHERE id = $3', values);
     else await this.my.query('UPDATE duels SET status = \'canceled\', ended_at = ?, updated_at = ? WHERE id = ?', values);
     await this.deleteDuelHighscores(id);
+    const safeId = Number(id);
+    if (this.isSQLite()) await this.sqlite.run('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
+    else if (this.isPostgres()) await this.pg.query('DELETE FROM leg_history WHERE duel_id = $1', [safeId]);
+    else await this.my.query('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
     return this.getDuel(id);
   }
 
@@ -1400,6 +1440,9 @@ class DataStore {
     if (this.isSQLite()) legId = Number((await this.sqlite.run('INSERT INTO duel_legs (duel_id, leg_number, mode, winner_slot, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?)', legValues)).lastID);
     else if (this.isPostgres()) legId = Number((await this.pg.query('INSERT INTO duel_legs (duel_id, leg_number, mode, winner_slot, started_at, ended_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id', legValues)).rows[0].id);
     else legId = Number((await this.my.query('INSERT INTO duel_legs (duel_id, leg_number, mode, winner_slot, started_at, ended_at) VALUES (?, ?, ?, ?, ?, ?)', legValues))[0].insertId);
+    if (this.isSQLite()) await this.sqlite.run('UPDATE player_throw_segments SET duel_leg_id = ? WHERE duel_id = ? AND thrown_at >= ? AND thrown_at <= ? AND duel_leg_id IS NULL', [legId, Number(duelId), Number(startedAt || endedAt), endedAt]);
+    else if (this.isPostgres()) await this.pg.query('UPDATE player_throw_segments SET duel_leg_id = $1 WHERE duel_id = $2 AND thrown_at >= $3 AND thrown_at <= $4 AND duel_leg_id IS NULL', [legId, Number(duelId), Number(startedAt || endedAt), endedAt]);
+    else await this.my.query('UPDATE player_throw_segments SET duel_leg_id = ? WHERE duel_id = ? AND thrown_at >= ? AND thrown_at <= ? AND duel_leg_id IS NULL', [legId, Number(duelId), Number(startedAt || endedAt), endedAt]);
 
     for (const player of Array.isArray(players) ? players : []) {
       const stats = [legId, Number(duelId), Number(player.slot), String(player.name || 'Spieler'), Number(player.turns || 0), Number(player.totalScored || 0), Number(player.average || 0), Number(player.firstNineAvg || 0), Number(player.bestTurn || 0), Number(player.count60plus || 0), Number(player.count80plus || 0), Number(player.count100plus || 0), Number(player.count140plus || 0), Number(player.count180 || 0), Number(player.checkoutAttempts || 0), Number(player.checkoutSuccess || 0), Number(player.lastCheckoutValue || 0), Number(player.busts || 0), Number(player.slot) === Number(winnerSlot) ? 1 : 0];
@@ -1571,18 +1614,18 @@ class DataStore {
 
     if (this.isSQLite()) {
       rows = await this.sqlite.all(
-        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId, event_key AS eventKey FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
     } else if (this.isPostgres()) {
       const result = await this.pg.query(
-        'SELECT id, player, player_slot AS "playerSlot", score, kind, category, game_mode AS "gameMode", checkout_rule AS "checkoutRule", leg_win AS "legWin", ts, duel_id AS "duelId" FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = $1 ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
+        'SELECT id, player, player_slot AS "playerSlot", score, kind, category, game_mode AS "gameMode", checkout_rule AS "checkoutRule", leg_win AS "legWin", ts, duel_id AS "duelId", event_key AS "eventKey" FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = $1 ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result.rows;
     } else {
       const result = await this.my.query(
-        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId, event_key AS eventKey FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result[0];
@@ -1599,6 +1642,7 @@ class DataStore {
       checkoutRule: r.checkoutRule || null,
       legWin: toBool(r.legWin),
       duelId: Number(r.duelId || 0) || null,
+      eventKey: r.eventKey || null,
       ts: Number(r.ts || 0)
     }));
   }
@@ -1617,32 +1661,40 @@ class DataStore {
     const ts = Number(entry && entry.ts ? entry.ts : Date.now());
     const duelId = Number(entry && entry.duelId) > 0 ? Number(entry.duelId) : null;
     const playerSlot = Number(entry && entry.playerSlot) > 0 ? Number(entry.playerSlot) : null;
+    const eventKey = entry && entry.eventKey ? String(entry.eventKey) : null;
     let category = ['single', 'duel', 'group', 'tournament'].includes(String(entry && entry.category || '')) ? String(entry.category) : null;
     if (duelId && !category) {
       const duel = await this.getDuel(duelId);
       category = duel && duel.match_type === 'tournament' ? 'tournament' : duel && (duel.match_type === 'group' || duel.category === 'group') ? 'group' : 'duel';
     }
     category = category || 'single';
+    if (eventKey) {
+      let existing;
+      if (this.isSQLite()) existing = await this.sqlite.get('SELECT id FROM highscores WHERE event_key = ?', [eventKey]);
+      else if (this.isPostgres()) existing = (await this.pg.query('SELECT id FROM highscores WHERE event_key = $1 LIMIT 1', [eventKey])).rows[0];
+      else existing = (await this.my.query('SELECT id FROM highscores WHERE event_key = ? LIMIT 1', [eventKey]))[0][0];
+      if (existing) return;
+    }
 
     if (this.isSQLite()) {
       await this.sqlite.run(
-        'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin ? 1 : 0, ts, duelId]
+        'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin ? 1 : 0, ts, duelId, eventKey]
       );
       return;
     }
 
     if (this.isPostgres()) {
       await this.pg.query(
-        'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-        [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin, ts, duelId]
+        'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin, ts, duelId, eventKey]
       );
       return;
     }
 
     await this.my.query(
-      'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin ? 1 : 0, ts, duelId]
+      'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin ? 1 : 0, ts, duelId, eventKey]
     );
   }
 
@@ -1777,13 +1829,13 @@ class DataStore {
     );
   }
 
-  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn, season = DEFAULT_STATS_SEASON) {
+  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn, season = DEFAULT_STATS_SEASON, duelId = null) {
     const ts = Date.now();
 
     if (this.isSQLite()) {
       await this.sqlite.run(
-        `INSERT INTO leg_history (player_id, season, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [playerId, season, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
+        `INSERT INTO leg_history (player_id, season, duel_id, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
       );
       // Keep rolling 50 legs
       await this.sqlite.run(
@@ -1797,8 +1849,8 @@ class DataStore {
 
     if (this.isPostgres()) {
       await this.pg.query(
-        `INSERT INTO leg_history (player_id, season, leg_avg, checkout, won, darts_thrown, ts) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [playerId, season, legAvg, checkout, won, dartsThrawn, ts]
+        `INSERT INTO leg_history (player_id, season, duel_id, leg_avg, checkout, won, darts_thrown, ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, legAvg, checkout, won, dartsThrawn, ts]
       );
       // Keep rolling 50 legs
       await this.pg.query(
@@ -1811,8 +1863,8 @@ class DataStore {
     }
 
     await this.my.query(
-      `INSERT INTO leg_history (player_id, season, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [playerId, season, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
+      `INSERT INTO leg_history (player_id, season, duel_id, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
     );
     // Keep rolling 50 legs
     await this.my.query(

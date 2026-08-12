@@ -1138,7 +1138,7 @@ async function recordPlayerLegStats(player, state, options = {}) {
     
     // Record leg in history
     const won = player.remaining === 0 ? 1 : 0;
-    await dataStore.recordLegHistory(player.slot, legAvg, checkout, won, dartsThrawn);
+    await dataStore.recordLegHistory(player.slot, legAvg, checkout, won, dartsThrawn, undefined, state.game?.duelId || null);
 
     // Update player stats
     const currentStats = await dataStore.getPlayerStats(player.slot) || {};
@@ -1254,8 +1254,15 @@ async function recordCompletedLegStats(state, winner) {
       ts: Date.now()
     };
   }
-  for (const player of completedPlayers) {
-    await recordPlayerLegStats(player, state, { skipDuel: true });
+  if (completedDuelId) {
+    if (completedMatch) {
+      const completedDuel = await dataStore.getDuel(completedDuelId);
+      if (completedDuel) await recordCompletedDuelPlayerStats(completedDuel);
+    }
+  } else {
+    for (const player of completedPlayers) {
+      await recordPlayerLegStats(player, state, { skipDuel: true });
+    }
   }
   if (completedMatch && completedDuelId && winner) {
     await dataStore.initPlayerStats(winner.slot);
@@ -1263,6 +1270,76 @@ async function recordCompletedLegStats(state, winner) {
     await dataStore.updatePlayerStats(winner.slot, {
       games_won: Number(winnerStats.games_won || 0) + 1
     });
+  }
+}
+
+async function recordCompletedDuelPlayerStats(duel) {
+  const checkoutRule = ['single', 'double', 'master'].includes(String(duel.checkout_rule || '').toLowerCase())
+    ? String(duel.checkout_rule).toLowerCase()
+    : null;
+  const bySlot = new Map();
+  for (const player of duel.players || []) {
+    bySlot.set(Number(player.player_slot), {
+      playerId: Number(player.player_slot), legs: 0, wins: 0, darts: 0, scored: 0,
+      firstNine: [], count180: 0, count171plus: 0, count140plus: 0, count100plus: 0,
+      checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, checkouts: { single: [0, 0, 0], double: [0, 0, 0], master: [0, 0, 0] }
+    });
+  }
+  for (const leg of duel.legs || []) {
+    for (const player of leg.players || []) {
+      const row = bySlot.get(Number(player.player_slot));
+      if (!row) continue;
+      row.legs += 1;
+      row.wins += Number(player.won || 0);
+      row.darts += Number(player.darts || 0);
+      row.scored += Number(player.scored || 0);
+      if (Number(player.first_nine_avg || 0) > 0) row.firstNine.push(Number(player.first_nine_avg));
+      row.count180 += Number(player.count_180 || 0);
+      row.count171plus += Number(player.count_171plus || 0);
+      row.count140plus += Number(player.count_140plus || 0);
+      row.count100plus += Number(player.count_100plus || 0);
+      row.checkoutAttempts += Number(player.checkout_attempts || 0);
+      row.checkoutSuccess += Number(player.checkout_success || 0);
+      row.highestCheckout = Math.max(row.highestCheckout, Number(player.checkout_highest || 0));
+      if (checkoutRule) {
+        const values = row.checkouts[checkoutRule];
+        values[0] += Number(player.checkout_attempts || 0);
+        values[1] += Number(player.checkout_success || 0);
+        values[2] = Math.max(values[2], Number(player.checkout_highest || 0));
+      }
+    }
+  }
+  for (const row of bySlot.values()) {
+    const current = await dataStore.getPlayerStats(row.playerId) || {};
+    const previousLegs = Number(current.legs_played || 0);
+    const updates = {
+      games_played: Number(current.games_played || 0) + 1,
+      games_won: Number(current.games_won || 0) + (Number(duel.winner_slot) === row.playerId ? 1 : 0),
+      legs_played: previousLegs + row.legs,
+      legs_won: Number(current.legs_won || 0) + row.wins,
+      total_darts: Number(current.total_darts || 0) + row.darts,
+      total_scored: Number(current.total_scored || 0) + row.scored,
+      highest_leg_avg: Math.max(Number(current.highest_leg_avg || 0), ...((duel.legs || []).flatMap(leg => (leg.players || []).filter(player => Number(player.player_slot) === row.playerId).map(player => Number(player.average || 0))))),
+      avg_first9: row.firstNine.length ? ((Number(current.avg_first9 || 0) * previousLegs + row.firstNine.reduce((sum, value) => sum + value, 0)) / (previousLegs + row.firstNine.length)) : Number(current.avg_first9 || 0),
+      count_180: Number(current.count_180 || 0) + row.count180,
+      count_171plus: Number(current.count_171plus || 0) + row.count171plus,
+      count_140plus: Number(current.count_140plus || 0) + row.count140plus,
+      count_100plus: Number(current.count_100plus || 0) + row.count100plus,
+      checkout_attempts: Number(current.checkout_attempts || 0) + row.checkoutAttempts,
+      checkout_success: Number(current.checkout_success || 0) + row.checkoutSuccess,
+      highest_checkout: Math.max(Number(current.highest_checkout || 0), row.highestCheckout)
+    };
+    if (checkoutRule) {
+      const values = row.checkouts[checkoutRule];
+      updates[`checkout_${checkoutRule}_attempts`] = Number(current[`checkout_${checkoutRule}_attempts`] || 0) + values[0];
+      updates[`checkout_${checkoutRule}_success`] = Number(current[`checkout_${checkoutRule}_success`] || 0) + values[1];
+      updates[`checkout_${checkoutRule}_highest`] = Math.max(Number(current[`checkout_${checkoutRule}_highest`] || 0), values[2]);
+    }
+    await dataStore.updatePlayerStats(row.playerId, updates);
+    for (const leg of duel.legs || []) {
+      const legPlayer = (leg.players || []).find(player => Number(player.player_slot) === row.playerId);
+      if (legPlayer) await dataStore.recordLegHistory(row.playerId, Number(legPlayer.average || 0), Number(legPlayer.checkout_highest || 0), Number(legPlayer.won || 0), Number(legPlayer.darts || 0), undefined, duel.id);
+    }
   }
 }
 
@@ -2377,7 +2454,7 @@ async function addTurnScoreHighscoreIfNeeded(player, state, source = 'live') {
 
   player.turnScoreRecorded = true;
   queueLiveDetailWrite(
-    () => addHighscore(player.name, turnScore, { kind, source, gameMode: state.game.mode, duelId: state.game.duelId, playerSlot: player.slot }),
+    () => addHighscore(player.name, turnScore, { kind, source, gameMode: state.game.mode, duelId: state.game.duelId, playerSlot: player.slot, turnId: state.game.turnId }),
     'Turn-Highscore'
   );
 }
@@ -2633,7 +2710,14 @@ async function addHighscore(playerName, score, meta = {}) {
     const matches = (await dataStore.getPlayers()).filter(player => String(player.name || '').trim().toLowerCase() === safeName.toLowerCase());
     if (matches.length === 1) playerSlot = Number(matches[0].slot) || null;
   }
-  await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, gameMode: meta.gameMode || meta.mode || DEFAULT_MODE, ...meta, playerSlot });
+  const duelId = Number(meta.duelId) > 0 ? Number(meta.duelId) : null;
+  let eventKey = meta.eventKey || null;
+  if (!eventKey && duelId && playerSlot) {
+    const duel = await dataStore.getDuel(duelId);
+    const legNumber = Number(duel?.total_legs || 0) + 1;
+    eventKey = ['duel', duelId, legNumber, playerSlot, meta.kind || 'score', safeScore, meta.turnId || ''].join(':');
+  }
+  await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, gameMode: meta.gameMode || meta.mode || DEFAULT_MODE, ...meta, playerSlot, eventKey });
 }
 
 // ──────────────────────────────────────────────
@@ -3744,9 +3828,10 @@ app.get('/api/players/:id/segment-analysis', async (req, res) => {
     if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
     const mode = String(req.query.mode || '').trim();
     const duelId = Number(req.query.duelId || 0) || null;
+    const duelLegId = Number(req.query.duelLegId || 0) || null;
     const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
     if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
-    res.json(await dataStore.getSegmentAnalysis(playerId, mode, duelId, season));
+    res.json(await dataStore.getSegmentAnalysis(playerId, mode, duelId, season, duelLegId));
   } catch (err) {
     res.status(500).json({ error: 'Segmentanalyse konnte nicht geladen werden: ' + err.message });
   }
@@ -3759,12 +3844,13 @@ app.get('/api/duels/:id/segment-analysis', async (req, res) => {
     const duel = await dataStore.getDuel(duelId);
     if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden' });
     const mode = String(req.query.mode || duel.mode || '').trim();
+    const duelLegId = Number(req.query.duelLegId || 0) || null;
     const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
     if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
     const players = await Promise.all((duel.players || []).map(async player => ({
       slot: Number(player.player_slot),
       name: player.player_name || 'Spieler',
-      analysis: await dataStore.getSegmentAnalysis(Number(player.player_slot), mode, duelId, season)
+      analysis: await dataStore.getSegmentAnalysis(Number(player.player_slot), mode, duelId, season, duelLegId)
     })));
     res.json({ duelId, mode, players });
   } catch (err) {
