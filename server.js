@@ -3805,6 +3805,11 @@ if (require.main === module) {
 }
 
 module.exports = {
+  app,
+  startServer,
+  createFireTvServer,
+  startFireTvServer,
+  getLocalIP,
   CHECKOUT_RULES,
   DEFAULT_CHECKOUT_RULE,
   getCheckoutRuleStats,
