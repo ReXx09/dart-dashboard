@@ -2753,7 +2753,7 @@ app.post('/api/live/start', async (req, res) => {
     const saved = await saveLiveState(fresh);
     broadcastReload();
     res.json(saved);
-  } catch (err) { res.status(500).json({ error: 'Einzelspiel konnte nicht gestartet werden: ' + err.message }); }
+  } catch (err) { res.status(500).json({ error: 'Solospiel konnte nicht gestartet werden: ' + err.message }); }
 });
 
 app.post('/api/game/checkout-rule', async (req, res) => {
@@ -2943,9 +2943,10 @@ app.get('/api/live/state', async (_req, res) => {
 
 app.get('/api/duels', async (req, res) => {
   const category = String(req.query.category || 'all').trim().toLowerCase();
-  const status = String(req.query.status || '').trim().toLowerCase();
+  const requestedStatus = String(req.query.status || 'finished').trim().toLowerCase();
+  const status = requestedStatus === 'all' ? '' : requestedStatus;
   if (!['all', 'single', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, single, duel, group oder tournament sein.' });
-  if (status && !['active', 'finished', 'canceled'].includes(status)) return res.status(400).json({ error: 'status muss active, finished oder canceled sein.' });
+  if (requestedStatus && !['all', 'active', 'finished', 'canceled'].includes(requestedStatus)) return res.status(400).json({ error: 'status muss all, active, finished oder canceled sein.' });
   try {
     const duels = await dataStore.listDuels(req.query.limit || 20, status);
     res.json(category === 'all' ? duels : duels.filter(duel => duel.category === category));
@@ -2978,8 +2979,8 @@ app.get('/api/duel-stats', async (req, res) => {
   const exactGroup = String(req.query.exact || 'false').toLowerCase() === 'true';
   const category = String(req.query.category || 'all').trim().toLowerCase();
   const status = String(req.query.status || 'finished').trim().toLowerCase();
-  if (!['all', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, duel, group oder tournament sein.' });
-  if (!['active', 'finished', 'canceled'].includes(status)) return res.status(400).json({ error: 'status muss active, finished oder canceled sein.' });
+  if (!['all', 'single', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, single, duel, group oder tournament sein.' });
+  if (status !== 'finished') return res.status(400).json({ error: 'Statistiken werden nur für abgeschlossene Begegnungen geführt.' });
   try {
     const duels = await dataStore.listDuels(100, status);
     const payload = aggregateDuelStats({ duels, slots, category, exactGroup });
@@ -3001,6 +3002,7 @@ app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
   try {
     const duel = await dataStore.getDuel(duelId);
     if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
+    if (duel.status === 'finished') return res.status(409).json({ error: 'Abgeschlossene Begegnungen können nicht gelöscht werden.' });
     const state = await getLiveState();
     const isCurrentDuel = Number(state.game?.duelId) === duelId;
     const deleted = await dataStore.deleteDuel(duelId);
@@ -3175,7 +3177,7 @@ app.post('/api/duels/:id/cancel', async (req, res) => {
     savedLiveMode = String(state.game.mode || DEFAULT_MODE);
     await saveLiveState(fresh);
     broadcastReload();
-    res.json({ duel, state: fresh });
+    res.json({ duel, state: fresh, message: 'Begegnung abgebrochen. Sie wird nicht in Highscores oder Statistiken aufgenommen und kann im Adminbereich gelöscht werden.' });
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht abgebrochen werden: ' + err.message }); }
 });
 

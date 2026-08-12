@@ -124,7 +124,7 @@
     <div class="sec-hd"><span class="sec-title">Erweiterte Spielfunktionen</span><div class="sec-line"></div></div>
     <fieldset>
       <legend>Begegnungen verwalten</legend>
-      <div class="field-hint" style="margin:0 0 8px">Nicht gewertete oder versehentlich angelegte Begegnungen können hier vollständig entfernt werden.</div>
+      <div class="field-hint" style="margin:0 0 8px">Nur offene oder abgebrochene Begegnungen können hier vollständig entfernt werden. Abgeschlossene Begegnungen bleiben Bestandteil der Statistiken.</div>
       <button class="btn-save" id="refreshDuelsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Begegnungen laden</button>
       <div class="duel-list" id="adminDuelList"><div class="duel-row">Begegnungen werden geladen...</div></div>
     </fieldset>
@@ -972,13 +972,13 @@
   loadAdminPlayers();
 
   function formatAdminDuelStatus(duel) {
-    return duel.status === 'finished' ? 'beendet' : 'offen';
+    return duel.status === 'finished' ? 'beendet' : duel.status === 'canceled' ? 'abgebrochen' : 'offen';
   }
 
   async function loadAdminDuels() {
     const list = document.getElementById('adminDuelList');
     try {
-      const response = await fetch('/api/duels?limit=100', { cache: 'no-store' });
+      const response = await fetch('/api/duels?limit=100&status=all', { cache: 'no-store' });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const duels = await response.json();
       if (!duels.length) {
@@ -987,7 +987,8 @@
       }
       list.innerHTML = duels.map(duel => {
         const players = (duel.players || []).map(player => escapeHtml(player.player_name)).join(' · ');
-        return '<div class="duel-row"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div><button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '">🗑 Löschen</button></div>';
+        const deleteButton = duel.status === 'finished' ? '' : '<button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '">🗑 Löschen</button>';
+        return '<div class="duel-row"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div>' + deleteButton + '</div>';
       }).join('');
       list.querySelectorAll('[data-duel-delete]').forEach(button => button.addEventListener('click', () => deleteAdminDuel(Number(button.dataset.duelDelete))));
     } catch (err) {

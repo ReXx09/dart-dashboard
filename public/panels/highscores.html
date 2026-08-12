@@ -500,7 +500,7 @@
           <div><h2>Begegnungs-Highscores</h2><p>Bestwerte aus 2-Player-Duellen und Gruppen mit 3–8 Spielern</p></div>
         </div>
         <nav class="encounter-nav" aria-label="Highscore-Kategorien">
-          <button type="button" data-encounter-category="single" onclick="setEncounterCategory('single')">Einzel</button>
+          <button type="button" data-encounter-category="single" onclick="setEncounterCategory('single')">Solospiel</button>
           <button type="button" data-encounter-category="duel" class="active" onclick="setEncounterCategory('duel')">Duelle</button>
           <button type="button" data-encounter-category="group" onclick="setEncounterCategory('group')">Begegnungen</button>
           <button type="button" data-encounter-category="tournament" onclick="setEncounterCategory('tournament')">Turniere</button>
@@ -550,7 +550,7 @@
               </select>
               <select id="scoreCategorySelect" aria-label="Highscore-Kategorie" style="width:auto;min-width:150px;padding:7px 9px;font-size:.75rem">
                 <option value="all">Alle Kategorien</option>
-                <option value="single">Einzel</option>
+                <option value="single">Solospiel</option>
                 <option value="duel">Duelle</option>
                 <option value="group">Begegnungen</option>
                 <option value="tournament">Turniere</option>
@@ -639,7 +639,7 @@
       finish: 'Finishes',
       manual: 'Manuelle Scores'
     };
-    const CATEGORY_LABELS = { single: 'Einzel', duel: 'Duell', group: 'Begegnung', tournament: 'Turnier' };
+    const CATEGORY_LABELS = { single: 'Solospiel', duel: 'Duell', group: 'Begegnung', tournament: 'Turnier' };
 
     updateClock();
     setInterval(updateClock, 1000);
@@ -721,7 +721,7 @@
         overviewData = await response.json();
         const modeSelect = document.getElementById('overviewMode');
         modeSelect.innerHTML = (overviewData.modes || ['gesamt']).map(mode => '<option value="' + escapeHtml(mode) + '">' + escapeHtml(mode === 'gesamt' ? 'Gesamt' : mode) + '</option>').join('');
-        const categoryLabels = { all: 'Alle Kategorien', single: 'Einzelspiele', duel: 'Duelle', group: 'Begegnungen', tournament: 'Turniere' };
+        const categoryLabels = { all: 'Alle Kategorien', single: 'Solospiele', duel: 'Duelle', group: 'Begegnungen', tournament: 'Turniere' };
         const categorySelect = document.getElementById('overviewCategory');
         categorySelect.innerHTML = (overviewData.categories || ['all']).map(category => '<option value="' + escapeHtml(category) + '">' + escapeHtml(categoryLabels[category] || category) + '</option>').join('');
         if ([...categorySelect.options].some(option => option.value === selectedOverviewCategory)) categorySelect.value = selectedOverviewCategory;
@@ -843,7 +843,7 @@
 
     async function loadEncounters() {
       try {
-        const response = await fetch('/api/duels?limit=100', { cache: 'no-store' });
+        const response = await fetch('/api/duels?limit=100&status=finished', { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounters = await response.json();
         renderEncounters();
@@ -1007,7 +1007,7 @@
           '<td class="rank">' + (idx + 1) + '</td>' +
           '<td class="player">' + escapeHtml(entry.player) + '</td>' +
           '<td class="score">' + entry.score + '</td>' +
-          '<td><div class="score-context"><span class="score-badge category">' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Einzel') + '</span><span class="score-badge">' + escapeHtml(entry.gameMode || '-') + '</span><span class="score-badge">' + escapeHtml(kind) + (entry.checkoutRule ? ' / ' + escapeHtml(entry.checkoutRule) : '') + (entry.legWin ? ' / Leg' : '') + '</span>' + (group.entries.length > 1 ? '<span class="score-badge">' + group.entries.length + ' Einträge</span>' : '') + '</div></td>' +
+          '<td><div class="score-context"><span class="score-badge category">' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Solospiel') + '</span><span class="score-badge">' + escapeHtml(entry.gameMode || '-') + '</span><span class="score-badge">' + escapeHtml(kind) + (entry.checkoutRule ? ' / ' + escapeHtml(entry.checkoutRule) : '') + (entry.legWin ? ' / Leg' : '') + '</span>' + (group.entries.length > 1 ? '<span class="score-badge">' + group.entries.length + ' Einträge</span>' : '') + '</div></td>' +
           '<td class="time" title="' + escapeHtml(formatTime(entry.ts)) + '">' + escapeHtml(formatRelativeTime(entry.ts)) + '</td>' +
           '<td><div class="score-actions"><button class="score-action" type="button" data-detail-group="' + idx + '" title="Score-Details öffnen">Details</button></div></td>' +
         '</tr>';
@@ -1101,7 +1101,7 @@
       document.getElementById('encounterDialogContent').innerHTML = '<div class="encounter-detail-table"><table><tbody>' +
         '<tr><th>Spieler</th><td class="accent">' + escapeHtml(entry.player) + '</td></tr>' +
         '<tr><th>Score</th><td class="accent">' + Number(entry.score || 0) + '</td></tr>' +
-        '<tr><th>Kategorie</th><td>' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Einzel') + '</td></tr>' +
+        '<tr><th>Kategorie</th><td>' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Solospiel') + '</td></tr>' +
         '<tr><th>Spielmodus</th><td>' + escapeHtml(entry.gameMode || '-') + '</td></tr>' +
         '<tr><th>Typ</th><td>' + escapeHtml(normalizeKind(entry.kind)) + '</td></tr>' +
         '<tr><th>Zeitpunkt</th><td>' + escapeHtml(formatTime(entry.ts)) + '</td></tr>' +
@@ -1123,7 +1123,7 @@
       document.getElementById('encounterDialogContent').innerHTML = '<div class="encounter-detail-table"><table><tbody>' +
         '<tr><th>Spieler</th><td class="accent">' + escapeHtml(entry.player) + '</td></tr>' +
         '<tr><th>Score</th><td class="accent">' + Number(entry.score || 0) + '</td></tr>' +
-        '<tr><th>Kategorie</th><td>' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Einzel') + '</td></tr>' +
+        '<tr><th>Kategorie</th><td>' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Solospiel') + '</td></tr>' +
         '<tr><th>Spielmodus</th><td>' + escapeHtml(entry.gameMode || '-') + '</td></tr>' +
         '<tr><th>Anzahl</th><td>' + group.entries.length + ' gleiche Einträge</td></tr>' +
         '</tbody></table><table style="margin-top:12px"><thead><tr><th>Zeitpunkt</th><th>ID</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
