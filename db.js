@@ -137,7 +137,31 @@ class DataStore {
     await this.ensureCheckoutRuleColumns();
     await this.ensureCheckoutStatsVersion();
     await this.ensureThrowSegmentSchema();
+    await this.ensurePerformanceIndexes();
     await this.seedFromLegacyJson();
+  }
+
+  async ensurePerformanceIndexes() {
+    const indexes = [
+      ['idx_duels_status_started', 'duels (status, started_at)'],
+      ['idx_duel_legs_duel', 'duel_legs (duel_id, leg_number)'],
+      ['idx_duel_leg_players_duel', 'duel_leg_players (duel_id, player_slot)'],
+      ['idx_tournament_matches_tournament', 'tournament_matches (tournament_id, round, position)'],
+      ['idx_throw_segments_player_mode_duel', 'player_throw_segments (player_slot, mode, duel_id, thrown_at)']
+    ];
+    for (const [name, target] of indexes) {
+      if (this.isSQLite()) {
+        await this.sqlite.run(`CREATE INDEX IF NOT EXISTS ${name} ON ${target}`);
+      } else if (this.isPostgres()) {
+        await this.pg.query(`CREATE INDEX IF NOT EXISTS ${name} ON ${target}`);
+      } else {
+        try {
+          await this.my.query(`CREATE INDEX ${name} ON ${target}`);
+        } catch (error) {
+          if (!/duplicate|already exists/i.test(String(error.message || ''))) throw error;
+        }
+      }
+    }
   }
 
   async ensureThrowSegmentSchema() {
