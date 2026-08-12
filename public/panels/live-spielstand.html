@@ -1236,7 +1236,7 @@
           <select id="matchStartKind" onchange="updateMatchStartKind()"><option value="encounter">Begegnung mit Statistik</option><option value="single">Einzelspiel ohne Begegnungsstatistik</option></select>
         </label>
         <label class="match-menu-field encounter-only">Typ
-          <select id="matchTypeSelect"><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">K.-o.-Turnier</option></select>
+          <select id="matchTypeSelect" onchange="updateMatchMenuType()"><option value="single">Einzelspiel</option><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">K.-o.-Turnier</option></select>
         </label>
         <label class="match-menu-field encounter-only" id="matchBestOfField">Best-of
           <select id="matchBestOf"><option value="1">Einzelleg</option><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option><option value="9">Best of 9</option></select>
@@ -1391,7 +1391,12 @@
 
     function updateMatchStartKind() {
       const isSingleGame = document.getElementById('matchStartKind').value === 'single';
-      document.querySelectorAll('.encounter-only').forEach(field => { field.hidden = isSingleGame; });
+      const typeSelect = document.getElementById('matchTypeSelect');
+      if (typeSelect) typeSelect.value = isSingleGame ? 'single' : (typeSelect.value === 'single' ? 'direct' : typeSelect.value);
+      document.querySelectorAll('.encounter-only').forEach(field => {
+        if (field.querySelector('#matchTypeSelect')) return;
+        field.hidden = isSingleGame;
+      });
       updateMatchModeAvailability();
       document.getElementById('matchMenuDescription').textContent = isSingleGame
         ? 'Starte ein einzelnes Spiel mit einem beliebigen Modus und den ausgewählten Spielern. Es wird keine Begegnung in der Statistik angelegt.'
@@ -1467,15 +1472,17 @@
 
     function updateMatchMenuType() {
       const type = document.getElementById('matchTypeSelect').value;
-      const isSingleGame = document.getElementById('matchStartKind').value === 'single';
+      const isSingleGame = type === 'single';
+      document.getElementById('matchStartKind').value = isSingleGame ? 'single' : 'encounter';
+      updateMatchStartKind();
       document.getElementById('tournamentNameField').hidden = isSingleGame || type !== 'tournament';
       updateMatchModeAvailability();
       document.querySelectorAll('#matchPlayerList input').forEach(input => { input.disabled = false; });
     }
 
     async function startConfiguredMatch() {
-      const startKind = document.getElementById('matchStartKind').value;
       const type = document.getElementById('matchTypeSelect').value;
+      const startKind = type === 'single' ? 'single' : document.getElementById('matchStartKind').value;
       const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
       if ((startKind === 'encounter' && ((type === 'direct' && playerSlots.length !== 2) || (type === 'tournament' && ![2, 4, 8, 16].includes(playerSlots.length)) || playerSlots.length < 2)) || (startKind === 'single' && playerSlots.length < 1)) { showToast(startKind === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : type === 'tournament' ? 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.' : 'Bitte die passende Anzahl Spieler auswählen.', true); return; }
       try {
