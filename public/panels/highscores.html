@@ -287,6 +287,7 @@
     .score-table .score-kind { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .score-table .score-type { color: #f4a261; }
     .score-table .score-kind { color: #aaa; }
+    .score-count { color: #888; font-size: .72rem; font-weight: 700; margin-left: 3px; }
     .score-table .score-actions { justify-content: flex-start; }
     .compact-table th, .compact-table td { padding: 5px 8px; }
     .compact-table th { font-size: .62rem; }
@@ -1015,10 +1016,10 @@
         return '<tr>' +
           '<td class="rank">' + (idx + 1) + '</td>' +
           '<td class="player">' + escapeHtml(entry.player) + '</td>' +
-          '<td class="score">' + entry.score + '</td>' +
+          '<td class="score">' + entry.score + (group.entries.length > 1 ? '<span class="score-count">[' + group.entries.length + ']</span>' : '') + '</td>' +
           '<td class="score-type" title="' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Solospiel') + '">' + escapeHtml(CATEGORY_LABELS[entry.category] || 'Solospiel') + '</td>' +
           '<td class="score-mode" title="' + escapeHtml(entry.gameMode || '-') + '">' + escapeHtml(entry.gameMode || '-') + '</td>' +
-          '<td class="score-kind" title="' + escapeHtml(kind + (entry.checkoutRule ? ' / ' + entry.checkoutRule : '') + (entry.legWin ? ' / Leg' : '')) + '">' + escapeHtml(kind + (entry.checkoutRule ? ' / ' + entry.checkoutRule : '') + (entry.legWin ? ' / Leg' : '')) + (group.entries.length > 1 ? ' · ' + group.entries.length + '×' : '') + '</td>' +
+          '<td class="score-kind" title="' + escapeHtml(kind + (entry.checkoutRule ? ' / ' + entry.checkoutRule : '') + (entry.legWin ? ' / Leg' : '')) + '">' + escapeHtml(kind + (entry.checkoutRule ? ' / ' + entry.checkoutRule : '') + (entry.legWin ? ' / Leg' : '')) + '</td>' +
           '<td class="time" title="' + escapeHtml(formatTime(entry.ts)) + '">' + escapeHtml(formatRelativeTime(entry.ts)) + '</td>' +
           '<td><div class="score-actions"><button class="score-action" type="button" data-detail-group="' + idx + '" title="Score-Details öffnen">Details</button></div></td>' +
         '</tr>';
