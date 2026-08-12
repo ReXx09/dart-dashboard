@@ -261,8 +261,8 @@
     .player { font-weight: 700; color: #f1f1f1; }
     .muted { color: #666; font-style: italic; }
     .time { color: #666; white-space: nowrap; }
-    .score-context { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-    .score-badge { display: inline-block; border: 1px solid #2d2d2d; border-radius: 4px; padding: 2px 5px; color: #aaa; background: #101010; font-size: .62rem; white-space: nowrap; }
+    .score-context { display: flex; gap: 4px; flex-wrap: nowrap; align-items: center; min-width: 0; min-height: 26px; overflow: hidden; }
+    .score-badge { display: inline-block; flex: 0 0 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; border: 1px solid #2d2d2d; border-radius: 4px; padding: 2px 5px; color: #aaa; background: #101010; font-size: .62rem; white-space: nowrap; }
     .score-badge.category { color: #f4a261; border-color: #5b3d28; }
     .score-actions { display: flex; gap: 5px; justify-content: flex-end; }
     .score-action { border: 1px solid #2d2d2d; background: #1b1b1b; color: #bbb; border-radius: 5px; padding: 4px 6px; cursor: pointer; font: inherit; font-size: .65rem; white-space: nowrap; }
@@ -279,7 +279,8 @@
     .score-table td.score { text-align: center; }
     .score-table .player,
     .score-table .time { overflow: hidden; text-overflow: ellipsis; }
-    .score-table .score-context { min-width: 0; }
+    .score-table td { overflow: hidden; }
+    .score-table .score-context { width: 100%; }
     .score-table .score-actions { justify-content: flex-start; }
     .compact-table th, .compact-table td { padding: 6px 8px; }
     .compact-table th { font-size: .62rem; }
