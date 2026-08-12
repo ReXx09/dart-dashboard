@@ -160,17 +160,24 @@ ensure_docker_ready() {
 show_network_hint() {
   local port ip_address count=0
   port="$(get_env_value PUBLIC_PORT 3100)"
-  msg_info ''
-  msg_info '=== Dashboard ist bereit ==='
-  msg_info "Lokaler Zugriff: http://localhost:${port}"
 
-  if command_exists ip; then
-    while IFS= read -r ip_address; do
-      [[ -z "$ip_address" || "$ip_address" == 127.* ]] && continue
-      msg_info "Netzwerk:       http://${ip_address}:${port}"
-      count=$((count + 1))
-      [[ "$count" -ge 3 ]] && break
-    done < <(ip -4 -o addr show 2>/dev/null | awk '{split($4, address, "/"); print address[1]}')
+  if command_exists curl && curl -fsS --max-time 5 "http://localhost:${port}/api/server-info" >/dev/null 2>&1; then
+    msg_info ''
+    msg_info '=== Dashboard ist bereit ==='
+    msg_info "Lokaler Zugriff: http://localhost:${port}"
+
+    if command_exists ip; then
+      while IFS= read -r ip_address; do
+        [[ -z "$ip_address" || "$ip_address" == 127.* ]] && continue
+        msg_info "Netzwerk:       http://${ip_address}:${port}"
+        count=$((count + 1))
+        [[ "$count" -ge 3 ]] && break
+      done < <(ip -4 -o addr show 2>/dev/null | awk '{split($4, address, "/"); print address[1]}')
+    fi
+    msg_info ''
+    return 0
   fi
-  msg_info ''
+
+  msg_warn "Dashboard-Port http://localhost:${port} antwortet noch nicht. Prüfe 'docker compose logs --tail=200' und 'docker ps'."
+  return 1
 }

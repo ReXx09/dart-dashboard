@@ -10,9 +10,9 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # Quellcode kopieren
-COPY server.js ./
-COPY db.js ./
-COPY public/ ./public/
+# Wichtig: Der Build-Kontext ist das App-Verzeichnis selbst; deshalb alle Projektdateien mitkopieren,
+# nicht nur einzelne Dateien. Sonst fehlen Modulordner wie lib/, modes/ oder scripts/ im Container.
+COPY . .
 
 # data/ wird als Volume gemountet → Einstellungen bleiben erhalten
 RUN mkdir -p /app/data
