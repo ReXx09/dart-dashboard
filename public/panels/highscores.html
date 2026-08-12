@@ -525,6 +525,7 @@
               <div class="panel-subtitle" id="listSubtitle">Alle gespeicherten Scores</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+              <input id="scoreSearch" type="search" aria-label="Alle Scores durchsuchen" placeholder="Scores durchsuchen..." autocomplete="off" style="width:220px;padding:7px 9px;font-size:.75rem" />
               <select id="scoreCategorySelect" aria-label="Highscore-Kategorie" style="width:auto;min-width:150px;padding:7px 9px;font-size:.75rem">
                 <option value="all">Alle Kategorien</option>
                 <option value="single">Einzel</option>
@@ -846,12 +847,32 @@
       return true;
     }
 
+    function scoreMatchesSearch(entry, search) {
+      const terms = String(search || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+      if (!terms.length) return true;
+      const category = String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single'));
+      const searchable = [
+        entry.player,
+        entry.score,
+        entry.gameMode,
+        category,
+        CATEGORY_LABELS[category],
+        normalizeKind(entry.kind),
+        entry.checkoutRule,
+        entry.id,
+        entry.duelId
+      ].filter(value => value !== null && value !== undefined).join(' ').toLowerCase();
+      return terms.every(term => searchable.includes(term));
+    }
+
     function filterScores() {
       const player = document.getElementById('playerFilter').value;
+      const search = document.getElementById('scoreSearch').value;
       return allScores
         .filter(entry => selectedScoreCategory === 'all' || String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single')) === selectedScoreCategory)
         .filter(entry => !selectedGameMode || String(entry.gameMode || '').toLowerCase() === selectedGameMode)
         .filter(entry => scoreMatchesFilter(entry, selectedFilter))
+        .filter(entry => scoreMatchesSearch(entry, search))
         .filter(entry => !player || String(entry.player) === player)
         .sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0));
     }
@@ -1060,6 +1081,7 @@
     });
 
     document.getElementById('playerFilter').addEventListener('change', render);
+    document.getElementById('scoreSearch').addEventListener('input', render);
     document.getElementById('scoreBody').addEventListener('click', event => {
       const detailButton = event.target.closest('[data-detail-id]');
       if (detailButton) openScoreDetail(detailButton.dataset.detailId);
