@@ -572,14 +572,20 @@ class DataStore {
     if (this.isSQLite()) {
       await this.sqlite.run("UPDATE highscores SET category = 'single' WHERE duel_id IS NULL AND (category IS NULL OR category = '')");
       await this.sqlite.run("UPDATE highscores SET category = CASE WHEN d.match_type = 'tournament' THEN 'tournament' WHEN d.match_type = 'group' OR d.participant_count >= 3 THEN 'group' ELSE 'duel' END FROM duels d WHERE highscores.duel_id = d.id AND (highscores.category IS NULL OR highscores.category = '')");
+      await this.sqlite.run("UPDATE highscores SET game_mode = (SELECT mode FROM duels WHERE duels.id = highscores.duel_id) WHERE (game_mode IS NULL OR game_mode = '') AND duel_id IS NOT NULL");
+      await this.sqlite.run("UPDATE highscores SET game_mode = '501' WHERE game_mode IS NULL OR game_mode = ''");
       await this.sqlite.run('UPDATE highscores SET player_slot = (SELECT player_slot FROM duel_players WHERE duel_id = highscores.duel_id AND LOWER(TRIM(player_name)) = LOWER(TRIM(highscores.player)) LIMIT 1) WHERE player_slot IS NULL AND duel_id IS NOT NULL');
     } else if (this.isPostgres()) {
       await this.pg.query("UPDATE highscores SET category = 'single' WHERE duel_id IS NULL AND (category IS NULL OR category = '')");
       await this.pg.query("UPDATE highscores h SET category = CASE WHEN d.match_type = 'tournament' THEN 'tournament' WHEN d.match_type = 'group' OR d.participant_count >= 3 THEN 'group' ELSE 'duel' END FROM duels d WHERE h.duel_id = d.id AND (h.category IS NULL OR h.category = '')");
+      await this.pg.query("UPDATE highscores h SET game_mode = d.mode FROM duels d WHERE h.duel_id = d.id AND (h.game_mode IS NULL OR h.game_mode = '')");
+      await this.pg.query("UPDATE highscores SET game_mode = '501' WHERE game_mode IS NULL OR game_mode = ''");
       await this.pg.query('UPDATE highscores h SET player_slot = dp.player_slot FROM duel_players dp WHERE h.player_slot IS NULL AND h.duel_id = dp.duel_id AND LOWER(TRIM(dp.player_name)) = LOWER(TRIM(h.player))');
     } else {
       await this.my.query("UPDATE highscores SET category = 'single' WHERE duel_id IS NULL AND (category IS NULL OR category = '')");
       await this.my.query("UPDATE highscores h JOIN duels d ON h.duel_id = d.id SET h.category = CASE WHEN d.match_type = 'tournament' THEN 'tournament' WHEN d.match_type = 'group' OR d.participant_count >= 3 THEN 'group' ELSE 'duel' END WHERE h.category IS NULL OR h.category = ''");
+      await this.my.query("UPDATE highscores h JOIN duels d ON h.duel_id = d.id SET h.game_mode = d.mode WHERE h.game_mode IS NULL OR h.game_mode = ''");
+      await this.my.query("UPDATE highscores SET game_mode = '501' WHERE game_mode IS NULL OR game_mode = ''");
       await this.my.query('UPDATE highscores h JOIN duel_players dp ON h.duel_id = dp.duel_id AND LOWER(TRIM(h.player)) = LOWER(TRIM(dp.player_name)) SET h.player_slot = dp.player_slot WHERE h.player_slot IS NULL');
     }
   }
@@ -1605,7 +1611,7 @@ class DataStore {
     }
 
     const kind = entry && entry.kind ? String(entry.kind) : null;
-    const gameMode = entry && entry.gameMode ? String(entry.gameMode) : null;
+    const gameMode = entry && entry.gameMode ? String(entry.gameMode) : '501';
     const checkoutRule = entry && entry.checkoutRule ? String(entry.checkoutRule) : null;
     const legWin = toBool(entry && entry.legWin);
     const ts = Number(entry && entry.ts ? entry.ts : Date.now());

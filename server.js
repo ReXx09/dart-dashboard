@@ -2627,7 +2627,7 @@ async function addHighscore(playerName, score, meta = {}) {
     const matches = (await dataStore.getPlayers()).filter(player => String(player.name || '').trim().toLowerCase() === safeName.toLowerCase());
     if (matches.length === 1) playerSlot = Number(matches[0].slot) || null;
   }
-  await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, gameMode: meta.gameMode || meta.mode || null, ...meta, playerSlot });
+  await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, gameMode: meta.gameMode || meta.mode || DEFAULT_MODE, ...meta, playerSlot });
 }
 
 // ──────────────────────────────────────────────

@@ -506,13 +506,13 @@
         </nav>
         <div class="encounter-toolbar">
           <div>
-            <h2 class="section-title" style="margin-bottom:0">Duelle und Gruppen-Begegnungen</h2>
+            <h2 class="section-title" style="margin-bottom:0">Begegnungs- und Solospielstatistiken</h2>
             <p class="stat-sub" id="encounterPlayerStatus">Wähle einen Spieler für seine Begegnungswerte.</p>
           </div>
           <select id="encounterCategory" aria-label="Begegnungskategorie">
-            <option value="all">Alle Begegnungen</option>
+            <option value="all" selected>Alle Begegnungen</option>
             <option value="single">Solospiele</option>
-            <option value="duel" selected>2-Player-Duelle</option>
+            <option value="duel">2-Player-Duelle</option>
             <option value="group">Gruppen mit 3–8 Spielern</option>
             <option value="tournament">Turniere</option>
           </select>
@@ -540,7 +540,7 @@
     let currentSeason = '2026';
     let currentStatsMode = '';
     let encounters = [];
-    let selectedEncounterCategory = 'duel';
+    let selectedEncounterCategory = 'all';
     let segmentAnalysis = null;
     let segmentComparison = false;
     let segmentComparisonData = [];
