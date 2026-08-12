@@ -111,6 +111,7 @@ function queueLiveStateWrite(state) {
         await dataStore.saveLiveState(snapshot);
         liveStateWriteKey = snapshotKey;
       } catch (error) {
+        if (!liveStateWritePending) liveStateWriteKey = null;
         console.error('[Live-State] Persistierung fehlgeschlagen:', error);
       }
     }
