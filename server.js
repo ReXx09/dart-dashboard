@@ -3566,6 +3566,11 @@ app.get('/api/highscores/overview', async (_req, res) => {
           checkoutAttempts: 0,
           checkoutSuccess: 0,
           highestCheckout: 0,
+          checkoutByRule: {
+            single: { attempts: 0, success: 0, highest: 0 },
+            double: { attempts: 0, success: 0, highest: 0 },
+            master: { attempts: 0, success: 0, highest: 0 }
+          },
           gamesPlayed: 0,
           gamesWon: 0,
           legsWon: 0
@@ -3583,6 +3588,14 @@ app.get('/api/highscores/overview', async (_req, res) => {
           entry.checkoutAttempts += Number(legPlayer.checkout_attempts || 0);
           entry.checkoutSuccess += Number(legPlayer.checkout_success || 0);
           entry.highestCheckout = Math.max(entry.highestCheckout, Number(legPlayer.checkout_highest || 0));
+          const checkoutRule = ['single', 'double', 'master'].includes(String(duel.checkout_rule || '').toLowerCase())
+            ? String(duel.checkout_rule).toLowerCase()
+            : null;
+          if (checkoutRule) {
+            entry.checkoutByRule[checkoutRule].attempts += Number(legPlayer.checkout_attempts || 0);
+            entry.checkoutByRule[checkoutRule].success += Number(legPlayer.checkout_success || 0);
+            entry.checkoutByRule[checkoutRule].highest = Math.max(entry.checkoutByRule[checkoutRule].highest, Number(legPlayer.checkout_highest || 0));
+          }
           if (Number(legPlayer.first_nine_avg || 0) > 0) {
             entry.firstNineTotal += Number(legPlayer.first_nine_avg);
             entry.firstNineCount += 1;
@@ -3598,11 +3611,83 @@ app.get('/api/highscores/overview', async (_req, res) => {
       checkoutRateSingle: null,
       checkoutRateDouble: null,
       checkoutRateMaster: null,
-      checkoutByRule: null,
+      checkoutByRule: Object.fromEntries(['single', 'double', 'master'].map(rule => {
+        const values = entry.checkoutByRule[rule];
+        return [rule, {
+          attempts: values.attempts,
+          success: values.success,
+          rate: values.attempts > 0 ? Number((values.success / values.attempts * 100).toFixed(1)) : 0,
+          highest: Math.min(170, values.highest)
+        }];
+      })),
       gamesWon: entry.gamesWon,
       trackingSince: null
     }));
-    const overviewEntries = entries.concat(groupedEntries);
+    const categoryGroups = new Map();
+    for (const entry of groupedEntries) {
+      const key = entry.category + ':' + entry.profileId;
+      if (!categoryGroups.has(key)) {
+        categoryGroups.set(key, {
+          profileId: entry.profileId,
+          player: entry.player,
+          mode: 'gesamt',
+          category: entry.category,
+          count180: 0,
+          darts: 0,
+          totalScored: 0,
+          firstNineTotal: 0,
+          firstNineCount: 0,
+          checkoutAttempts: 0,
+          checkoutSuccess: 0,
+          highestCheckout: 0,
+          checkoutByRule: {
+            single: { attempts: 0, success: 0, highest: 0 },
+            double: { attempts: 0, success: 0, highest: 0 },
+            master: { attempts: 0, success: 0, highest: 0 }
+          },
+          gamesPlayed: 0,
+          gamesWon: 0,
+          legsWon: 0
+        });
+      }
+      const total = categoryGroups.get(key);
+      total.count180 += entry.count180;
+      total.darts += entry.darts;
+      total.totalScored += entry.totalScored;
+      total.firstNineTotal += entry.firstNineAverage * entry.firstNineCount;
+      total.firstNineCount += entry.firstNineCount;
+      total.checkoutAttempts += entry.checkoutAttempts;
+      total.checkoutSuccess += entry.checkoutSuccess;
+      total.highestCheckout = Math.max(total.highestCheckout, entry.highestCheckout);
+      total.gamesPlayed += entry.gamesPlayed;
+      total.gamesWon += entry.gamesWon;
+      total.legsWon += entry.legsWon;
+      for (const rule of ['single', 'double', 'master']) {
+        total.checkoutByRule[rule].attempts += entry.checkoutByRule[rule].attempts;
+        total.checkoutByRule[rule].success += entry.checkoutByRule[rule].success;
+        total.checkoutByRule[rule].highest = Math.max(total.checkoutByRule[rule].highest, entry.checkoutByRule[rule].highest);
+      }
+    }
+    const categoryEntries = Array.from(categoryGroups.values()).map(entry => ({
+      ...entry,
+      checkoutByRule: Object.fromEntries(['single', 'double', 'master'].map(rule => {
+        const values = entry.checkoutByRule[rule];
+        return [rule, {
+          ...values,
+          rate: values.attempts > 0 ? Number((values.success / values.attempts * 100).toFixed(1)) : 0,
+          highest: Math.min(170, values.highest)
+        }];
+      })),
+      threeDartAverage: entry.darts > 0 ? Number((entry.totalScored / entry.darts * 3).toFixed(1)) : 0,
+      firstNineAverage: entry.firstNineCount > 0 ? Number((entry.firstNineTotal / entry.firstNineCount).toFixed(1)) : 0,
+      checkoutRate: entry.checkoutAttempts > 0 ? Number((entry.checkoutSuccess / entry.checkoutAttempts * 100).toFixed(1)) : 0,
+      checkoutRateSingle: entry.checkoutByRule.single.attempts > 0 ? Number((entry.checkoutByRule.single.success / entry.checkoutByRule.single.attempts * 100).toFixed(1)) : null,
+      checkoutRateDouble: entry.checkoutByRule.double.attempts > 0 ? Number((entry.checkoutByRule.double.success / entry.checkoutByRule.double.attempts * 100).toFixed(1)) : null,
+      checkoutRateMaster: entry.checkoutByRule.master.attempts > 0 ? Number((entry.checkoutByRule.master.success / entry.checkoutByRule.master.attempts * 100).toFixed(1)) : null,
+      gamesWon: entry.gamesWon,
+      trackingSince: null
+    }));
+    const overviewEntries = entries.concat(groupedEntries, categoryEntries);
     const ranked = (field, predicate = value => value > 0) => overviewEntries
       .filter(entry => predicate(entry[field], entry))
       .sort((a, b) => b[field] - a[field]);
