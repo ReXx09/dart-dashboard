@@ -5,6 +5,7 @@ const os = require('os');
 const http = require('http');
 const crypto = require('crypto');
 const { DataStore } = require('./db');
+const { aggregateDuelStats } = require('./lib/duel-stats');
 const {
   GAME_MODES,
   CHECKOUT_RULES,
@@ -13,6 +14,22 @@ const {
   getStartScoreForMode,
   getCricketNumbersForMode
 } = require('./modes');
+const {
+  isValidCheckout,
+  isCheckoutAttempt,
+  getCheckoutRuleStats
+} = require('./modes/x01');
+const {
+  defaultPlayerCricketState,
+  applyCricketHit,
+  checkCricketWin
+} = require('./modes/cricket');
+const {
+  calculateEliminationPoints,
+  checkEliminationWin,
+  getEliminationWinner,
+  applyEliminationThrow
+} = require('./modes/elimination');
 
 let SerialPortCtor = null;
 let ReadlineParserCtor = null;
@@ -301,222 +318,6 @@ let runtimeTuning = {
 };
 
 
-function isValidCheckout(remaining, points, rule, segment = null) {
-  // remaining = what's left BEFORE this throw
-  // points = what was thrown
-  const nextRemaining = remaining - points;
-  if (nextRemaining < 0) return false; // bust (overthrow)
-  if ((rule === 'double' || rule === 'master') && nextRemaining === 1) return false; // Rest 1 ist nicht checkoutbar
-  if (nextRemaining === 0) {
-    // Checkout attempt – validate the finishing dart
-    if (rule === 'single') return true; // any dart can finish
-    if (rule === 'double') {
-      // Prefer the real segment; point-only requests use valid dart values.
-      const normalizedSegment = String(segment || '').toUpperCase();
-      return segment ? (/^D(?:[1-9]|1[0-9]|20)$/.test(normalizedSegment) || normalizedSegment === 'DBULL') : isDoublePoints(points);
-    }
-    if (rule === 'master') {
-      const normalizedSegment = String(segment || '').toUpperCase();
-      return segment
-        ? (/^[DT](?:[1-9]|1[0-9]|20)$/.test(normalizedSegment) || normalizedSegment === 'DBULL')
-        : isMasterPoints(points);
-    }
-    return true;
-  }
-  return true; // not a checkout attempt, valid
-}
-
-function isCheckoutFinishSegment(segment, rule = DEFAULT_CHECKOUT_RULE) {
-  const normalized = String(segment || '').toUpperCase();
-  if (rule === 'single') return /^(?:S|D|T)(?:[1-9]|1[0-9]|20)$/.test(normalized) || normalized === 'S25' || normalized === 'DBULL';
-  if (rule === 'master') return /^(?:D|T)(?:[1-9]|1[0-9]|20)$/.test(normalized) || normalized === 'DBULL';
-  return /^D(?:[1-9]|1[0-9]|20)$/.test(normalized) || normalized === 'DBULL';
-}
-
-function isCheckoutAttempt(remaining, segment, rule = DEFAULT_CHECKOUT_RULE) {
-  const rest = Number(remaining);
-  return rest > 0 && rest <= 170 && isCheckoutFinishSegment(segment, rule);
-}
-
-function getCheckoutRuleStats(player, rule) {
-  const safeRule = ['single', 'double', 'master'].includes(rule) ? rule : DEFAULT_CHECKOUT_RULE;
-  if (!player.checkoutByRule || typeof player.checkoutByRule !== 'object') player.checkoutByRule = {};
-  if (!player.checkoutByRule[safeRule]) player.checkoutByRule[safeRule] = { attempts: 0, success: 0, highest: 0 };
-  return player.checkoutByRule[safeRule];
-}
-
-function isDoublePoints(points) {
-  // A double value is an even number where points/2 is a valid dart number (1-20, 25)
-  if (points <= 0 || points > 50) return false;
-  if (points === 50) return true; // bullseye
-  if (points % 2 !== 0) return false;
-  const base = points / 2;
-  return base >= 1 && base <= 20;
-}
-
-function isMasterPoints(points) {
-  // Master out: double OR triple
-  if (isDoublePoints(points)) return true;
-  if (points <= 0 || points > 60) return false;
-  if (points % 3 !== 0) return false;
-  const base = points / 3;
-  return base >= 1 && base <= 20;
-}
-
-function defaultPlayerCricketState(mode) {
-  const nums = getCricketNumbersForMode(mode);
-  if (!nums) return {};
-  const hits = {};
-  nums.forEach(n => { hits[n] = 0; });
-  return { cricketHits: hits, cricketClosed: {}, cricketPoints: 0 };
-}
-
-// ── Cricket Scoring ──────────────────────────────────
-function calculateCricketPoints(player, allPlayers) {
-  return Number(player.cricketPoints ?? player.totalScored ?? 0);
-}
-
-function applyCricketHit(player, allPlayers, number, hitCount) {
-  if (!player.cricketHits) player.cricketHits = {};
-  if (!player.cricketClosed) player.cricketClosed = {};
-
-  const oldHits = Number(player.cricketHits[number] || 0);
-  const newHits = oldHits + hitCount;
-  const opponentHasClosed = allPlayers.some(opponent =>
-    opponent.slot !== player.slot && opponent.cricketClosed && opponent.cricketClosed[number]
-  );
-
-  player.cricketHits[number] = newHits;
-  if (newHits >= 3) player.cricketClosed[number] = true;
-
-  const newlyScoringHits = opponentHasClosed
-    ? 0
-    : Math.max(0, newHits - 3) - Math.max(0, oldHits - 3);
-  const awardedPoints = newlyScoringHits * number;
-  player.cricketPoints = Number(player.cricketPoints ?? player.totalScored ?? 0) + awardedPoints;
-  player.totalScored = player.cricketPoints;
-  return awardedPoints;
-}
-
-function checkCricketWin(player, allPlayers) {
-  if (!player.cricketClosed) return false;
-  
-  // ALLE 7 Zahlen (15-20, 25) müssen geschlossen sein
-  const requiredNumbers = [15, 16, 17, 18, 19, 20, 25];
-  const allClosed = requiredNumbers.every(n => player.cricketClosed[n] === true);
-  if (!allClosed) return false;
-  
-  // Punkte berechnen
-  const myPoints = calculateCricketPoints(player, allPlayers);
-  
-  // Prüfen ob Gegner mehr Punkte haben (auch wenn sie noch nicht alle Zahlen geschlossen haben)
-  for (const opp of allPlayers) {
-    if (opp.slot === player.slot) continue;
-    const oppPoints = calculateCricketPoints(opp, allPlayers);
-    if (oppPoints > myPoints) return false;
-  }
-  
-  return true;
-}
-
-// ── Elimination Scoring ──────────────────────────────────
-function calculateEliminationPoints(player) {
-  return Math.max(0, Number(player.totalScored || 0));
-}
-
-function checkEliminationWin(state) {
-  const modeDef = GAME_MODES[state.game.mode];
-  if (!modeDef || modeDef.type !== 'elimination') return false;
-
-  const targetScore = Number(modeDef.targetScore || 301);
-  if (state.players.some(player => calculateEliminationPoints(player) >= targetScore)) return true;
-
-  // Nach dem dritten Wurf des letzten Spielers ist die zehnte Aufnahme komplett.
-  const lastPlayerIndex = Math.max(0, state.players.length - 1);
-  return Number(state.game.throwRound || 0) >= 10
-    && Number(state.game.currentThrow || 0) >= 3
-    && Number(state.game.activePlayer || 0) === lastPlayerIndex;
-}
-
-function getEliminationWinner(state) {
-  // Gewinner ist der erste Spieler bei 301, sonst der Punktbeste nach 10 Aufnahmen.
-  let winner = null;
-  let maxPoints = -1;
-  for (const player of state.players) {
-    const points = calculateEliminationPoints(player);
-    if (points > maxPoints) {
-      maxPoints = points;
-      winner = player;
-    }
-  }
-  return winner;
-}
-
-function applyEliminationThrow(state, player, value) {
-  const modeDef = GAME_MODES[state.game.mode] || GAME_MODES.elimination;
-  const targetScore = Number(modeDef.targetScore || 301);
-  const previousTurnPoints = Array.isArray(player.currentRoundPoints)
-    ? player.currentRoundPoints.reduce((sum, points) => sum + (Number(points) || 0), 0)
-    : 0;
-  const nextScore = calculateEliminationPoints(player) + value;
-
-  if (nextScore > targetScore) {
-    // Ein Überwurf macht die komplette laufende Aufnahme ungültig.
-    player.totalScored = Math.max(0, nextScore - previousTurnPoints - value);
-    return { bust: true, eliminationAction: null };
-  }
-
-  player.totalScored = nextScore;
-  const eliminated = applyEliminationHit(state, player, value);
-  return {
-    bust: false,
-    eliminationAction: eliminated ? state.lastAction : null
-  };
-}
-
-function applyEliminationHit(state, player, value) {
-  // Fix: Vergleiche den AKTUELLEN Punktestand des werfenden Spielers
-  // (nachdem der Wurf addiert wurde) mit allen anderen Spielern
-  const currentPlayerScore = calculateEliminationPoints(player);
-  
-  for (const other of state.players) {
-    if (other.slot === player.slot) continue;
-    const otherPoints = calculateEliminationPoints(other);
-    
-    // Elimination: Punktestand des anderen Spielers entspricht MEINEM aktuellen Score
-    if (otherPoints === currentPlayerScore) {
-      // Nur eliminieren wenn der andere NICHT bereits bei 0 ist
-      // (verhindert "Selbst-Elimination" durch Startwert 0)
-      if (otherPoints === 0 && currentPlayerScore === 0) continue;
-      
-      // ELIMINATION! Anderen Spieler auf 0 zurücksetzen
-      other.totalScored = 0;
-      other.throws = other.throws || [];
-      other.throws.push({
-        points: 0,
-        remaining: 0,
-        bust: false,
-        eliminated: true,
-        eliminatedBy: player.slot,
-        ts: Date.now(),
-        source: 'elimination'
-      });
-      state.lastAction = {
-        type: 'elimination',
-        source: 'elimination',
-        playerIndex: state.players.indexOf(other),
-        playerSlot: other.slot,
-        player: other.name,
-        eliminatedBy: player.name,
-        eliminatedBySlot: player.slot,
-        points: value,
-        ts: Date.now()
-      };
-      return true;
-    }
-  }
-  return false;
-}
 
 const dataStore = new DataStore();
 
@@ -3178,46 +2979,8 @@ app.get('/api/duel-stats', async (req, res) => {
   if (!['active', 'finished', 'canceled'].includes(status)) return res.status(400).json({ error: 'status muss active, finished oder canceled sein.' });
   try {
     const duels = await dataStore.listDuels(100, status);
-    const wanted = slots.join('-');
-    const matching = duels.filter(duel => {
-      if (category !== 'all' && duel.category !== category) return false;
-      const participantSlots = (duel.players || []).map(player => Number(player.player_slot)).sort((a, b) => a - b);
-      const key = participantSlots.join('-');
-      if (!slots.length) return true;
-      return exactGroup ? key === wanted : slots.every(slot => participantSlots.includes(slot));
-    });
-    const aggregate = new Map();
-    let totalLegs = 0;
-    for (const duel of matching) {
-      for (const leg of duel.legs || []) {
-        totalLegs += 1;
-        for (const player of leg.players || []) {
-          if (slots.length && !slots.includes(Number(player.player_slot))) continue;
-          const key = Number(player.player_slot);
-          const current = aggregate.get(key) || { slot: key, name: player.player_name, legs: 0, wins: 0, darts: 0, scored: 0, average: 0, bestTurn: 0, bestLeg: null, highestCheckout: 0, count60plus: 0, count80plus: 0, count100plus: 0, count140plus: 0, count180: 0, checkoutAttempts: 0, checkoutSuccess: 0, busts: 0 };
-          current.legs += 1;
-          current.wins += Number(player.won || 0);
-          current.darts += Number(player.darts || 0);
-          current.scored += Number(player.scored || 0);
-          current.bestTurn = Math.max(current.bestTurn, Number(player.best_turn || 0));
-          current.count60plus += Number(player.count_60plus || 0);
-          current.count80plus += Number(player.count_80plus || 0);
-          current.highestCheckout = Math.max(current.highestCheckout, Number(player.checkout_highest || 0));
-          if (Number(player.won || 0) && Number(player.darts || 0) > 0) {
-            current.bestLeg = current.bestLeg === null ? Number(player.darts) : Math.min(current.bestLeg, Number(player.darts));
-          }
-          current.count100plus += Number(player.count_100plus || 0);
-          current.count140plus += Number(player.count_140plus || 0);
-          current.count180 += Number(player.count_180 || 0);
-          current.checkoutAttempts += Number(player.checkout_attempts || 0);
-          current.checkoutSuccess += Number(player.checkout_success || 0);
-          current.busts += Number(player.busts || 0);
-          current.average = current.darts > 0 ? roundAverage(current.scored / current.darts * 3) : 0;
-          aggregate.set(key, current);
-        }
-      }
-    }
-    res.json({ category, playerSlots: slots, exactGroup, duels: matching.length, legs: totalLegs, players: Array.from(aggregate.values()) });
+    const payload = aggregateDuelStats({ duels, slots, category, exactGroup });
+    res.json(payload);
   } catch (err) { res.status(500).json({ error: 'Duellstatistik konnte nicht geladen werden: ' + err.message }); }
 });
 
