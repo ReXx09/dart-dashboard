@@ -459,6 +459,7 @@
           <div><h2>Top 3 pro Kennzahl</h2><p id="overviewStatus">Gesamtwerte aus dem aktiven Statistik-Tracking</p></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
             <select id="overviewMode" aria-label="Spielmodus für Übersicht"><option value="gesamt">Gesamt</option></select>
+            <select id="overviewCategory" aria-label="Kategorie für Übersicht"><option value="all">Alle Kategorien</option></select>
             <select id="overviewPlayer" aria-label="Spieler für Übersicht"><option value="all">Alle Spieler</option></select>
           </div>
         </div>
@@ -566,6 +567,7 @@
     let selectedScoreCategory = 'all';
     let overviewData = null;
     let selectedOverviewPlayer = 'all';
+    let selectedOverviewCategory = 'all';
     let encounters = [];
     let encounterDetail = null;
     let encounterDetailView = 'duel';
@@ -608,9 +610,9 @@
 
     const METRICS = [
       ['count180', '180er', '#e63946', value => value],
-      ['checkoutRateSingle', 'Single-Out-Quote', '#f4a261', value => value + '%'],
-      ['checkoutRateDouble', 'Double-Out-Quote', '#ff7f51', value => value + '%'],
-      ['checkoutRateMaster', 'Master-Out-Quote', '#e9c46a', value => value + '%'],
+      ['checkoutRateSingle', 'Single-Out-Quote', '#f4a261', value => value === null ? '-' : value + '%'],
+      ['checkoutRateDouble', 'Double-Out-Quote', '#ff7f51', value => value === null ? '-' : value + '%'],
+      ['checkoutRateMaster', 'Master-Out-Quote', '#e9c46a', value => value === null ? '-' : value + '%'],
       ['threeDartAverage', '3-Dart-Average', '#2a9d8f', value => Number(value).toFixed(1)],
       ['firstNineAverage', 'Erster-9-AVG', '#e76f51', value => Number(value).toFixed(1)],
       ['highestCheckout', 'Höchster Checkout', '#9b5de5', value => value],
@@ -659,7 +661,8 @@
       if (!metrics) { grid.innerHTML = '<div class="metric-empty">Noch keine Statistikdaten vorhanden.</div>'; return; }
       grid.innerHTML = METRICS.map(([key, title, accent, format]) => {
         const rows = (metrics[key] || [])
-          .filter(item => item.mode === mode || mode === 'gesamt')
+          .filter(item => mode === 'gesamt' ? item.mode === 'gesamt' : item.mode === mode)
+          .filter(item => selectedOverviewCategory === 'all' ? (mode === 'gesamt' ? item.category === 'all' : true) : item.category === selectedOverviewCategory)
           .filter(item => selectedOverviewPlayer === 'all' || String(item.profileId) === selectedOverviewPlayer)
           .slice(0, 3);
         return '<article class="metric-card" style="--accent:' + accent + '"><h3>' + title + '</h3><ol class="metric-list">' +
@@ -674,7 +677,12 @@
         if (!response.ok) throw new Error('HTTP ' + response.status);
         overviewData = await response.json();
         const modeSelect = document.getElementById('overviewMode');
-        modeSelect.innerHTML = (overviewData.modes || ['gesamt']).map(mode => '<option value="' + escapeHtml(mode) + '">' + escapeHtml(mode) + '</option>').join('');
+        modeSelect.innerHTML = (overviewData.modes || ['gesamt']).map(mode => '<option value="' + escapeHtml(mode) + '">' + escapeHtml(mode === 'gesamt' ? 'Gesamt' : mode) + '</option>').join('');
+        const categoryLabels = { all: 'Alle Kategorien', single: 'Einzelspiele', duel: 'Duelle', group: 'Begegnungen', tournament: 'Turniere' };
+        const categorySelect = document.getElementById('overviewCategory');
+        categorySelect.innerHTML = (overviewData.categories || ['all']).map(category => '<option value="' + escapeHtml(category) + '">' + escapeHtml(categoryLabels[category] || category) + '</option>').join('');
+        if ([...categorySelect.options].some(option => option.value === selectedOverviewCategory)) categorySelect.value = selectedOverviewCategory;
+        else selectedOverviewCategory = 'all';
         const playerSelect = document.getElementById('overviewPlayer');
         const playerNames = new Map();
         (overviewData.players || []).forEach(item => {
@@ -688,7 +696,7 @@
           .map(([id, name]) => '<option value="' + escapeHtml(id) + '">' + escapeHtml(name) + '</option>').join('');
         if ([...playerNames.keys()].includes(selectedOverviewPlayer)) playerSelect.value = selectedOverviewPlayer;
         else selectedOverviewPlayer = 'all';
-        document.getElementById('overviewStatus').textContent = overviewData.modes && overviewData.modes.length > 1 ? 'Nach Spielmodus getrennt' : 'Gesamtwerte; Modus-Tracking folgt mit der Detailstatistik';
+        document.getElementById('overviewStatus').textContent = overviewData.modes && overviewData.modes.length > 1 ? 'Nach Spielmodus und Begegnungskategorie getrennt' : 'Gesamtwerte aus dem aktiven Statistik-Tracking';
         renderOverview();
       } catch (err) {
         document.getElementById('overviewStatus').textContent = 'Übersicht konnte nicht geladen werden';
@@ -1040,6 +1048,10 @@
       render();
     });
     document.getElementById('overviewMode').addEventListener('change', renderOverview);
+    document.getElementById('overviewCategory').addEventListener('change', event => {
+      selectedOverviewCategory = event.target.value;
+      renderOverview();
+    });
     document.getElementById('overviewPlayer').addEventListener('change', event => {
       selectedOverviewPlayer = event.target.value;
       renderOverview();

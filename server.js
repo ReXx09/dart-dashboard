@@ -3527,6 +3527,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
         profileId: Number(player.slot),
         player: player.name,
         mode: 'gesamt',
+        category: 'all',
         count180: Number(stats.count_180 || 0),
         threeDartAverage: darts > 0 ? Number((totalScored / darts * 3).toFixed(1)) : 0,
         firstNineAverage: Number(stats.avg_first9 || 0),
@@ -3541,15 +3542,76 @@ app.get('/api/highscores/overview', async (_req, res) => {
         trackingSince: stats.updated_at ? Number(stats.updated_at) : null
       });
     }
-    const ranked = (field, predicate = value => value > 0) => entries
+
+    const grouped = new Map();
+    const duels = await dataStore.listDuels(100, 'finished');
+    for (const duel of duels) {
+      const category = ['single', 'duel', 'group', 'tournament'].includes(String(duel.category || '')) ? duel.category : 'duel';
+      const mode = String(duel.mode || '501');
+      for (const player of duel.players || []) {
+        const slot = Number(player.player_slot);
+        const key = category + ':' + mode + ':' + slot;
+        if (!grouped.has(key)) grouped.set(key, {
+          profileId: slot,
+          player: player.player_name,
+          mode,
+          category,
+          count180: 0,
+          darts: 0,
+          totalScored: 0,
+          firstNineTotal: 0,
+          firstNineCount: 0,
+          checkoutAttempts: 0,
+          checkoutSuccess: 0,
+          highestCheckout: 0,
+          gamesPlayed: 0,
+          gamesWon: 0,
+          legsWon: 0
+        });
+        const entry = grouped.get(key);
+        entry.gamesPlayed += 1;
+        if (Number(duel.winner_slot) === slot) entry.gamesWon += 1;
+        for (const leg of duel.legs || []) {
+          const legPlayer = (leg.players || []).find(item => Number(item.player_slot) === slot);
+          if (!legPlayer) continue;
+          entry.legsWon += Number(legPlayer.won || 0);
+          entry.darts += Number(legPlayer.darts || 0);
+          entry.totalScored += Number(legPlayer.scored || 0);
+          entry.count180 += Number(legPlayer.count_180 || 0);
+          entry.checkoutAttempts += Number(legPlayer.checkout_attempts || 0);
+          entry.checkoutSuccess += Number(legPlayer.checkout_success || 0);
+          entry.highestCheckout = Math.max(entry.highestCheckout, Number(legPlayer.checkout_highest || 0));
+          if (Number(legPlayer.first_nine_avg || 0) > 0) {
+            entry.firstNineTotal += Number(legPlayer.first_nine_avg);
+            entry.firstNineCount += 1;
+          }
+        }
+      }
+    }
+    const groupedEntries = Array.from(grouped.values()).map(entry => ({
+      ...entry,
+      threeDartAverage: entry.darts > 0 ? Number((entry.totalScored / entry.darts * 3).toFixed(1)) : 0,
+      firstNineAverage: entry.firstNineCount > 0 ? Number((entry.firstNineTotal / entry.firstNineCount).toFixed(1)) : 0,
+      checkoutRate: entry.checkoutAttempts > 0 ? Number((entry.checkoutSuccess / entry.checkoutAttempts * 100).toFixed(1)) : 0,
+      checkoutRateSingle: null,
+      checkoutRateDouble: null,
+      checkoutRateMaster: null,
+      checkoutByRule: null,
+      gamesWon: entry.gamesWon,
+      trackingSince: null
+    }));
+    const overviewEntries = entries.concat(groupedEntries);
+    const ranked = (field, predicate = value => value > 0) => overviewEntries
       .filter(entry => predicate(entry[field], entry))
       .sort((a, b) => b[field] - a[field]);
-    res.json({ trackingMode: 'gesamt', modes: ['gesamt'], players: entries.map(entry => ({ profileId: entry.profileId, player: entry.player })), metrics: {
+    const modes = ['gesamt', ...new Set(groupedEntries.map(entry => entry.mode))];
+    const categories = ['all', ...new Set(groupedEntries.map(entry => entry.category))];
+    res.json({ trackingMode: 'gesamt', modes, categories, players: entries.map(entry => ({ profileId: entry.profileId, player: entry.player })), metrics: {
       count180: ranked('count180'),
       checkoutRate: ranked('checkoutRate', (_value, entry) => entry.checkoutAttempts > 0),
-      checkoutRateSingle: entries.filter(entry => entry.checkoutByRule.single.attempts > 0).map(entry => ({ ...entry, checkoutRateSingle: entry.checkoutByRule.single.rate })).sort((a, b) => b.checkoutRateSingle - a.checkoutRateSingle),
-      checkoutRateDouble: entries.filter(entry => entry.checkoutByRule.double.attempts > 0).map(entry => ({ ...entry, checkoutRateDouble: entry.checkoutByRule.double.rate })).sort((a, b) => b.checkoutRateDouble - a.checkoutRateDouble),
-      checkoutRateMaster: entries.filter(entry => entry.checkoutByRule.master.attempts > 0).map(entry => ({ ...entry, checkoutRateMaster: entry.checkoutByRule.master.rate })).sort((a, b) => b.checkoutRateMaster - a.checkoutRateMaster),
+      checkoutRateSingle: overviewEntries.filter(entry => entry.checkoutByRule && entry.checkoutByRule.single.attempts > 0).map(entry => ({ ...entry, checkoutRateSingle: entry.checkoutByRule.single.rate })).sort((a, b) => b.checkoutRateSingle - a.checkoutRateSingle),
+      checkoutRateDouble: overviewEntries.filter(entry => entry.checkoutByRule && entry.checkoutByRule.double.attempts > 0).map(entry => ({ ...entry, checkoutRateDouble: entry.checkoutByRule.double.rate })).sort((a, b) => b.checkoutRateDouble - a.checkoutRateDouble),
+      checkoutRateMaster: overviewEntries.filter(entry => entry.checkoutByRule && entry.checkoutByRule.master.attempts > 0).map(entry => ({ ...entry, checkoutRateMaster: entry.checkoutByRule.master.rate })).sort((a, b) => b.checkoutRateMaster - a.checkoutRateMaster),
       threeDartAverage: ranked('threeDartAverage'),
       firstNineAverage: ranked('firstNineAverage'),
       highestCheckout: ranked('highestCheckout'),

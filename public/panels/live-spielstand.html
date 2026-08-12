@@ -564,6 +564,52 @@
       padding-bottom: 12px;
       border-bottom: 1px solid #333;
     }
+    .action-confirm-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 11000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(4, 7, 9, .78);
+      backdrop-filter: blur(5px);
+    }
+    .action-confirm-overlay.show { display: flex; }
+    .action-confirm-card {
+      width: min(440px, 100%);
+      padding: 24px;
+      background: #171b1e;
+      border: 1px solid #49545b;
+      border-top: 3px solid #f4c542;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+      animation: confirm-card-in .18s ease-out;
+    }
+    @keyframes confirm-card-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .action-confirm-icon { color: #f4c542; font-size: 1.5rem; line-height: 1; margin-bottom: 14px; }
+    .action-confirm-card h2 { color: #fff; font-size: 1.25rem; margin-bottom: 8px; }
+    .action-confirm-card p { color: #b9c2c7; font-size: .92rem; line-height: 1.5; }
+    .action-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+    .action-confirm-actions button {
+      min-height: 42px;
+      padding: 9px 16px;
+      border: 1px solid #536068;
+      border-radius: 8px;
+      background: #22292d;
+      color: #f1f1f1;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
+    .action-confirm-actions button:hover { border-color: #d7e0e5; background: #2d363b; }
+    .action-confirm-actions .confirm-primary { border-color: #f4c542; background: #f4c542; color: #17120a; }
+    .action-confirm-actions .confirm-primary:hover { border-color: #ffe27a; background: #ffe27a; }
+    @media (max-width: 480px) {
+      .action-confirm-card { padding: 20px; }
+      .action-confirm-actions { flex-direction: column-reverse; }
+      .action-confirm-actions button { width: 100%; }
+    }
     .modal-options {
       display: grid;
       gap: 8px;
@@ -1227,6 +1273,17 @@
   <div class="winner-overlay" id="winnerOverlay"></div>
   <div class="duel-stats-overlay" id="duelStatsOverlay"></div>
   <div class="leg-start-overlay" id="legStartOverlay" role="dialog" aria-modal="true" aria-labelledby="legStartTitle"></div>
+  <div class="action-confirm-overlay" id="actionConfirmOverlay" role="dialog" aria-modal="true" aria-labelledby="actionConfirmTitle" aria-describedby="actionConfirmMessage">
+    <div class="action-confirm-card">
+      <div class="action-confirm-icon" aria-hidden="true">!</div>
+      <h2 id="actionConfirmTitle">Aktion bestätigen</h2>
+      <p id="actionConfirmMessage"></p>
+      <div class="action-confirm-actions">
+        <button type="button" id="actionConfirmCancel">Abbrechen</button>
+        <button type="button" class="confirm-primary" id="actionConfirmAccept">Bestätigen</button>
+      </div>
+    </div>
+  </div>
   <div class="match-menu-overlay" id="matchMenuOverlay" role="dialog" aria-modal="true" aria-labelledby="matchMenuTitle">
     <div class="match-menu-card">
       <h3 id="matchMenuTitle">Begegnung starten</h3>
@@ -1333,6 +1390,40 @@
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escapeAttr(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+    function confirmAction({ title, message, acceptLabel = 'Bestätigen' }) {
+      const overlay = document.getElementById('actionConfirmOverlay');
+      const titleElement = document.getElementById('actionConfirmTitle');
+      const messageElement = document.getElementById('actionConfirmMessage');
+      const acceptButton = document.getElementById('actionConfirmAccept');
+      const cancelButton = document.getElementById('actionConfirmCancel');
+      if (!overlay || !titleElement || !messageElement || !acceptButton || !cancelButton) return Promise.resolve(false);
+
+      titleElement.textContent = title;
+      messageElement.textContent = message;
+      acceptButton.textContent = acceptLabel;
+      overlay.classList.add('show');
+
+      return new Promise(resolve => {
+        const finish = accepted => {
+          overlay.classList.remove('show');
+          acceptButton.removeEventListener('click', accept);
+          cancelButton.removeEventListener('click', cancel);
+          overlay.removeEventListener('click', backdropCancel);
+          document.removeEventListener('keydown', escapeCancel);
+          resolve(accepted);
+        };
+        const accept = () => finish(true);
+        const cancel = () => finish(false);
+        const backdropCancel = event => { if (event.target === overlay) cancel(); };
+        const escapeCancel = event => { if (event.key === 'Escape') cancel(); };
+        acceptButton.addEventListener('click', accept);
+        cancelButton.addEventListener('click', cancel);
+        overlay.addEventListener('click', backdropCancel);
+        document.addEventListener('keydown', escapeCancel);
+        acceptButton.focus();
+      });
+    }
+
     function getPointsPerAufnahme(player) {
       const currentRound = Array.isArray(player && player.currentRoundPoints) ? player.currentRoundPoints : [];
       if (currentRound.length > 0) {
@@ -1376,7 +1467,11 @@
 
     function openMatchMenu() {
       if (hasActiveMatch(liveState)) {
-        if (confirm('Die laufende Begegnung wirklich abbrechen? Die bisherige Begegnung bleibt in der Statistik erhalten.')) abortActiveMatch();
+        confirmAction({
+          title: 'Begegnung abbrechen?',
+          message: 'Die laufende Begegnung wird beendet. Die bisherige Begegnung bleibt in der Statistik erhalten.',
+          acceptLabel: 'Begegnung abbrechen'
+        }).then(accepted => { if (accepted) abortActiveMatch(); });
         return;
       }
       const modeSelect = document.getElementById('matchMode');
@@ -1420,7 +1515,7 @@
 
     function getMatchActionPresentation(state) {
       const game = state && state.game ? state.game : {};
-      const isSingleGame = Number(game.duelId || 0) <= 0;
+      const isSingleGame = String(game.matchType || '') === 'single' || Number(game.duelId || 0) <= 0;
       const matchType = String(game.matchType || 'direct');
       if (isSingleGame) return { label: 'Einzelspiel läuft', title: 'Laufendes Einzelspiel', className: 'match-kind-single' };
       if (matchType === 'tournament') return { label: 'Turnier läuft', title: 'Laufende Turnierbegegnung', className: 'match-kind-tournament' };
@@ -2760,7 +2855,12 @@
     // ── Letzten Wurf zurücksetzen ──
     async function undoLastThrow() {
       const btn = document.getElementById('focusUndoBtn');
-      if (!window.confirm('Den letzten Wurf wirklich zurücksetzen?')) return;
+      const accepted = await confirmAction({
+        title: 'Letzten Wurf zurücksetzen?',
+        message: 'Der zuletzt gespeicherte Wurf wird aus dem laufenden Spiel entfernt.',
+        acceptLabel: 'Wurf zurücksetzen'
+      });
+      if (!accepted) return;
       if (btn) btn.disabled = true;
       try {
         const r = await fetch('/api/live/undo', { method: 'POST' });
