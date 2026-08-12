@@ -1686,14 +1686,15 @@
       if (duelStatsLegIndex >= legs.length) duelStatsLegIndex = -1;
       const selectedLegs = duelStatsLegIndex >= 0 ? [legs[duelStatsLegIndex]] : legs;
       const stats = aggregateDuelStats(duel, selectedLegs);
-      if (stats.length < 2) return;
+      if (stats.length < 1) return;
       const winner = Array.isArray(state.players)
         ? state.players.find(player => Number(player.slot) === Number(state.lastAction && state.lastAction.winnerSlot))
         : null;
       const matchComplete = isMatchComplete(state, winner);
       const legsToWin = Math.max(1, Number(state.game && state.game.legsToWin || 1));
+      const isSingleGame = String(state.game && state.game.matchType || '') === 'single';
       const progressText = matchComplete
-        ? 'Begegnung beendet · Sieger: ' + escapeHtml(winner ? winner.name : 'unbekannt')
+        ? (isSingleGame ? 'Solospiel beendet' : 'Begegnung beendet · Sieger: ' + escapeHtml(winner ? winner.name : 'unbekannt'))
         : 'Leg beendet · Stand ' + stats.map(item => item.wins).join(' : ') + ' · nächster Schritt: Nächstes Leg starten';
       const viewLabel = duelStatsLegIndex < 0 ? 'Alle Legs' : 'Leg ' + Number(legs[duelStatsLegIndex].leg_number || duelStatsLegIndex + 1);
       const legNavigation = '<div class="duel-leg-nav"><button type="button" onclick="changeDuelStatsLeg(-1)" ' + (duelStatsLegIndex < 0 ? 'disabled' : '') + '>‹ Zurück</button><strong>' + viewLabel + '</strong><button type="button" onclick="changeDuelStatsLeg(1)" ' + (duelStatsLegIndex >= legs.length - 1 ? 'disabled' : '') + '>Vor ›</button></div>';
@@ -1714,7 +1715,7 @@
         ['180', item => item.count180]
       ];
       const gridColumns = 'minmax(110px, 1fr) ' + stats.map(() => 'minmax(105px, 1fr)').join(' ');
-      overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">Begegnung · ' + escapeHtml(duel.id) + '</div>' +
+      overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">' + (isSingleGame ? 'Solospiel' : 'Begegnung') + ' · ' + escapeHtml(duel.id) + '</div>' +
         '<div class="duel-stats-score">' + escapeHtml(state.game.mode || '501') + ' · ' + stats.map(item => item.wins).join(' : ') + '</div>' +
         '<div class="duel-stats-progress">Best of ' + (legsToWin * 2 - 1) + ' · ' + progressText + '</div>' +
         legNavigation +
