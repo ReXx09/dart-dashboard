@@ -26,6 +26,8 @@
     .logo { font-size: 2rem; }
     .header-text h1 { font-size: 1.35rem; font-weight: 700; }
     .header-text p { font-size: .78rem; color: #666; margin-top: 2px; }
+    .header-back { color: #888; text-decoration: none; font-size: .85rem; }
+    .header-back:hover { color: #fff; }
     .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
     #clock { font-size: 1.15rem; font-weight: 600; color: #e63946; font-variant-numeric: tabular-nums; text-align: right; }
     main {
@@ -355,6 +357,7 @@
 </head>
 <body>
   <header>
+    <a href="/" class="header-back">← Zurück</a>
     <span class="logo">🏆</span>
     <div class="header-text">
       <h1>Highscores</h1>
@@ -364,7 +367,6 @@
       <div>
         <div id="clock">--:--:--</div>
       </div>
-      <a href="/" class="btn" style="padding:8px 12px;font-size:.75rem">← Zurück</a>
     </div>
   </header>
 
@@ -482,7 +484,7 @@
           <div><h2>Begegnungs-Highscores</h2><p>Bestwerte aus 2-Player-Duellen und Gruppen mit 3–8 Spielern</p></div>
         </div>
         <nav class="encounter-nav" aria-label="Highscore-Kategorien">
-          <button type="button" data-encounter-category="single" onclick="setScoreCategory('single')">Einzel</button>
+          <button type="button" data-encounter-category="single" onclick="setEncounterCategory('single')">Einzel</button>
           <button type="button" data-encounter-category="duel" class="active" onclick="setEncounterCategory('duel')">Duelle</button>
           <button type="button" data-encounter-category="group" onclick="setEncounterCategory('group')">Begegnungen</button>
           <button type="button" data-encounter-category="tournament" onclick="setEncounterCategory('tournament')">Turniere</button>

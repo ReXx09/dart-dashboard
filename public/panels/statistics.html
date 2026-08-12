@@ -26,6 +26,8 @@
     .logo { font-size: 2rem; }
     .header-text h1 { font-size: 1.35rem; font-weight: 700; }
     .header-text p { font-size: .78rem; color: #666; margin-top: 2px; }
+    .header-back { color: #888; text-decoration: none; font-size: .85rem; }
+    .header-back:hover { color: #fff; }
     .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
     #clock { font-size: 1.15rem; font-weight: 600; color: #e63946; font-variant-numeric: tabular-nums; text-align: right; }
     main {
@@ -353,6 +355,7 @@
 </head>
 <body>
   <header>
+    <a href="/" class="header-back">← Zurück</a>
     <span class="logo">📊</span>
     <div class="header-text">
       <h1>Statistiken</h1>
@@ -360,7 +363,6 @@
     </div>
     <div class="header-right">
       <div id="clock">--:--:--</div>
-      <a href="/" class="btn" style="padding:8px 12px;font-size:.75rem">← Zurück</a>
     </div>
   </header>
   <main>
