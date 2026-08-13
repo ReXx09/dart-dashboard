@@ -36,8 +36,9 @@
     .topbar-info { min-width: auto; font-size: 1.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
     .topbar-mode, .topbar-checkout { text-align: center; }
     .topbar-separator { color: #d7e0e5; font-size: 1.55rem; font-weight: 400; line-height: .7; }
-    .topbar .fs-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
-    .topbar .fs-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
+    .topbar .fs-btn, .topbar .audio-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
+    .topbar .fs-btn:hover, .topbar .audio-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
+    .topbar .audio-btn.active { border-color: #2a9d8f; color: #7ac29a; }
     .daily-hs {
       font-size: .72rem;
       color: #f4a261;
@@ -678,6 +679,7 @@
       <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
     </div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
+    <button class="audio-btn" id="audioUnlockBtn" onclick="unlockMobileAudio()" title="Ton auf diesem Gerät aktivieren">🔊 Ton</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
   <main>
@@ -749,24 +751,37 @@
 
     function playConfiguredEventSoundValue(fileName, volume, fallback) {
       const soundPath = /[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg';
-      const audio = new Audio('/sounds/' + soundPath.split('/').map(encodeURIComponent).join('/'));
-      audio.volume = Number.isFinite(Number(volume)) ? Number(volume) : 0.3;
+      const soundUrl = '/sounds/' + soundPath.split('/').map(encodeURIComponent).join('/');
+      const level = Number.isFinite(Number(volume)) ? Number(volume) : 0.3;
+      if (mobileAudioContext && mobileAudioContext.state === 'running') {
+        fetch(soundUrl).then(response => response.arrayBuffer()).then(data => mobileAudioContext.decodeAudioData(data)).then(buffer => {
+          const source = mobileAudioContext.createBufferSource();
+          const gain = mobileAudioContext.createGain();
+          gain.gain.value = level;
+          source.buffer = buffer;
+          source.connect(gain).connect(mobileAudioContext.destination);
+          source.start();
+        }).catch(() => fallback());
+        return;
+      }
+      const audio = new Audio(soundUrl);
+      audio.volume = level;
       audio.play().catch(() => fallback());
     }
 
     let mobileAudioUnlocked = false;
+    let mobileAudioContext = null;
     function unlockMobileAudio() {
-      if (mobileAudioUnlocked) return;
-      mobileAudioUnlocked = true;
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
-          const context = new AudioContextClass();
-          context.resume().finally(() => context.close().catch(() => {}));
+          if (!mobileAudioContext) mobileAudioContext = new AudioContextClass();
+          mobileAudioContext.resume().then(() => {
+            mobileAudioUnlocked = true;
+            const button = document.getElementById('audioUnlockBtn');
+            if (button) { button.textContent = '🔊 Ton aktiv'; button.classList.add('active'); }
+          }).catch(() => {});
         }
-        const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAA');
-        silentAudio.muted = true;
-        silentAudio.play().catch(() => {});
       } catch (_) {}
     }
     ['pointerdown', 'touchstart', 'click'].forEach(eventName => {
