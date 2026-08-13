@@ -709,6 +709,18 @@
       return !config || (isEventEnabled(eventKey) && config.sound === eventKey);
     }
 
+    function playTripleEventSound(lastThrow) {
+      const segment = String(lastThrow && lastThrow.segment || '').toUpperCase();
+      if (!/^T\d+$/.test(segment)) return;
+      const specificKey = ['T20', 'T19', 'T18', 'T17'].includes(segment) ? segment.toLowerCase() : null;
+      const specificConfig = specificKey && eventEffects && eventEffects[specificKey];
+      const eventKey = specificConfig && specificConfig.sound !== 'none' ? specificKey : 'triple';
+      const soundKey = [lastThrow.ts, lastThrow.playerSlot, segment, eventKey].join(':');
+      if (soundKey === lastEventSoundKey || !isEventEnabled(eventKey)) return;
+      lastEventSoundKey = soundKey;
+      playConfiguredEventSound(eventKey, () => {});
+    }
+
     function playConfiguredEventSound(eventKey, fallback) {
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
@@ -1078,6 +1090,7 @@
       } else {
         hideEliminationOverlay();
       }
+      playTripleEventSound(lastThrow);
 
       const isCricket = mode === 'cricket';
       const isElimination = mode === 'elimination';

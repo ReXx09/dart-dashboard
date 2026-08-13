@@ -754,8 +754,10 @@
         const result = await fetch('/api/sounds/available').then(r => r.json());
         const folderChoices = (Array.isArray(result.folders) ? result.folders : [])
           .map(folder => ['random-folder:' + folder, randomFolderLabel(folder)]);
+        const fileChoices = (Array.isArray(result.sounds) ? result.sounds : [])
+          .map(fileName => ['file:' + fileName, 'Datei: ' + fileName]);
         const existingValues = new Set(EVENT_EFFECT_CHOICES.sounds.map(([value]) => value));
-        EVENT_EFFECT_CHOICES.sounds.push(...folderChoices.filter(([value]) => !existingValues.has(value)));
+        EVENT_EFFECT_CHOICES.sounds.push(...folderChoices.concat(fileChoices).filter(([value]) => !existingValues.has(value)));
       } catch (_) {
         showToast('Sound-Verzeichnis konnte nicht geladen werden');
       }
