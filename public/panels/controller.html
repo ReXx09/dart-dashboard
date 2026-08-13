@@ -233,8 +233,8 @@
     .event-preview-effect.confetti-preview { background: transparent; animation: none; }
     .event-preview-effect.confetti-preview .confetti { position: absolute; width: 10px; height: 10px; top: -10px; animation: event-preview-confetti-fall 3s linear forwards; }
     .event-preview-effect.fireworks-preview { background: rgba(4,8,20,.92); animation: event-preview-in 3.2s ease-out forwards; overflow: hidden; }
-    .firework-burst { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #f4c542; box-shadow: 0 0 12px 4px #f4c542; animation: event-preview-firework 1.5s ease-out forwards; }
-    .firework-burst::before { content: ''; position: absolute; inset: -34px; border-radius: 50%; background: repeating-conic-gradient(from 0deg, currentColor 0deg 3deg, transparent 3deg 18deg); -webkit-mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); }
+    .firework-burst { position: absolute; width: var(--burst-size, 8px); height: var(--burst-size, 8px); border-radius: 50%; background: #f4c542; box-shadow: 0 0 12px 4px #f4c542; animation: event-preview-firework var(--burst-duration, 1.5s) ease-out forwards; }
+    .firework-burst::before { content: ''; position: absolute; inset: calc(var(--burst-radius, 34px) * -1); border-radius: 50%; background: repeating-conic-gradient(from var(--burst-rotation, 0deg), currentColor 0deg var(--ray-width, 3deg), transparent var(--ray-width, 3deg) var(--ray-step, 18deg)); -webkit-mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); filter: drop-shadow(0 0 5px currentColor); }
     @keyframes event-preview-firework { 0% { transform: translateY(48vh) scale(.2); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateY(0) scale(1.2); opacity: 0; } }
     @keyframes event-preview-in { 0% { opacity: 0; transform: scale(.86); } 18% { opacity: 1; transform: scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: scale(1.04); } }
     @keyframes event-preview-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-9px); } 75% { transform: translateX(9px); } }
@@ -722,7 +722,13 @@
       } else if (animation === 'fireworks') {
         overlay.className = 'event-preview-effect fireworks-preview';
         const colors = ['#f4c542', '#e63946', '#2a9d8f', '#457b9d', '#f4a261'];
-        overlay.innerHTML = Array.from({ length: 7 }, (_, index) => '<span class="firework-burst" style="left:' + (12 + index * 13) + '%;top:' + (18 + (index % 3) * 18) + 'vh;color:' + colors[index % colors.length] + ';background:' + colors[index % colors.length] + ';box-shadow:0 0 12px 4px ' + colors[index % colors.length] + ';animation-delay:' + (index * .22) + 's"></span>').join('');
+        overlay.innerHTML = Array.from({ length: 9 }, (_, index) => {
+          const color = colors[index % colors.length];
+          const size = 5 + Math.random() * 9;
+          const radius = 24 + Math.random() * 62;
+          const rayStep = 12 + Math.floor(Math.random() * 12) * 2;
+          return '<span class="firework-burst" style="left:' + (6 + index * 11 + Math.random() * 6) + '%;top:' + (12 + (index % 3) * 22 + Math.random() * 8) + 'vh;color:' + color + ';background:' + color + ';box-shadow:0 0 ' + Math.round(radius * .28) + 'px ' + Math.round(size * .7) + 'px ' + color + ';--burst-size:' + size.toFixed(1) + 'px;--burst-radius:' + radius.toFixed(1) + 'px;--ray-step:' + rayStep + 'deg;--ray-width:' + Math.max(2, Math.round(rayStep / 6)) + 'deg;--burst-rotation:' + Math.round(Math.random() * 30) + 'deg;--burst-duration:' + (1.25 + Math.random() * .8).toFixed(2) + 's;animation-delay:' + (index * .16 + Math.random() * .18).toFixed(2) + 's"></span>';
+        }).join('');
       } else {
         overlay.className = 'event-preview-effect ' + animation;
         overlay.style.animationDuration = Math.min(duration, 5000) + 'ms';

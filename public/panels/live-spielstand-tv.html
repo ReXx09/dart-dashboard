@@ -517,8 +517,8 @@
       }
     }
     .fireworks-container { position: fixed; inset: 0; z-index: 10002; pointer-events: none; overflow: hidden; }
-    .fireworks-burst { position: absolute; width: 8px; height: 8px; border-radius: 50%; animation: fireworks-burst 1.5s ease-out forwards; }
-    .fireworks-burst::before { content: ''; position: absolute; inset: -38px; border-radius: 50%; background: repeating-conic-gradient(from 0deg, currentColor 0deg 3deg, transparent 3deg 18deg); -webkit-mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); }
+    .fireworks-burst { position: absolute; width: var(--burst-size, 8px); height: var(--burst-size, 8px); border-radius: 50%; animation: fireworks-burst var(--burst-duration, 1.5s) ease-out forwards; }
+    .fireworks-burst::before { content: ''; position: absolute; inset: calc(var(--burst-radius, 38px) * -1); border-radius: 50%; background: repeating-conic-gradient(from var(--burst-rotation, 0deg), currentColor 0deg var(--ray-width, 3deg), transparent var(--ray-width, 3deg) var(--ray-step, 18deg)); -webkit-mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); filter: drop-shadow(0 0 5px currentColor); }
     @keyframes fireworks-burst { 0% { transform: translateY(48vh) scale(.2); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateY(0) scale(1.2); opacity: 0; } }
     @keyframes bounce {
       0%, 100% { transform: translateY(0); }
@@ -1186,13 +1186,22 @@
       for (let i = 0; i < 9; i++) {
         const burst = document.createElement('div');
         const color = colors[i % colors.length];
+        const size = 5 + Math.random() * 9;
+        const radius = 25 + Math.random() * 62;
+        const rayStep = 12 + Math.floor(Math.random() * 12) * 2;
         burst.className = 'fireworks-burst';
-        burst.style.left = (8 + i * 11) + '%';
-        burst.style.top = (16 + (i % 3) * 20) + 'vh';
+        burst.style.left = (6 + i * 11 + Math.random() * 6) + '%';
+        burst.style.top = (12 + (i % 3) * 22 + Math.random() * 8) + 'vh';
         burst.style.color = color;
         burst.style.background = color;
-        burst.style.boxShadow = '0 0 14px 5px ' + color;
-        burst.style.animationDelay = (i * .18) + 's';
+        burst.style.boxShadow = '0 0 ' + Math.round(radius * .28) + 'px ' + Math.round(size * .7) + 'px ' + color;
+        burst.style.setProperty('--burst-size', size + 'px');
+        burst.style.setProperty('--burst-radius', radius + 'px');
+        burst.style.setProperty('--ray-step', rayStep + 'deg');
+        burst.style.setProperty('--ray-width', Math.max(2, Math.round(rayStep / 6)) + 'deg');
+        burst.style.setProperty('--burst-rotation', Math.round(Math.random() * 30) + 'deg');
+        burst.style.setProperty('--burst-duration', (1.25 + Math.random() * .8).toFixed(2) + 's');
+        burst.style.animationDelay = (i * .16 + Math.random() * .18).toFixed(2) + 's';
         container.appendChild(burst);
       }
       document.body.appendChild(container);
