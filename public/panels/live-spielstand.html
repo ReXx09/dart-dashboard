@@ -1340,6 +1340,18 @@
       playConfiguredEventSound(eventKey, () => {});
     }
 
+    function playBullEventSound(lastThrow) {
+      let segment = String(lastThrow && lastThrow.segment || '').toUpperCase();
+      if (!segment && Number(lastThrow && lastThrow.code) === 125) segment = 'S25';
+      if (!segment && Number(lastThrow && lastThrow.code) === 225) segment = 'DBULL';
+      const eventKey = segment === 'DBULL' ? 'dbull' : ['S25', 'BULL'].includes(segment) ? 'bull' : null;
+      if (!eventKey) return;
+      const soundKey = [lastThrow.ts, lastThrow.playerSlot, segment, eventKey].join(':');
+      if (soundKey === lastEventSoundKey || !isEventEnabled(eventKey)) return;
+      lastEventSoundKey = soundKey;
+      playConfiguredEventSound(eventKey, () => {});
+    }
+
     function playConfiguredEventSound(eventKey, fallback) {
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
@@ -2456,6 +2468,7 @@
         hideEliminationOverlay();
       }
       playTripleEventSound(lastThrow);
+      playBullEventSound(lastThrow);
 
       const isCricket = mode === 'cricket';
       const isElimination = mode === 'elimination';
