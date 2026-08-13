@@ -412,9 +412,6 @@
         <button class="btn-sm" id="reloadEventsBtn" onclick="loadEventSettings()">Neu laden</button>
         <button class="btn-sm primary" id="saveEventsBtn" onclick="saveEventSettings()">Event-Konfiguration speichern</button>
       </div>
-      <h4 style="margin-top:16px;color:#9ec8e2;font-size:.74rem;text-transform:uppercase;letter-spacing:1px">Soundbibliothek</h4>
-      <div class="sound-library" id="soundLibrary"><div class="event-intro">Lade Sounds...</div></div>
-      <div class="tuning-hint">Die Auswahl wird über die bestehende Settings-API gespeichert. Die eigentliche Wiedergabe bleibt in den bereits vorhandenen Live-Panels.</div>
       </div>
     </section>
   </main>
@@ -460,18 +457,6 @@
         ['shake', 'Neues Shake']
       ]
     };
-
-    const SOUND_LIBRARY = [
-      ['bust', 'BUST', 'Fallender Warnton, bereits im Live-Panel vorhanden'],
-      ['elimination', 'Elimination', 'Tiefer dramatischer Ton, bereits vorhanden'],
-      ['cricket-score', 'Cricket-Score', 'Heller aufsteigender Punkteton, bereits vorhanden'],
-      ['checkout-success', 'Checkout-Fanfare', 'Kurze aufsteigende Erfolgsfanfare'],
-      ['winner-fanfare', 'Winner-Fanfare', 'Breitere Siegesfanfare mit zwei Klangstufen'],
-      ['countdown-tick', 'Countdown-Tick', 'Kurzer klarer Taktton'],
-      ['positive-chime', 'Positiver Chime', 'Heller kurzer Bestätigungston'],
-      ['double-hit', 'Doppel-Ton', 'Mittlerer zweistufiger Trefferklang'],
-      ['triple-hit', 'Triple-Ton', 'Längerer dreistufig wirkender Trefferklang']
-    ];
 
     const TUNING_PRESETS = {
       safe: {
@@ -584,21 +569,6 @@
         ? [['' + selected, 'Gespeichert: ' + String(selected).slice(5)]]
         : [];
       return legacyOption.concat(options).map(([value, label]) => '<option value="' + value + '"' + (value === selected ? ' selected' : '') + '>' + label + '</option>').join('');
-    }
-
-    function renderSoundLibrary() {
-      const library = document.getElementById('soundLibrary');
-      if (!library) return;
-      library.innerHTML = SOUND_LIBRARY.map(([key, label, description]) =>
-        '<div class="sound-library-item">' +
-          '<div class="sound-info"><strong>' + escHtml(label) + '</strong><span>' + escHtml(description) + '</span></div>' +
-          '<button class="btn-sm" type="button" onclick="previewSoundLibraryItem(\'' + key + '\')">Anspielen</button>' +
-        '</div>'
-      ).join('');
-    }
-
-    function previewSoundLibraryItem(sound) {
-      playEventPreviewSound(sound, 0.3);
     }
 
     function renderEventSettings(eventEffects) {
@@ -767,7 +737,6 @@
           .map(fileName => ['file:' + fileName, 'Datei: ' + fileName]);
         const existingValues = new Set(EVENT_EFFECT_CHOICES.sounds.map(([value]) => value));
         EVENT_EFFECT_CHOICES.sounds.push(...dynamicChoices.filter(([value]) => !existingValues.has(value)));
-        renderSoundLibrary();
       } catch (_) {
         showToast('Sound-Verzeichnis konnte nicht geladen werden');
       }
@@ -1438,7 +1407,6 @@
         eventSettingsLoadedOnce = true;
         loadAvailableSoundFiles().finally(() => loadEventSettings());
       }
-      renderSoundLibrary();
 
       const hashId = String((location.hash || '').replace('#', '')).trim().toLowerCase();
       const normalizedHash = (hashId === 'spieler' || hashId === 'aktionen') ? 'spiel' : hashId;
