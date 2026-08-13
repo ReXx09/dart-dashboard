@@ -438,7 +438,7 @@
         ['cricket-score', 'Vorhandener Cricket-Ton'],
         ['checkout-success', 'Neue Checkout-Fanfare'],
         ['winner-fanfare', 'Neue Winner-Fanfare'],
-        ['random-files', 'Zufall aus Sound-Verzeichnis'],
+        ['random-files', 'Random_Alle_Sounds'],
         ['countdown-tick', 'Neuer Countdown-Tick'],
         ['positive-chime', 'Neuer positiver Chime'],
         ['double-hit', 'Neuer Doppel-Ton'],
@@ -570,6 +570,13 @@
         ? [['' + selected, 'Gespeichert: ' + String(selected).replace(/^(file:|random-folder:)/, '')]]
         : [];
       return legacyOption.concat(options).map(([value, label]) => '<option value="' + escHtml(value) + '"' + (value === selected ? ' selected' : '') + '>' + escHtml(label) + '</option>').join('');
+    }
+
+    function randomFolderLabel(folder) {
+      return 'Random_' + String(folder).split('/').map(part => {
+        if (/^commedy$/i.test(part)) return 'Comedy';
+        return part ? part.charAt(0).toUpperCase() + part.slice(1) : part;
+      }).join('/');
     }
 
     function renderEventSettings(eventEffects) {
@@ -745,12 +752,10 @@
     async function loadAvailableSoundFiles() {
       try {
         const result = await fetch('/api/sounds/available').then(r => r.json());
-        const dynamicChoices = (Array.isArray(result.sounds) ? result.sounds : [])
-          .map(fileName => ['file:' + fileName, 'Datei: ' + fileName]);
         const folderChoices = (Array.isArray(result.folders) ? result.folders : [])
-          .map(folder => ['random-folder:' + folder, 'Zufall: ' + folder]);
+          .map(folder => ['random-folder:' + folder, randomFolderLabel(folder)]);
         const existingValues = new Set(EVENT_EFFECT_CHOICES.sounds.map(([value]) => value));
-        EVENT_EFFECT_CHOICES.sounds.push(...folderChoices.concat(dynamicChoices).filter(([value]) => !existingValues.has(value)));
+        EVENT_EFFECT_CHOICES.sounds.push(...folderChoices.filter(([value]) => !existingValues.has(value)));
       } catch (_) {
         showToast('Sound-Verzeichnis konnte nicht geladen werden');
       }
