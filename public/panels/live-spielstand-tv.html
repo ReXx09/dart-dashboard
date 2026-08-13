@@ -517,9 +517,11 @@
       }
     }
     .fireworks-container { position: fixed; inset: 0; z-index: 10002; pointer-events: none; overflow: hidden; }
-    .fireworks-burst { position: absolute; width: var(--burst-size, 8px); height: var(--burst-size, 8px); border-radius: 50%; animation: fireworks-burst var(--burst-duration, 1.5s) ease-out forwards; }
-    .fireworks-burst::before { content: ''; position: absolute; inset: calc(var(--burst-radius, 38px) * -1); border-radius: 50%; background: repeating-conic-gradient(from var(--burst-rotation, 0deg), currentColor 0deg var(--ray-width, 3deg), transparent var(--ray-width, 3deg) var(--ray-step, 18deg)); -webkit-mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); filter: drop-shadow(0 0 5px currentColor); }
-    @keyframes fireworks-burst { 0% { transform: translateY(48vh) scale(.2); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateY(0) scale(1.2); opacity: 0; } }
+    .fireworks-burst { position: absolute; width: var(--burst-size, 8px); height: var(--burst-size, 8px); border-radius: 50%; background: radial-gradient(circle, #fff 0 18%, currentColor 30% 58%, transparent 72%); box-shadow: 0 0 var(--core-glow, 14px) var(--core-spread, 5px) currentColor; animation: fireworks-burst var(--burst-duration, 1.5s) ease-out forwards; }
+    .fireworks-burst::before, .fireworks-burst::after { content: ''; position: absolute; border-radius: 50%; background: repeating-conic-gradient(from var(--burst-rotation, 0deg), currentColor 0deg var(--ray-width, 3deg), transparent var(--ray-width, 3deg) var(--ray-step, 18deg)); -webkit-mask: radial-gradient(circle, transparent 0 var(--core-hole, 6px), #000 var(--core-hole, 6px) var(--ray-mask, 10px), transparent var(--ray-mask, 10px)); mask: radial-gradient(circle, transparent 0 var(--core-hole, 6px), #000 var(--core-hole, 6px) var(--ray-mask, 10px), transparent var(--ray-mask, 10px)); filter: drop-shadow(0 0 var(--ray-glow, 5px) currentColor); }
+    .fireworks-burst::before { inset: calc(var(--burst-radius, 38px) * -1); opacity: .95; }
+    .fireworks-burst::after { inset: calc(var(--burst-radius, 38px) * -.68); opacity: .78; transform: rotate(9deg); background: repeating-conic-gradient(from var(--burst-rotation, 0deg), #fff 0deg var(--inner-ray-width, 2deg), transparent var(--inner-ray-width, 2deg) var(--inner-ray-step, 13deg)); }
+    @keyframes fireworks-burst { 0% { transform: translateY(48vh) scale(.08); opacity: 0; } 24% { opacity: 1; } 48% { transform: translateY(0) scale(1.08); opacity: 1; } 100% { transform: translateY(0) scale(1.22); opacity: 0; } }
     @keyframes bounce {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-10px); }
@@ -711,7 +713,8 @@
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
       if (config && String(config.sound || '').startsWith('file:')) {
-        const audio = new Audio('/sounds/' + String(config.sound).slice(5) + '.ogg');
+        const fileName = String(config.sound).slice(5);
+        const audio = new Audio('/sounds/' + (/[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg'));
         audio.volume = Number.isFinite(Number(config.volume)) ? Number(config.volume) : 0.3;
         audio.play().catch(() => fallback());
         return;
@@ -1182,23 +1185,30 @@
     function createFireworks() {
       const container = document.createElement('div');
       container.className = 'fireworks-container';
-      const colors = ['#f4c542', '#e63946', '#2a9d8f', '#457b9d', '#f4a261'];
-      for (let i = 0; i < 9; i++) {
+      const colors = ['#fff7c2', '#f4c542', '#e63946', '#2a9d8f', '#72b7ff', '#f4a261', '#ff8bd1'];
+      for (let i = 0; i < 12; i++) {
         const burst = document.createElement('div');
         const color = colors[i % colors.length];
         const size = 5 + Math.random() * 9;
-        const radius = 25 + Math.random() * 62;
-        const rayStep = 12 + Math.floor(Math.random() * 12) * 2;
+        const radius = 28 + Math.random() * 70;
+        const rayStep = 10 + Math.floor(Math.random() * 13) * 2;
         burst.className = 'fireworks-burst';
-        burst.style.left = (6 + i * 11 + Math.random() * 6) + '%';
-        burst.style.top = (12 + (i % 3) * 22 + Math.random() * 8) + 'vh';
+        burst.style.left = (5 + Math.random() * 88) + '%';
+        burst.style.top = (10 + Math.random() * 72) + 'vh';
         burst.style.color = color;
         burst.style.background = color;
-        burst.style.boxShadow = '0 0 ' + Math.round(radius * .28) + 'px ' + Math.round(size * .7) + 'px ' + color;
+        burst.style.boxShadow = '0 0 ' + Math.round(radius * .3) + 'px ' + Math.round(size * .8) + 'px ' + color;
         burst.style.setProperty('--burst-size', size + 'px');
         burst.style.setProperty('--burst-radius', radius + 'px');
         burst.style.setProperty('--ray-step', rayStep + 'deg');
         burst.style.setProperty('--ray-width', Math.max(2, Math.round(rayStep / 6)) + 'deg');
+        burst.style.setProperty('--inner-ray-step', (rayStep * .72).toFixed(1) + 'deg');
+        burst.style.setProperty('--inner-ray-width', Math.max(1, Math.round(rayStep / 9)) + 'deg');
+        burst.style.setProperty('--core-hole', Math.max(4, Math.round(size * .7)) + 'px');
+        burst.style.setProperty('--ray-mask', Math.max(8, Math.round(size * 1.35)) + 'px');
+        burst.style.setProperty('--ray-glow', Math.round(4 + size * .55) + 'px');
+        burst.style.setProperty('--core-glow', Math.round(10 + size * 1.2) + 'px');
+        burst.style.setProperty('--core-spread', Math.round(3 + size * .45) + 'px');
         burst.style.setProperty('--burst-rotation', Math.round(Math.random() * 30) + 'deg');
         burst.style.setProperty('--burst-duration', (1.25 + Math.random() * .8).toFixed(2) + 's');
         burst.style.animationDelay = (i * .16 + Math.random() * .18).toFixed(2) + 's';

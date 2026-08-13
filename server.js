@@ -2995,6 +2995,19 @@ app.get('/api/storage/status', async (_req, res) => {
 
 // ── Settings ──
 app.get('/api/settings', (_req, res) => res.json(getSettings()));
+app.get('/api/sounds/available', (_req, res) => {
+  const soundsDirectory = path.join(__dirname, 'public', 'sounds');
+  try {
+    const sounds = fs.readdirSync(soundsDirectory, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.(mp3|ogg)$/i.test(entry.name))
+      .map((entry) => entry.name)
+      .sort((left, right) => left.localeCompare(right, 'de', { sensitivity: 'base' }));
+    res.json({ sounds });
+  } catch (err) {
+    if (err.code === 'ENOENT') return res.json({ sounds: [] });
+    res.status(500).json({ error: 'Sound-Verzeichnis konnte nicht gelesen werden' });
+  }
+});
 app.put('/api/settings', requireAdmin, (req, res) => {
   const current = getSettings();
   const next = req.body && typeof req.body === 'object' ? req.body : {};

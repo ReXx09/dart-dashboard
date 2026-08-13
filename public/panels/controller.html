@@ -233,9 +233,11 @@
     .event-preview-effect.confetti-preview { background: transparent; animation: none; }
     .event-preview-effect.confetti-preview .confetti { position: absolute; width: 10px; height: 10px; top: -10px; animation: event-preview-confetti-fall 3s linear forwards; }
     .event-preview-effect.fireworks-preview { background: rgba(4,8,20,.92); animation: event-preview-in 3.2s ease-out forwards; overflow: hidden; }
-    .firework-burst { position: absolute; width: var(--burst-size, 8px); height: var(--burst-size, 8px); border-radius: 50%; background: #f4c542; box-shadow: 0 0 12px 4px #f4c542; animation: event-preview-firework var(--burst-duration, 1.5s) ease-out forwards; }
-    .firework-burst::before { content: ''; position: absolute; inset: calc(var(--burst-radius, 34px) * -1); border-radius: 50%; background: repeating-conic-gradient(from var(--burst-rotation, 0deg), currentColor 0deg var(--ray-width, 3deg), transparent var(--ray-width, 3deg) var(--ray-step, 18deg)); -webkit-mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); filter: drop-shadow(0 0 5px currentColor); }
-    @keyframes event-preview-firework { 0% { transform: translateY(48vh) scale(.2); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateY(0) scale(1.2); opacity: 0; } }
+    .firework-burst { position: absolute; width: var(--burst-size, 8px); height: var(--burst-size, 8px); border-radius: 50%; background: radial-gradient(circle, #fff 0 18%, currentColor 30% 58%, transparent 72%); box-shadow: 0 0 var(--core-glow, 14px) var(--core-spread, 5px) currentColor; animation: event-preview-firework var(--burst-duration, 1.5s) ease-out forwards; }
+    .firework-burst::before, .firework-burst::after { content: ''; position: absolute; border-radius: 50%; background: repeating-conic-gradient(from var(--burst-rotation, 0deg), currentColor 0deg var(--ray-width, 3deg), transparent var(--ray-width, 3deg) var(--ray-step, 18deg)); -webkit-mask: radial-gradient(circle, transparent 0 var(--core-hole, 6px), #000 var(--core-hole, 6px) var(--ray-mask, 10px), transparent var(--ray-mask, 10px)); mask: radial-gradient(circle, transparent 0 var(--core-hole, 6px), #000 var(--core-hole, 6px) var(--ray-mask, 10px), transparent var(--ray-mask, 10px)); filter: drop-shadow(0 0 var(--ray-glow, 5px) currentColor); }
+    .firework-burst::before { inset: calc(var(--burst-radius, 34px) * -1); opacity: .95; }
+    .firework-burst::after { inset: calc(var(--burst-radius, 34px) * -.68); opacity: .78; transform: rotate(9deg); background: repeating-conic-gradient(from var(--burst-rotation, 0deg), #fff 0deg var(--inner-ray-width, 2deg), transparent var(--inner-ray-width, 2deg) var(--inner-ray-step, 13deg)); }
+    @keyframes event-preview-firework { 0% { transform: translateY(48vh) scale(.08); opacity: 0; } 24% { opacity: 1; } 48% { transform: translateY(0) scale(1.08); opacity: 1; } 100% { transform: translateY(0) scale(1.22); opacity: 0; } }
     @keyframes event-preview-in { 0% { opacity: 0; transform: scale(.86); } 18% { opacity: 1; transform: scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: scale(1.04); } }
     @keyframes event-preview-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-9px); } 75% { transform: translateX(9px); } }
     @keyframes event-preview-bust-flash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
@@ -646,7 +648,8 @@
     function playEventPreviewSound(sound, volume) {
       if (sound === 'none') return;
       if (sound.startsWith('file:')) {
-        const audio = new Audio('/sounds/' + sound.slice(5) + '.ogg');
+        const fileName = sound.slice(5);
+        const audio = new Audio('/sounds/' + (/[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg'));
         audio.volume = volume;
         audio.play().catch(() => showToast('Sounddatei fehlt oder Audio wurde blockiert'));
         return;
@@ -721,13 +724,13 @@
         overlay.innerHTML = Array.from({ length: 40 }, (_, index) => '<span class="confetti" style="left:' + (index * 2.5) + '%;background:' + colors[index % colors.length] + ';animation-delay:' + (index % 8) * .12 + 's"></span>').join('');
       } else if (animation === 'fireworks') {
         overlay.className = 'event-preview-effect fireworks-preview';
-        const colors = ['#f4c542', '#e63946', '#2a9d8f', '#457b9d', '#f4a261'];
-        overlay.innerHTML = Array.from({ length: 9 }, (_, index) => {
+        const colors = ['#fff7c2', '#f4c542', '#e63946', '#2a9d8f', '#72b7ff', '#f4a261', '#ff8bd1'];
+        overlay.innerHTML = Array.from({ length: 12 }, (_, index) => {
           const color = colors[index % colors.length];
           const size = 5 + Math.random() * 9;
-          const radius = 24 + Math.random() * 62;
-          const rayStep = 12 + Math.floor(Math.random() * 12) * 2;
-          return '<span class="firework-burst" style="left:' + (6 + index * 11 + Math.random() * 6) + '%;top:' + (12 + (index % 3) * 22 + Math.random() * 8) + 'vh;color:' + color + ';background:' + color + ';box-shadow:0 0 ' + Math.round(radius * .28) + 'px ' + Math.round(size * .7) + 'px ' + color + ';--burst-size:' + size.toFixed(1) + 'px;--burst-radius:' + radius.toFixed(1) + 'px;--ray-step:' + rayStep + 'deg;--ray-width:' + Math.max(2, Math.round(rayStep / 6)) + 'deg;--burst-rotation:' + Math.round(Math.random() * 30) + 'deg;--burst-duration:' + (1.25 + Math.random() * .8).toFixed(2) + 's;animation-delay:' + (index * .16 + Math.random() * .18).toFixed(2) + 's"></span>';
+          const radius = 28 + Math.random() * 70;
+          const rayStep = 10 + Math.floor(Math.random() * 13) * 2;
+          return '<span class="firework-burst" style="left:' + (5 + Math.random() * 88) + '%;top:' + (10 + Math.random() * 72) + 'vh;color:' + color + ';background:' + color + ';box-shadow:0 0 ' + Math.round(radius * .3) + 'px ' + Math.round(size * .8) + 'px ' + color + ';--burst-size:' + size.toFixed(1) + 'px;--burst-radius:' + radius.toFixed(1) + 'px;--ray-step:' + rayStep + 'deg;--ray-width:' + Math.max(2, Math.round(rayStep / 6)) + 'deg;--inner-ray-step:' + (rayStep * .72).toFixed(1) + 'deg;--inner-ray-width:' + Math.max(1, Math.round(rayStep / 9)) + 'deg;--core-hole:' + Math.max(4, Math.round(size * .7)) + 'px;--ray-mask:' + Math.max(8, Math.round(size * 1.35)) + 'px;--ray-glow:' + Math.round(4 + size * .55) + 'px;--core-glow:' + Math.round(10 + size * 1.2) + 'px;--core-spread:' + Math.round(3 + size * .45) + 'px;--burst-rotation:' + Math.round(Math.random() * 30) + 'deg;--burst-duration:' + (1.25 + Math.random() * .8).toFixed(2) + 's;animation-delay:' + (index * .16 + Math.random() * .18).toFixed(2) + 's"></span>';
         }).join('');
       } else {
         overlay.className = 'event-preview-effect ' + animation;
@@ -764,6 +767,22 @@
         showToast('Event-Konfiguration konnte nicht geladen werden');
       }
       if (btn) btn.disabled = false;
+    }
+
+    async function loadAvailableSoundFiles() {
+      try {
+        const result = await fetch('/api/sounds/available').then(r => r.json());
+        const dynamicChoices = (Array.isArray(result.sounds) ? result.sounds : [])
+          .map(fileName => ['file:' + fileName, 'Datei: ' + fileName]);
+        const existingValues = new Set(EVENT_EFFECT_CHOICES.sounds.map(([value]) => value));
+        EVENT_EFFECT_CHOICES.sounds.push(...dynamicChoices.filter(([value]) => {
+          const baseValue = 'file:' + value.slice(5).replace(/\.(mp3|ogg)$/i, '');
+          return !existingValues.has(value) && !existingValues.has(baseValue);
+        }));
+        renderSoundLibrary();
+      } catch (_) {
+        showToast('Sound-Verzeichnis konnte nicht geladen werden');
+      }
     }
 
     async function saveEventSettings() {
@@ -1429,7 +1448,7 @@
       }
       if (!eventSettingsLoadedOnce) {
         eventSettingsLoadedOnce = true;
-        loadEventSettings();
+        loadAvailableSoundFiles().finally(() => loadEventSettings());
       }
       renderSoundLibrary();
 
