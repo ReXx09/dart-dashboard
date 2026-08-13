@@ -1311,6 +1311,18 @@
       const config = eventEffects && eventEffects[eventKey];
       return !config || (isEventEnabled(eventKey) && config.sound === eventKey);
     }
+
+    function playConfiguredEventSound(eventKey, fallback) {
+      const config = eventEffects && eventEffects[eventKey];
+      if (config && !isEventEnabled(eventKey)) return;
+      if (config && String(config.sound || '').startsWith('file:')) {
+        const audio = new Audio('/sounds/' + String(config.sound).slice(5) + '.ogg');
+        audio.volume = Number.isFinite(Number(config.volume)) ? Number(config.volume) : 0.3;
+        audio.play().catch(() => fallback());
+        return;
+      }
+      if (!config || config.sound === eventKey) fallback();
+    }
     let duelStatsEnabled = localStorage.getItem('liveDuelStatsEnabled') !== 'false';
 
     function startCountdown(state) {
@@ -2345,9 +2357,9 @@
       if (lastThrow && lastThrow.bust) {
         if (isEventAnimationEnabled('bust')) showBustOverlay(active); else hideBustOverlay();
         const soundKey = [lastThrow.ts, lastThrow.playerSlot, 'bust'].join(':');
-        if (soundKey !== lastEventSoundKey && isEventSoundEnabled('bust')) {
+        if (soundKey !== lastEventSoundKey && isEventEnabled('bust')) {
           lastEventSoundKey = soundKey;
-          playBustSound();
+          playConfiguredEventSound('bust', playBustSound);
         }
       } else {
         hideBustOverlay();
@@ -2360,9 +2372,9 @@
         if (eliminatedPlayer && eliminatorPlayer) {
           if (isEventAnimationEnabled('elimination')) showEliminationOverlay(eliminatedPlayer, eliminatorPlayer); else hideEliminationOverlay();
           const soundKey = [lastThrow.ts, lastThrow.playerSlot, 'elimination'].join(':');
-          if (soundKey !== lastEventSoundKey && isEventSoundEnabled('elimination')) {
+          if (soundKey !== lastEventSoundKey && isEventEnabled('elimination')) {
             lastEventSoundKey = soundKey;
-            playEliminationSound();
+            playConfiguredEventSound('elimination', playEliminationSound);
           }
         }
       } else {
@@ -2559,7 +2571,7 @@
       animation.className = 'cricket-score-animation';
       animation.textContent = '+' + points;
       document.body.appendChild(animation);
-      if (isEventSoundEnabled('cricketScore')) playCricketScoreSound();
+      playConfiguredEventSound('cricketScore', playCricketScoreSound);
       setTimeout(() => animation.remove(), 1200);
     }
 

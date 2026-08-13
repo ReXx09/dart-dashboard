@@ -214,8 +214,28 @@
     .event-preview-effect.flash { background: rgba(244,199,66,.3); }
     .event-preview-effect.celebration strong { border-color: #f4c542; box-shadow: 0 0 55px rgba(244,197,66,.75); transform: scale(1.08); }
     .event-preview-effect.shake strong { animation: event-preview-shake .45s ease-in-out 2; }
+    .event-preview-effect.bust-overlay { background: rgba(230,57,70,.15); animation: event-preview-bust-flash .6s ease-out; }
+    .event-preview-effect.bust-overlay .bust-text { background: #e63946; color: #fff; font-size: 3rem; font-weight: 900; padding: 20px 50px; border-radius: 20px; text-transform: uppercase; letter-spacing: 4px; box-shadow: 0 0 60px rgba(230,57,70,.6); animation: event-preview-bust-pulse .8s ease-in-out infinite alternate; }
+    .event-preview-effect.elimination-overlay { background: rgba(139,0,0,.25); animation: event-preview-elimination-flash .8s ease-out; }
+    .event-preview-effect.elimination-overlay .elimination-text { background: linear-gradient(135deg, #8b0000, #ff0000); color: #fff; font-size: 3.5rem; font-weight: 900; padding: 30px 60px; border-radius: 25px; text-transform: uppercase; letter-spacing: 6px; box-shadow: 0 0 80px rgba(255,0,0,.8), 0 0 160px rgba(139,0,0,.6); animation: event-preview-elimination-pulse .6s ease-in-out infinite alternate; text-shadow: 0 0 20px rgba(255,255,255,.5); }
+    .event-preview-effect.cricket-score-animation { top: 42%; left: 50%; inset: auto; color: #f4a261; font-size: clamp(2rem, 5vw, 4rem); font-weight: 900; text-shadow: 0 0 20px rgba(244,162,97,.8); background: transparent; animation: event-preview-cricket-score-pop 1.1s ease-out forwards; }
+    .event-preview-effect.winner-overlay { background: rgba(0,0,0,.9); animation: event-preview-winner-in .3s ease-out forwards; }
+    .event-preview-effect.winner-overlay .winner-card { background: linear-gradient(135deg, #1a1a2e, #16213e); border: 3px solid #f4a261; border-radius: 24px; padding: 40px 60px; text-align: center; box-shadow: 0 0 60px rgba(244,162,97,.4), 0 20px 40px rgba(0,0,0,.5); }
+    .event-preview-effect.winner-overlay .winner-icon { font-size: 4rem; margin-bottom: 16px; animation: event-preview-bounce 1s ease infinite; }
+    .event-preview-effect.winner-overlay .winner-subtitle { font-size: 1.2rem; color: #aaa; }
+    .event-preview-effect.winner-overlay .winner-title { color: #f4a261; font-size: 2rem; font-weight: 900; }
+    .event-preview-effect.confetti-preview { background: transparent; animation: none; }
+    .event-preview-effect.confetti-preview .confetti { position: absolute; width: 10px; height: 10px; top: -10px; animation: event-preview-confetti-fall 3s linear forwards; }
     @keyframes event-preview-in { 0% { opacity: 0; transform: scale(.86); } 18% { opacity: 1; transform: scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: scale(1.04); } }
     @keyframes event-preview-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-9px); } 75% { transform: translateX(9px); } }
+    @keyframes event-preview-bust-flash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes event-preview-bust-pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+    @keyframes event-preview-elimination-flash { 0% { opacity: 0; transform: scale(.8); } 15% { opacity: 1; transform: scale(1.05); } 85% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
+    @keyframes event-preview-elimination-pulse { from { transform: scale(1); box-shadow: 0 0 80px rgba(255,0,0,.8), 0 0 160px rgba(139,0,0,.6); } to { transform: scale(1.1); box-shadow: 0 0 120px rgba(255,0,0,1), 0 0 240px rgba(139,0,0,.8); } }
+    @keyframes event-preview-cricket-score-pop { 0% { opacity: 0; transform: translate(-50%,20px) scale(.7); } 20% { opacity: 1; transform: translate(-50%,0) scale(1.15); } 100% { opacity: 0; transform: translate(-50%,-70px) scale(1); } }
+    @keyframes event-preview-winner-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes event-preview-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes event-preview-confetti-fall { to { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
     .field-test-log { margin-top: 10px; max-height: 220px; overflow: auto; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; }
     .field-test-log table { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: .72rem; }
     .field-test-log th, .field-test-log td { padding: 6px 8px; border-bottom: 1px solid #141414; text-align: left; white-space: nowrap; }
@@ -410,7 +430,20 @@
         ['countdown-tick', 'Neuer Countdown-Tick'],
         ['positive-chime', 'Neuer positiver Chime'],
         ['double-hit', 'Neuer Doppel-Ton'],
-        ['triple-hit', 'Neuer Triple-Ton']
+        ['triple-hit', 'Neuer Triple-Ton'],
+        ['file:t20', 'Datei: T20'],
+        ['file:t19', 'Datei: T19'],
+        ['file:t18', 'Datei: T18'],
+        ['file:t17', 'Datei: T17'],
+        ['file:bull', 'Datei: Bull'],
+        ['file:dbull', 'Datei: dBull'],
+        ['file:triple', 'Datei: Triple'],
+        ['file:maximum', 'Datei: 180 / Maximum'],
+        ['file:checkout', 'Datei: Checkout'],
+        ['file:winner', 'Datei: Winner'],
+        ['file:bust', 'Datei: BUST'],
+        ['file:elimination', 'Datei: Elimination'],
+        ['file:cricket-score', 'Datei: Cricket-Score']
       ],
       animations: [
         ['none', 'Keine Animation'],
@@ -572,6 +605,12 @@
 
     function playEventPreviewSound(sound, volume) {
       if (sound === 'none') return;
+      if (sound.startsWith('file:')) {
+        const audio = new Audio('/sounds/' + sound.slice(5) + '.ogg');
+        audio.volume = volume;
+        audio.play().catch(() => showToast('Sounddatei fehlt oder Audio wurde blockiert'));
+        return;
+      }
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) return;
@@ -623,11 +662,30 @@
       if (animation === 'none') return;
       document.querySelectorAll('.event-preview-effect').forEach(el => el.remove());
       const overlay = document.createElement('div');
-      overlay.className = 'event-preview-effect ' + animation;
-      overlay.style.animationDuration = Math.min(duration, 5000) + 'ms';
-      overlay.innerHTML = '<strong>' + escHtml(eventName) + '</strong>';
+      const existingPreview = ['bust', 'elimination', 'cricket-score', 'winner', 'confetti'].includes(animation);
+      if (animation === 'bust') {
+        overlay.className = 'event-preview-effect bust-overlay';
+        overlay.innerHTML = '<div class="bust-text">✖ ÜBERWORFEN</div>';
+      } else if (animation === 'elimination') {
+        overlay.className = 'event-preview-effect elimination-overlay';
+        overlay.innerHTML = '<div class="elimination-text">💀 ELIMINIERT! 💀</div>';
+      } else if (animation === 'cricket-score') {
+        overlay.className = 'event-preview-effect cricket-score-animation';
+        overlay.textContent = '+30';
+      } else if (animation === 'winner') {
+        overlay.className = 'event-preview-effect winner-overlay';
+        overlay.innerHTML = '<div class="winner-card"><div class="winner-icon">🏆</div><div class="winner-subtitle">VORSCHAU</div><div class="winner-title">' + escHtml(eventName) + '</div></div>';
+      } else if (animation === 'confetti') {
+        overlay.className = 'event-preview-effect confetti-preview';
+        const colors = ['#f4a261', '#e63946', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'];
+        overlay.innerHTML = Array.from({ length: 40 }, (_, index) => '<span class="confetti" style="left:' + (index * 2.5) + '%;background:' + colors[index % colors.length] + ';animation-delay:' + (index % 8) * .12 + 's"></span>').join('');
+      } else {
+        overlay.className = 'event-preview-effect ' + animation;
+        overlay.style.animationDuration = Math.min(duration, 5000) + 'ms';
+        overlay.innerHTML = '<strong>' + escHtml(eventName) + '</strong>';
+      }
       document.body.appendChild(overlay);
-      setTimeout(() => overlay.remove(), Math.min(duration + 150, 5200));
+      setTimeout(() => overlay.remove(), existingPreview ? Math.min(Math.max(duration, 1200) + 150, 5200) : Math.min(duration + 150, 5200));
     }
 
     function collectEventSettings() {

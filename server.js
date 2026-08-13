@@ -568,7 +568,20 @@ const EVENT_EFFECT_SOUNDS = [
   'countdown-tick',
   'positive-chime',
   'double-hit',
-  'triple-hit'
+  'triple-hit',
+  'file:t20',
+  'file:t19',
+  'file:t18',
+  'file:t17',
+  'file:bull',
+  'file:dbull',
+  'file:triple',
+  'file:maximum',
+  'file:checkout',
+  'file:winner',
+  'file:bust',
+  'file:elimination',
+  'file:cricket-score'
 ];
 const EVENT_EFFECT_ANIMATIONS = [
   'none',
