@@ -693,6 +693,7 @@
     let isFirstLoad = true;
     let lastCricketAnimationKey = '';
     let lastEventSoundKey = '';
+    let winnerOverlayKey = '';
     let eventEffects = null;
     const eventTarget = 'tv';
 
@@ -741,7 +742,17 @@
       playConfiguredEventSound(eventKey, () => {});
     }
 
-    function playConfiguredEventSound(eventKey, fallback) {
+    function stableSoundIndex(files, selectionKey) {
+      if (!files.length) return -1;
+      let hash = 2166136261;
+      for (const character of String(selectionKey || '')) {
+        hash ^= character.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0) % files.length;
+    }
+
+    function playConfiguredEventSound(eventKey, fallback, selectionKey = '') {
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
       if (config && (config.sound === 'random-files' || String(config.sound || '').startsWith('random-folder:'))) {
@@ -750,7 +761,7 @@
           const files = (Array.isArray(result.sounds) ? result.sounds : [])
             .filter(fileName => !folder || fileName.startsWith(folder + '/'));
           if (!files.length) return fallback();
-          playConfiguredEventSoundValue(files[Math.floor(Math.random() * files.length)], config.volume, fallback);
+          playConfiguredEventSoundValue(files[stableSoundIndex(files, selectionKey || eventKey)], config.volume, fallback);
         }).catch(() => fallback());
         return;
       }
@@ -1207,6 +1218,9 @@
     function showWinnerOverlay(winner, state) {
       const overlay = document.getElementById('winnerOverlay');
       if (!overlay) return;
+      const currentWinnerKey = [state.game.duelId, state.lastAction && state.lastAction.ts, state.lastAction && state.lastAction.winnerSlot].join(':');
+      if (winnerOverlayKey === currentWinnerKey) return;
+      winnerOverlayKey = currentWinnerKey;
       const mode = state.game.mode;
       const isCricket = mode === 'cricket';
       const isElimination = mode === 'elimination';
@@ -1234,7 +1248,7 @@
 
       overlay.classList.add('show');
       overlay.style.display = 'flex';
-      playConfiguredEventSound('winner', () => {});
+      playConfiguredEventSound('winner', () => {}, currentWinnerKey);
       if (eventEffects && eventEffects.winner && eventEffects.winner.animation === 'fireworks' && isEventEnabled('winner')) createFireworks();
       else createConfetti();
     }

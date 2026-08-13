@@ -1289,6 +1289,8 @@
     let liveState = null;
     let countdownTimer = null;
     let pendingWinner = null;
+    let winnerOverlayKey = '';
+    let winnerDismissedKey = '';
     let isFirstLoad = true;
     let lastCricketAnimationKey = '';
     let lastEventSoundKey = '';
@@ -1352,7 +1354,17 @@
       playConfiguredEventSound(eventKey, () => {});
     }
 
-    function playConfiguredEventSound(eventKey, fallback) {
+    function stableSoundIndex(files, selectionKey) {
+      if (!files.length) return -1;
+      let hash = 2166136261;
+      for (const character of String(selectionKey || '')) {
+        hash ^= character.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0) % files.length;
+    }
+
+    function playConfiguredEventSound(eventKey, fallback, selectionKey = '') {
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
       if (config && (config.sound === 'random-files' || String(config.sound || '').startsWith('random-folder:'))) {
@@ -1361,7 +1373,7 @@
           const files = (Array.isArray(result.sounds) ? result.sounds : [])
             .filter(fileName => !folder || fileName.startsWith(folder + '/'));
           if (!files.length) return fallback();
-          playConfiguredEventSoundValue(files[Math.floor(Math.random() * files.length)], config.volume, fallback);
+          playConfiguredEventSoundValue(files[stableSoundIndex(files, selectionKey || eventKey)], config.volume, fallback);
         }).catch(() => fallback());
         return;
       }
@@ -1946,6 +1958,7 @@
         const state = await response.json();
         if (!response.ok) throw new Error(state.error || 'HTTP ' + response.status);
         liveState = state;
+        winnerDismissedKey = [state.game.duelId, state.lastAction && state.lastAction.ts, state.lastAction && state.lastAction.winnerSlot].join(':');
         duelStatsScheduledFor = '';
         duelStatsVisibleFor = getDuelStatsKey(state);
         hideDuelStatsOverlay();
@@ -2525,9 +2538,10 @@
 
       if (winner && state.game.status === 'leg-finished') {
         pendingWinner = winner;
+        const currentWinnerKey = [state.game.duelId, state.lastAction && state.lastAction.ts, state.lastAction && state.lastAction.winnerSlot].join(':');
         if (duelStatsDismissed) {
           hideDuelStatsOverlay();
-          if (isMatchComplete(state, winner)) showWinnerOverlay(winner, state);
+          if (isMatchComplete(state, winner) && winnerDismissedKey !== currentWinnerKey) showWinnerOverlay(winner, state);
           else hideWinnerOverlay();
         } else if (duelStatsVisibleFor === duelStatsKey) {
           hideWinnerOverlay();
@@ -2577,6 +2591,9 @@
     // ── Winner Overlay ──
     function showWinnerOverlay(winner, state) {
       if (state && state.game && String(state.game.matchType) === 'tournament') return;
+      const currentWinnerKey = [state.game.duelId, state.lastAction && state.lastAction.ts, state.lastAction && state.lastAction.winnerSlot].join(':');
+      if (winnerOverlayKey === currentWinnerKey || winnerDismissedKey === currentWinnerKey) return;
+      winnerOverlayKey = currentWinnerKey;
       const overlay = document.getElementById('winnerOverlay');
       if (!overlay) return;
       const mode = state.game.mode;
@@ -2610,7 +2627,7 @@
 
       overlay.classList.add('show');
       overlay.style.display = 'flex';
-      playConfiguredEventSound('winner', () => {});
+      playConfiguredEventSound('winner', () => {}, currentWinnerKey);
       if (eventEffects && eventEffects.winner && eventEffects.winner.animation === 'fireworks' && isEventEnabled('winner')) createFireworks();
       else createConfetti();
     }
