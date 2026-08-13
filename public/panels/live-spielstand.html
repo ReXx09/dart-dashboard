@@ -348,7 +348,7 @@
     }
 
     .focus-big-score {
-      font-size: clamp(14.6rem, 16.4vw, 17.6rem);
+      font-size: clamp(15.6rem, calc(16.4vw + 1rem), 18.6rem);
       font-weight: 900;
       line-height: 1;
       color: var(--pc, #f4a261);
@@ -1163,75 +1163,6 @@
       }
     }
 
-    /* Spezielle TV-Auflösung (1024x860) – kompakte Kacheln in einer Zeile */
-    @media (width: 1024px) and (height: 860px) {
-      .focus-kacheln { grid-template-columns: 0.5fr 1.5fr; }
-      .focus-kachel { min-height: 0; padding: 6px; }
-      .focus-kachel:nth-child(2) > div { min-height: 6rem; }
-      .focus-kachel h4 { font-size: .5rem; }
-      .throw-seg { min-height: 70px; }
-      .throw-seg .pts { font-size: 1.98rem; }
-      .throw-seg .seg { font-size: .8rem; }
-      .focus-big-score { font-size: clamp(9rem, 17vw, 13rem); }
-      .focus-summary { margin-top: 2px; }
-      .focus-summary div { padding: 3px; }
-      .focus-summary span { font-size: .4rem; }
-      .focus-summary strong { font-size: .65rem; }
-      .focus-player.has-others { flex: 1; }
-      .focus-leg-card { display: none; }
-      .compact-players { gap: 3px; flex-basis: 128px; height: 128px; max-height: none; }
-      .compact-players .score-card { padding: 4px 8px; gap: 3px; flex-direction: row; align-items: center; border-radius: 6px; }
-      .compact-players .score-card .sc-color-bar { width: 3px; height: 28px; align-self: center; flex-shrink: 0; border-radius: 2px; }
-      .compact-players .score-card .sc-name { font-size: .6rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-score { font-size: 1rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card.compact-non-cricket .sc-score { font-size: 1.3rem; }
-      .compact-players .score-card .sc-stats { font-size: .45rem; white-space: nowrap; flex-shrink: 0; }
-      .compact-players .score-card .sc-last-throws { flex-shrink: 0; }
-      .compact-players .score-card .sc-throw-chip { font-size: .5rem; padding: 1px 3px; min-width: 14px; border-radius: 4px; }
-      .compact-players .score-card.compact-crowded { flex-direction: column; align-items: center; }
-        .compact-players .score-card.compact-crowded {
-          justify-content: flex-start;
-          gap: 2px;
-          padding: 4px 8px 3px;
-        }
-        .compact-players .score-card.compact-crowded .sc-color-bar { width: 100%; height: 3px; margin-bottom: 2px; }
-        .compact-players .score-card.compact-crowded .sc-score { line-height: .9; }
-      .compact-players .score-card.compact-crowded .compact-cricket-status { font-size: .42rem; }
-      /* Cricket-Grid für die kompakte Zeile */
-      .compact-players .score-card .cricket-grid {
-        gap: 4px 6px;
-        margin: 4px 0;
-      }
-      .compact-players .score-card .cricket-num {
-        min-width: 40px;
-        gap: 2px;
-      }
-      .compact-players .score-card .num-label {
-        font-size: .55rem;
-      }
-      .compact-players .score-card .hit-marker {
-        width: 14px;
-        height: 14px;
-      }
-      .compact-players .score-card .hit-marker.hit-1,
-      .compact-players .score-card .hit-marker.hit-2,
-      .compact-players .score-card .hit-marker.hit-3 {
-        background: #2a9d8f;
-        border-color: #2a9d8f;
-      }
-      .compact-players .score-card .hit-marker.closed {
-        background: #1a1a1a;
-        border-color: #2a9d8f;
-      }
-      .compact-players .score-card .hit-marker.closed::after {
-        font-size: 10px;
-        color: #2a9d8f;
-      }
-      .focus-controls-card .ctrl-title { font-size: .42rem; }
-      .focus-controls-card .ctrl-btn { font-size: .65rem; padding: 16px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-      .focus-controls-card { display: none; height: 236px !important; }
-    }
-
     /* Tablet-Auflösungen – Buttons hoch genug */
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) {
       :root {
@@ -1251,7 +1182,7 @@
       .focus-player.single { grid-template-rows: minmax(0, 1fr) auto; }
       .focus-card { min-height: 0; padding: 6px; }
       .focus-name { font-size: 1.5rem; }
-      .focus-big-score { font-size: clamp(9rem, 14vw, 13rem); }
+      .focus-big-score { font-size: clamp(10rem, calc(14vw + 1rem), 14rem); }
       .match-menu-field { font-size: .82rem; }
       .match-menu-field select, .match-menu-field input:not([type="checkbox"]) { min-height: var(--tablet-menu-control-height, 52px); padding: 13px 12px; font-size: .9rem; }
       .match-player-option { min-height: var(--tablet-player-tile-height, 52px); }
@@ -1264,7 +1195,7 @@
       .focus-player.single { grid-template-rows: minmax(0, 1fr) auto; }
       .focus-card { min-height: 0; padding: 6px; }
       .focus-name { font-size: 1.5rem; }
-      .focus-big-score { font-size: clamp(9rem, 14vw, 13rem); }
+      .focus-big-score { font-size: clamp(10rem, calc(14vw + 1rem), 14rem); }
     }
   </style>
 </head>
