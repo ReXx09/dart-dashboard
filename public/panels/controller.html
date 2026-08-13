@@ -208,6 +208,12 @@
     .event-table input[type="checkbox"] { width: 17px; height: 17px; accent-color: #47d6b6; }
     .event-name { font-weight: 700; white-space: nowrap; }
     .event-existing { color: #8dd7c5; font-size: .65rem; display: block; margin-top: 3px; }
+    .sound-library { margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .sound-library-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 10px; }
+    .sound-library-item strong { display: block; color: #e2edf4; font-size: .78rem; }
+    .sound-library-item span { display: block; color: #687682; font-size: .68rem; margin-top: 2px; }
+    .sound-library-item .sound-info { flex: 1; min-width: 0; }
+    @media (max-width: 700px) { .sound-library { grid-template-columns: 1fr; } }
     .event-preview-effect { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; pointer-events: none; background: rgba(244,162,97,.12); animation: event-preview-in 1.1s ease-out forwards; }
     .event-preview-effect strong { padding: 18px 28px; border: 2px solid #f4a261; border-radius: 14px; color: #fff; background: rgba(20,20,20,.92); font-size: clamp(1.2rem, 4vw, 2rem); text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 34px rgba(244,162,97,.42); }
     .event-preview-effect.highlight strong { border-color: #2a9d8f; box-shadow: 0 0 44px rgba(42,157,143,.65); }
@@ -400,6 +406,8 @@
         <button class="btn-sm" id="reloadEventsBtn" onclick="loadEventSettings()">Neu laden</button>
         <button class="btn-sm primary" id="saveEventsBtn" onclick="saveEventSettings()">Event-Konfiguration speichern</button>
       </div>
+      <h4 style="margin-top:16px;color:#9ec8e2;font-size:.74rem;text-transform:uppercase;letter-spacing:1px">Soundbibliothek</h4>
+      <div class="sound-library" id="soundLibrary"><div class="event-intro">Lade Sounds...</div></div>
       <div class="tuning-hint">Die Auswahl wird über die bestehende Settings-API gespeichert. Die eigentliche Wiedergabe bleibt in den bereits vorhandenen Live-Panels.</div>
       </div>
     </section>
@@ -458,6 +466,18 @@
         ['shake', 'Neues Shake']
       ]
     };
+
+    const SOUND_LIBRARY = [
+      ['bust', 'BUST', 'Fallender Warnton, bereits im Live-Panel vorhanden'],
+      ['elimination', 'Elimination', 'Tiefer dramatischer Ton, bereits vorhanden'],
+      ['cricket-score', 'Cricket-Score', 'Heller aufsteigender Punkteton, bereits vorhanden'],
+      ['checkout-success', 'Checkout-Fanfare', 'Kurze aufsteigende Erfolgsfanfare'],
+      ['winner-fanfare', 'Winner-Fanfare', 'Breitere Siegesfanfare mit zwei Klangstufen'],
+      ['countdown-tick', 'Countdown-Tick', 'Kurzer klarer Taktton'],
+      ['positive-chime', 'Positiver Chime', 'Heller kurzer Bestätigungston'],
+      ['double-hit', 'Doppel-Ton', 'Mittlerer zweistufiger Trefferklang'],
+      ['triple-hit', 'Triple-Ton', 'Längerer dreistufig wirkender Trefferklang']
+    ];
 
     const TUNING_PRESETS = {
       safe: {
@@ -566,6 +586,21 @@
 
     function eventSelectOptions(options, selected) {
       return options.map(([value, label]) => '<option value="' + value + '"' + (value === selected ? ' selected' : '') + '>' + label + '</option>').join('');
+    }
+
+    function renderSoundLibrary() {
+      const library = document.getElementById('soundLibrary');
+      if (!library) return;
+      library.innerHTML = SOUND_LIBRARY.map(([key, label, description]) =>
+        '<div class="sound-library-item">' +
+          '<div class="sound-info"><strong>' + escHtml(label) + '</strong><span>' + escHtml(description) + '</span></div>' +
+          '<button class="btn-sm" type="button" onclick="previewSoundLibraryItem(\'' + key + '\')">Anspielen</button>' +
+        '</div>'
+      ).join('');
+    }
+
+    function previewSoundLibraryItem(sound) {
+      playEventPreviewSound(sound, 0.3);
     }
 
     function renderEventSettings(eventEffects) {
@@ -1381,6 +1416,7 @@
         eventSettingsLoadedOnce = true;
         loadEventSettings();
       }
+      renderSoundLibrary();
 
       const hashId = String((location.hash || '').replace('#', '')).trim().toLowerCase();
       const normalizedHash = (hashId === 'spieler' || hashId === 'aktionen') ? 'spiel' : hashId;
