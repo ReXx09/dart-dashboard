@@ -590,6 +590,7 @@ const EVENT_EFFECT_ANIMATIONS = [
   'cricket-score',
   'winner',
   'confetti',
+  'fireworks',
   'highlight',
   'flash',
   'celebration',

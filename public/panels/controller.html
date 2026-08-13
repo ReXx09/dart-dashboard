@@ -232,6 +232,10 @@
     .event-preview-effect.winner-overlay .winner-title { color: #f4a261; font-size: 2rem; font-weight: 900; }
     .event-preview-effect.confetti-preview { background: transparent; animation: none; }
     .event-preview-effect.confetti-preview .confetti { position: absolute; width: 10px; height: 10px; top: -10px; animation: event-preview-confetti-fall 3s linear forwards; }
+    .event-preview-effect.fireworks-preview { background: rgba(4,8,20,.92); animation: event-preview-in 3.2s ease-out forwards; overflow: hidden; }
+    .firework-burst { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #f4c542; box-shadow: 0 0 12px 4px #f4c542; animation: event-preview-firework 1.5s ease-out forwards; }
+    .firework-burst::before { content: ''; position: absolute; inset: -34px; border-radius: 50%; background: repeating-conic-gradient(from 0deg, currentColor 0deg 3deg, transparent 3deg 18deg); -webkit-mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); }
+    @keyframes event-preview-firework { 0% { transform: translateY(48vh) scale(.2); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateY(0) scale(1.2); opacity: 0; } }
     @keyframes event-preview-in { 0% { opacity: 0; transform: scale(.86); } 18% { opacity: 1; transform: scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: scale(1.04); } }
     @keyframes event-preview-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-9px); } 75% { transform: translateX(9px); } }
     @keyframes event-preview-bust-flash { 0% { opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
@@ -460,6 +464,7 @@
         ['cricket-score', 'Vorhandene Cricket-Animation'],
         ['winner', 'Vorhandenes Winner-Overlay'],
         ['confetti', 'Vorhandener Confetti-Effekt'],
+        ['fireworks', 'Neues Feuerwerk'],
         ['highlight', 'Neues Highlight'],
         ['flash', 'Neuer Flash'],
         ['celebration', 'Neue Celebration'],
@@ -714,6 +719,10 @@
         overlay.className = 'event-preview-effect confetti-preview';
         const colors = ['#f4a261', '#e63946', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'];
         overlay.innerHTML = Array.from({ length: 40 }, (_, index) => '<span class="confetti" style="left:' + (index * 2.5) + '%;background:' + colors[index % colors.length] + ';animation-delay:' + (index % 8) * .12 + 's"></span>').join('');
+      } else if (animation === 'fireworks') {
+        overlay.className = 'event-preview-effect fireworks-preview';
+        const colors = ['#f4c542', '#e63946', '#2a9d8f', '#457b9d', '#f4a261'];
+        overlay.innerHTML = Array.from({ length: 7 }, (_, index) => '<span class="firework-burst" style="left:' + (12 + index * 13) + '%;top:' + (18 + (index % 3) * 18) + 'vh;color:' + colors[index % colors.length] + ';background:' + colors[index % colors.length] + ';box-shadow:0 0 12px 4px ' + colors[index % colors.length] + ';animation-delay:' + (index * .22) + 's"></span>').join('');
       } else {
         overlay.className = 'event-preview-effect ' + animation;
         overlay.style.animationDuration = Math.min(duration, 5000) + 'ms';

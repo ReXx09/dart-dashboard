@@ -1164,6 +1164,10 @@
         opacity: 0;
       }
     }
+    .fireworks-container { position: fixed; inset: 0; z-index: 10002; pointer-events: none; overflow: hidden; }
+    .fireworks-burst { position: absolute; width: 8px; height: 8px; border-radius: 50%; animation: fireworks-burst 1.5s ease-out forwards; }
+    .fireworks-burst::before { content: ''; position: absolute; inset: -38px; border-radius: 50%; background: repeating-conic-gradient(from 0deg, currentColor 0deg 3deg, transparent 3deg 18deg); -webkit-mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); mask: radial-gradient(circle, transparent 0 5px, #000 6px 8px, transparent 9px); }
+    @keyframes fireworks-burst { 0% { transform: translateY(48vh) scale(.2); opacity: 0; } 35% { opacity: 1; } 100% { transform: translateY(0) scale(1.2); opacity: 0; } }
 
     /* Tablet-Auflösungen – Buttons hoch genug */
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) {
@@ -2521,7 +2525,8 @@
 
       overlay.classList.add('show');
       overlay.style.display = 'flex';
-      createConfetti();
+      if (eventEffects && eventEffects.winner && eventEffects.winner.animation === 'fireworks' && isEventEnabled('winner')) createFireworks();
+      else createConfetti();
     }
 
     function hideWinnerOverlay() {
@@ -2610,6 +2615,26 @@
         confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
         container.appendChild(confetti);
       }
+    }
+
+    function createFireworks() {
+      const container = document.createElement('div');
+      container.className = 'fireworks-container';
+      const colors = ['#f4c542', '#e63946', '#2a9d8f', '#457b9d', '#f4a261'];
+      for (let i = 0; i < 9; i++) {
+        const burst = document.createElement('div');
+        const color = colors[i % colors.length];
+        burst.className = 'fireworks-burst';
+        burst.style.left = (8 + i * 11) + '%';
+        burst.style.top = (16 + (i % 3) * 20) + 'vh';
+        burst.style.color = color;
+        burst.style.background = color;
+        burst.style.boxShadow = '0 0 14px 5px ' + color;
+        burst.style.animationDelay = (i * .18) + 's';
+        container.appendChild(burst);
+      }
+      document.body.appendChild(container);
+      setTimeout(() => container.remove(), 3800);
     }
 
     function startNextLegCountdown() {
