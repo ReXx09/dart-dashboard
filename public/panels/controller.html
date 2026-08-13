@@ -445,19 +445,6 @@
         ['positive-chime', 'Neuer positiver Chime'],
         ['double-hit', 'Neuer Doppel-Ton'],
         ['triple-hit', 'Neuer Triple-Ton'],
-        ['file:t20', 'Datei: T20'],
-        ['file:t19', 'Datei: T19'],
-        ['file:t18', 'Datei: T18'],
-        ['file:t17', 'Datei: T17'],
-        ['file:bull', 'Datei: Bull'],
-        ['file:dbull', 'Datei: dBull'],
-        ['file:triple', 'Datei: Triple'],
-        ['file:maximum', 'Datei: 180 / Maximum'],
-        ['file:checkout', 'Datei: Checkout'],
-        ['file:winner', 'Datei: Winner'],
-        ['file:bust', 'Datei: BUST'],
-        ['file:elimination', 'Datei: Elimination'],
-        ['file:cricket-score', 'Datei: Cricket-Score']
       ],
       animations: [
         ['none', 'Keine Animation'],
@@ -592,7 +579,11 @@
     }
 
     function eventSelectOptions(options, selected) {
-      return options.map(([value, label]) => '<option value="' + value + '"' + (value === selected ? ' selected' : '') + '>' + label + '</option>').join('');
+      const hasSelected = options.some(([value]) => value === selected);
+      const legacyOption = selected && !hasSelected && String(selected).startsWith('file:')
+        ? [['' + selected, 'Gespeichert: ' + String(selected).slice(5)]]
+        : [];
+      return legacyOption.concat(options).map(([value, label]) => '<option value="' + value + '"' + (value === selected ? ' selected' : '') + '>' + label + '</option>').join('');
     }
 
     function renderSoundLibrary() {
@@ -775,10 +766,7 @@
         const dynamicChoices = (Array.isArray(result.sounds) ? result.sounds : [])
           .map(fileName => ['file:' + fileName, 'Datei: ' + fileName]);
         const existingValues = new Set(EVENT_EFFECT_CHOICES.sounds.map(([value]) => value));
-        EVENT_EFFECT_CHOICES.sounds.push(...dynamicChoices.filter(([value]) => {
-          const baseValue = 'file:' + value.slice(5).replace(/\.(mp3|ogg)$/i, '');
-          return !existingValues.has(value) && !existingValues.has(baseValue);
-        }));
+        EVENT_EFFECT_CHOICES.sounds.push(...dynamicChoices.filter(([value]) => !existingValues.has(value)));
         renderSoundLibrary();
       } catch (_) {
         showToast('Sound-Verzeichnis konnte nicht geladen werden');

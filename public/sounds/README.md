@@ -2,7 +2,7 @@
 
 Lege hier lizenzierte Sounddateien fuer die Event-Zuordnung ab. MP3- und OGG-Dateien werden beim Laden des Controllers automatisch erkannt und in die Ton-Auswahl aufgenommen.
 
-Unterstuetzte Dateinamen:
+Beispiel-Dateinamen:
 
 - t20.ogg
 - t19.ogg
