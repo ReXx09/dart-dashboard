@@ -4033,6 +4033,8 @@ function createFireTvServer() {
     res.sendFile(path.join(panelsDir, panel));
   });
 
+  fireTvApp.use('/icons', express.static(path.join(__dirname, 'public', 'icons')));
+
   fireTvApp.use('/api', proxyToBrowser);
 
   fireTvApp.use((_req, res) => {

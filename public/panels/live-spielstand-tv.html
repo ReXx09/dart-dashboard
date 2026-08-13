@@ -781,7 +781,7 @@
       const checkoutLabel = getFocusCheckoutLabel(state);
       
       const throwsHtml = displayThrows.map((pt, ti) => {
-        const throwData = Array.isArray(p.currentRoundPoints) ? throws.slice(-currentRound.length)[ti] : lastThrows[ti];
+        const throwData = pt === null ? null : (Array.isArray(p.currentRoundPoints) ? throws.slice(-currentRound.length)[ti] : lastThrows[ti]);
         const isBust = !!(throwData && throwData.bust);
         const pointsLabel = isBust ? 'BUST' : (pt === null ? '<img class="open-arrow" src="../icons/Dart_Pfeil_Logo.png" alt="Offener Wurf" title="Offener Wurf">' : (pt === 0 ? '0' : '+' + pt));
         const segmentLabel = throwData && throwData.segment ? throwData.segment : (pt === null ? '' : String(pt));
