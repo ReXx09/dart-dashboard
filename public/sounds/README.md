@@ -28,4 +28,4 @@ sounds/
 		sound-02.ogg
 ```
 
-Der Controller erkennt den Ordner automatisch und zeigt im Dropdown nur den Verweis `Random_Comedy` an. Dieser Verweis spielt bei jedem Event zufaellig eine Datei aus `sounds/commedy/`. Auch weitere Unterordner werden einbezogen. `Random_Alle_Sounds` verwendet weiterhin alle Sounddateien. Nach dem Ablegen den Controller neu laden.
+Der Controller erkennt den Ordner automatisch und zeigt im Dropdown nur den Verweis `Random_Comedy` an. Dieser Verweis spielt bei jedem Event zufaellig eine Datei aus `sounds/commedy/`. Auch weitere Unterordner werden einbezogen. So kannst du beispielsweise fuer das Winner-Overlay einen eigenen Ordner mit Sieger-Sounds anlegen und `Random_Comedy` oder `Random_Western` als Sound auswaehlen. Nach dem Ablegen den Controller neu laden.

@@ -411,6 +411,7 @@
       <div class="tuning-row">
         <button class="btn-sm" id="reloadEventsBtn" onclick="loadEventSettings()">Neu laden</button>
         <button class="btn-sm primary" id="saveEventsBtn" onclick="saveEventSettings()">Event-Konfiguration speichern</button>
+        <a class="btn-sm" href="/admin.html">Admin-Anmeldung</a>
       </div>
       </div>
     </section>
@@ -438,7 +439,6 @@
         ['cricket-score', 'Vorhandener Cricket-Ton'],
         ['checkout-success', 'Neue Checkout-Fanfare'],
         ['winner-fanfare', 'Neue Winner-Fanfare'],
-        ['random-files', 'Random_Alle_Sounds'],
         ['countdown-tick', 'Neuer Countdown-Tick'],
         ['positive-chime', 'Neuer positiver Chime'],
         ['double-hit', 'Neuer Doppel-Ton'],
@@ -761,6 +761,16 @@
       }
     }
 
+    async function settingsSaveError(response, fallback) {
+      let message = '';
+      try {
+        const result = await response.json();
+        message = result && result.error ? String(result.error) : '';
+      } catch (_) {}
+      if (response.status === 401) return 'Bitte zuerst Admin-Anmeldung öffnen und anmelden.';
+      return message || fallback;
+    }
+
     async function saveEventSettings() {
       const btn = document.getElementById('saveEventsBtn');
       if (btn) btn.disabled = true;
@@ -771,12 +781,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...settings, eventEffects: collectEventSettings() })
         });
-        if (!res.ok) throw new Error('save failed');
+        if (!res.ok) throw new Error(await settingsSaveError(res, 'Event-Konfiguration konnte nicht gespeichert werden'));
         const saved = await res.json();
         renderEventSettings(saved.eventEffects || {});
         showToast('Event-Konfiguration gespeichert');
-      } catch (_) {
-        showToast('Event-Konfiguration konnte nicht gespeichert werden');
+      } catch (error) {
+        showToast(error.message || 'Event-Konfiguration konnte nicht gespeichert werden');
       }
       if (btn) btn.disabled = false;
     }
@@ -972,13 +982,13 @@
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
-          showToast('Tuning-Speichern fehlgeschlagen');
+          showToast(await settingsSaveError(res, 'Tuning-Speichern fehlgeschlagen'));
         } else {
           showToast('Tuning gespeichert und aktiv');
           await loadTuningSettings();
         }
-      } catch (_) {
-        showToast('Tuning-Speichern fehlgeschlagen');
+      } catch (error) {
+        showToast(error.message || 'Tuning-Speichern fehlgeschlagen');
       }
       if (btn) btn.disabled = false;
     }
