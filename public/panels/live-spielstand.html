@@ -2036,7 +2036,7 @@
         const isBust = !!(throwData && throwData.bust);
         const pointsLabel = isBust ? 'BUST' : (pt === null ? '<img class="open-arrow" src="/icons/Dart_Pfeil_Logo.png" alt="Offener Wurf" title="Offener Wurf">' : (pt === 0 ? '0' : '+' + pt));
         // Segment aus dem passenden Wurf-Eintrag holen
-        let segmentLabel = '-';
+        let segmentLabel = '';
         if (pt !== null) {
           if (throwData && throwData.segment) {
             segmentLabel = throwData.segment;
@@ -2183,7 +2183,7 @@
       const throwsHtml = displayThrows.map((points, index) => {
         const throwData = currentRoundThrows[index];
         const pointsLabel = points === null ? '<img class="open-arrow" src="/icons/Dart_Pfeil_Logo.png" alt="Offener Wurf" title="Offener Wurf">' : (points === 0 ? '0' : '+' + points);
-        const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
+        const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '' : String(points));
         return '<div class="throw-seg' + (points === null ? '' : ' thrown') + '" style="--pc:' + escapeAttr(p.color || '#e63946') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
           '<div class="seg">' + segmentLabel + '</div>' +

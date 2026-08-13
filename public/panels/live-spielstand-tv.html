@@ -234,6 +234,8 @@
       box-shadow: none;
     }
     .throw-seg .pts { font-size: 1.4rem; color: var(--pc, #e63946); }
+    .throw-seg.open .pts { color: #6fa5d7; line-height: .85; }
+    .open-arrow { display: inline-block; width: 7.5rem; height: 3.75rem; object-fit: contain; vertical-align: middle; }
     .throw-seg .seg { font-size: .85rem; color: #555; margin-top: 2px; }
     .focus-big-score { font-size: 4.2rem; font-weight: 900; line-height: .95; color: var(--pc, #f4a261); font-variant-numeric: tabular-nums; }
     .focus-summary { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
@@ -781,8 +783,8 @@
       const throwsHtml = displayThrows.map((pt, ti) => {
         const throwData = Array.isArray(p.currentRoundPoints) ? throws.slice(-currentRound.length)[ti] : lastThrows[ti];
         const isBust = !!(throwData && throwData.bust);
-        const pointsLabel = isBust ? 'BUST' : (pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt));
-        const segmentLabel = throwData && throwData.segment ? throwData.segment : (pt === null ? '-' : String(pt));
+        const pointsLabel = isBust ? 'BUST' : (pt === null ? '<img class="open-arrow" src="/icons/Dart_Pfeil_Logo.png" alt="Offener Wurf" title="Offener Wurf">' : (pt === 0 ? '0' : '+' + pt));
+        const segmentLabel = throwData && throwData.segment ? throwData.segment : (pt === null ? '' : String(pt));
         return '<div class="throw-seg' + (pt === null ? ' open' : ' thrown') + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#f4a261') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
           '<div class="seg">' + segmentLabel + '</div>' +
@@ -900,8 +902,8 @@
       const throwsHtml = displayThrows.map((points, index) => {
         const throwData = currentRoundThrows[index];
         const isBust = !!(throwData && throwData.bust);
-        const pointsLabel = isBust ? 'BUST' : (points === null ? 'offen' : (points === 0 ? '0' : '+' + points));
-        const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
+        const pointsLabel = isBust ? 'BUST' : (points === null ? '<img class="open-arrow" src="/icons/Dart_Pfeil_Logo.png" alt="Offener Wurf" title="Offener Wurf">' : (points === 0 ? '0' : '+' + points));
+        const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '' : String(points));
         return '<div class="throw-seg' + (points === null ? '' : ' thrown') + (isBust ? ' bust' : '') + '" style="--pc:' + escapeAttr(p.color || '#e63946') + '"><div class="pts">' + pointsLabel + '</div><div class="seg">' + segmentLabel + '</div></div>';
       }).join('');
       const legStats = getLiveLegStats(p);
