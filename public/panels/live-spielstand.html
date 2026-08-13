@@ -1356,6 +1356,25 @@
       audio.volume = Number.isFinite(Number(volume)) ? Number(volume) : 0.3;
       audio.play().catch(() => fallback());
     }
+
+    let mobileAudioUnlocked = false;
+    function unlockMobileAudio() {
+      if (mobileAudioUnlocked) return;
+      mobileAudioUnlocked = true;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          const context = new AudioContextClass();
+          context.resume().finally(() => context.close().catch(() => {}));
+        }
+        const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAA');
+        silentAudio.muted = true;
+        silentAudio.play().catch(() => {});
+      } catch (_) {}
+    }
+    ['pointerdown', 'touchstart', 'click'].forEach(eventName => {
+      document.addEventListener(eventName, unlockMobileAudio, { once: true, passive: true });
+    });
     let duelStatsEnabled = localStorage.getItem('liveDuelStatsEnabled') !== 'false';
 
     function startCountdown(state) {
