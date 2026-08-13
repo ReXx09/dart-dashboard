@@ -208,6 +208,14 @@
     .event-table input[type="checkbox"] { width: 17px; height: 17px; accent-color: #47d6b6; }
     .event-name { font-weight: 700; white-space: nowrap; }
     .event-existing { color: #8dd7c5; font-size: .65rem; display: block; margin-top: 3px; }
+    .event-preview-effect { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; pointer-events: none; background: rgba(244,162,97,.12); animation: event-preview-in 1.1s ease-out forwards; }
+    .event-preview-effect strong { padding: 18px 28px; border: 2px solid #f4a261; border-radius: 14px; color: #fff; background: rgba(20,20,20,.92); font-size: clamp(1.2rem, 4vw, 2rem); text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 34px rgba(244,162,97,.42); }
+    .event-preview-effect.highlight strong { border-color: #2a9d8f; box-shadow: 0 0 44px rgba(42,157,143,.65); }
+    .event-preview-effect.flash { background: rgba(244,199,66,.3); }
+    .event-preview-effect.celebration strong { border-color: #f4c542; box-shadow: 0 0 55px rgba(244,197,66,.75); transform: scale(1.08); }
+    .event-preview-effect.shake strong { animation: event-preview-shake .45s ease-in-out 2; }
+    @keyframes event-preview-in { 0% { opacity: 0; transform: scale(.86); } 18% { opacity: 1; transform: scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: scale(1.04); } }
+    @keyframes event-preview-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-9px); } 75% { transform: translateX(9px); } }
     .field-test-log { margin-top: 10px; max-height: 220px; overflow: auto; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; }
     .field-test-log table { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: .72rem; }
     .field-test-log th, .field-test-log td { padding: 6px 8px; border-bottom: 1px solid #141414; text-align: left; white-space: nowrap; }
@@ -364,8 +372,8 @@
       <p class="event-intro">Vorhandene Effekte werden nur zugeordnet. BUST, Elimination und Cricket-Score sind bereits integriert; neue Treffer bleiben deaktiviert, bis ein Effekt dafür vorhanden ist.</p>
       <div class="event-table-wrap">
         <table class="event-table">
-          <thead><tr><th>Ereignis</th><th>Browser</th><th>TV / Firestick</th><th>Ton</th><th>Animation</th><th>Lautstärke</th><th>Dauer ms</th></tr></thead>
-          <tbody id="eventEffectsTable"><tr><td colspan="7">Lade Event-Konfiguration...</td></tr></tbody>
+          <thead><tr><th>Ereignis</th><th>Browser</th><th>TV / Firestick</th><th>Ton</th><th>Animation</th><th>Lautstärke</th><th>Dauer ms</th><th>Vorschau</th></tr></thead>
+          <tbody id="eventEffectsTable"><tr><td colspan="8">Lade Event-Konfiguration...</td></tr></tbody>
         </table>
       </div>
       <div class="tuning-row">
@@ -396,7 +404,13 @@
         ['none', 'Kein Ton'],
         ['bust', 'Vorhandener BUST-Ton'],
         ['elimination', 'Vorhandener Elimination-Ton'],
-        ['cricket-score', 'Vorhandener Cricket-Ton']
+        ['cricket-score', 'Vorhandener Cricket-Ton'],
+        ['checkout-success', 'Neue Checkout-Fanfare'],
+        ['winner-fanfare', 'Neue Winner-Fanfare'],
+        ['countdown-tick', 'Neuer Countdown-Tick'],
+        ['positive-chime', 'Neuer positiver Chime'],
+        ['double-hit', 'Neuer Doppel-Ton'],
+        ['triple-hit', 'Neuer Triple-Ton']
       ],
       animations: [
         ['none', 'Keine Animation'],
@@ -404,7 +418,11 @@
         ['elimination', 'Vorhandenes Elimination-Overlay'],
         ['cricket-score', 'Vorhandene Cricket-Animation'],
         ['winner', 'Vorhandenes Winner-Overlay'],
-        ['confetti', 'Vorhandener Confetti-Effekt']
+        ['confetti', 'Vorhandener Confetti-Effekt'],
+        ['highlight', 'Neues Highlight'],
+        ['flash', 'Neuer Flash'],
+        ['celebration', 'Neue Celebration'],
+        ['shake', 'Neues Shake']
       ]
     };
 
@@ -522,7 +540,7 @@
       if (!table) return;
       const entries = Object.entries(eventEffects || {});
       if (!entries.length) {
-        table.innerHTML = '<tr><td colspan="7">Keine Event-Konfiguration vorhanden.</td></tr>';
+        table.innerHTML = '<tr><td colspan="8">Keine Event-Konfiguration vorhanden.</td></tr>';
         return;
       }
       table.innerHTML = entries.map(([key, event]) => {
@@ -535,8 +553,81 @@
           '<td><select class="event-animation" aria-label="Animation ' + escHtml(event.label || key) + '">' + eventSelectOptions(EVENT_EFFECT_CHOICES.animations, event.animation) + '</select></td>' +
           '<td><input class="event-volume" type="number" min="0" max="1" step="0.05" value="' + Number(event.volume ?? 0.3) + '" aria-label="Lautstärke ' + escHtml(event.label || key) + '"></td>' +
           '<td><input class="event-duration" type="number" min="100" max="10000" step="100" value="' + Number(event.durationMs ?? 900) + '" aria-label="Dauer ' + escHtml(event.label || key) + '"></td>' +
+          '<td><button class="btn-sm" type="button" onclick="previewEventEffect(this)">Anspielen</button></td>' +
         '</tr>';
       }).join('');
+    }
+
+    function previewEventEffect(button) {
+      const row = button && button.closest('tr[data-event-key]');
+      if (!row) return;
+      const eventName = row.querySelector('.event-name')?.textContent || 'Event';
+      const sound = row.querySelector('.event-sound')?.value || 'none';
+      const animation = row.querySelector('.event-animation')?.value || 'none';
+      const volume = clampNumber(row.querySelector('.event-volume')?.value, 0.3, 0, 1);
+      const duration = clampInt(row.querySelector('.event-duration')?.value, 900, 100, 10000);
+      playEventPreviewSound(sound, volume);
+      showEventPreviewAnimation(eventName, animation, duration);
+    }
+
+    function playEventPreviewSound(sound, volume) {
+      if (sound === 'none') return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const ctx = new AudioContextClass();
+        const now = ctx.currentTime;
+        const gain = ctx.createGain();
+        const oscillator = ctx.createOscillator();
+        const patterns = {
+          bust: [[150, 80, .4, 'square']],
+          elimination: [[100, 40, 1.2, 'sawtooth']],
+          'cricket-score': [[660, 990, .25, 'sine']],
+          'checkout-success': [[523, 784, .55, 'triangle'], [659, 1047, .7, 'triangle']],
+          'winner-fanfare': [[392, 784, .45, 'triangle'], [523, 1047, .7, 'triangle']],
+          'countdown-tick': [[880, 880, .16, 'square']],
+          'positive-chime': [[660, 990, .3, 'sine']],
+          'double-hit': [[440, 660, .26, 'triangle']],
+          'triple-hit': [[440, 660, .42, 'triangle']]
+        };
+        const pattern = patterns[sound] || patterns['positive-chime'];
+        oscillator.type = pattern[0][3];
+        oscillator.frequency.setValueAtTime(pattern[0][0], now);
+        oscillator.frequency.linearRampToValueAtTime(pattern[0][1], now + pattern[0][2]);
+        gain.gain.setValueAtTime(Math.max(.0001, volume), now);
+        gain.gain.exponentialRampToValueAtTime(.0001, now + pattern[0][2]);
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start(now);
+        oscillator.stop(now + pattern[0][2]);
+        if (pattern[1]) {
+          const second = ctx.createOscillator();
+          const secondGain = ctx.createGain();
+          second.type = pattern[1][3];
+          second.frequency.setValueAtTime(pattern[1][0], now + .18);
+          second.frequency.linearRampToValueAtTime(pattern[1][1], now + .18 + pattern[1][2]);
+          secondGain.gain.setValueAtTime(Math.max(.0001, volume), now + .18);
+          secondGain.gain.exponentialRampToValueAtTime(.0001, now + .18 + pattern[1][2]);
+          second.connect(secondGain);
+          secondGain.connect(ctx.destination);
+          second.start(now + .18);
+          second.stop(now + .18 + pattern[1][2]);
+        }
+        setTimeout(() => ctx.close().catch(() => {}), 1800);
+      } catch (_) {
+        showToast('Audio-Vorschau wurde vom Browser blockiert');
+      }
+    }
+
+    function showEventPreviewAnimation(eventName, animation, duration) {
+      if (animation === 'none') return;
+      document.querySelectorAll('.event-preview-effect').forEach(el => el.remove());
+      const overlay = document.createElement('div');
+      overlay.className = 'event-preview-effect ' + animation;
+      overlay.style.animationDuration = Math.min(duration, 5000) + 'ms';
+      overlay.innerHTML = '<strong>' + escHtml(eventName) + '</strong>';
+      document.body.appendChild(overlay);
+      setTimeout(() => overlay.remove(), Math.min(duration + 150, 5200));
     }
 
     function collectEventSettings() {

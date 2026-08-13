@@ -558,8 +558,30 @@ const EVENT_EFFECT_DEFAULTS = {
   confetti: { label: 'Confetti', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'confetti', volume: 0.3, durationMs: 3000 }
 };
 
-const EVENT_EFFECT_SOUNDS = ['none', 'bust', 'elimination', 'cricket-score'];
-const EVENT_EFFECT_ANIMATIONS = ['none', 'bust', 'elimination', 'cricket-score', 'winner', 'confetti'];
+const EVENT_EFFECT_SOUNDS = [
+  'none',
+  'bust',
+  'elimination',
+  'cricket-score',
+  'checkout-success',
+  'winner-fanfare',
+  'countdown-tick',
+  'positive-chime',
+  'double-hit',
+  'triple-hit'
+];
+const EVENT_EFFECT_ANIMATIONS = [
+  'none',
+  'bust',
+  'elimination',
+  'cricket-score',
+  'winner',
+  'confetti',
+  'highlight',
+  'flash',
+  'celebration',
+  'shake'
+];
 
 function normalizeEventEffects(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
