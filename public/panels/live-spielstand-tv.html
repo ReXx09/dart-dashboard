@@ -684,6 +684,24 @@
     let countdownTimer = null;
     let isFirstLoad = true;
     let lastCricketAnimationKey = '';
+    let lastEventSoundKey = '';
+    let eventEffects = null;
+    const eventTarget = 'tv';
+
+    function isEventEnabled(eventKey) {
+      const config = eventEffects && eventEffects[eventKey];
+      return !config || config[eventTarget + 'Enabled'] !== false;
+    }
+
+    function isEventAnimationEnabled(eventKey) {
+      const config = eventEffects && eventEffects[eventKey];
+      return !config || (isEventEnabled(eventKey) && config.animation === eventKey);
+    }
+
+    function isEventSoundEnabled(eventKey) {
+      const config = eventEffects && eventEffects[eventKey];
+      return !config || (isEventEnabled(eventKey) && config.sound === eventKey);
+    }
 
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
@@ -998,12 +1016,16 @@
         const animationKey = [lastThrow.ts, lastThrow.playerSlot, lastThrow.cricketPointsAwarded].join(':');
         if (animationKey !== lastCricketAnimationKey) {
           lastCricketAnimationKey = animationKey;
-          showCricketScoreAnimation(lastThrow.cricketPointsAwarded);
+          if (isEventAnimationEnabled('cricketScore')) showCricketScoreAnimation(lastThrow.cricketPointsAwarded);
         }
       }
       if (lastThrow && lastThrow.bust) {
-        showBustOverlay(active);
-        playBustSound();
+        if (isEventAnimationEnabled('bust')) showBustOverlay(active); else hideBustOverlay();
+        const soundKey = [lastThrow.ts, lastThrow.playerSlot, 'bust'].join(':');
+        if (soundKey !== lastEventSoundKey && isEventSoundEnabled('bust')) {
+          lastEventSoundKey = soundKey;
+          playBustSound();
+        }
       } else {
         hideBustOverlay();
       }
@@ -1013,8 +1035,12 @@
         const eliminatedPlayer = state.players.find(p => p.slot === lastThrow.playerSlot);
         const eliminatorPlayer = state.players.find(p => p.slot === lastThrow.eliminatedBySlot);
         if (eliminatedPlayer && eliminatorPlayer) {
-          showEliminationOverlay(eliminatedPlayer, eliminatorPlayer);
-          playEliminationSound();
+          if (isEventAnimationEnabled('elimination')) showEliminationOverlay(eliminatedPlayer, eliminatorPlayer); else hideEliminationOverlay();
+          const soundKey = [lastThrow.ts, lastThrow.playerSlot, 'elimination'].join(':');
+          if (soundKey !== lastEventSoundKey && isEventSoundEnabled('elimination')) {
+            lastEventSoundKey = soundKey;
+            playEliminationSound();
+          }
         }
       } else {
         hideEliminationOverlay();
@@ -1275,7 +1301,7 @@
       animation.className = 'cricket-score-animation';
       animation.textContent = '+' + points;
       document.body.appendChild(animation);
-      playCricketScoreSound();
+      if (isEventSoundEnabled('cricketScore')) playCricketScoreSound();
       setTimeout(() => animation.remove(), 1200);
     }
 
@@ -1337,6 +1363,10 @@
 
     async function loadAll(retryAttempt = 0) {
       try {
+        if (eventEffects === null) {
+          const settings = await fetch('/api/settings', { cache: 'no-store' }).then(r => r.json());
+          eventEffects = settings.eventEffects || {};
+        }
         const stateRes = await fetch('/api/live/state', { cache: 'no-store' });
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();

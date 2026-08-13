@@ -196,6 +196,18 @@
     .tuning-quickhelp li { font-size: .74rem; color: #b7c2c9; line-height: 1.35; }
     .tuning-quickhelp strong { color: #e2edf4; }
     .tuning-hint { margin-top: 8px; font-size: .72rem; color: #555; line-height: 1.4; }
+    .event-intro { color: #9aa8b5; font-size: .78rem; line-height: 1.45; margin-bottom: 12px; }
+    .event-table-wrap { overflow-x: auto; border: 1px solid #1a1a1a; border-radius: 10px; }
+    .event-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: .74rem; }
+    .event-table th, .event-table td { padding: 8px; border-bottom: 1px solid #1a1a1a; text-align: left; vertical-align: middle; }
+    .event-table th { color: #777; background: #0b0b0b; font-size: .66rem; text-transform: uppercase; letter-spacing: .7px; white-space: nowrap; }
+    .event-table td { color: #d5dbe0; background: #0d0d0d; }
+    .event-table tr:last-child td { border-bottom: 0; }
+    .event-table select, .event-table input[type="number"] { width: 100%; min-width: 92px; background: #070707; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 6px; border-radius: 7px; font: inherit; }
+    .event-table select:focus, .event-table input[type="number"]:focus { outline: none; border-color: #47d6b6; }
+    .event-table input[type="checkbox"] { width: 17px; height: 17px; accent-color: #47d6b6; }
+    .event-name { font-weight: 700; white-space: nowrap; }
+    .event-existing { color: #8dd7c5; font-size: .65rem; display: block; margin-top: 3px; }
     .field-test-log { margin-top: 10px; max-height: 220px; overflow: auto; background: #070707; border: 1px solid #1a1a1a; border-radius: 10px; }
     .field-test-log table { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: .72rem; }
     .field-test-log th, .field-test-log td { padding: 6px 8px; border-bottom: 1px solid #141414; text-align: left; white-space: nowrap; }
@@ -226,6 +238,7 @@
       <button class="menu-link menu-accent-4" data-section="arduino" type="button" onclick="activateSection('arduino')"><span class="menu-no">02</span><span class="menu-title">Arduino</span><span class="menu-sub">Live-Zustand und Telemetrie</span></button>
       <button class="menu-link menu-accent-5" data-section="scanner" type="button" onclick="activateSection('scanner')"><span class="menu-no">03</span><span class="menu-title">Scanner</span><span class="menu-sub">Rohwerte und Matrix-Log</span></button>
       <button class="menu-link menu-accent-6" data-section="tuning" type="button" onclick="activateSection('tuning')"><span class="menu-no">04</span><span class="menu-title">Tuning</span><span class="menu-sub">Trefferparameter abstimmen</span></button>
+      <button class="menu-link menu-accent-7" data-section="events" type="button" onclick="activateSection('events')"><span class="menu-no">05</span><span class="menu-title">Events</span><span class="menu-sub">Töne und Effekte zuordnen</span></button>
     </aside>
     <section class="content-viewer">
       <div class="viewer-bar">
@@ -346,6 +359,21 @@
       </div>
       <div class="tuning-hint">Hinweis: Werte in kleinen Schritten aendern (10-30 ms) und danach 10-20 Testwuerfe je Feld pruefen.</div>
       </div>
+      <div class="ctrl-section" id="events">
+      <h3>Event-Zuordnung</h3>
+      <p class="event-intro">Vorhandene Effekte werden nur zugeordnet. BUST, Elimination und Cricket-Score sind bereits integriert; neue Treffer bleiben deaktiviert, bis ein Effekt dafür vorhanden ist.</p>
+      <div class="event-table-wrap">
+        <table class="event-table">
+          <thead><tr><th>Ereignis</th><th>Browser</th><th>TV / Firestick</th><th>Ton</th><th>Animation</th><th>Lautstärke</th><th>Dauer ms</th></tr></thead>
+          <tbody id="eventEffectsTable"><tr><td colspan="7">Lade Event-Konfiguration...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="tuning-row">
+        <button class="btn-sm" id="reloadEventsBtn" onclick="loadEventSettings()">Neu laden</button>
+        <button class="btn-sm primary" id="saveEventsBtn" onclick="saveEventSettings()">Event-Konfiguration speichern</button>
+      </div>
+      <div class="tuning-hint">Die Auswahl wird über die bestehende Settings-API gespeichert. Die eigentliche Wiedergabe bleibt in den bereits vorhandenen Live-Panels.</div>
+      </div>
     </section>
   </main>
   <div class="toast" id="toast"></div>
@@ -360,7 +388,25 @@
     let fieldTestWindow = null;
     let tuningInfoWindow = null;
     let tuningLoadedOnce = false;
+    let eventSettingsLoadedOnce = false;
     let latestObservedMatrixHit = null;
+
+    const EVENT_EFFECT_CHOICES = {
+      sounds: [
+        ['none', 'Kein Ton'],
+        ['bust', 'Vorhandener BUST-Ton'],
+        ['elimination', 'Vorhandener Elimination-Ton'],
+        ['cricket-score', 'Vorhandener Cricket-Ton']
+      ],
+      animations: [
+        ['none', 'Keine Animation'],
+        ['bust', 'Vorhandenes BUST-Overlay'],
+        ['elimination', 'Vorhandenes Elimination-Overlay'],
+        ['cricket-score', 'Vorhandene Cricket-Animation'],
+        ['winner', 'Vorhandenes Winner-Overlay'],
+        ['confetti', 'Vorhandener Confetti-Effekt']
+      ]
+    };
 
     const TUNING_PRESETS = {
       safe: {
@@ -415,6 +461,14 @@
       return Math.round(n);
     }
 
+    function clampNumber(v, fallback, min, max) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return fallback;
+      if (Number.isFinite(min) && n < min) return min;
+      if (Number.isFinite(max) && n > max) return max;
+      return n;
+    }
+
     function activateSection(sectionId) {
       let id = String(sectionId || '').trim().toLowerCase();
       if (id === 'spieler' || id === 'aktionen') id = 'spiel';
@@ -457,6 +511,80 @@
       document.getElementById('tuningThrowWindow').value = t.arduinoThrowWindowMs;
       document.getElementById('tuningPlayerSwitchDelay').value = t.playerSwitchDelayMs;
       document.getElementById('tuningSinglePlayerSwitchDelay').value = t.singlePlayerSwitchDelayMs != null ? t.singlePlayerSwitchDelayMs : 3000;
+    }
+
+    function eventSelectOptions(options, selected) {
+      return options.map(([value, label]) => '<option value="' + value + '"' + (value === selected ? ' selected' : '') + '>' + label + '</option>').join('');
+    }
+
+    function renderEventSettings(eventEffects) {
+      const table = document.getElementById('eventEffectsTable');
+      if (!table) return;
+      const entries = Object.entries(eventEffects || {});
+      if (!entries.length) {
+        table.innerHTML = '<tr><td colspan="7">Keine Event-Konfiguration vorhanden.</td></tr>';
+        return;
+      }
+      table.innerHTML = entries.map(([key, event]) => {
+        const existing = event.sound !== 'none' || event.animation !== 'none';
+        return '<tr data-event-key="' + key + '">' +
+          '<td><span class="event-name">' + escHtml(event.label || key) + '</span>' + (existing ? '<span class="event-existing">Bestand vorhanden</span>' : '') + '</td>' +
+          '<td><input class="event-browser" type="checkbox"' + (event.browserEnabled !== false ? ' checked' : '') + ' aria-label="Browser ' + escHtml(event.label || key) + '"></td>' +
+          '<td><input class="event-tv" type="checkbox"' + (event.tvEnabled !== false ? ' checked' : '') + ' aria-label="TV ' + escHtml(event.label || key) + '"></td>' +
+          '<td><select class="event-sound" aria-label="Ton ' + escHtml(event.label || key) + '">' + eventSelectOptions(EVENT_EFFECT_CHOICES.sounds, event.sound) + '</select></td>' +
+          '<td><select class="event-animation" aria-label="Animation ' + escHtml(event.label || key) + '">' + eventSelectOptions(EVENT_EFFECT_CHOICES.animations, event.animation) + '</select></td>' +
+          '<td><input class="event-volume" type="number" min="0" max="1" step="0.05" value="' + Number(event.volume ?? 0.3) + '" aria-label="Lautstärke ' + escHtml(event.label || key) + '"></td>' +
+          '<td><input class="event-duration" type="number" min="100" max="10000" step="100" value="' + Number(event.durationMs ?? 900) + '" aria-label="Dauer ' + escHtml(event.label || key) + '"></td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function collectEventSettings() {
+      const eventEffects = {};
+      document.querySelectorAll('#eventEffectsTable tr[data-event-key]').forEach((row) => {
+        const key = row.getAttribute('data-event-key');
+        eventEffects[key] = {
+          browserEnabled: row.querySelector('.event-browser').checked,
+          tvEnabled: row.querySelector('.event-tv').checked,
+          sound: row.querySelector('.event-sound').value,
+          animation: row.querySelector('.event-animation').value,
+          volume: clampNumber(row.querySelector('.event-volume').value, 0.3, 0, 1),
+          durationMs: clampInt(row.querySelector('.event-duration').value, 900, 100, 10000)
+        };
+      });
+      return eventEffects;
+    }
+
+    async function loadEventSettings() {
+      const btn = document.getElementById('reloadEventsBtn');
+      if (btn) btn.disabled = true;
+      try {
+        const settings = await fetch('/api/settings').then(r => r.json());
+        renderEventSettings(settings.eventEffects || {});
+      } catch (_) {
+        showToast('Event-Konfiguration konnte nicht geladen werden');
+      }
+      if (btn) btn.disabled = false;
+    }
+
+    async function saveEventSettings() {
+      const btn = document.getElementById('saveEventsBtn');
+      if (btn) btn.disabled = true;
+      try {
+        const settings = await fetch('/api/settings').then(r => r.json());
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...settings, eventEffects: collectEventSettings() })
+        });
+        if (!res.ok) throw new Error('save failed');
+        const saved = await res.json();
+        renderEventSettings(saved.eventEffects || {});
+        showToast('Event-Konfiguration gespeichert');
+      } catch (_) {
+        showToast('Event-Konfiguration konnte nicht gespeichert werden');
+      }
+      if (btn) btn.disabled = false;
     }
 
     function collectTuningFromInputs() {
@@ -1099,6 +1227,10 @@
       if (!tuningLoadedOnce) {
         tuningLoadedOnce = true;
         loadTuningSettings();
+      }
+      if (!eventSettingsLoadedOnce) {
+        eventSettingsLoadedOnce = true;
+        loadEventSettings();
       }
 
       const hashId = String((location.hash || '').replace('#', '')).trim().toLowerCase();

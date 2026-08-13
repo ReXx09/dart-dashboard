@@ -541,6 +541,44 @@ function saveMatrixMapping(mapping) {
   return normalized;
 }
 
+const EVENT_EFFECT_DEFAULTS = {
+  t20: { label: 'T20', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  t19: { label: 'T19', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  t18: { label: 'T18', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  t17: { label: 'T17', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  bull: { label: 'Bull / 25', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  dbull: { label: 'dBull', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  triple: { label: 'Triple allgemein', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  maximum: { label: '180 / Maximum', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 1200 },
+  checkout: { label: 'Checkout', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 1400 },
+  bust: { label: 'BUST', browserEnabled: true, tvEnabled: true, sound: 'bust', animation: 'bust', volume: 0.3, durationMs: 1500 },
+  elimination: { label: 'Elimination', browserEnabled: true, tvEnabled: true, sound: 'elimination', animation: 'elimination', volume: 0.4, durationMs: 2000 },
+  cricketScore: { label: 'Cricket-Score', browserEnabled: true, tvEnabled: true, sound: 'cricket-score', animation: 'cricket-score', volume: 0.22, durationMs: 1200 },
+  winner: { label: 'Winner', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'winner', volume: 0.3, durationMs: 3000 },
+  confetti: { label: 'Confetti', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'confetti', volume: 0.3, durationMs: 3000 }
+};
+
+const EVENT_EFFECT_SOUNDS = ['none', 'bust', 'elimination', 'cricket-score'];
+const EVENT_EFFECT_ANIMATIONS = ['none', 'bust', 'elimination', 'cricket-score', 'winner', 'confetti'];
+
+function normalizeEventEffects(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(Object.entries(EVENT_EFFECT_DEFAULTS).map(([key, fallback]) => {
+    const item = source[key] && typeof source[key] === 'object' ? source[key] : {};
+    const volume = clampNumber(item.volume, fallback.volume, 0, 1);
+    const durationMs = clampNumber(item.durationMs, fallback.durationMs, 100, 10000);
+    return [key, {
+      ...fallback,
+      browserEnabled: item.browserEnabled !== false,
+      tvEnabled: item.tvEnabled !== false,
+      sound: EVENT_EFFECT_SOUNDS.includes(item.sound) ? item.sound : fallback.sound,
+      animation: EVENT_EFFECT_ANIMATIONS.includes(item.animation) ? item.animation : fallback.animation,
+      volume,
+      durationMs
+    }];
+  }));
+}
+
 function getSettings() {
   const merged = {
     arduinoMonitorEnabled: true,
@@ -560,11 +598,13 @@ function getSettings() {
     throwMinIntervalMs: runtimeTuning.throwMinIntervalMs,
     playerSwitchDelayMs: runtimeTuning.playerSwitchDelayMs,
     singlePlayerSwitchDelayMs: runtimeTuning.singlePlayerSwitchDelayMs,
+    eventEffects: normalizeEventEffects(),
     ...readJson(SETTINGS_FILE, {})
   };
+  merged.eventEffects = normalizeEventEffects(merged.eventEffects);
   return merged;
 }
-function saveSettings(s) { writeJson(SETTINGS_FILE, s); }
+function saveSettings(s) { writeJson(SETTINGS_FILE, { ...s, eventEffects: normalizeEventEffects(s.eventEffects) }); }
 
 function clampNumber(value, fallback, min, max) {
   const n = Number(value);
