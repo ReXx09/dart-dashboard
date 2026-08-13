@@ -1319,7 +1319,13 @@
     }
 
     function playTripleEventSound(lastThrow) {
-      const segment = String(lastThrow && lastThrow.segment || '').toUpperCase();
+      let segment = String(lastThrow && lastThrow.segment || '').toUpperCase();
+      if (!segment && Number(lastThrow && lastThrow.code) > 0) {
+        const code = Number(lastThrow.code);
+        const multiplier = Math.floor(code / 100);
+        const number = code % 100;
+        if (multiplier === 3 && number >= 1 && number <= 20) segment = 'T' + number;
+      }
       if (!/^T\d+$/.test(segment)) return;
       const specificKey = ['T20', 'T19', 'T18', 'T17'].includes(segment) ? segment.toLowerCase() : null;
       const specificConfig = specificKey && eventEffects && eventEffects[specificKey];
