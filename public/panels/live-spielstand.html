@@ -285,6 +285,8 @@
       box-shadow: none;
     }
     .throw-seg .pts { font-size: 2.7rem; color: var(--pc, #e63946); }
+    .throw-seg.open .pts { color: #6fa5d7; font-size: 3.4rem; line-height: .85; }
+    .open-arrow { display: inline-block; font-weight: 900; }
     .throw-seg .seg { font-size: .95rem; color: #555; margin-top: 1px; }
     .throw-seg.bust { border-color: #e63946; background: #2a0a0a; box-shadow: 0 0 15px rgba(230,57,70,.4); }
     .throw-seg.bust .pts { color: #e63946; font-size: 2.52rem; }
@@ -2032,7 +2034,7 @@
       const throwsHtml = displayThrows.map((pt, ti) => {
         const throwData = currentRoundThrows[ti];
         const isBust = !!(throwData && throwData.bust);
-        const pointsLabel = isBust ? 'BUST' : (pt === null ? 'offen' : (pt === 0 ? '0' : '+' + pt));
+        const pointsLabel = isBust ? 'BUST' : (pt === null ? '<span class="open-arrow" aria-label="Offener Wurf" title="Offener Wurf">&#8594;</span>' : (pt === 0 ? '0' : '+' + pt));
         // Segment aus dem passenden Wurf-Eintrag holen
         let segmentLabel = '-';
         if (pt !== null) {
@@ -2180,7 +2182,7 @@
       // Letzte Würfe
       const throwsHtml = displayThrows.map((points, index) => {
         const throwData = currentRoundThrows[index];
-        const pointsLabel = points === null ? 'offen' : (points === 0 ? '0' : '+' + points);
+        const pointsLabel = points === null ? '<span class="open-arrow" aria-label="Offener Wurf" title="Offener Wurf">&#8594;</span>' : (points === 0 ? '0' : '+' + points);
         const segmentLabel = throwData && throwData.segment ? throwData.segment : (points === null ? '-' : String(points));
         return '<div class="throw-seg' + (points === null ? '' : ' thrown') + '" style="--pc:' + escapeAttr(p.color || '#e63946') + '">' +
           '<div class="pts">' + pointsLabel + '</div>' +
