@@ -566,10 +566,10 @@
 
     function eventSelectOptions(options, selected) {
       const hasSelected = options.some(([value]) => value === selected);
-      const legacyOption = selected && !hasSelected && String(selected).startsWith('file:')
-        ? [['' + selected, 'Gespeichert: ' + String(selected).slice(5)]]
+      const legacyOption = selected && !hasSelected && (String(selected).startsWith('file:') || String(selected).startsWith('random-folder:'))
+        ? [['' + selected, 'Gespeichert: ' + String(selected).replace(/^(file:|random-folder:)/, '')]]
         : [];
-      return legacyOption.concat(options).map(([value, label]) => '<option value="' + value + '"' + (value === selected ? ' selected' : '') + '>' + label + '</option>').join('');
+      return legacyOption.concat(options).map(([value, label]) => '<option value="' + escHtml(value) + '"' + (value === selected ? ' selected' : '') + '>' + escHtml(label) + '</option>').join('');
     }
 
     function renderEventSettings(eventEffects) {
@@ -609,9 +609,11 @@
 
     function playEventPreviewSound(sound, volume) {
       if (sound === 'none') return;
-      if (sound === 'random-files') {
+      if (sound === 'random-files' || sound.startsWith('random-folder:')) {
         fetch('/api/sounds/available').then(r => r.json()).then(result => {
-          const files = Array.isArray(result.sounds) ? result.sounds : [];
+          const folder = sound.startsWith('random-folder:') ? sound.slice(14) : '';
+          const files = (Array.isArray(result.sounds) ? result.sounds : [])
+            .filter(fileName => !folder || fileName.startsWith(folder + '/'));
           if (!files.length) return;
           playEventPreviewSound('file:' + files[Math.floor(Math.random() * files.length)], volume);
         }).catch(() => showToast('Sound-Verzeichnis konnte nicht geladen werden'));
@@ -619,7 +621,8 @@
       }
       if (sound.startsWith('file:')) {
         const fileName = sound.slice(5);
-        const audio = new Audio('/sounds/' + (/[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg'));
+        const soundPath = /[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg';
+        const audio = new Audio('/sounds/' + soundPath.split('/').map(encodeURIComponent).join('/'));
         audio.volume = volume;
         audio.play().catch(() => showToast('Sounddatei fehlt oder Audio wurde blockiert'));
         return;
@@ -744,8 +747,10 @@
         const result = await fetch('/api/sounds/available').then(r => r.json());
         const dynamicChoices = (Array.isArray(result.sounds) ? result.sounds : [])
           .map(fileName => ['file:' + fileName, 'Datei: ' + fileName]);
+        const folderChoices = (Array.isArray(result.folders) ? result.folders : [])
+          .map(folder => ['random-folder:' + folder, 'Zufall: ' + folder]);
         const existingValues = new Set(EVENT_EFFECT_CHOICES.sounds.map(([value]) => value));
-        EVENT_EFFECT_CHOICES.sounds.push(...dynamicChoices.filter(([value]) => !existingValues.has(value)));
+        EVENT_EFFECT_CHOICES.sounds.push(...folderChoices.concat(dynamicChoices).filter(([value]) => !existingValues.has(value)));
       } catch (_) {
         showToast('Sound-Verzeichnis konnte nicht geladen werden');
       }

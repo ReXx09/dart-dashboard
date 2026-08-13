@@ -712,9 +712,11 @@
     function playConfiguredEventSound(eventKey, fallback) {
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
-      if (config && config.sound === 'random-files') {
+      if (config && (config.sound === 'random-files' || String(config.sound || '').startsWith('random-folder:'))) {
         fetch('/api/sounds/available').then(r => r.json()).then(result => {
-          const files = Array.isArray(result.sounds) ? result.sounds : [];
+          const folder = String(config.sound || '').startsWith('random-folder:') ? String(config.sound).slice(14) : '';
+          const files = (Array.isArray(result.sounds) ? result.sounds : [])
+            .filter(fileName => !folder || fileName.startsWith(folder + '/'));
           if (!files.length) return fallback();
           playConfiguredEventSoundValue(files[Math.floor(Math.random() * files.length)], config.volume, fallback);
         }).catch(() => fallback());
@@ -728,7 +730,8 @@
     }
 
     function playConfiguredEventSoundValue(fileName, volume, fallback) {
-      const audio = new Audio('/sounds/' + (/[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg'));
+      const soundPath = /[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg';
+      const audio = new Audio('/sounds/' + soundPath.split('/').map(encodeURIComponent).join('/'));
       audio.volume = Number.isFinite(Number(volume)) ? Number(volume) : 0.3;
       audio.play().catch(() => fallback());
     }

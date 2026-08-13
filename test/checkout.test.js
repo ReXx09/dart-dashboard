@@ -1,13 +1,39 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 const {
   getCheckoutRuleStats,
   getCheckoutValue,
   isCheckoutAttempt,
   isValidCheckout,
+  isValidEventEffectSound,
+  scanSoundDirectory,
   normalizeLiveStateSnapshot
 } = require('../server');
+
+test('Sound-Verzeichnisse werden rekursiv erkannt und Pfade bleiben sicher', () => {
+  const soundsDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'dart-sounds-'));
+  try {
+    fs.mkdirSync(path.join(soundsDirectory, 'winner', 'special'), { recursive: true });
+    fs.writeFileSync(path.join(soundsDirectory, 'winner', 'fanfare.mp3'), '');
+    fs.writeFileSync(path.join(soundsDirectory, 'winner', 'special', 'final.ogg'), '');
+    fs.writeFileSync(path.join(soundsDirectory, 'not-a-sound.txt'), '');
+
+    assert.deepEqual(scanSoundDirectory(soundsDirectory), {
+      sounds: ['winner/fanfare.mp3', 'winner/special/final.ogg'],
+      folders: ['winner', 'winner/special']
+    });
+    assert.equal(isValidEventEffectSound('random-folder:winner'), true);
+    assert.equal(isValidEventEffectSound('file:winner/fanfare.mp3'), true);
+    assert.equal(isValidEventEffectSound('random-folder:../outside'), false);
+    assert.equal(isValidEventEffectSound('file:winner/evil.wav'), false);
+  } finally {
+    fs.rmSync(soundsDirectory, { recursive: true, force: true });
+  }
+});
 
 test('Single-Out erlaubt jeden gültigen Abschlussdart', () => {
   assert.equal(isValidCheckout(20, 20, 'single', 'S20'), true);

@@ -600,8 +600,47 @@ const EVENT_EFFECT_ANIMATIONS = [
 function isValidEventEffectSound(value) {
   if (EVENT_EFFECT_SOUNDS.includes(value)) return true;
   if (value === 'random-files') return true;
-  return typeof value === 'string'
-    && /^file:[^\\/\\?%#]+\.(?:mp3|ogg)$/i.test(value);
+  if (typeof value !== 'string') return false;
+  if (value.startsWith('random-folder:')) return isSafeSoundRelativePath(value.slice(14));
+  return value.startsWith('file:') && isSafeSoundFilePath(value.slice(5));
+}
+
+function isSafeSoundRelativePath(value) {
+  if (typeof value !== 'string' || !value || value.startsWith('/') || value.includes('\\')) return false;
+  const parts = value.split('/');
+  return parts.every(part => part && part !== '.' && part !== '..' && !/[\?%#]/.test(part));
+}
+
+function isSafeSoundFilePath(value) {
+  return isSafeSoundRelativePath(value) && /\.(?:mp3|ogg)$/i.test(value);
+}
+
+function scanSoundDirectory(soundsDirectory) {
+  const sounds = [];
+  const folders = new Set();
+  const visit = (directory, relativeDirectory = '') => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isSymbolicLink()) continue;
+      const relativePath = relativeDirectory ? relativeDirectory + '/' + entry.name : entry.name;
+      if (entry.isDirectory()) {
+        visit(path.join(directory, entry.name), relativePath);
+      } else if (entry.isFile() && /\.(mp3|ogg)$/i.test(entry.name)) {
+        sounds.push(relativePath);
+        if (relativeDirectory) {
+          const directoryParts = relativeDirectory.split('/');
+          for (let index = 1; index <= directoryParts.length; index += 1) {
+            folders.add(directoryParts.slice(0, index).join('/'));
+          }
+        }
+      }
+    }
+  };
+  visit(soundsDirectory);
+  const sortedSounds = sounds.sort((left, right) => left.localeCompare(right, 'de', { sensitivity: 'base' }));
+  return {
+    sounds: sortedSounds,
+    folders: [...folders].sort((left, right) => left.localeCompare(right, 'de', { sensitivity: 'base' }))
+  };
 }
 
 function normalizeEventEffects(value) {
@@ -3005,11 +3044,7 @@ app.get('/api/settings', (_req, res) => res.json(getSettings()));
 app.get('/api/sounds/available', (_req, res) => {
   const soundsDirectory = path.join(__dirname, 'public', 'sounds');
   try {
-    const sounds = fs.readdirSync(soundsDirectory, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /\.(mp3|ogg)$/i.test(entry.name))
-      .map((entry) => entry.name)
-      .sort((left, right) => left.localeCompare(right, 'de', { sensitivity: 'base' }));
-    res.json({ sounds });
+    res.json(scanSoundDirectory(soundsDirectory));
   } catch (err) {
     if (err.code === 'ENOENT') return res.json({ sounds: [] });
     res.status(500).json({ error: 'Sound-Verzeichnis konnte nicht gelesen werden' });
@@ -4170,5 +4205,7 @@ module.exports = {
   getCheckoutValue,
   isCheckoutAttempt,
   isValidCheckout,
+  isValidEventEffectSound,
+  scanSoundDirectory,
   normalizeLiveStateSnapshot
 };
