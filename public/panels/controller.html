@@ -438,6 +438,7 @@
         ['cricket-score', 'Vorhandener Cricket-Ton'],
         ['checkout-success', 'Neue Checkout-Fanfare'],
         ['winner-fanfare', 'Neue Winner-Fanfare'],
+        ['random-files', 'Zufall aus Sound-Verzeichnis'],
         ['countdown-tick', 'Neuer Countdown-Tick'],
         ['positive-chime', 'Neuer positiver Chime'],
         ['double-hit', 'Neuer Doppel-Ton'],
@@ -608,6 +609,14 @@
 
     function playEventPreviewSound(sound, volume) {
       if (sound === 'none') return;
+      if (sound === 'random-files') {
+        fetch('/api/sounds/available').then(r => r.json()).then(result => {
+          const files = Array.isArray(result.sounds) ? result.sounds : [];
+          if (!files.length) return;
+          playEventPreviewSound('file:' + files[Math.floor(Math.random() * files.length)], volume);
+        }).catch(() => showToast('Sound-Verzeichnis konnte nicht geladen werden'));
+        return;
+      }
       if (sound.startsWith('file:')) {
         const fileName = sound.slice(5);
         const audio = new Audio('/sounds/' + (/[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg'));

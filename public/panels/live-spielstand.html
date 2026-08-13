@@ -1321,14 +1321,25 @@
     function playConfiguredEventSound(eventKey, fallback) {
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
+      if (config && config.sound === 'random-files') {
+        fetch('/api/sounds/available').then(r => r.json()).then(result => {
+          const files = Array.isArray(result.sounds) ? result.sounds : [];
+          if (!files.length) return fallback();
+          playConfiguredEventSoundValue(files[Math.floor(Math.random() * files.length)], config.volume, fallback);
+        }).catch(() => fallback());
+        return;
+      }
       if (config && String(config.sound || '').startsWith('file:')) {
-        const fileName = String(config.sound).slice(5);
-        const audio = new Audio('/sounds/' + (/[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg'));
-        audio.volume = Number.isFinite(Number(config.volume)) ? Number(config.volume) : 0.3;
-        audio.play().catch(() => fallback());
+        playConfiguredEventSoundValue(String(config.sound).slice(5), config.volume, fallback);
         return;
       }
       if (!config || config.sound === eventKey) fallback();
+    }
+
+    function playConfiguredEventSoundValue(fileName, volume, fallback) {
+      const audio = new Audio('/sounds/' + (/[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg'));
+      audio.volume = Number.isFinite(Number(volume)) ? Number(volume) : 0.3;
+      audio.play().catch(() => fallback());
     }
     let duelStatsEnabled = localStorage.getItem('liveDuelStatsEnabled') !== 'false';
 
@@ -2528,6 +2539,7 @@
 
       overlay.classList.add('show');
       overlay.style.display = 'flex';
+      playConfiguredEventSound('winner', () => {});
       if (eventEffects && eventEffects.winner && eventEffects.winner.animation === 'fireworks' && isEventEnabled('winner')) createFireworks();
       else createConfetti();
     }

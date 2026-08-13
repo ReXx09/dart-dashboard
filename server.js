@@ -597,6 +597,13 @@ const EVENT_EFFECT_ANIMATIONS = [
   'shake'
 ];
 
+function isValidEventEffectSound(value) {
+  if (EVENT_EFFECT_SOUNDS.includes(value)) return true;
+  if (value === 'random-files') return true;
+  return typeof value === 'string'
+    && /^file:[^\\/\\?%#]+\.(?:mp3|ogg)$/i.test(value);
+}
+
 function normalizeEventEffects(value) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return Object.fromEntries(Object.entries(EVENT_EFFECT_DEFAULTS).map(([key, fallback]) => {
@@ -607,7 +614,7 @@ function normalizeEventEffects(value) {
       ...fallback,
       browserEnabled: item.browserEnabled !== false,
       tvEnabled: item.tvEnabled !== false,
-      sound: EVENT_EFFECT_SOUNDS.includes(item.sound) ? item.sound : fallback.sound,
+      sound: isValidEventEffectSound(item.sound) ? item.sound : fallback.sound,
       animation: EVENT_EFFECT_ANIMATIONS.includes(item.animation) ? item.animation : fallback.animation,
       volume,
       durationMs
