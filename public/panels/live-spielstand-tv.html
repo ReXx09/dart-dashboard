@@ -790,7 +790,26 @@
       audio.src = soundUrl;
       audio.load();
       audio.volume = level;
-      audio.play().catch(() => fallback());
+      audio.onerror = () => playConfiguredEventSoundWithWebAudio(soundUrl, level, fallback);
+      audio.play().catch(() => playConfiguredEventSoundWithWebAudio(soundUrl, level, fallback));
+    }
+
+    function playConfiguredEventSoundWithWebAudio(soundUrl, volume, fallback) {
+      if (!mobileAudioContext) return fallback();
+      const start = () => fetch(soundUrl, { cache: 'force-cache' })
+        .then(response => response.ok ? response.arrayBuffer() : Promise.reject(new Error('Sounddatei nicht gefunden')))
+        .then(data => mobileAudioContext.decodeAudioData(data))
+        .then(buffer => {
+          const source = mobileAudioContext.createBufferSource();
+          const gain = mobileAudioContext.createGain();
+          gain.gain.value = volume;
+          source.buffer = buffer;
+          source.connect(gain).connect(mobileAudioContext.destination);
+          source.start(0);
+        })
+        .catch(() => fallback());
+      if (mobileAudioContext.state === 'running') start();
+      else mobileAudioContext.resume().then(start).catch(() => fallback());
     }
 
     function loadAvailableSoundFiles() {
@@ -1561,7 +1580,7 @@
         if (eventEffects === null) {
           const settings = await fetch('/api/settings', { cache: 'no-store' }).then(r => r.json());
           eventEffects = settings.eventEffects || {};
-          loadAvailableSoundFiles().catch(() => {});
+          await loadAvailableSoundFiles().catch(() => null);
           dailyDisplaySettings = {
             mode: settings.dailyHighscoreDisplayMode || 'alternate',
             intervalMs: Math.max(2000, Number(settings.dailyHighscoreDisplayIntervalMs) || 5000)
