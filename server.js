@@ -4187,6 +4187,7 @@ function createFireTvServer() {
   });
 
   fireTvApp.use('/icons', express.static(path.join(__dirname, 'public', 'icons')));
+  fireTvApp.use('/sounds', express.static(path.join(__dirname, 'public', 'sounds')));
 
   fireTvApp.use('/api', proxyToBrowser);
 
