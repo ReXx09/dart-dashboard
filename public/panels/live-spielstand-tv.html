@@ -699,7 +699,6 @@
     let dailyDisplaySettings = { mode: 'alternate', intervalMs: 5000 };
     let dailyDisplayTimer = null;
     let availableSoundFilesPromise = null;
-    const activeTvAudio = new Set();
     const eventTarget = 'tv';
 
     function isEventEnabled(eventKey) {
@@ -781,15 +780,17 @@
       const soundPath = /[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg';
       const soundUrl = '/sounds/' + soundPath.split('/').map(encodeURIComponent).join('/');
       const level = Number.isFinite(Number(volume)) ? Number(volume) : 0.3;
-      const audio = new Audio(soundUrl);
-      audio.preload = 'auto';
-      audio.playsInline = true;
+      if (!tvAudioUnlockElement) {
+        tvAudioUnlockElement = new Audio();
+        tvAudioUnlockElement.preload = 'auto';
+        tvAudioUnlockElement.playsInline = true;
+      }
+      const audio = tvAudioUnlockElement;
+      audio.pause();
+      audio.src = soundUrl;
+      audio.load();
       audio.volume = level;
-      activeTvAudio.add(audio);
-      const release = () => activeTvAudio.delete(audio);
-      audio.addEventListener('ended', release, { once: true });
-      audio.addEventListener('error', release, { once: true });
-      audio.play().catch(() => { release(); fallback(); });
+      audio.play().catch(() => fallback());
     }
 
     function loadAvailableSoundFiles() {
@@ -817,6 +818,9 @@
           mediaUnlock.then(() => {
             tvAudioUnlockElement.pause();
             tvAudioUnlockElement.currentTime = 0;
+            mobileAudioUnlocked = true;
+            const button = document.getElementById('audioUnlockBtn');
+            if (button) { button.textContent = '🔊 Ton aktiv'; button.classList.add('active'); }
           }).catch(() => {});
         }
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
