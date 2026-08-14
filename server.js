@@ -3059,6 +3059,17 @@ app.get('/api/sounds/available', (_req, res) => {
     res.status(500).json({ error: 'Sound-Verzeichnis konnte nicht gelesen werden' });
   }
 });
+app.put('/api/event-effects', requireLocalNetwork, (req, res) => {
+  const current = getSettings();
+  const eventEffects = req.body && typeof req.body === 'object' ? req.body.eventEffects : null;
+  if (!eventEffects || typeof eventEffects !== 'object' || Array.isArray(eventEffects)) {
+    return res.status(400).json({ error: 'eventEffects-Konfiguration erwartet.' });
+  }
+  const next = { ...current, eventEffects: normalizeEventEffects(eventEffects) };
+  saveSettings(next);
+  broadcastReload();
+  res.json({ eventEffects: next.eventEffects });
+});
 app.put('/api/settings', requireAdmin, (req, res) => {
   const current = getSettings();
   const next = req.body && typeof req.body === 'object' ? req.body : {};

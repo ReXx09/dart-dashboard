@@ -785,11 +785,10 @@
       const btn = document.getElementById('saveEventsBtn');
       if (btn) btn.disabled = true;
       try {
-        const settings = await fetch('/api/settings').then(r => r.json());
-        const res = await fetch('/api/settings', {
+        const res = await fetch('/api/event-effects', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...settings, eventEffects: collectEventSettings() })
+          body: JSON.stringify({ eventEffects: collectEventSettings() })
         });
         if (!res.ok) throw new Error(await settingsSaveError(res, 'Event-Konfiguration konnte nicht gespeichert werden'));
         const saved = await res.json();
