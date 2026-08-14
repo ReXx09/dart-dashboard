@@ -46,10 +46,22 @@ try {
 // SSE – alle offenen Dashboard-Clients
 // ──────────────────────────────────────────────
 const sseClients = new Set();
-let liveDetailWriteQueue = Promise.resolve();
+const LIVE_STATE_WRITE_DEBOUNCE_MS = 250;
+const LIVE_DETAIL_FLUSH_DELAY_MS = 35;
+const LIVE_DETAIL_BATCH_SIZE = 32;
+const LIVE_DISPLAY_THROW_HISTORY_LIMIT = 60;
+const LIVE_DISPLAY_THROW_PREFIX_LIMIT = 9;
+let liveLifecycleGeneration = 0;
+let liveCompletionQueue = Promise.resolve();
+let liveDetailPendingSegments = [];
+let liveDetailPendingTasks = [];
+let liveDetailFlushTimer = null;
+let liveDetailWriteRunning = false;
+let liveDetailDrainPromise = Promise.resolve();
 let liveStateCache = null;
 let liveStateWritePending = null;
 let liveStateWriteRunning = false;
+let liveStateWriteTimer = null;
 let liveStateWriteKey = null;
 let liveStateBroadcastKey = null;
 
@@ -85,46 +97,148 @@ function getLiveStateSignature(state) {
       duelId: game.duelId,
       tournamentId: game.tournamentId,
       tournamentMatchId: game.tournamentMatchId,
+      tournamentRound: game.tournamentRound,
+      tournamentName: game.tournamentName,
+      tournamentMatchLabel: game.tournamentMatchLabel,
       matchType: game.matchType,
       bestOf: game.bestOf,
-      legsToWin: game.legsToWin
+      legsToWin: game.legsToWin,
+      checkoutRule: game.checkoutRule
     },
     players,
     lastAction: normalized.lastAction || null
   });
 }
 
-function queueLiveStateWrite(state) {
-  const normalized = normalizeLiveStateSnapshot(state || {});
-  const key = getLiveStateSignature(normalized);
-  if (key === liveStateWriteKey && !liveStateWritePending) return;
+function scheduleLiveStateWrite() {
+  if (liveStateWriteTimer || liveStateWriteRunning || !liveStateWritePending) return;
+  liveStateWriteTimer = setTimeout(() => {
+    liveStateWriteTimer = null;
+    startLiveStateWriteDrain();
+  }, LIVE_STATE_WRITE_DEBOUNCE_MS);
+}
 
-  liveStateWritePending = normalized;
-  liveStateWriteKey = key;
-  if (liveStateWriteRunning) return;
-
+function startLiveStateWriteDrain() {
+  if (liveStateWriteRunning || !liveStateWritePending) return;
   liveStateWriteRunning = true;
   (async () => {
     while (liveStateWritePending) {
-      const snapshot = liveStateWritePending;
+      const pending = liveStateWritePending;
       liveStateWritePending = null;
-      const snapshotKey = getLiveStateSignature(snapshot);
+      if (pending.generation !== liveLifecycleGeneration) continue;
       try {
-        await dataStore.saveLiveState(snapshot);
-        liveStateWriteKey = snapshotKey;
+        await dataStore.saveLiveState(pending.snapshot);
+        liveStateWriteKey = pending.generation === liveLifecycleGeneration ? pending.key : null;
       } catch (error) {
         if (!liveStateWritePending) liveStateWriteKey = null;
         console.error('[Live-State] Persistierung fehlgeschlagen:', error);
       }
     }
     liveStateWriteRunning = false;
+    scheduleLiveStateWrite();
   })();
 }
 
+function queueLiveStateWrite(state, options = {}) {
+  const normalized = normalizeLiveStateSnapshot(state || {});
+  const key = getLiveStateSignature(normalized);
+  if (key === liveStateWriteKey && !liveStateWritePending) return;
+  if (liveStateWritePending && liveStateWritePending.key === key) return;
+
+  liveStateWritePending = {
+    snapshot: normalized,
+    key,
+    generation: liveLifecycleGeneration,
+    force: options.immediate === true
+  };
+  liveStateWriteKey = key;
+  if (options.immediate === true) {
+    if (liveStateWriteTimer) clearTimeout(liveStateWriteTimer);
+    liveStateWriteTimer = null;
+    startLiveStateWriteDrain();
+    return;
+  }
+  scheduleLiveStateWrite();
+}
+
+function scheduleLiveDetailFlush() {
+  if (liveDetailFlushTimer || liveDetailWriteRunning) return;
+  liveDetailFlushTimer = setTimeout(() => {
+    liveDetailFlushTimer = null;
+    startLiveDetailDrain();
+  }, LIVE_DETAIL_FLUSH_DELAY_MS);
+}
+
+function startLiveDetailDrain() {
+  if (liveDetailWriteRunning) return liveDetailDrainPromise;
+  if (liveDetailPendingSegments.length === 0 && liveDetailPendingTasks.length === 0) return Promise.resolve();
+
+  liveDetailWriteRunning = true;
+  liveDetailDrainPromise = (async () => {
+    while (liveDetailPendingSegments.length > 0 || liveDetailPendingTasks.length > 0) {
+      const segmentBatch = liveDetailPendingSegments.splice(0, LIVE_DETAIL_BATCH_SIZE);
+      if (segmentBatch.length > 0) {
+        try {
+          if (typeof dataStore.recordThrowSegments === 'function') {
+            await dataStore.recordThrowSegments(segmentBatch);
+          } else {
+            for (const segment of segmentBatch) {
+              await dataStore.recordThrowSegment(segment.playerSlot, segment.segment, segment.points, segment.mode, segment.bust, segment.thrownAt, segment.duelId);
+            }
+          }
+        } catch (error) {
+          console.error('[Live-Detail] Wurfdetails fehlgeschlagen:', error);
+        }
+      }
+
+      const taskBatch = liveDetailPendingTasks.splice(0, LIVE_DETAIL_BATCH_SIZE);
+      for (const entry of taskBatch) {
+        try {
+          await entry.task();
+        } catch (error) {
+          console.error('[Live-Detail] ' + entry.label + ' fehlgeschlagen:', error);
+        }
+      }
+    }
+  })().finally(() => {
+    liveDetailWriteRunning = false;
+    if (liveDetailPendingSegments.length > 0 || liveDetailPendingTasks.length > 0) scheduleLiveDetailFlush();
+  });
+  return liveDetailDrainPromise;
+}
+
+function queueLiveThrowSegment(playerSlot, segment, points, mode, bust, thrownAt, duelId) {
+  liveDetailPendingSegments.push({
+    playerSlot: Number(playerSlot),
+    segment: String(segment || 'MISS').toUpperCase(),
+    points: Number(points || 0),
+    mode: mode ? String(mode) : null,
+    bust: !!bust,
+    thrownAt: Number(thrownAt) || Date.now(),
+    duelId: Number(duelId) > 0 ? Number(duelId) : null
+  });
+  if (liveDetailPendingSegments.length >= LIVE_DETAIL_BATCH_SIZE) {
+    if (liveDetailFlushTimer) clearTimeout(liveDetailFlushTimer);
+    liveDetailFlushTimer = null;
+    startLiveDetailDrain();
+  } else {
+    scheduleLiveDetailFlush();
+  }
+}
+
 function queueLiveDetailWrite(task, label) {
-  liveDetailWriteQueue = liveDetailWriteQueue
-    .then(() => task())
-    .catch(error => console.error('[Live-Detail] ' + label + ' fehlgeschlagen:', error));
+  liveDetailPendingTasks.push({ task, label });
+  scheduleLiveDetailFlush();
+}
+
+function flushLiveDetailWrites() {
+  if (liveDetailFlushTimer) clearTimeout(liveDetailFlushTimer);
+  liveDetailFlushTimer = null;
+  return startLiveDetailDrain();
+}
+
+function isLiveLifecycleCurrent(generation) {
+  return Number(generation) === liveLifecycleGeneration;
 }
 
 function broadcastReload() {
@@ -136,7 +250,7 @@ function broadcastLiveState(state) {
   const signature = getLiveStateSignature(normalized);
   if (signature === liveStateBroadcastKey) return;
   liveStateBroadcastKey = signature;
-  const payload = JSON.stringify(normalized);
+  const payload = JSON.stringify(getLiveDisplayState(normalized));
   sseClients.forEach(res => { try { res.write('event: live-state\ndata: ' + payload + '\n\n'); } catch { sseClients.delete(res); } });
 }
 
@@ -170,7 +284,11 @@ function readRaspberryTemperature() {
 function getSystemDiagnostics() {
   const totalMemory = Number(os.totalmem());
   const freeMemory = Number(os.freemem());
+  const processMemory = process.memoryUsage();
   const memoryUsed = Math.max(0, totalMemory - freeMemory);
+  const cachedPlayers = Array.isArray(liveStateCache?.players) ? liveStateCache.players : [];
+  const cachedThrowCount = cachedPlayers.reduce((sum, player) => sum + (Array.isArray(player.throws) ? player.throws.length : 0), 0);
+  const cachedStateBytes = liveStateCache ? Buffer.byteLength(JSON.stringify(liveStateCache), 'utf8') : 0;
   let disk = { totalBytes: null, freeBytes: null, usedBytes: null, usedPercent: null };
   try {
     const stats = fs.statfsSync(DATA_DIR);
@@ -196,6 +314,24 @@ function getSystemDiagnostics() {
       freeBytes: freeMemory,
       usedBytes: memoryUsed,
       usedPercent: totalMemory ? Math.round(memoryUsed / totalMemory * 1000) / 10 : null
+    },
+    processMemory: {
+      rssBytes: processMemory.rss,
+      heapTotalBytes: processMemory.heapTotal,
+      heapUsedBytes: processMemory.heapUsed,
+      externalBytes: processMemory.external,
+      arrayBuffersBytes: processMemory.arrayBuffers
+    },
+    liveCache: {
+      generation: liveLifecycleGeneration,
+      stateBytes: cachedStateBytes,
+      players: cachedPlayers.length,
+      throws: cachedThrowCount,
+      stateWritePending: !!liveStateWritePending,
+      stateWriteRunning: liveStateWriteRunning,
+      detailSegmentsPending: liveDetailPendingSegments.length,
+      detailTasksPending: liveDetailPendingTasks.length,
+      detailWriteRunning: liveDetailWriteRunning
     },
     disk,
     temperatureC: readRaspberryTemperature(),
@@ -743,6 +879,7 @@ let matrixLastAcceptedHitAt = 0;
 let matrixLastAcceptedKey = '';
 let matrixHitClusterTimer = null;
 let matrixHitClusterHits = [];
+let matrixHitClusterGeneration = null;
 let matrixStickySignalKey = '';
 let matrixStickySignalFirstAt = 0;
 let matrixStickySignalCount = 0;
@@ -897,12 +1034,19 @@ function pickFreshestActiveSignal(activeMap) {
 }
 
 function flushMatrixHitCluster() {
+  const clusterGeneration = matrixHitClusterGeneration;
+  matrixHitClusterGeneration = null;
   if (matrixHitClusterTimer) {
     clearTimeout(matrixHitClusterTimer);
     matrixHitClusterTimer = null;
   }
 
   if (!Array.isArray(matrixHitClusterHits) || matrixHitClusterHits.length === 0) {
+    matrixHitClusterHits = [];
+    return;
+  }
+
+  if (!isLiveLifecycleCurrent(clusterGeneration)) {
     matrixHitClusterHits = [];
     return;
   }
@@ -956,7 +1100,7 @@ function flushMatrixHitCluster() {
   normalizeArduinoStatePatch({ matrixSniffer: { ...matrixSniffer, lastMatrixHit: acceptedHit } });
 
   if (runtimeTuning.matrixAutoThrowEnabled !== false && (acceptedHit.mapped || ARDUINO_AUTO_THROW_MATRIX_UNMAPPED)) {
-    handleArduinoMatrixHit(acceptedHit);
+    handleArduinoMatrixHit(acceptedHit, clusterGeneration);
   }
 }
 
@@ -967,6 +1111,7 @@ function queueMatrixHitCandidate(hit, nowMs) {
   if (isAutoAdvancePending()) return false;
   if (!shouldQueueMatrixHit(key, now)) return false;
 
+  if (matrixHitClusterGeneration == null) matrixHitClusterGeneration = liveLifecycleGeneration;
   matrixHitClusterHits.push({ hit, at: now });
   if (!matrixHitClusterTimer) {
     matrixHitClusterTimer = setTimeout(flushMatrixHitCluster, runtimeTuning.matrixHitClusterWindowMs);
@@ -1213,6 +1358,57 @@ function clearPendingArduinoThrow() {
   pendingArduinoThrow = null;
 }
 
+function invalidateLiveLifecycle() {
+  liveLifecycleGeneration += 1;
+  cancelScheduledAutoAdvance();
+  clearPendingArduinoThrow();
+  if (liveStateWriteTimer) clearTimeout(liveStateWriteTimer);
+  liveStateWriteTimer = null;
+  liveStateWritePending = null;
+  liveStateWriteKey = null;
+  arduinoProcessingPromise = Promise.resolve();
+  arduinoThrowLockUntil = 0;
+  matrixHitSuppressUntil = 0;
+  matrixLastAcceptedHitAt = 0;
+  matrixLastAcceptedKey = '';
+  matrixHitClusterGeneration = null;
+  if (matrixHitClusterTimer) clearTimeout(matrixHitClusterTimer);
+  matrixHitClusterTimer = null;
+  matrixHitClusterHits = [];
+  matrixStickySignalKey = '';
+  matrixStickySignalFirstAt = 0;
+  matrixStickySignalCount = 0;
+  matrixStickySignalBlockedKey = '';
+  matrixSniffer.activeRows = {};
+  matrixSniffer.activeColumns = {};
+  matrixSniffer.lastMatrixHit = null;
+  matrixSniffer.matrixHitActive = false;
+  matrixSniffer.lastMatrixHitMs = 0;
+  matrixSniffer.lastMatrixHitPairMs = 0;
+  matrixSniffer.lastMatrixHitRow = null;
+  matrixSniffer.lastMatrixHitColumn = null;
+  lastAppliedThrowAt = 0;
+  normalizeArduinoStatePatch({
+    pendingThrow: false,
+    lastAutoThrow: null,
+    lastMiss: null,
+    lastAutoThrowError: null,
+    matrixSniffer: { ...matrixSniffer, lastMatrixHit: null }
+  });
+  return liveLifecycleGeneration;
+}
+
+function queueArduinoProcessing(task, generation = liveLifecycleGeneration) {
+  const expectedGeneration = Number(generation);
+  arduinoProcessingPromise = arduinoProcessingPromise
+    .catch(() => {})
+    .then(() => {
+      if (!isLiveLifecycleCurrent(expectedGeneration)) return null;
+      return task(expectedGeneration);
+    });
+  return arduinoProcessingPromise;
+}
+
 function advanceLiveTurn(state) {
   state.game.turnId = Math.max(1, Number(state.game.turnId || 1) + 1);
   return state.game.turnId;
@@ -1400,6 +1596,34 @@ async function recordCompletedLegStats(state, winner) {
   }
 }
 
+function queueCompletedLegStats(state, winner, generation = liveLifecycleGeneration) {
+  const snapshot = cloneLiveState(state);
+  const winnerSnapshot = cloneLiveState(winner);
+  const expectedDuelId = Number(snapshot?.game?.duelId || 0) || null;
+  const expectedActionTs = Number(snapshot?.lastAction?.ts || 0);
+  liveCompletionQueue = liveCompletionQueue
+    .catch(() => {})
+    .then(async () => {
+      await flushLiveDetailWrites();
+      const completionState = cloneLiveState(snapshot);
+      await recordCompletedLegStats(completionState, winnerSnapshot);
+
+      if (!expectedDuelId || !isLiveLifecycleCurrent(generation)) return;
+      if (Number(completionState?.game?.duelId || 0) === expectedDuelId) return;
+
+      const latest = await getLiveState();
+      if (!isLiveLifecycleCurrent(generation)) return;
+      if (Number(latest?.game?.duelId || 0) !== expectedDuelId) return;
+      if (String(latest?.game?.status || '') !== 'leg-finished') return;
+      if (Number(latest?.lastAction?.ts || 0) !== expectedActionTs) return;
+
+      const saved = await saveLiveState(completionState, { immediate: true });
+      broadcastLiveState(saved);
+    })
+    .catch(error => console.error('[Stats] Leg-Abschluss fehlgeschlagen:', error));
+  return liveCompletionQueue;
+}
+
 async function recordCompletedDuelPlayerStats(duel) {
   const checkoutRule = ['single', 'double', 'master'].includes(String(duel.checkout_rule || '').toLowerCase())
     ? String(duel.checkout_rule).toLowerCase()
@@ -1561,21 +1785,22 @@ function scheduleAutoAdvance(state, source, delayMs) {
   }
 
   const token = autoAdvanceToken;
+  const expectedGeneration = liveLifecycleGeneration;
   const expectedTurnId = Number(state.game.turnId || 1);
   const expectedActivePlayer = Number(state.game.activePlayer || 0);
   const expectedThrow = Number(state.game.currentThrow || 0);
   autoAdvanceTimer = setTimeout(() => {
     autoAdvanceTimer = null;
-    if (token !== autoAdvanceToken) return;
+    if (token !== autoAdvanceToken || !isLiveLifecycleCurrent(expectedGeneration)) return;
 
     getLiveState()
-      .then((latest) => {
-        if (token !== autoAdvanceToken || latest.game.status === 'leg-finished') return;
+      .then(async (latest) => {
+        if (token !== autoAdvanceToken || !isLiveLifecycleCurrent(expectedGeneration) || latest.game.status === 'leg-finished') return;
         const pending = latest.lastAction && latest.lastAction.autoAdvancePending;
         if (!pending || Number(latest.game.turnId || 1) !== expectedTurnId || Number(latest.game.activePlayer || 0) !== expectedActivePlayer || Number(latest.game.currentThrow || 0) !== expectedThrow) return;
         if (!completeAutoAdvance(latest, source)) return;
-        const saved = saveLiveState(latest);
-        broadcastReload();
+        const saved = await saveLiveState(latest);
+        broadcastLiveState(saved);
         return saved;
       })
       .catch((error) => console.error('[Live] Auto-Weiter fehlgeschlagen:', error));
@@ -1633,11 +1858,13 @@ async function advanceAfterThreeThrows(state, player, source) {
   scheduleAutoAdvance(state, source, delayMs);
 }
 
-async function applyArduinoThrowFromChannel(channel, evt = {}) {
+async function applyArduinoThrowFromChannel(channel, evt = {}, generation = liveLifecycleGeneration) {
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const value = dartValueFromChannel(channel);
   if (value == null) return { ok: false, reason: 'unknown-channel', channel: formatChannel(channel) };
 
   const state = await getLiveState();
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
   if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
   if (state.lastAction && state.lastAction.autoAdvancePending) return { ok: false, reason: 'auto-advance-pending' };
@@ -1694,22 +1921,20 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
 
   if (!Array.isArray(player.throws)) player.throws = [];
   const throwSegment = evt.segment || codeToSegment(evt.code) || pointsToSegment(value) || 'MISS';
+  const thrownAt = Date.now();
   player.throws.push({
     points: value,
     cricketPointsAwarded,
     remaining: player.remaining,
     bust,
-    ts: Date.now(),
+    ts: thrownAt,
     source: 'arduino',
     turnId: state.game.turnId || 1,
     segment: throwSegment,
     channel: formatChannel(channel),
     raw: evt.line || null
   });
-  queueLiveDetailWrite(
-    () => dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust, Date.now(), state.game.duelId),
-    'Arduino-Wurf'
-  );
+  queueLiveThrowSegment(player.slot, throwSegment, value, mode, bust, thrownAt, state.game.duelId);
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -1739,33 +1964,39 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     ruleStats.success += 1;
     ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
     state.lastAction.winner = player.name;
     state.lastAction.winnerSlot = player.slot;
-    // Record stats after leg finish
-    await recordCompletedLegStats(state, player);
+    queueLiveDetailWrite(
+      () => addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino', gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot }),
+      'Leg-Highscore'
+    );
+    queueCompletedLegStats(state, player, generation);
   } else if (isCricket && checkCricketWin(player, state.players)) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino', gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot });
     state.game.status = 'leg-finished';
     state.lastAction.cricketWin = true;
     state.lastAction.winner = player.name;
     state.lastAction.winnerSlot = player.slot;
-    // Record stats after leg finish
-    await recordCompletedLegStats(state, player);
+    queueLiveDetailWrite(
+      () => addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino', gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot }),
+      'Leg-Highscore'
+    );
+    queueCompletedLegStats(state, player, generation);
   } else if (isElimination && checkEliminationWin(state)) {
     const winner = getEliminationWinner(state);
     if (winner) {
       winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
-      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino', gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot });
       state.game.status = 'leg-finished';
       state.lastAction.eliminationWin = true;
       state.lastAction.winner = winner.name;
       state.lastAction.winnerSlot = winner.slot;
-      // Record stats after leg finish
-      await recordCompletedLegStats(state, winner);
+      queueLiveDetailWrite(
+        () => addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino', gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot }),
+        'Leg-Highscore'
+      );
+      queueCompletedLegStats(state, winner, generation);
     }
   }
 
@@ -1777,13 +2008,16 @@ async function applyArduinoThrowFromChannel(channel, evt = {}) {
     await advanceAfterThreeThrows(state, player, 'arduino');
   }
 
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const saved = await saveLiveState(state);
-  broadcastReload();
+  broadcastLiveState(saved);
   return { ok: true, value, player: player.name, playerSlot: player.slot, channel: formatChannel(channel), bust, remaining: player.remaining, state: saved };
 }
 
-async function applyArduinoMiss(evt = {}, reason = 'timeout') {
+async function applyArduinoMiss(evt = {}, reason = 'timeout', generation = liveLifecycleGeneration) {
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const state = await getLiveState();
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
   if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
   if (state.lastAction && state.lastAction.autoAdvancePending) return { ok: false, reason: 'auto-advance-pending' };
@@ -1798,21 +2032,19 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
 
   if (!Array.isArray(player.throws)) player.throws = [];
   const throwSegment = 'MISS';
+  const thrownAt = Date.now();
   player.throws.push({
     points: 0,
     remaining: player.remaining,
     bust: false,
-    ts: Date.now(),
+    ts: thrownAt,
     source: 'arduino-miss',
     reason,
     channel: evt.channel ? formatChannel(evt.channel) : null,
     segment: throwSegment,
     raw: evt.line || null
   });
-  queueLiveDetailWrite(
-    () => dataStore.recordThrowSegment(player.slot, throwSegment, 0, state.game.mode, false, Date.now(), state.game.duelId),
-    'Arduino-Miss'
-  );
+  queueLiveThrowSegment(player.slot, throwSegment, 0, state.game.mode, false, thrownAt, state.game.duelId);
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -1837,8 +2069,9 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout') {
     await advanceAfterThreeThrows(state, player, 'arduino-miss');
   }
 
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const saved = await saveLiveState(state);
-  broadcastReload();
+  broadcastLiveState(saved);
   return { ok: true, reason, player: player.name, playerSlot: player.slot, remaining: player.remaining, state: saved };
 }
 
@@ -1910,7 +2143,8 @@ function updateMatrixSnifferState(row, column, active, evt = {}) {
   }
 }
 
-function handleArduinoMatrixHit(hit) {
+function handleArduinoMatrixHit(hit, generation = liveLifecycleGeneration) {
+  if (!isLiveLifecycleCurrent(generation)) return;
   if (isAutoAdvancePending()) return;
   if (pendingArduinoThrow && !pendingArduinoThrow.applied) return;
   if (Date.now() < arduinoThrowLockUntil) return;
@@ -1923,10 +2157,9 @@ function handleArduinoMatrixHit(hit) {
     return;
   }
 
-  arduinoProcessingPromise = arduinoProcessingPromise
-    .catch(() => {})
-    .then(() => applyArduinoThrowFromMatrix(hit))
+  queueArduinoProcessing((taskGeneration) => applyArduinoThrowFromMatrix(hit, taskGeneration), generation)
     .then((result) => {
+      if (!result) return;
       if (result && result.ok) {
         const now = Date.now();
         lastAppliedThrowAt = now;
@@ -1974,7 +2207,8 @@ function handleChannelActiveEvent(evt) {
   runChannelAutoDetect();
 }
 
-async function applyArduinoThrowFromMatrix(hit) {
+async function applyArduinoThrowFromMatrix(hit, generation = liveLifecycleGeneration) {
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const rawCode = Number(hit && hit.code);
   const rawPoints = Number(hit && hit.points);
   const hasCode = Number.isFinite(rawCode) && rawCode >= 0 && rawCode <= 999;
@@ -1986,6 +2220,7 @@ async function applyArduinoThrowFromMatrix(hit) {
   if (value === null) return { ok: false, reason: 'invalid-points', hit };
   
   const state = await getLiveState();
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
   if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
   if (state.lastAction && state.lastAction.autoAdvancePending) return { ok: false, reason: 'auto-advance-pending' };
@@ -2041,12 +2276,13 @@ async function applyArduinoThrowFromMatrix(hit) {
   player.currentRoundPoints.push(value);
 
   if (!Array.isArray(player.throws)) player.throws = [];
+  const thrownAt = Date.now();
   player.throws.push({
     points: value,
     cricketPointsAwarded,
     remaining: player.remaining,
     bust,
-    ts: Date.now(),
+    ts: thrownAt,
     source: 'arduino-matrix',
     turnId: state.game.turnId || 1,
     segment: throwSegment,
@@ -2056,10 +2292,7 @@ async function applyArduinoThrowFromMatrix(hit) {
     channel: hit.key,
     raw: hit.line || null
   });
-  queueLiveDetailWrite(
-    () => dataStore.recordThrowSegment(player.slot, throwSegment, value, mode, bust, Date.now(), state.game.duelId),
-    'Matrix-Wurf'
-  );
+  queueLiveThrowSegment(player.slot, throwSegment, value, mode, bust, thrownAt, state.game.duelId);
 
   player.average = calculateCurrentRoundAverage(player);
   state.game.currentThrow = (Number(state.game.currentThrow || 0) || 0) + 1;
@@ -2092,33 +2325,39 @@ async function applyArduinoThrowFromMatrix(hit) {
     ruleStats.success += 1;
     ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot });
     state.game.status = 'leg-finished';
     state.lastAction.legWin = true;
     state.lastAction.winner = player.name;
     state.lastAction.winnerSlot = player.slot;
-    // Record stats after leg finish
-    await recordCompletedLegStats(state, player);
+    queueLiveDetailWrite(
+      () => addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'arduino-matrix', gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot }),
+      'Leg-Highscore'
+    );
+    queueCompletedLegStats(state, player, generation);
   } else if (isCricket && checkCricketWin(player, state.players)) {
     player.legs = Math.max(0, Number(player.legs || 0)) + 1;
-    await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix', gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot });
     state.game.status = 'leg-finished';
     state.lastAction.cricketWin = true;
     state.lastAction.winner = player.name;
     state.lastAction.winnerSlot = player.slot;
-    // Record stats after leg finish
-    await recordCompletedLegStats(state, player);
+    queueLiveDetailWrite(
+      () => addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'arduino-matrix', gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot }),
+      'Leg-Highscore'
+    );
+    queueCompletedLegStats(state, player, generation);
   } else if (isElimination && checkEliminationWin(state)) {
     const winner = getEliminationWinner(state);
     if (winner) {
       winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
-      await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino-matrix', gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot });
       state.game.status = 'leg-finished';
       state.lastAction.eliminationWin = true;
       state.lastAction.winner = winner.name;
       state.lastAction.winnerSlot = winner.slot;
-      // Record stats after leg finish
-      await recordCompletedLegStats(state, winner);
+      queueLiveDetailWrite(
+        () => addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, source: 'arduino-matrix', gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot }),
+        'Leg-Highscore'
+      );
+      queueCompletedLegStats(state, winner, generation);
     }
   }
 
@@ -2130,8 +2369,9 @@ async function applyArduinoThrowFromMatrix(hit) {
     await advanceAfterThreeThrows(state, player, 'arduino-matrix');
   }
 
+  if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const saved = await saveLiveState(state);
-  broadcastReload();
+  broadcastLiveState(saved);
   return { ok: true, value, player: player.name, playerSlot: player.slot, hit, bust, remaining: player.remaining, state: saved };
 }
 
@@ -2142,7 +2382,7 @@ function handleArduinoTrigger(evt) {
   if (Date.now() < arduinoThrowLockUntil) return;
 
   clearPendingArduinoThrow();
-  pendingArduinoThrow = { triggerMs: Number(evt.ms || 0), line: evt.line || '', startedAt: Date.now(), applied: false, timer: null };
+  pendingArduinoThrow = { triggerMs: Number(evt.ms || 0), line: evt.line || '', startedAt: Date.now(), generation: liveLifecycleGeneration, applied: false, timer: null };
   pendingArduinoThrow.timer = setTimeout(() => {
     const pending = pendingArduinoThrow;
     if (!pending || pending.applied) return;
@@ -2150,10 +2390,11 @@ function handleArduinoTrigger(evt) {
     pendingArduinoThrowTimer = null;
     normalizeArduinoStatePatch({ pendingThrow: false });
 
-    arduinoProcessingPromise = arduinoProcessingPromise
-      .catch(() => {})
-      .then(() => applyArduinoMiss({ line: pending.line || '', ms: pending.triggerMs }, 'timeout'))
-      .then((result) => normalizeArduinoStatePatch({ lastMiss: result.ok ? result : { ok: false, reason: result.reason } }))
+    queueArduinoProcessing((generation) => applyArduinoMiss({ line: pending.line || '', ms: pending.triggerMs }, 'timeout', generation), pending.generation)
+      .then((result) => {
+        if (!result) return;
+        normalizeArduinoStatePatch({ lastMiss: result.ok ? result : { ok: false, reason: result.reason } });
+      })
       .catch((err) => normalizeArduinoStatePatch({ lastMiss: { ok: false, reason: err.message }, lastAutoThrowError: err.message }));
   }, runtimeTuning.arduinoThrowWindowMs);
   pendingArduinoThrowTimer = pendingArduinoThrow.timer;
@@ -2170,10 +2411,10 @@ function handleArduinoActiveEvent(evt) {
   clearPendingArduinoThrow();
   normalizeArduinoStatePatch({ pendingThrow: false, lastAutoThrowError: null });
 
-  arduinoProcessingPromise = arduinoProcessingPromise
-    .catch(() => {})
-    .then(() => applyArduinoThrowFromChannel(evt.channel, evt))
+  const generation = liveLifecycleGeneration;
+  queueArduinoProcessing((taskGeneration) => applyArduinoThrowFromChannel(evt.channel, evt, taskGeneration), generation)
     .then((result) => {
+      if (!result) return;
       if (pending) pending.applied = result.ok;
       normalizeArduinoStatePatch({ lastAutoThrow: result.ok ? result : { ok: false, reason: result.reason }, lastAutoThrowError: result.ok ? null : result.reason });
     })
@@ -2204,10 +2445,10 @@ function parseArduinoLine(line) {
   if (psMatch) {
     const playerSwitchEvt = { ms: Number(psMatch[1]), ts: Date.now(), line: clean };
     normalizeArduinoStatePatch({ playerSwitch: playerSwitchEvt, lastLine: clean });
-    arduinoProcessingPromise = arduinoProcessingPromise
-      .catch(() => {})
-      .then(async () => {
+    const generation = liveLifecycleGeneration;
+    queueArduinoProcessing(async (taskGeneration) => {
         const state = await getLiveState();
+        if (!isLiveLifecycleCurrent(taskGeneration)) return null;
         if (!Array.isArray(state.players) || state.players.length === 0) return;
         const nextIdx = (state.game.activePlayer + 1) % state.players.length;
         state.game.activePlayer = nextIdx;
@@ -2215,9 +2456,10 @@ function parseArduinoLine(line) {
         advanceLiveTurn(state);
         state.game.throwRound = (state.game.throwRound || 1) + 1;
         state.lastAction = { type: 'player-switch-btn', player: state.players[nextIdx].name, playerSlot: state.players[nextIdx].slot, ts: Date.now() };
-        await saveLiveState(state);
-        broadcastReload();
-      });
+        const saved = await saveLiveState(state);
+        broadcastLiveState(saved);
+      }, generation)
+      .catch(error => console.error('[Arduino] Spielerwechsel fehlgeschlagen:', error));
     return;
   }
 
@@ -2691,6 +2933,21 @@ function normalizeLiveStateSnapshot(state) {
   };
 }
 
+function getLiveDisplayState(state) {
+  const normalized = normalizeLiveStateSnapshot(state || {});
+  return {
+    ...normalized,
+    players: normalized.players.map(player => {
+      const throws = Array.isArray(player.throws) ? player.throws : [];
+      if (throws.length <= LIVE_DISPLAY_THROW_PREFIX_LIMIT + LIVE_DISPLAY_THROW_HISTORY_LIMIT) return player;
+      return {
+        ...player,
+        throws: throws.slice(0, LIVE_DISPLAY_THROW_PREFIX_LIMIT).concat(throws.slice(-LIVE_DISPLAY_THROW_HISTORY_LIMIT))
+      };
+    })
+  };
+}
+
 function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
   const now = Date.now();
   const sourcePlayers = Array.isArray(sourceState?.players) && sourceState.players.length > 0
@@ -2821,10 +3078,10 @@ async function getLiveState() {
   return state;
 }
 
-async function saveLiveState(state) {
+async function saveLiveState(state, options = {}) {
   const safe = normalizeLiveStateSnapshot({ ...(state || {}), game: { ...((state && state.game) || {}), updatedAt: Date.now() } });
   liveStateCache = cloneLiveState(safe);
-  queueLiveStateWrite(safe);
+  queueLiveStateWrite(safe, options);
   return safe;
 }
 
@@ -2942,10 +3199,10 @@ app.post('/api/game/mode', async (req, res) => {
   const mode = String(req.body?.mode || '').trim();
   if (!GAME_MODES[mode]) return res.status(400).json({ error: `Unbekannter Modus: ${mode}` });
   try {
-    cancelScheduledAutoAdvance();
+    invalidateLiveLifecycle();
     savedLiveMode = mode;
     const fresh = resetLiveState(false, mode);
-    const saved = await saveLiveState(fresh);
+    const saved = await saveLiveState(fresh, { immediate: true });
     broadcastReload();
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Modus-Wechsel fehlgeschlagen: ' + err.message }); }
@@ -2959,7 +3216,6 @@ app.post('/api/live/start', async (req, res) => {
   if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
   if (slots.length < 1 || slots.length > 8) return res.status(400).json({ error: 'Bitte 1 bis 8 Spieler auswählen.' });
   try {
-    cancelScheduledAutoAdvance();
     const currentState = await getLiveState();
     if (Number(currentState.game?.duelId || 0) > 0) {
       const currentDuel = await dataStore.getDuel(currentState.game.duelId);
@@ -2967,11 +3223,12 @@ app.post('/api/live/start', async (req, res) => {
     }
     const availableSlots = new Set((await getActivePlayersForLive()).map(player => Number(player.slot)));
     if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
+    invalidateLiveLifecycle();
     const fresh = await defaultLiveState(mode, slots);
     fresh.game.checkoutRule = checkoutRule;
     savedLiveMode = mode;
     savedCheckoutRule = checkoutRule;
-    const saved = await saveLiveState(fresh);
+    const saved = await saveLiveState(fresh, { immediate: true });
     broadcastReload();
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Solospiel konnte nicht gestartet werden: ' + err.message }); }
@@ -2987,7 +3244,7 @@ app.post('/api/game/checkout-rule', async (req, res) => {
     state.game.checkoutRule = rule;
     state.game.updatedAt = Date.now();
     const saved = await saveLiveState(state);
-    broadcastReload();
+    broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Regel-Wechsel fehlgeschlagen: ' + err.message }); }
 });
@@ -3017,9 +3274,10 @@ app.post('/api/live/players', async (req, res) => {
     const available = await getActivePlayersForLive();
     const availableSlots = new Set(available.map(player => Number(player.slot)));
     if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
+    invalidateLiveLifecycle();
     const fresh = await defaultLiveState(savedLiveMode, slots);
     fresh.game.selectedPlayerSlots = slots;
-    const saved = await saveLiveState(fresh);
+    const saved = await saveLiveState(fresh, { immediate: true });
     broadcastReload();
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Spielerauswahl konnte nicht gespeichert werden: ' + err.message }); }
@@ -3177,7 +3435,7 @@ app.get('/api/arduino/raw', (_req, res) => {
 app.get('/api/live/state', async (_req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.json(await getLiveState());
+    res.json(getLiveDisplayState(await getLiveState()));
   }
   catch (err) { res.status(500).json({ error: 'Live-State konnte nicht geladen werden: ' + err.message }); }
 });
@@ -3259,7 +3517,6 @@ app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
 
 app.post('/api/duels/start', async (req, res) => {
   try {
-    cancelScheduledAutoAdvance();
     const currentState = await getLiveState();
     if (Number(currentState.game?.duelId || 0) > 0) {
       const currentDuel = await dataStore.getDuel(currentState.game.duelId);
@@ -3278,6 +3535,7 @@ app.post('/api/duels/start', async (req, res) => {
     const configuredPlayers = await getPlayers();
     const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());
     if (selectedPlayers.length !== slots.length) return res.status(400).json({ error: 'Alle ausgewählten Slots müssen einen Spielernamen haben.' });
+    invalidateLiveLifecycle();
     const profiles = await dataStore.getProfiles();
     const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
     const tournamentName = String(req.body?.tournamentName || '').trim();
@@ -3303,7 +3561,7 @@ app.post('/api/duels/start', async (req, res) => {
     }
     savedLiveMode = mode;
     savedCheckoutRule = checkoutRule;
-    await saveLiveState(fresh);
+    await saveLiveState(fresh, { immediate: true });
     broadcastReload();
     res.json(fresh);
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht gestartet werden: ' + err.message }); }
@@ -3391,6 +3649,7 @@ app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
   try {
     const state = await getLiveState();
     if (Number(state.game.duelId) !== Number(req.params.id)) return res.status(409).json({ error: 'Diese Begegnung ist nicht aktiv.' });
+    invalidateLiveLifecycle();
     const winnerSlot = Number(req.body?.winnerSlot || 0) || null;
     const duel = await dataStore.finishDuel(req.params.id, winnerSlot);
     if (winnerSlot) {
@@ -3401,7 +3660,7 @@ app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
       });
     }
     state.game.duelId = null;
-    await saveLiveState(state);
+    await saveLiveState(state, { immediate: true });
     broadcastReload();
     res.json(duel);
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht beendet werden: ' + err.message }); }
@@ -3409,14 +3668,14 @@ app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
 
 app.post('/api/duels/:id/cancel', async (req, res) => {
   try {
-    cancelScheduledAutoAdvance();
     const state = await getLiveState();
     const duelId = Number(req.params.id);
     if (Number(state.game?.duelId) !== duelId) return res.status(409).json({ error: 'Diese Begegnung ist nicht aktiv.' });
+    invalidateLiveLifecycle();
     const duel = await dataStore.cancelDuel(duelId);
     const fresh = await defaultLiveState(String(state.game.mode || DEFAULT_MODE), state.game.selectedPlayerSlots);
     savedLiveMode = String(state.game.mode || DEFAULT_MODE);
-    await saveLiveState(fresh);
+    await saveLiveState(fresh, { immediate: true });
     broadcastReload();
     res.json({ duel, state: fresh, message: 'Begegnung abgebrochen. Sie wird nicht in Highscores oder Statistiken aufgenommen und kann im Adminbereich gelöscht werden.' });
   } catch (err) { res.status(500).json({ error: 'Begegnung konnte nicht abgebrochen werden: ' + err.message }); }
@@ -3425,7 +3684,7 @@ app.post('/api/duels/:id/cancel', async (req, res) => {
 app.post('/api/live/reset', async (req, res) => {
   const carryLegs = !!(req.body && req.body.carryLegs);
   try {
-    cancelScheduledAutoAdvance();
+    invalidateLiveLifecycle();
     const mode = savedLiveMode || DEFAULT_MODE;
     const current = await getLiveState();
     if (!carryLegs && Number(current.game?.duelId || 0) > 0) {
@@ -3448,7 +3707,7 @@ app.post('/api/live/reset', async (req, res) => {
       fresh.game.tournamentRound = Number(current.game.tournamentRound || 0) || null;
       fresh.game.tournamentMatchLabel = String(current.game.tournamentMatchLabel || '');
     }
-    const saved = await saveLiveState(fresh);
+    const saved = await saveLiveState(fresh, { immediate: true });
     broadcastReload();
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Live-Reset fehlgeschlagen: ' + err.message }); }
@@ -3473,7 +3732,9 @@ app.post('/api/live/throw', async (req, res) => {
   if (!Number.isFinite(points) || points < 0 || points > 180) return res.status(400).json({ error: 'points muss zwischen 0 und 180 liegen.' });
 
   try {
+    const generation = liveLifecycleGeneration;
     const state = await getLiveState();
+    if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
     if (Number.isInteger(playerSlot) && playerSlot > 0) {
       targetIndex = state.players.findIndex(player => Number(player.slot) === playerSlot);
     }
@@ -3523,11 +3784,9 @@ app.post('/api/live/throw', async (req, res) => {
 
     if (!Array.isArray(player.throws)) player.throws = [];
     const throwSegment = incomingSegment;
-    player.throws.push({ points, remaining: player.remaining, bust, ts: Date.now(), mode, segment: throwSegment, turnId: state.game.turnId || 1 });
-    queueLiveDetailWrite(
-      () => dataStore.recordThrowSegment(player.slot, throwSegment, points, mode, bust, Date.now(), state.game.duelId),
-      'Manueller Wurf'
-    );
+    const thrownAt = Date.now();
+    player.throws.push({ points, remaining: player.remaining, bust, ts: thrownAt, mode, segment: throwSegment, turnId: state.game.turnId || 1 });
+    queueLiveThrowSegment(player.slot, throwSegment, points, mode, bust, thrownAt, state.game.duelId);
 
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
@@ -3547,33 +3806,39 @@ app.post('/api/live/throw', async (req, res) => {
       ruleStats.success += 1;
       ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
       player.legs += 1;
-      await addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot });
       state.game.status = 'leg-finished';
       state.lastAction.legWin = true;
       state.lastAction.winner = player.name;
       state.lastAction.winnerSlot = player.slot;
-      // Record stats after leg finish
-      await recordCompletedLegStats(state, player);
+      queueLiveDetailWrite(
+        () => addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot }),
+        'Leg-Highscore'
+      );
+      queueCompletedLegStats(state, player, generation);
     } else if (isCricket && checkCricketWin(player, state.players)) {
       player.legs += 1;
-      await addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot });
       state.game.status = 'leg-finished';
       state.lastAction.cricketWin = true;
       state.lastAction.winner = player.name;
       state.lastAction.winnerSlot = player.slot;
-      // Record stats after leg finish
-      await recordCompletedLegStats(state, player);
+      queueLiveDetailWrite(
+        () => addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot }),
+        'Leg-Highscore'
+      );
+      queueCompletedLegStats(state, player, generation);
     } else if (isElimination && checkEliminationWin(state)) {
       const winner = getEliminationWinner(state);
       if (winner) {
         winner.legs += 1;
-        await addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot });
         state.game.status = 'leg-finished';
         state.lastAction.eliminationWin = true;
         state.lastAction.winner = winner.name;
         state.lastAction.winnerSlot = winner.slot;
-        // Record stats after leg finish
-        await recordCompletedLegStats(state, winner);
+        queueLiveDetailWrite(
+          () => addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, gameMode: mode, duelId: state.game.duelId, playerSlot: winner.slot }),
+          'Leg-Highscore'
+        );
+        queueCompletedLegStats(state, winner, generation);
       }
     }
 
@@ -3585,8 +3850,9 @@ app.post('/api/live/throw', async (req, res) => {
       await advanceAfterThreeThrows(state, player, 'manual');
     }
 
+    if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
     const saved = await saveLiveState(state);
-    broadcastReload();
+    broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Wurf konnte nicht gespeichert werden: ' + err.message }); }
 });
@@ -3625,7 +3891,7 @@ app.post('/api/live/next-player', async (req, res) => {
     state.players[nextIndex].turnScoreRecorded = false;
     state.lastAction = { type: 'next-player', player: state.players[nextIndex].name, playerSlot: state.players[nextIndex].slot, ts: Date.now() };
     const saved = await saveLiveState(state);
-    broadcastReload();
+    broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Next-Player fehlgeschlagen: ' + err.message }); }
 });
@@ -3683,7 +3949,7 @@ app.post('/api/live/undo', async (req, res) => {
     state.lastAction = { type: 'undo', player: player.name, points: lastThrow.points, ts: Date.now() };
 
     const saved = await saveLiveState(state);
-    broadcastReload();
+    broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Undo fehlgeschlagen: ' + err.message }); }
 });
@@ -4230,5 +4496,6 @@ module.exports = {
   isValidCheckout,
   isValidEventEffectSound,
   scanSoundDirectory,
-  normalizeLiveStateSnapshot
+  normalizeLiveStateSnapshot,
+  getLiveDisplayState
 };

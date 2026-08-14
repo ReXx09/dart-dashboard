@@ -11,7 +11,8 @@ const {
   isValidCheckout,
   isValidEventEffectSound,
   scanSoundDirectory,
-  normalizeLiveStateSnapshot
+  normalizeLiveStateSnapshot,
+  getLiveDisplayState
 } = require('../server');
 
 test('Sound-Verzeichnisse werden rekursiv erkannt und Pfade bleiben sicher', () => {
@@ -134,4 +135,21 @@ test('normalizeLiveStateSnapshot normalisiert den State für Persistenz und redu
   assert.deepEqual(normalized.players[0].checkoutByRule.double, { attempts: 1, success: 0, highest: 50 });
   assert.deepEqual(normalized.players[0].checkoutByRule.master, { attempts: 0, success: 0, highest: 0 });
   assert.deepEqual(normalized.lastAction, { type: 'throw', points: 20 });
+});
+
+test('getLiveDisplayState begrenzt die transportierte Wurf-Historie', () => {
+  const display = getLiveDisplayState({
+    game: { mode: '501', status: 'running' },
+    players: [{
+      slot: 1,
+      name: 'Alice',
+      remaining: 200,
+      throws: Array.from({ length: 150 }, (_, index) => ({ points: index, turnId: index }))
+    }]
+  });
+
+  assert.equal(display.players[0].throws.length, 69);
+  assert.equal(display.players[0].throws[0].points, 0);
+  assert.equal(display.players[0].throws[8].points, 8);
+  assert.equal(display.players[0].throws.at(-1).points, 149);
 });

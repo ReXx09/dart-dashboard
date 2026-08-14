@@ -219,7 +219,8 @@ class DataStore {
       ['idx_duel_legs_duel', 'duel_legs (duel_id, leg_number)'],
       ['idx_duel_leg_players_duel', 'duel_leg_players (duel_id, player_slot)'],
       ['idx_tournament_matches_tournament', 'tournament_matches (tournament_id, round, position)'],
-      ['idx_throw_segments_player_mode_duel', 'player_throw_segments (player_slot, mode, duel_id, thrown_at)']
+      ['idx_throw_segments_player_mode_duel', 'player_throw_segments (player_slot, mode, duel_id, thrown_at)'],
+      ['idx_throw_segments_analysis', 'player_throw_segments (player_slot, season, duel_id, duel_leg_id, thrown_at)']
     ];
     for (const [name, target] of indexes) {
       if (this.isSQLite()) {
@@ -1292,6 +1293,35 @@ class DataStore {
     if (this.isSQLite()) await this.sqlite.run('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values);
     else if (this.isPostgres()) await this.pg.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', values);
     else await this.my.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values);
+  }
+
+  async recordThrowSegments(segments) {
+    const safeSegments = (Array.isArray(segments) ? segments : []).filter(segment => segment && Number(segment.playerSlot) > 0);
+    if (safeSegments.length === 0) return;
+    const values = [];
+    const placeholders = safeSegments.map((segment, index) => {
+      const playerSlot = Number(segment.playerSlot);
+      const thrownAt = Number(segment.thrownAt) || Date.now();
+      values.push(
+        playerSlot,
+        String(segment.segment || 'MISS').toUpperCase(),
+        Number(segment.points || 0),
+        segment.mode ? String(segment.mode) : null,
+        segment.bust ? 1 : 0,
+        thrownAt,
+        Number(segment.duelId) > 0 ? Number(segment.duelId) : null,
+        segment.season || DEFAULT_STATS_SEASON
+      );
+      if (this.isPostgres()) {
+        const offset = index * 8;
+        return '(' + Array.from({ length: 8 }, (_value, column) => '$' + (offset + column + 1)).join(', ') + ')';
+      }
+      return '(?, ?, ?, ?, ?, ?, ?, ?)';
+    }).join(', ');
+    const sql = 'INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES ' + placeholders;
+    if (this.isSQLite()) await this.sqlite.run(sql, values);
+    else if (this.isPostgres()) await this.pg.query(sql, values);
+    else await this.my.query(sql, values);
   }
 
   async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON, duelLegId = null) {
