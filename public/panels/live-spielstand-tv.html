@@ -679,7 +679,7 @@
       <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
     </div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
-    <button class="audio-btn" id="audioUnlockBtn" onclick="unlockMobileAudio()" title="Ton auf diesem Gerät aktivieren">🔊 Ton</button>
+    <button class="audio-btn" id="audioUnlockBtn" onclick="toggleMobileAudio()" title="Ton einschalten">🔇 Ton aus</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
   <main>
@@ -699,6 +699,8 @@
     let dailyDisplaySettings = { mode: 'alternate', intervalMs: 5000 };
     let dailyDisplayTimer = null;
     let availableSoundFilesPromise = null;
+    const tvAudioCache = new Map();
+    let tvCurrentAudio = null;
     const eventTarget = 'tv';
 
     function isEventEnabled(eventKey) {
@@ -757,6 +759,7 @@
     }
 
     function playConfiguredEventSound(eventKey, fallback, selectionKey = '') {
+      if (!mobileAudioUnlocked) return;
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
       if (config && (config.sound === 'random-files' || String(config.sound || '').startsWith('random-folder:'))) {
@@ -780,18 +783,42 @@
       const soundPath = /[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg';
       const soundUrl = '/sounds/' + soundPath.split('/').map(encodeURIComponent).join('/');
       const level = Number.isFinite(Number(volume)) ? Number(volume) : 0.3;
-      if (!tvAudioUnlockElement) {
-        tvAudioUnlockElement = new Audio();
-        tvAudioUnlockElement.preload = 'auto';
-        tvAudioUnlockElement.playsInline = true;
-      }
-      const audio = tvAudioUnlockElement;
-      audio.pause();
-      audio.src = soundUrl;
-      audio.load();
+      const audio = getTvCachedAudio(soundUrl);
+      if (tvCurrentAudio && tvCurrentAudio !== audio) tvCurrentAudio.pause();
+      tvCurrentAudio = audio;
       audio.volume = level;
       audio.onerror = () => playConfiguredEventSoundWithWebAudio(soundUrl, level, fallback);
+      audio.currentTime = 0;
       audio.play().catch(() => playConfiguredEventSoundWithWebAudio(soundUrl, level, fallback));
+    }
+
+    function getTvCachedAudio(soundUrl) {
+      let audio = tvAudioCache.get(soundUrl);
+      if (audio) return audio;
+      audio = new Audio(soundUrl);
+      audio.preload = 'auto';
+      audio.playsInline = true;
+      audio.load();
+      tvAudioCache.set(soundUrl, audio);
+      return audio;
+    }
+
+    function preloadConfiguredTvSounds(result) {
+      const configuredFiles = new Set();
+      Object.values(eventEffects || {}).forEach(config => {
+        const sound = String(config && config.sound || '');
+        if (sound.startsWith('file:')) configuredFiles.add(sound.slice(5));
+        if (sound.startsWith('random-folder:')) {
+          const folder = sound.slice(14);
+          (Array.isArray(result && result.sounds) ? result.sounds : [])
+            .filter(fileName => fileName.startsWith(folder + '/'))
+            .forEach(fileName => configuredFiles.add(fileName));
+        }
+      });
+      configuredFiles.forEach(fileName => {
+        const soundPath = /[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg';
+        getTvCachedAudio('/sounds/' + soundPath.split('/').map(encodeURIComponent).join('/'));
+      });
     }
 
     function playConfiguredEventSoundWithWebAudio(soundUrl, volume, fallback) {
@@ -820,9 +847,30 @@
       return availableSoundFilesPromise;
     }
 
-    let mobileAudioUnlocked = false;
+    let mobileAudioUnlocked = localStorage.getItem('liveAudioEnabled') === 'true';
     let mobileAudioContext = null;
     let tvAudioUnlockElement = null;
+    function updateAudioButton() {
+      const button = document.getElementById('audioUnlockBtn');
+      if (!button) return;
+      button.textContent = mobileAudioUnlocked ? '🔊 Ton an' : '🔇 Ton aus';
+      button.title = mobileAudioUnlocked ? 'Ton ausschalten' : 'Ton einschalten';
+      button.classList.toggle('active', mobileAudioUnlocked);
+    }
+    function toggleMobileAudio() {
+      if (mobileAudioUnlocked) {
+        mobileAudioUnlocked = false;
+        localStorage.setItem('liveAudioEnabled', 'false');
+        if (tvCurrentAudio) { tvCurrentAudio.pause(); tvCurrentAudio.currentTime = 0; }
+        if (tvAudioUnlockElement) { tvAudioUnlockElement.pause(); tvAudioUnlockElement.currentTime = 0; }
+        if (mobileAudioContext) mobileAudioContext.suspend().catch(() => {});
+        updateAudioButton();
+        return;
+      }
+      mobileAudioUnlocked = true;
+      localStorage.setItem('liveAudioEnabled', 'true');
+      unlockMobileAudio();
+    }
     function unlockMobileAudio() {
       try {
         if (!tvAudioUnlockElement) {
@@ -837,25 +885,19 @@
           mediaUnlock.then(() => {
             tvAudioUnlockElement.pause();
             tvAudioUnlockElement.currentTime = 0;
-            mobileAudioUnlocked = true;
-            const button = document.getElementById('audioUnlockBtn');
-            if (button) { button.textContent = '🔊 Ton aktiv'; button.classList.add('active'); }
+            updateAudioButton();
           }).catch(() => {});
         }
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
           if (!mobileAudioContext) mobileAudioContext = new AudioContextClass();
           mobileAudioContext.resume().then(() => {
-            mobileAudioUnlocked = true;
-            const button = document.getElementById('audioUnlockBtn');
-            if (button) { button.textContent = '🔊 Ton aktiv'; button.classList.add('active'); }
+            updateAudioButton();
           }).catch(() => {});
         }
       } catch (_) {}
     }
-    ['pointerdown', 'touchstart', 'click'].forEach(eventName => {
-      document.addEventListener(eventName, unlockMobileAudio, { once: true, passive: true });
-    });
+    updateAudioButton();
 
     function startCountdown(state) {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
@@ -1580,7 +1622,8 @@
         if (eventEffects === null) {
           const settings = await fetch('/api/settings', { cache: 'no-store' }).then(r => r.json());
           eventEffects = settings.eventEffects || {};
-          await loadAvailableSoundFiles().catch(() => null);
+          const availableSounds = await loadAvailableSoundFiles().catch(() => null);
+          preloadConfiguredTvSounds(availableSounds);
           dailyDisplaySettings = {
             mode: settings.dailyHighscoreDisplayMode || 'alternate',
             intervalMs: Math.max(2000, Number(settings.dailyHighscoreDisplayIntervalMs) || 5000)

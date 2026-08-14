@@ -1270,7 +1270,7 @@
       <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
     </div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
-    <button class="audio-btn" id="audioUnlockBtn" onclick="unlockMobileAudio()" title="Ton auf diesem Gerät aktivieren">🔊 Ton</button>
+    <button class="audio-btn" id="audioUnlockBtn" onclick="toggleMobileAudio()" title="Ton einschalten">🔇 Ton aus</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
 
@@ -1367,6 +1367,7 @@
     }
 
     function playConfiguredEventSound(eventKey, fallback, selectionKey = '') {
+      if (!mobileAudioUnlocked) return;
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
       if (config && (config.sound === 'random-files' || String(config.sound || '').startsWith('random-folder:'))) {
@@ -1406,24 +1407,39 @@
       audio.play().catch(() => fallback());
     }
 
-    let mobileAudioUnlocked = false;
+    let mobileAudioUnlocked = localStorage.getItem('liveAudioEnabled') === 'true';
     let mobileAudioContext = null;
+    function updateAudioButton() {
+      const button = document.getElementById('audioUnlockBtn');
+      if (!button) return;
+      button.textContent = mobileAudioUnlocked ? '🔊 Ton an' : '🔇 Ton aus';
+      button.title = mobileAudioUnlocked ? 'Ton ausschalten' : 'Ton einschalten';
+      button.classList.toggle('active', mobileAudioUnlocked);
+    }
+    function toggleMobileAudio() {
+      if (mobileAudioUnlocked) {
+        mobileAudioUnlocked = false;
+        localStorage.setItem('liveAudioEnabled', 'false');
+        if (mobileAudioContext) mobileAudioContext.suspend().catch(() => {});
+        updateAudioButton();
+        return;
+      }
+      mobileAudioUnlocked = true;
+      localStorage.setItem('liveAudioEnabled', 'true');
+      unlockMobileAudio();
+    }
     function unlockMobileAudio() {
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
           if (!mobileAudioContext) mobileAudioContext = new AudioContextClass();
           mobileAudioContext.resume().then(() => {
-            mobileAudioUnlocked = true;
-            const button = document.getElementById('audioUnlockBtn');
-            if (button) { button.textContent = '🔊 Ton aktiv'; button.classList.add('active'); }
+            updateAudioButton();
           }).catch(() => {});
         }
       } catch (_) {}
     }
-    ['pointerdown', 'touchstart', 'click'].forEach(eventName => {
-      document.addEventListener(eventName, unlockMobileAudio, { once: true, passive: true });
-    });
+    updateAudioButton();
     let duelStatsEnabled = localStorage.getItem('liveDuelStatsEnabled') !== 'false';
 
     function startCountdown(state) {
