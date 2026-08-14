@@ -1295,6 +1295,8 @@
     let lastCricketAnimationKey = '';
     let lastEventSoundKey = '';
     let eventEffects = null;
+    let dailyDisplaySettings = { mode: 'alternate', intervalMs: 5000 };
+    let dailyDisplayTimer = null;
     const eventTarget = 'browser';
     let duelStatsTimer = null;
     let duelStatsScheduledFor = '';
@@ -3009,13 +3011,29 @@
     function renderDailyHighscore(data) {
       const el = document.getElementById('dailyHsDisplay');
       if (!el) return;
-      if (data && data.best) {
-        el.querySelector('.hs-val').textContent = data.best.score + ' (' + data.best.player + ')';
-        el.title = 'Heute: ' + data.count + ' Einträge · Bester: ' + data.best.player + ' mit ' + data.best.score;
+      const mode = dailyDisplaySettings.mode;
+      if (mode === 'off') {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = '';
+      const showCheckout = mode === 'checkout' || (mode === 'alternate' && Math.floor(Date.now() / dailyDisplaySettings.intervalMs) % 2 === 0);
+      const best = showCheckout ? data && data.bestCheckout : data && data.best;
+      const label = showCheckout ? 'Höchster Checkout' : 'Tages-Highscore';
+      const labelEl = el.querySelector('.hs-label');
+      if (labelEl) labelEl.textContent = showCheckout ? 'Checkout' : 'Tages-HS';
+      if (best) {
+        el.querySelector('.hs-val').textContent = best.score + ' (' + best.player + ')';
+        el.title = label + ': ' + best.player + ' mit ' + best.score;
       } else {
         el.querySelector('.hs-val').textContent = '–';
-        el.title = data && data.count ? data.count + ' Einträge' : 'Keine Einträge heute';
+        el.title = showCheckout ? 'Heute kein Checkout erfasst' : (data && data.count ? data.count + ' Einträge' : 'Keine Einträge heute');
       }
+    }
+
+    function startDailyDisplayTimer() {
+      if (dailyDisplayTimer) clearInterval(dailyDisplayTimer);
+      dailyDisplayTimer = setInterval(() => renderDailyHighscore(dailyHighscoreCache), 1000);
     }
 
     // ── Leg-Neustart ──
@@ -3078,6 +3096,11 @@
         if (eventEffects === null) {
           const settings = await fetch('/api/settings', { cache: 'no-store' }).then(r => r.json());
           eventEffects = settings.eventEffects || {};
+          dailyDisplaySettings = {
+            mode: settings.dailyHighscoreDisplayMode || 'alternate',
+            intervalMs: Math.max(2000, Number(settings.dailyHighscoreDisplayIntervalMs) || 5000)
+          };
+          startDailyDisplayTimer();
         }
         const stateRes = await fetch('/api/live/state', { cache: 'no-store' });
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);

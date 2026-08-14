@@ -695,6 +695,11 @@
     let lastEventSoundKey = '';
     let winnerOverlayKey = '';
     let eventEffects = null;
+    let dailyHighscoreCache = null;
+    let dailyDisplaySettings = { mode: 'alternate', intervalMs: 5000 };
+    let dailyDisplayTimer = null;
+    let availableSoundFilesPromise = null;
+    const activeTvAudio = new Set();
     const eventTarget = 'tv';
 
     function isEventEnabled(eventKey) {
@@ -756,7 +761,7 @@
       const config = eventEffects && eventEffects[eventKey];
       if (config && !isEventEnabled(eventKey)) return;
       if (config && (config.sound === 'random-files' || String(config.sound || '').startsWith('random-folder:'))) {
-        fetch('/api/sounds/available').then(r => r.json()).then(result => {
+        (availableSoundFilesPromise || loadAvailableSoundFiles()).then(result => {
           const folder = String(config.sound || '').startsWith('random-folder:') ? String(config.sound).slice(14) : '';
           const files = (Array.isArray(result.sounds) ? result.sounds : [])
             .filter(fileName => !folder || fileName.startsWith(folder + '/'));
@@ -776,26 +781,44 @@
       const soundPath = /[.](mp3|ogg)$/i.test(fileName) ? fileName : fileName + '.ogg';
       const soundUrl = '/sounds/' + soundPath.split('/').map(encodeURIComponent).join('/');
       const level = Number.isFinite(Number(volume)) ? Number(volume) : 0.3;
-      if (mobileAudioContext && mobileAudioContext.state === 'running') {
-        fetch(soundUrl).then(response => response.arrayBuffer()).then(data => mobileAudioContext.decodeAudioData(data)).then(buffer => {
-          const source = mobileAudioContext.createBufferSource();
-          const gain = mobileAudioContext.createGain();
-          gain.gain.value = level;
-          source.buffer = buffer;
-          source.connect(gain).connect(mobileAudioContext.destination);
-          source.start();
-        }).catch(() => fallback());
-        return;
-      }
       const audio = new Audio(soundUrl);
+      audio.preload = 'auto';
+      audio.playsInline = true;
       audio.volume = level;
-      audio.play().catch(() => fallback());
+      activeTvAudio.add(audio);
+      const release = () => activeTvAudio.delete(audio);
+      audio.addEventListener('ended', release, { once: true });
+      audio.addEventListener('error', release, { once: true });
+      audio.play().catch(() => { release(); fallback(); });
+    }
+
+    function loadAvailableSoundFiles() {
+      if (!availableSoundFilesPromise) {
+        availableSoundFilesPromise = fetch('/api/sounds/available', { cache: 'no-store' })
+          .then(response => response.ok ? response.json() : Promise.reject(new Error('Soundliste nicht verfügbar')));
+      }
+      return availableSoundFilesPromise;
     }
 
     let mobileAudioUnlocked = false;
     let mobileAudioContext = null;
+    let tvAudioUnlockElement = null;
     function unlockMobileAudio() {
       try {
+        if (!tvAudioUnlockElement) {
+          tvAudioUnlockElement = new Audio();
+          tvAudioUnlockElement.preload = 'auto';
+          tvAudioUnlockElement.playsInline = true;
+          tvAudioUnlockElement.volume = 0;
+          tvAudioUnlockElement.src = '/sounds/sonar-sweep-beep.mp3';
+        }
+        const mediaUnlock = tvAudioUnlockElement.play();
+        if (mediaUnlock && typeof mediaUnlock.then === 'function') {
+          mediaUnlock.then(() => {
+            tvAudioUnlockElement.pause();
+            tvAudioUnlockElement.currentTime = 0;
+          }).catch(() => {});
+        }
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (AudioContextClass) {
           if (!mobileAudioContext) mobileAudioContext = new AudioContextClass();
@@ -1398,19 +1421,36 @@
         const r = await fetch('/api/highscores/daily');
         if (!r.ok) return;
         const data = await r.json();
+        dailyHighscoreCache = data;
         renderDailyHighscore(data);
       } catch {}
     }
     function renderDailyHighscore(data) {
       const el = document.getElementById('dailyHsDisplay');
       if (!el) return;
-      if (data && data.best) {
-        el.querySelector('.hs-val').textContent = data.best.score + ' (' + data.best.player + ')';
-        el.title = 'Heute: ' + data.count + ' Einträge · Bester: ' + data.best.player + ' mit ' + data.best.score;
+      const mode = dailyDisplaySettings.mode;
+      if (mode === 'off') {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = '';
+      const showCheckout = mode === 'checkout' || (mode === 'alternate' && Math.floor(Date.now() / dailyDisplaySettings.intervalMs) % 2 === 0);
+      const best = showCheckout ? data && data.bestCheckout : data && data.best;
+      const label = showCheckout ? 'Höchster Checkout' : 'Tages-Highscore';
+      const labelEl = el.querySelector('.hs-label');
+      if (labelEl) labelEl.textContent = showCheckout ? 'Checkout' : 'Tages-HS';
+      if (best) {
+        el.querySelector('.hs-val').textContent = best.score + ' (' + best.player + ')';
+        el.title = label + ': ' + best.player + ' mit ' + best.score;
       } else {
         el.querySelector('.hs-val').textContent = '–';
-        el.title = data && data.count ? data.count + ' Einträge' : 'Keine Einträge heute';
+        el.title = showCheckout ? 'Heute kein Checkout erfasst' : (data && data.count ? data.count + ' Einträge' : 'Keine Einträge heute');
       }
+    }
+
+    function startDailyDisplayTimer() {
+      if (dailyDisplayTimer) clearInterval(dailyDisplayTimer);
+      dailyDisplayTimer = setInterval(() => renderDailyHighscore(dailyHighscoreCache), 1000);
     }
 
     // ── Bust / Audio ──
@@ -1517,6 +1557,12 @@
         if (eventEffects === null) {
           const settings = await fetch('/api/settings', { cache: 'no-store' }).then(r => r.json());
           eventEffects = settings.eventEffects || {};
+          loadAvailableSoundFiles().catch(() => {});
+          dailyDisplaySettings = {
+            mode: settings.dailyHighscoreDisplayMode || 'alternate',
+            intervalMs: Math.max(2000, Number(settings.dailyHighscoreDisplayIntervalMs) || 5000)
+          };
+          startDailyDisplayTimer();
         }
         const stateRes = await fetch('/api/live/state', { cache: 'no-store' });
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);

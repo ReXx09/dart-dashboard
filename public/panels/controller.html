@@ -319,6 +319,20 @@
         <input class="points-in" id="ctrlPoints" type="number" min="0" max="180" value="60" />
         <button class="pts" id="ctrlThrowBtn">Werfen</button>
       </div>
+      <div style="height:16px"></div>
+      <h3>Tagesanzeige</h3>
+      <div class="input-row">
+        <label for="dailyHighscoreDisplayMode">Obere Anzeige:</label>
+        <select id="dailyHighscoreDisplayMode">
+          <option value="alternate">Abwechselnd: Checkout / Tages-Highscore</option>
+          <option value="checkout">Höchster Checkout</option>
+          <option value="daily-highscore">Tages-Highscore</option>
+          <option value="off">Ausblenden</option>
+        </select>
+        <label for="dailyHighscoreDisplayIntervalMs">Wechsel (Sek.):</label>
+        <input id="dailyHighscoreDisplayIntervalMs" type="number" min="2" max="60" step="1" value="5" />
+        <button class="btn-sm primary" type="button" onclick="saveDailyDisplaySettings()">Anzeige speichern</button>
+      </div>
       </div>
       <div class="ctrl-section" id="arduino">
       <h3>Arduino Monitor</h3>
@@ -1424,6 +1438,7 @@
       const arduino = await fetch('/api/arduino/state').then(r => r.json()).catch(() => ({}));
       renderArduinoState(arduino);
       updateFieldTestUi();
+      loadDailyDisplaySettings();
       if (!tuningLoadedOnce) {
         tuningLoadedOnce = true;
         loadTuningSettings();
@@ -1441,6 +1456,32 @@
         activateSection(hashId);
       } else if (!document.querySelector('.ctrl-section.is-active')) {
         activateSection('spiel');
+      }
+    }
+
+    async function loadDailyDisplaySettings() {
+      try {
+        const settings = await fetch('/api/settings').then(r => r.json());
+        const mode = document.getElementById('dailyHighscoreDisplayMode');
+        const interval = document.getElementById('dailyHighscoreDisplayIntervalMs');
+        if (mode) mode.value = settings.dailyHighscoreDisplayMode || 'alternate';
+        if (interval) interval.value = Math.round(Number(settings.dailyHighscoreDisplayIntervalMs || 5000) / 1000);
+      } catch (_) {}
+    }
+
+    async function saveDailyDisplaySettings() {
+      try {
+        const settings = await fetch('/api/settings').then(r => r.json());
+        const intervalSeconds = clampInt(document.getElementById('dailyHighscoreDisplayIntervalMs').value, 5, 2, 60);
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...settings, dailyHighscoreDisplayMode: document.getElementById('dailyHighscoreDisplayMode').value, dailyHighscoreDisplayIntervalMs: intervalSeconds * 1000 })
+        });
+        if (!res.ok) throw new Error(await settingsSaveError(res, 'Anzeigeeinstellung konnte nicht gespeichert werden'));
+        showToast('Tagesanzeige gespeichert');
+      } catch (error) {
+        showToast(error.message || 'Anzeigeeinstellung konnte nicht gespeichert werden');
       }
     }
 

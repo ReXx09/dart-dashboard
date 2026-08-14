@@ -678,9 +678,20 @@ function getSettings() {
     ...readJson(SETTINGS_FILE, {})
   };
   merged.eventEffects = normalizeEventEffects(merged.eventEffects);
+  merged.dailyHighscoreDisplayMode = ['checkout', 'daily-highscore', 'alternate', 'off'].includes(merged.dailyHighscoreDisplayMode)
+    ? merged.dailyHighscoreDisplayMode
+    : 'alternate';
+  merged.dailyHighscoreDisplayIntervalMs = clampNumber(merged.dailyHighscoreDisplayIntervalMs, 5000, 2000, 60000);
   return merged;
 }
-function saveSettings(s) { writeJson(SETTINGS_FILE, { ...s, eventEffects: normalizeEventEffects(s.eventEffects) }); }
+function saveSettings(s) {
+  writeJson(SETTINGS_FILE, {
+    ...s,
+    eventEffects: normalizeEventEffects(s.eventEffects),
+    dailyHighscoreDisplayMode: ['checkout', 'daily-highscore', 'alternate', 'off'].includes(s.dailyHighscoreDisplayMode) ? s.dailyHighscoreDisplayMode : 'alternate',
+    dailyHighscoreDisplayIntervalMs: clampNumber(s.dailyHighscoreDisplayIntervalMs, 5000, 2000, 60000)
+  });
+}
 
 function clampNumber(value, fallback, min, max) {
   const n = Number(value);
@@ -2817,7 +2828,9 @@ async function saveLiveState(state) {
   return safe;
 }
 
-async function getHighscores(gameMode = '') { return dataStore.getHighscores(500, gameMode); }
+async function getHighscores(gameMode = '', options = {}) {
+  return dataStore.getHighscores(500, gameMode, options.includeActive === true);
+}
 
 async function addHighscore(playerName, score, meta = {}) {
   const safeName = String(playerName || '').trim();
@@ -3715,10 +3728,12 @@ app.get('/api/highscores/daily', async (_req, res) => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const fromTs = todayStart.getTime();
-    const all = await getHighscores();
+    const all = await getHighscores('', { includeActive: true });
     const today = all.filter(e => Number(e.ts) >= fromTs).sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0));
     const best = today.length > 0 ? today[0] : null;
-    res.json({ best, count: today.length, list: today });
+    const checkouts = today.filter(entry => entry.kind === 'checkout');
+    const bestCheckout = checkouts.length > 0 ? checkouts[0] : null;
+    res.json({ best, bestCheckout, count: today.length, list: today });
   } catch (err) { res.status(500).json({ error: 'Daily-Highscore fehlgeschlagen: ' + err.message }); }
 });
 
