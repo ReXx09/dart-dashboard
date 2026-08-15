@@ -682,6 +682,27 @@ const EVENT_EFFECT_DEFAULTS = {
   t19: { label: 'T19', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
   t18: { label: 'T18', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
   t17: { label: 'T17', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  double: { label: 'Double allgemein', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d1: { label: 'D1', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d2: { label: 'D2', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d3: { label: 'D3', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d4: { label: 'D4', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d5: { label: 'D5', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d6: { label: 'D6', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d7: { label: 'D7', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d8: { label: 'D8', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d9: { label: 'D9', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d10: { label: 'D10', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d11: { label: 'D11', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d12: { label: 'D12', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d13: { label: 'D13', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d14: { label: 'D14', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d15: { label: 'D15', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d16: { label: 'D16', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d17: { label: 'D17', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d18: { label: 'D18', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d19: { label: 'D19', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
+  d20: { label: 'D20', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
   bull: { label: 'Bull / 25', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
   dbull: { label: 'dBull', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
   triple: { label: 'Triple allgemein', browserEnabled: true, tvEnabled: true, sound: 'none', animation: 'none', volume: 0.3, durationMs: 900 },
@@ -1146,6 +1167,13 @@ function summarizeMatrixHit(hit) {
   };
 }
 
+function sanitizeArduinoAutomationResult(result) {
+  if (!result || typeof result !== 'object') return result || null;
+  const summary = { ...result };
+  delete summary.state;
+  return summary;
+}
+
 function buildArduinoStateView() {
   const matrixSnifferView = arduinoState.matrixSniffer ? { ...arduinoState.matrixSniffer } : null;
   const matrixHit = summarizeMatrixHit(matrixSniffer.lastMatrixHit);
@@ -1187,8 +1215,8 @@ function buildArduinoStateView() {
 
   const automation = {
     pendingThrow: !!arduinoState.pendingThrow,
-    lastAutoThrow: arduinoState.lastAutoThrow || null,
-    lastMiss: arduinoState.lastMiss || null,
+    lastAutoThrow: sanitizeArduinoAutomationResult(arduinoState.lastAutoThrow),
+    lastMiss: sanitizeArduinoAutomationResult(arduinoState.lastMiss),
     lastAutoThrowError: arduinoState.lastAutoThrowError || null,
     lastPlayerSwitch: arduinoState.playerSwitch || null,
     channelAutoDetect: arduinoState.channelAutoDetect || null
@@ -2011,7 +2039,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}, generation = live
   if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const saved = await saveLiveState(state);
   broadcastLiveState(saved);
-  return { ok: true, value, player: player.name, playerSlot: player.slot, channel: formatChannel(channel), bust, remaining: player.remaining, state: saved };
+  return { ok: true, value, player: player.name, playerSlot: player.slot, channel: formatChannel(channel), bust, remaining: player.remaining };
 }
 
 async function applyArduinoMiss(evt = {}, reason = 'timeout', generation = liveLifecycleGeneration) {
@@ -2072,7 +2100,7 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout', generation = liveL
   if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const saved = await saveLiveState(state);
   broadcastLiveState(saved);
-  return { ok: true, reason, player: player.name, playerSlot: player.slot, remaining: player.remaining, state: saved };
+  return { ok: true, reason, player: player.name, playerSlot: player.slot, remaining: player.remaining };
 }
 
 function updateMatrixSnifferState(row, column, active, evt = {}) {
@@ -2372,7 +2400,7 @@ async function applyArduinoThrowFromMatrix(hit, generation = liveLifecycleGenera
   if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   const saved = await saveLiveState(state);
   broadcastLiveState(saved);
-  return { ok: true, value, player: player.name, playerSlot: player.slot, hit, bust, remaining: player.remaining, state: saved };
+  return { ok: true, value, player: player.name, playerSlot: player.slot, hit, bust, remaining: player.remaining };
 }
 
 function handleArduinoTrigger(evt) {
@@ -2935,8 +2963,19 @@ function normalizeLiveStateSnapshot(state) {
 
 function getLiveDisplayState(state) {
   const normalized = normalizeLiveStateSnapshot(state || {});
+  const displayArduino = normalized.arduino && typeof normalized.arduino === 'object' && normalized.arduino.automation && typeof normalized.arduino.automation === 'object'
+    ? {
+        ...normalized.arduino,
+        automation: {
+          ...normalized.arduino.automation,
+          lastAutoThrow: sanitizeArduinoAutomationResult(normalized.arduino.automation.lastAutoThrow),
+          lastMiss: sanitizeArduinoAutomationResult(normalized.arduino.automation.lastMiss)
+        }
+      }
+    : normalized.arduino;
   return {
     ...normalized,
+    arduino: displayArduino,
     players: normalized.players.map(player => {
       const throws = Array.isArray(player.throws) ? player.throws : [];
       if (throws.length <= LIVE_DISPLAY_THROW_PREFIX_LIMIT + LIVE_DISPLAY_THROW_HISTORY_LIMIT) return player;

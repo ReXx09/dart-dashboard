@@ -153,3 +153,21 @@ test('getLiveDisplayState begrenzt die transportierte Wurf-Historie', () => {
   assert.equal(display.players[0].throws[8].points, 8);
   assert.equal(display.players[0].throws.at(-1).points, 149);
 });
+
+test('getLiveDisplayState entfernt verschachtelte Arduino-States aus der Telemetrie', () => {
+  const nestedState = { game: { mode: '501' }, players: [{ slot: 1, throws: [{ points: 20 }] }] };
+  const display = getLiveDisplayState({
+    game: { mode: '501', status: 'running' },
+    players: [],
+    arduino: {
+      automation: {
+        lastAutoThrow: { ok: true, value: 20, state: nestedState },
+        lastMiss: { ok: true, state: nestedState }
+      }
+    }
+  });
+
+  assert.equal(display.arduino.automation.lastAutoThrow.state, undefined);
+  assert.equal(display.arduino.automation.lastMiss.state, undefined);
+  assert.equal(display.arduino.automation.lastAutoThrow.value, 20);
+});

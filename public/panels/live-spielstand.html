@@ -1356,6 +1356,24 @@
       playConfiguredEventSound(eventKey, () => {});
     }
 
+    function playDoubleEventSound(lastThrow) {
+      let segment = String(lastThrow && lastThrow.segment || '').toUpperCase();
+      if (!segment && Number(lastThrow && lastThrow.code) > 0) {
+        const code = Number(lastThrow.code);
+        const multiplier = Math.floor(code / 100);
+        const number = code % 100;
+        if (multiplier === 2 && number >= 1 && number <= 20) segment = 'D' + number;
+      }
+      if (!/^D(?:[1-9]|1[0-9]|20)$/.test(segment)) return;
+      const specificKey = segment.toLowerCase();
+      const specificConfig = eventEffects && eventEffects[specificKey];
+      const eventKey = specificConfig && specificConfig.sound !== 'none' ? specificKey : 'double';
+      const soundKey = [lastThrow.ts, lastThrow.playerSlot, segment, eventKey].join(':');
+      if (soundKey === lastEventSoundKey || !isEventEnabled(eventKey)) return;
+      lastEventSoundKey = soundKey;
+      playConfiguredEventSound(eventKey, () => {});
+    }
+
     function stableSoundIndex(files, selectionKey) {
       if (!files.length) return -1;
       let hash = 2166136261;
@@ -2499,6 +2517,7 @@
         hideEliminationOverlay();
       }
       playTripleEventSound(lastThrow);
+      playDoubleEventSound(lastThrow);
       playBullEventSound(lastThrow);
 
       const isCricket = mode === 'cricket';
