@@ -1275,23 +1275,29 @@
 
       // Check for leg finished (winner)
       const isLegFinished = state.game.status === 'leg-finished';
-      if (!isLegFinished) hideWinnerOverlay();
+      if (!isLegFinished) {
+        winnerOverlayKey = '';
+        hideWinnerOverlay();
+      }
+      const serverWinnerSlot = Number(state.lastAction && state.lastAction.winnerSlot || 0);
+      const serverWinner = isLegFinished
+        ? state.players.find(p => Number(p.slot) === serverWinnerSlot)
+        : null;
       let winner = null;
       if (isElimination) {
         // Bei Elimination: Kein Check auf remaining === 0 (alle starten bei 0!)
         if (isLegFinished) {
-          winner = state.players.find(p => p.slot === state.lastAction?.winnerSlot) ||
+          winner = serverWinner ||
             state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
         }
       } else {
         if (isCricket) {
           winner = isLegFinished
-            ? state.players.find(p => p.slot === state.lastAction?.winnerSlot)
-              || state.players.find(p => isClientCricketWinner(p, state.players))
+            ? serverWinner || state.players.find(p => isClientCricketWinner(p, state.players))
             : null;
         } else {
           // x01: Winner hat remaining === 0
-          winner = state.players.find(p => Number(p.remaining) === 0);
+          winner = serverWinner || state.players.find(p => Number(p.remaining) === 0);
           if (!winner && isLegFinished) {
             winner = state.players.reduce((a, b) => (a.legs || 0) > (b.legs || 0) ? a : b);
           }
@@ -1330,7 +1336,7 @@
     function showWinnerOverlay(winner, state) {
       const overlay = document.getElementById('winnerOverlay');
       if (!overlay) return;
-      const currentWinnerKey = [state.game.duelId, state.lastAction && state.lastAction.ts, state.lastAction && state.lastAction.winnerSlot].join(':');
+      const currentWinnerKey = [state.game.duelId, state.game.startedAt, state.lastAction && state.lastAction.ts, state.lastAction && state.lastAction.winnerSlot].join(':');
       if (winnerOverlayKey === currentWinnerKey) return;
       winnerOverlayKey = currentWinnerKey;
       const mode = state.game.mode;
