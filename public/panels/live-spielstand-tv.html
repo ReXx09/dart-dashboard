@@ -1336,7 +1336,7 @@
     function showWinnerOverlay(winner, state) {
       const overlay = document.getElementById('winnerOverlay');
       if (!overlay) return;
-      const currentWinnerKey = [state.game.duelId, state.game.startedAt, state.lastAction && state.lastAction.ts, state.lastAction && state.lastAction.winnerSlot].join(':');
+      const currentWinnerKey = [state.game.duelId, state.lastAction && state.lastAction.ts, state.lastAction && state.lastAction.winnerSlot].join(':');
       if (winnerOverlayKey === currentWinnerKey) return;
       winnerOverlayKey = currentWinnerKey;
       const mode = state.game.mode;
