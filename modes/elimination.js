@@ -41,16 +41,6 @@ function applyEliminationHit(state, player, value) {
       if (otherPoints === 0 && currentPlayerScore === 0) continue;
 
       other.totalScored = 0;
-      other.throws = other.throws || [];
-      other.throws.push({
-        points: 0,
-        remaining: 0,
-        bust: false,
-        eliminated: true,
-        eliminatedBy: player.slot,
-        ts: Date.now(),
-        source: 'elimination'
-      });
       state.lastAction = {
         type: 'elimination',
         source: 'elimination',

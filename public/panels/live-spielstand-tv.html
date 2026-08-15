@@ -1062,7 +1062,9 @@
 
     function renderFocusLegCard(p) {
       if (!p) return '';
-      const throws = Array.isArray(p.throws) ? p.throws : [];
+      const throws = Array.isArray(p.throws)
+        ? p.throws.filter(throwData => throwData && throwData.source !== 'elimination' && !throwData.eliminated)
+        : [];
       const turnScores = [];
       const hasTurnIds = throws.some(t => Number.isFinite(Number(t && t.turnId)));
       if (hasTurnIds) {

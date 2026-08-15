@@ -1599,13 +1599,6 @@ async function recordCompletedLegStats(state, winner) {
       await recordPlayerLegStats(player, state, { skipDuel: true });
     }
   }
-  if (completedMatch && completedDuelId && winner) {
-    await dataStore.initPlayerStats(winner.slot);
-    const winnerStats = await dataStore.getPlayerStats(winner.slot) || {};
-    await dataStore.updatePlayerStats(winner.slot, {
-      games_won: Number(winnerStats.games_won || 0) + 1
-    });
-  }
 }
 
 function queueCompletedLegStats(state, winner, generation = liveLifecycleGeneration) {
