@@ -1293,7 +1293,8 @@
     let winnerDismissedKey = '';
     let isFirstLoad = true;
     let lastCricketAnimationKey = '';
-    let lastEventSoundKey = '';
+    const playedEventSoundKeys = new Set();
+    const maxPlayedEventSoundKeys = 128;
     let eventEffects = null;
     let dailyDisplaySettings = { mode: 'alternate', intervalMs: 5000 };
     let dailyDisplayTimer = null;
@@ -1326,6 +1327,15 @@
       return !config || (isEventEnabled(eventKey) && config.sound === eventKey);
     }
 
+    function claimEventSound(soundKey) {
+      if (!soundKey || playedEventSoundKeys.has(soundKey)) return false;
+      playedEventSoundKeys.add(soundKey);
+      if (playedEventSoundKeys.size > maxPlayedEventSoundKeys) {
+        playedEventSoundKeys.delete(playedEventSoundKeys.values().next().value);
+      }
+      return true;
+    }
+
     function playTripleEventSound(lastThrow) {
       let segment = String(lastThrow && lastThrow.segment || '').toUpperCase();
       if (!segment && Number(lastThrow && lastThrow.code) > 0) {
@@ -1339,8 +1349,7 @@
       const specificConfig = specificKey && eventEffects && eventEffects[specificKey];
       const eventKey = specificConfig && specificConfig.sound !== 'none' ? specificKey : 'triple';
       const soundKey = [lastThrow.ts, lastThrow.playerSlot, segment, eventKey].join(':');
-      if (soundKey === lastEventSoundKey || !isEventEnabled(eventKey)) return;
-      lastEventSoundKey = soundKey;
+      if (!isEventEnabled(eventKey) || !claimEventSound(soundKey)) return;
       playConfiguredEventSound(eventKey, () => {});
     }
 
@@ -1351,8 +1360,7 @@
       const eventKey = segment === 'DBULL' ? 'dbull' : ['S25', 'BULL'].includes(segment) ? 'bull' : null;
       if (!eventKey) return;
       const soundKey = [lastThrow.ts, lastThrow.playerSlot, segment, eventKey].join(':');
-      if (soundKey === lastEventSoundKey || !isEventEnabled(eventKey)) return;
-      lastEventSoundKey = soundKey;
+      if (!isEventEnabled(eventKey) || !claimEventSound(soundKey)) return;
       playConfiguredEventSound(eventKey, () => {});
     }
 
@@ -1369,8 +1377,7 @@
       const specificConfig = eventEffects && eventEffects[specificKey];
       const eventKey = specificConfig && specificConfig.sound !== 'none' ? specificKey : 'double';
       const soundKey = [lastThrow.ts, lastThrow.playerSlot, segment, eventKey].join(':');
-      if (soundKey === lastEventSoundKey || !isEventEnabled(eventKey)) return;
-      lastEventSoundKey = soundKey;
+      if (!isEventEnabled(eventKey) || !claimEventSound(soundKey)) return;
       playConfiguredEventSound(eventKey, () => {});
     }
 
@@ -2493,8 +2500,7 @@
       if (lastThrow && lastThrow.bust) {
         if (isEventAnimationEnabled('bust')) showBustOverlay(active); else hideBustOverlay();
         const soundKey = [lastThrow.ts, lastThrow.playerSlot, 'bust'].join(':');
-        if (soundKey !== lastEventSoundKey && isEventEnabled('bust')) {
-          lastEventSoundKey = soundKey;
+        if (isEventEnabled('bust') && claimEventSound(soundKey)) {
           playConfiguredEventSound('bust', playBustSound);
         }
       } else {
@@ -2508,8 +2514,7 @@
         if (eliminatedPlayer && eliminatorPlayer) {
           if (isEventAnimationEnabled('elimination')) showEliminationOverlay(eliminatedPlayer, eliminatorPlayer); else hideEliminationOverlay();
           const soundKey = [lastThrow.ts, lastThrow.playerSlot, 'elimination'].join(':');
-          if (soundKey !== lastEventSoundKey && isEventEnabled('elimination')) {
-            lastEventSoundKey = soundKey;
+          if (isEventEnabled('elimination') && claimEventSound(soundKey)) {
             playConfiguredEventSound('elimination', playEliminationSound);
           }
         }
