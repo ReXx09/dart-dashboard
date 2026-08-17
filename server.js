@@ -3668,11 +3668,14 @@ app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
     invalidateLiveLifecycle();
     const winnerSlot = Number(req.body?.winnerSlot || 0) || null;
     const duel = await dataStore.finishDuel(req.params.id, winnerSlot);
-    if (winnerSlot) {
-      await dataStore.initPlayerStats(winnerSlot);
-      const winnerStats = await dataStore.getPlayerStats(winnerSlot) || {};
-      await dataStore.updatePlayerStats(winnerSlot, {
-        games_won: Number(winnerStats.games_won || 0) + 1
+    for (const participant of duel?.players || []) {
+      const playerId = Number(participant.player_slot);
+      if (!Number.isInteger(playerId) || playerId < 1) continue;
+      await dataStore.initPlayerStats(playerId);
+      const playerStats = await dataStore.getPlayerStats(playerId) || {};
+      await dataStore.updatePlayerStats(playerId, {
+        games_played: Number(playerStats.games_played || 0) + 1,
+        games_won: Number(playerStats.games_won || 0) + (playerId === winnerSlot ? 1 : 0)
       });
     }
     state.game.duelId = null;
