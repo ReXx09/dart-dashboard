@@ -86,6 +86,23 @@
     .btn:hover { background: #2a2a2a; border-color: #e63946; }
     .btn.primary { background: #e63946; border-color: #e63946; color: #fff; }
     .btn.primary:hover { background: #c1121f; }
+    .edit-toolbar { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+    .edit-status { color: #2a9d8f; font-size: .72rem; }
+    .stats-editor { background: #111; border: 1px solid #2a2a2a; border-radius: 10px; padding: 14px; margin-bottom: 18px; }
+    .stats-editor[hidden] { display: none; }
+    .stats-editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; }
+    .stats-editor-field { margin: 0; }
+    .stats-editor-field label { margin-bottom: 5px; }
+    .stats-editor-field input { padding: 8px 10px; }
+    .stats-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+    .stats-editor-message { color: #888; font-size: .72rem; margin-top: 8px; }
+    .pin-dialog { position: fixed; inset: 0; z-index: 30; display: none; place-items: center; padding: 18px; background: rgba(0,0,0,.78); }
+    .pin-dialog.is-open { display: grid; }
+    .pin-dialog-card { width: min(360px, 100%); background: #141414; border: 1px solid #333; border-top: 3px solid #e63946; border-radius: 12px; padding: 18px; }
+    .pin-dialog-card h2 { font-size: 1rem; margin-bottom: 8px; }
+    .pin-dialog-card p { color: #888; font-size: .78rem; margin-bottom: 14px; }
+    .pin-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+    .pin-dialog-error { min-height: 18px; color: #e63946; font-size: .72rem; margin-top: 8px; }
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -396,6 +413,21 @@
       <button class="btn primary" id="refreshBtn">🔄 Aktualisieren</button>
     </div>
 
+    <div class="edit-toolbar">
+      <span class="edit-status" id="editStatus" hidden>Bearbeitungsmodus aktiv</span>
+      <button class="btn" id="editStatsBtn" type="button">🔒 Statistik bearbeiten</button>
+    </div>
+
+    <section class="stats-editor" id="statsEditor" hidden>
+      <h2 class="section-title">Statistik bearbeiten</h2>
+      <div class="stats-editor-grid" id="statsEditorGrid"></div>
+      <div class="stats-editor-message" id="statsEditorMessage">Änderungen werden erst nach dem Speichern übernommen.</div>
+      <div class="stats-editor-actions">
+        <button class="btn" id="cancelStatsEditBtn" type="button">Abbrechen</button>
+        <button class="btn primary" id="saveStatsEditBtn" type="button">Speichern</button>
+      </div>
+    </section>
+
     <div class="summary-grid" id="summaryGrid">
       <!-- Summary cards injected here -->
     </div>
@@ -534,6 +566,19 @@
       <div id="encounterDialogContent"><div class="encounter-empty">Daten werden geladen...</div></div>
     </div>
   </div>
+  <div class="pin-dialog" id="pinDialog" role="dialog" aria-modal="true" aria-labelledby="pinDialogTitle">
+    <form class="pin-dialog-card" id="pinForm">
+      <h2 id="pinDialogTitle">Admin-PIN erforderlich</h2>
+      <p>Bitte bestätige die PIN, um Statistiken bearbeiten zu können.</p>
+      <label for="statsAdminPin">Admin-PIN</label>
+      <input id="statsAdminPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" required />
+      <div class="pin-dialog-error" id="pinDialogError"></div>
+      <div class="pin-dialog-actions">
+        <button class="btn" id="cancelPinBtn" type="button">Abbrechen</button>
+        <button class="btn primary" type="submit">Freischalten</button>
+      </div>
+    </form>
+  </div>
   <script>
     const API_BASE = '/api';
     let currentPlayerId = null;
@@ -550,6 +595,21 @@
     let selectedSegmentType = 'all';
     let encounterDetail = null;
     let encounterDetailView = 'duel';
+    let statsEditEnabled = false;
+    const editableStats = [
+      ['games_played', 'Games gespielt', 'integer'], ['games_won', 'Games gewonnen', 'integer'],
+      ['legs_played', 'Legs gespielt', 'integer'], ['legs_won', 'Legs gewonnen', 'integer'],
+      ['total_darts', 'Darts gesamt', 'integer'], ['total_scored', 'Punkte gesamt', 'integer'],
+      ['highest_leg_avg', 'Highest Leg Avg', 'decimal'], ['avg_first9', 'First 9 Avg', 'decimal'],
+      ['checkout_attempts', 'Checkout Versuche', 'integer'], ['checkout_success', 'Checkout Erfolge', 'integer'],
+      ['highest_checkout', 'Highest Checkout', 'integer'],
+      ['checkout_single_attempts', 'Single Versuche', 'integer'], ['checkout_single_success', 'Single Erfolge', 'integer'], ['checkout_single_highest', 'Single Highest', 'integer'],
+      ['checkout_double_attempts', 'Double Versuche', 'integer'], ['checkout_double_success', 'Double Erfolge', 'integer'], ['checkout_double_highest', 'Double Highest', 'integer'],
+      ['checkout_master_attempts', 'Master Versuche', 'integer'], ['checkout_master_success', 'Master Erfolge', 'integer'], ['checkout_master_highest', 'Master Highest', 'integer'],
+      ['checkout_100plus', 'Checkout 100+', 'integer'], ['checkout_120plus', 'Checkout 120+', 'integer'], ['checkout_160plus', 'Checkout 160+', 'integer'],
+      ['count_180', '180er', 'integer'], ['count_171plus', '171+', 'integer'], ['count_140plus', '140+', 'integer'], ['count_100plus', '100+', 'integer'],
+      ['max_score', 'Max Score', 'integer'], ['cricket_legs', 'Cricket Legs', 'integer'], ['cricket_won', 'Cricket gewonnen', 'integer'], ['cricket_mpr', 'Cricket MPR', 'decimal']
+    ];
 
     // DOM Elements
     const playerSelect = document.getElementById('playerSelect');
@@ -557,6 +617,79 @@
     const statsModeSelect = document.getElementById('statsModeSelect');
     const refreshBtn = document.getElementById('refreshBtn');
     const summaryGrid = document.getElementById('summaryGrid');
+    const editStatsBtn = document.getElementById('editStatsBtn');
+    const editStatus = document.getElementById('editStatus');
+    const statsEditor = document.getElementById('statsEditor');
+    const statsEditorGrid = document.getElementById('statsEditorGrid');
+    const statsEditorMessage = document.getElementById('statsEditorMessage');
+    const pinDialog = document.getElementById('pinDialog');
+    const pinForm = document.getElementById('pinForm');
+    const statsAdminPin = document.getElementById('statsAdminPin');
+    const pinDialogError = document.getElementById('pinDialogError');
+
+    statsEditorGrid.innerHTML = editableStats.map(([field, label, type]) =>
+      '<div class="stats-editor-field"><label for="edit-' + field + '">' + label + '</label><input id="edit-' + field + '" data-stat-edit="' + field + '" type="number" min="0" step="' + (type === 'decimal' ? '0.01' : '1') + '" inputmode="decimal"></div>'
+    ).join('');
+
+    function showPinDialog() {
+      pinDialog.classList.add('is-open');
+      pinDialogError.textContent = '';
+      statsAdminPin.value = '';
+      setTimeout(() => statsAdminPin.focus(), 0);
+    }
+
+    function hidePinDialog() { pinDialog.classList.remove('is-open'); }
+
+    function setStatsEditor(enabled) {
+      statsEditEnabled = enabled;
+      statsEditor.hidden = !enabled;
+      editStatus.hidden = !enabled;
+      editStatsBtn.textContent = enabled ? '🔓 Bearbeiten schließen' : '🔒 Statistik bearbeiten';
+      editStatsBtn.classList.toggle('primary', enabled);
+    }
+
+    function fillStatsEditor(stats) {
+      statsEditorGrid.querySelectorAll('[data-stat-edit]').forEach(input => {
+        input.value = Number(stats?.[input.dataset.statEdit] || 0);
+      });
+    }
+
+    function leaveStatsEditor() {
+      setStatsEditor(false);
+      hidePinDialog();
+    }
+
+    async function loginForStatsEdit(pin) {
+      const response = await fetch(API_BASE + '/admin/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Anmeldung fehlgeschlagen.');
+    }
+
+    async function saveStatsEdit() {
+      if (!statsEditEnabled || !currentPlayerId) return;
+      const payload = {};
+      statsEditorGrid.querySelectorAll('[data-stat-edit]').forEach(input => { payload[input.dataset.statEdit] = Number(input.value || 0); });
+      const button = document.getElementById('saveStatsEditBtn');
+      button.disabled = true;
+      statsEditorMessage.textContent = 'Speichere...';
+      try {
+        const response = await fetch(API_BASE + '/players/' + currentPlayerId + '/stats?season=' + encodeURIComponent(currentSeason), {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) leaveStatsEditor();
+          throw new Error(result.error || 'Statistik konnte nicht gespeichert werden.');
+        }
+        fillStatsEditor(result);
+        statsEditorMessage.textContent = 'Gespeichert.';
+        await loadStats();
+      } catch (error) {
+        statsEditorMessage.textContent = error.message;
+      } finally { button.disabled = false; }
+    }
 
     // Tab handling
     document.querySelectorAll('.tab').forEach(btn => {
@@ -648,6 +781,7 @@
         ]);
         const stats = await statsRes.json();
         const history = await historyRes.json();
+        if (statsEditEnabled) fillStatsEditor(stats);
         segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
         if (segmentComparison) await loadSegmentComparison();
         const highscores = highscoresRes.ok ? await highscoresRes.json() : [];
@@ -1072,11 +1206,13 @@
 
     // Event listeners
     playerSelect.addEventListener('change', () => {
+      leaveStatsEditor();
       currentPlayerId = playerSelect.value ? Number(playerSelect.value) : null;
       loadStats();
     });
 
     seasonSelect.addEventListener('change', () => {
+      leaveStatsEditor();
       currentSeason = seasonSelect.value;
       loadStats();
     });
@@ -1124,6 +1260,35 @@
     });
 
     refreshBtn.addEventListener('click', loadStats);
+    editStatsBtn.addEventListener('click', () => {
+      if (statsEditEnabled) {
+        leaveStatsEditor();
+      } else if (!currentPlayerId) {
+        editStatus.hidden = false;
+        editStatus.textContent = 'Bitte zuerst einen Spieler auswählen.';
+        setTimeout(() => { if (!statsEditEnabled) editStatus.hidden = true; }, 3000);
+      } else {
+        showPinDialog();
+      }
+    });
+    document.getElementById('cancelStatsEditBtn').addEventListener('click', leaveStatsEditor);
+    document.getElementById('saveStatsEditBtn').addEventListener('click', saveStatsEdit);
+    document.getElementById('cancelPinBtn').addEventListener('click', hidePinDialog);
+    pinForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const submitButton = pinForm.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      pinDialogError.textContent = '';
+      try {
+        await loginForStatsEdit(statsAdminPin.value);
+        hidePinDialog();
+        setStatsEditor(true);
+        await loadStats();
+      } catch (error) {
+        pinDialogError.textContent = error.message;
+        statsAdminPin.select();
+      } finally { submitButton.disabled = false; }
+    });
     loadEncounters();
 
     // Init
