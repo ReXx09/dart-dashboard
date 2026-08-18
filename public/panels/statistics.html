@@ -419,6 +419,7 @@
 
     <div class="edit-toolbar">
       <span class="edit-status" id="editStatus" hidden>Bearbeitungsmodus aktiv</span>
+      <button class="btn" id="recalcGamesBtn" type="button" hidden title="Games gespielt/gewonnen aus Duellen neu berechnen">↺ Games neu berechnen</button>
       <button class="btn" id="editStatsBtn" type="button">🔒 Statistik bearbeiten</button>
     </div>
 
@@ -599,20 +600,6 @@
     let encounterDetail = null;
     let encounterDetailView = 'duel';
     let statsEditEnabled = false;
-    const editableStats = [
-      ['games_played', 'Games gespielt', 'integer'], ['games_won', 'Games gewonnen', 'integer'],
-      ['legs_played', 'Legs gespielt', 'integer'], ['legs_won', 'Legs gewonnen', 'integer'],
-      ['total_darts', 'Darts gesamt', 'integer'], ['total_scored', 'Punkte gesamt', 'integer'],
-      ['highest_leg_avg', 'Highest Leg Avg', 'decimal'], ['avg_first9', 'First 9 Avg', 'decimal'],
-      ['checkout_attempts', 'Checkout Versuche', 'integer'], ['checkout_success', 'Checkout Erfolge', 'integer'],
-      ['highest_checkout', 'Highest Checkout', 'integer'],
-      ['checkout_single_attempts', 'Single Versuche', 'integer'], ['checkout_single_success', 'Single Erfolge', 'integer'], ['checkout_single_highest', 'Single Highest', 'integer'],
-      ['checkout_double_attempts', 'Double Versuche', 'integer'], ['checkout_double_success', 'Double Erfolge', 'integer'], ['checkout_double_highest', 'Double Highest', 'integer'],
-      ['checkout_master_attempts', 'Master Versuche', 'integer'], ['checkout_master_success', 'Master Erfolge', 'integer'], ['checkout_master_highest', 'Master Highest', 'integer'],
-      ['checkout_100plus', 'Checkout 100+', 'integer'], ['checkout_120plus', 'Checkout 120+', 'integer'], ['checkout_160plus', 'Checkout 160+', 'integer'],
-      ['count_180', '180er', 'integer'], ['count_171plus', '171+', 'integer'], ['count_140plus', '140+', 'integer'], ['count_100plus', '100+', 'integer'],
-      ['max_score', 'Max Score', 'integer'], ['cricket_legs', 'Cricket Legs', 'integer'], ['cricket_won', 'Cricket gewonnen', 'integer'], ['cricket_mpr', 'Cricket MPR', 'decimal']
-    ];
 
     // DOM Elements
     const playerSelect = document.getElementById('playerSelect');
@@ -641,6 +628,7 @@
     function setStatsEditor(enabled) {
       statsEditEnabled = enabled;
       editStatus.hidden = !enabled;
+      document.getElementById('recalcGamesBtn').hidden = !(enabled && currentPlayerId);
       editStatsBtn.textContent = enabled ? '🔓 Bearbeiten schließen' : '🔒 Statistik bearbeiten';
       editStatsBtn.classList.toggle('primary', enabled);
     }
@@ -840,9 +828,14 @@
 
     function renderEncounterStats(data) {
       const container = document.getElementById('encounterStats');
-      if (!currentPlayerId || !data || !data.legs) {
+      if (!currentPlayerId) {
         container.innerHTML = '<div class="stat-item"><div class="stat-label">Begegnungswerte</div><div class="stat-value">-</div><div class="stat-sub">Spieler auswählen</div></div>';
         document.getElementById('encounterPlayerStatus').textContent = 'Wähle einen Spieler für seine Begegnungswerte.';
+        return;
+      }
+      if (!data || !data.legs) {
+        container.innerHTML = '<div class="stat-item"><div class="stat-label">Begegnungswerte</div><div class="stat-value">-</div><div class="stat-sub">Keine Legs in dieser Kategorie</div></div>';
+        document.getElementById('encounterPlayerStatus').textContent = 'Für diesen Spieler sind in dieser Kategorie noch keine Begegnungen gespeichert.';
         return;
       }
       const player = (data.players || [])[0] || {};
@@ -1294,6 +1287,24 @@
         setTimeout(() => { if (!statsEditEnabled) editStatus.hidden = true; }, 3000);
       } else {
         showPinDialog();
+      }
+    });
+    document.getElementById('recalcGamesBtn').addEventListener('click', async () => {
+      if (!currentPlayerId || !statsEditEnabled) return;
+      const btn = document.getElementById('recalcGamesBtn');
+      btn.disabled = true;
+      btn.textContent = '\u21ba Berechne...';
+      try {
+        const response = await fetch(API_BASE + '/players/' + currentPlayerId + '/stats/recalculate-games?season=' + encodeURIComponent(currentSeason), { method: 'POST' });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Fehler');
+        Object.assign(currentStats, result);
+        await loadStats();
+      } catch (error) {
+        alert('Neuberechnung fehlgeschlagen: ' + error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '\u21ba Games neu berechnen';
       }
     });
     document.getElementById('statEditPopupCancel').addEventListener('click', closeStatEditPopup);

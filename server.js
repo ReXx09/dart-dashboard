@@ -4345,6 +4345,22 @@ app.post('/api/players/:id/stats/reset', requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/api/players/:id/stats/recalculate-games', requireAdmin, async (req, res) => {
+  const playerId = Number(req.params.id);
+  const season = String(req.query.season || req.body?.season || DEFAULT_STATS_SEASON).trim();
+  if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
+  if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
+  try {
+    const gamesPlayed = await dataStore.countPlayerFinishedDuels(playerId);
+    const gamesWon = await dataStore.countPlayerWonDuels(playerId);
+    await dataStore.initPlayerStats(playerId, season);
+    await dataStore.updatePlayerStats(playerId, { games_played: gamesPlayed, games_won: gamesWon }, season);
+    res.json(await dataStore.getPlayerStats(playerId, season));
+  } catch (err) {
+    res.status(500).json({ error: 'Neuberechnung fehlgeschlagen: ' + err.message });
+  }
+});
+
 app.get('/api/players/:id/history', async (req, res) => {
   try {
     const playerId = Number(req.params.id);

@@ -1859,6 +1859,22 @@ class DataStore {
     );
   }
 
+  async countPlayerFinishedDuels(playerSlot) {
+    const slot = Number(playerSlot);
+    const sql = "SELECT COUNT(DISTINCT d.id) as count FROM duels d JOIN duel_players dp ON dp.duel_id = d.id WHERE dp.player_slot = ? AND d.status = 'finished'";
+    if (this.isSQLite()) return Number((await this.sqlite.get(sql, [slot]))?.count || 0);
+    if (this.isPostgres()) return Number((await this.pg.query(sql.replace(/\?/g, '$1'), [slot])).rows[0]?.count || 0);
+    return Number((await this.my.query(sql, [slot]))[0]?.[0]?.count || 0);
+  }
+
+  async countPlayerWonDuels(playerSlot) {
+    const slot = Number(playerSlot);
+    const sql = "SELECT COUNT(*) as count FROM duels WHERE winner_slot = ? AND status = 'finished'";
+    if (this.isSQLite()) return Number((await this.sqlite.get(sql, [slot]))?.count || 0);
+    if (this.isPostgres()) return Number((await this.pg.query(sql.replace(/\?/g, '$1'), [slot])).rows[0]?.count || 0);
+    return Number((await this.my.query(sql, [slot]))[0]?.[0]?.count || 0);
+  }
+
   async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn, season = DEFAULT_STATS_SEASON, duelId = null) {
     const ts = Date.now();
 

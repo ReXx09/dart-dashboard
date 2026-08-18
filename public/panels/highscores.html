@@ -658,7 +658,7 @@
     }
 
     function escapeHtml(value) {
-      return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
     }
 
     const METRICS = [
@@ -692,7 +692,11 @@
 
     function setScoreCategory(category) {
       selectedScoreCategory = category;
-      document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
+      if (['single', 'duel', 'group', 'tournament'].includes(category)) {
+        selectedEncounterCategory = category;
+        document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
+        renderEncounters();
+      }
       document.getElementById('scoreCategorySelect').value = category;
       selectedFilter = 'all';
       document.getElementById('scoreSelect').value = 'all';
@@ -704,6 +708,8 @@
       selectedScoreCategory = category;
       selectedEncounterCategory = category;
       document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === category));
+      const categorySelect = document.getElementById('scoreCategorySelect');
+      if ([...categorySelect.options].some(option => option.value === category)) categorySelect.value = category;
       renderEncounters();
     }
 
@@ -1178,8 +1184,6 @@
     document.getElementById('scoreBody').addEventListener('click', event => {
       const groupButton = event.target.closest('[data-detail-group]');
       if (groupButton) openScoreGroupDetail(groupButton.dataset.detailGroup);
-      const detailButton = event.target.closest('[data-detail-id]');
-      if (detailButton) openScoreDetail(detailButton.dataset.detailId);
     });
     document.getElementById('scoreCategorySelect').addEventListener('change', event => setScoreCategory(event.target.value));
     document.getElementById('encounterDialog').addEventListener('click', event => {
