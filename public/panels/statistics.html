@@ -88,14 +88,18 @@
     .btn.primary:hover { background: #c1121f; }
     .edit-toolbar { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
     .edit-status { color: #2a9d8f; font-size: .72rem; }
-    .stats-editor { background: #111; border: 1px solid #2a2a2a; border-radius: 10px; padding: 14px; margin-bottom: 18px; }
-    .stats-editor[hidden] { display: none; }
-    .stats-editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; }
-    .stats-editor-field { margin: 0; }
-    .stats-editor-field label { margin-bottom: 5px; }
-    .stats-editor-field input { padding: 8px 10px; }
-    .stats-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-    .stats-editor-message { color: #888; font-size: .72rem; margin-top: 8px; }
+    .stat-item.editable { cursor: pointer; position: relative; }
+    .stat-item.editable:hover { border-color: #f4a261; }
+    .stat-edit-icon { position: absolute; top: 5px; right: 6px; font-size: .65rem; opacity: 0; pointer-events: none; line-height: 1; }
+    .stat-item.editable:hover .stat-edit-icon { opacity: 1; }
+    .stat-edit-popup { position: fixed; z-index: 40; background: #1a1a1a; border: 1px solid #333; border-top: 3px solid #f4a261; border-radius: 10px; padding: 14px; width: min(260px, 92vw); box-shadow: 0 8px 32px rgba(0,0,0,.7); }
+    .stat-edit-popup[hidden] { display: none; }
+    .stat-edit-popup-title { font-size: .6rem; text-transform: uppercase; letter-spacing: 1.2px; color: #f4a261; font-weight: 700; margin-bottom: 10px; }
+    .stat-edit-popup-field { margin-bottom: 8px; }
+    .stat-edit-popup-field label { font-size: .6rem; color: #777; margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 1px; }
+    .stat-edit-popup-field input { padding: 8px 10px; }
+    .stat-edit-popup-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+    .stat-edit-popup-error { min-height: 14px; color: #e63946; font-size: .68rem; margin-top: 6px; }
     .pin-dialog { position: fixed; inset: 0; z-index: 30; display: none; place-items: center; padding: 18px; background: rgba(0,0,0,.78); }
     .pin-dialog.is-open { display: grid; }
     .pin-dialog-card { width: min(360px, 100%); background: #141414; border: 1px solid #333; border-top: 3px solid #e63946; border-radius: 12px; padding: 18px; }
@@ -418,16 +422,6 @@
       <button class="btn" id="editStatsBtn" type="button">🔒 Statistik bearbeiten</button>
     </div>
 
-    <section class="stats-editor" id="statsEditor" hidden>
-      <h2 class="section-title">Statistik bearbeiten</h2>
-      <div class="stats-editor-grid" id="statsEditorGrid"></div>
-      <div class="stats-editor-message" id="statsEditorMessage">Änderungen werden erst nach dem Speichern übernommen.</div>
-      <div class="stats-editor-actions">
-        <button class="btn" id="cancelStatsEditBtn" type="button">Abbrechen</button>
-        <button class="btn primary" id="saveStatsEditBtn" type="button">Speichern</button>
-      </div>
-    </section>
-
     <div class="summary-grid" id="summaryGrid">
       <!-- Summary cards injected here -->
     </div>
@@ -566,6 +560,15 @@
       <div id="encounterDialogContent"><div class="encounter-empty">Daten werden geladen...</div></div>
     </div>
   </div>
+  <div id="statEditPopup" class="stat-edit-popup" hidden>
+    <div class="stat-edit-popup-title" id="statEditPopupTitle"></div>
+    <div id="statEditPopupFields"></div>
+    <div class="stat-edit-popup-error" id="statEditPopupError"></div>
+    <div class="stat-edit-popup-actions">
+      <button class="btn" id="statEditPopupCancel" type="button">Abbrechen</button>
+      <button class="btn primary" id="statEditPopupSave" type="button">Speichern</button>
+    </div>
+  </div>
   <div class="pin-dialog" id="pinDialog" role="dialog" aria-modal="true" aria-labelledby="pinDialogTitle">
     <form class="pin-dialog-card" id="pinForm">
       <h2 id="pinDialogTitle">Admin-PIN erforderlich</h2>
@@ -619,17 +622,12 @@
     const summaryGrid = document.getElementById('summaryGrid');
     const editStatsBtn = document.getElementById('editStatsBtn');
     const editStatus = document.getElementById('editStatus');
-    const statsEditor = document.getElementById('statsEditor');
-    const statsEditorGrid = document.getElementById('statsEditorGrid');
-    const statsEditorMessage = document.getElementById('statsEditorMessage');
     const pinDialog = document.getElementById('pinDialog');
+    let currentStats = {};
+    let statEditPopupOpen = false;
     const pinForm = document.getElementById('pinForm');
     const statsAdminPin = document.getElementById('statsAdminPin');
     const pinDialogError = document.getElementById('pinDialogError');
-
-    statsEditorGrid.innerHTML = editableStats.map(([field, label, type]) =>
-      '<div class="stats-editor-field"><label for="edit-' + field + '">' + label + '</label><input id="edit-' + field + '" data-stat-edit="' + field + '" type="number" min="0" step="' + (type === 'decimal' ? '0.01' : '1') + '" inputmode="decimal"></div>'
-    ).join('');
 
     function showPinDialog() {
       pinDialog.classList.add('is-open');
@@ -642,21 +640,81 @@
 
     function setStatsEditor(enabled) {
       statsEditEnabled = enabled;
-      statsEditor.hidden = !enabled;
       editStatus.hidden = !enabled;
       editStatsBtn.textContent = enabled ? '🔓 Bearbeiten schließen' : '🔒 Statistik bearbeiten';
       editStatsBtn.classList.toggle('primary', enabled);
     }
 
-    function fillStatsEditor(stats) {
-      statsEditorGrid.querySelectorAll('[data-stat-edit]').forEach(input => {
-        input.value = Number(stats?.[input.dataset.statEdit] || 0);
-      });
-    }
-
     function leaveStatsEditor() {
+      closeStatEditPopup();
       setStatsEditor(false);
       hidePinDialog();
+      if (currentPlayerId) loadStats();
+    }
+
+    function statItem(label, value, sub, editFields, editLabels) {
+      const editable = statsEditEnabled && Array.isArray(editFields) && editFields.length > 0;
+      const dataAttrs = editable ? ' data-edit-fields="' + editFields.join(',') + '" data-edit-labels="' + (editLabels || editFields).join(',') + '"' : '';
+      const icon = editable ? '<span class="stat-edit-icon" aria-hidden="true">✏</span>' : '';
+      return '<div class="stat-item' + (editable ? ' editable' : '') + '"' + dataAttrs + '>' + icon + '<div class="stat-label">' + label + '</div><div class="stat-value">' + value + '</div><div class="stat-sub">' + sub + '</div></div>';
+    }
+
+    function openStatEditPopup(cardEl) {
+      const fields = (cardEl.dataset.editFields || '').split(',').filter(Boolean);
+      const labels = (cardEl.dataset.editLabels || '').split(',').filter(Boolean);
+      if (!fields.length) return;
+      const popup = document.getElementById('statEditPopup');
+      document.getElementById('statEditPopupTitle').textContent = labels[0] || fields[0];
+      document.getElementById('statEditPopupError').textContent = '';
+      document.getElementById('statEditPopupFields').innerHTML = fields.map((field, i) => {
+        const label = labels[i] || field;
+        const val = Number(currentStats[field] || 0);
+        const isDecimal = ['highest_leg_avg', 'avg_first9', 'cricket_mpr'].includes(field);
+        return '<div class="stat-edit-popup-field"><label>' + escapeHtml(label) + '</label><input type="number" min="0" step="' + (isDecimal ? '0.01' : '1') + '" value="' + val + '" data-popup-field="' + field + '"></div>';
+      }).join('');
+      const rect = cardEl.getBoundingClientRect();
+      const pw = Math.min(260, window.innerWidth * 0.92);
+      let left = Math.min(rect.left, window.innerWidth - pw - 8);
+      let top = rect.bottom + 6;
+      if (left < 8) left = 8;
+      if (top + 180 > window.innerHeight - 8) top = Math.max(8, rect.top - 185);
+      popup.style.left = left + 'px';
+      popup.style.top = top + 'px';
+      popup.hidden = false;
+      statEditPopupOpen = true;
+      const firstInput = popup.querySelector('input');
+      if (firstInput) setTimeout(() => { firstInput.focus(); firstInput.select(); }, 0);
+    }
+
+    function closeStatEditPopup() {
+      document.getElementById('statEditPopup').hidden = true;
+      statEditPopupOpen = false;
+    }
+
+    async function saveStatEditPopup() {
+      if (!currentPlayerId) return;
+      const popup = document.getElementById('statEditPopup');
+      const saveBtn = document.getElementById('statEditPopupSave');
+      const errorEl = document.getElementById('statEditPopupError');
+      const payload = {};
+      popup.querySelectorAll('[data-popup-field]').forEach(input => { payload[input.dataset.popupField] = Number(input.value || 0); });
+      saveBtn.disabled = true;
+      errorEl.textContent = '';
+      try {
+        const response = await fetch(API_BASE + '/players/' + currentPlayerId + '/stats?season=' + encodeURIComponent(currentSeason), {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) leaveStatsEditor();
+          throw new Error(result.error || 'Fehler beim Speichern.');
+        }
+        Object.assign(currentStats, result);
+        closeStatEditPopup();
+        await loadStats();
+      } catch (error) {
+        errorEl.textContent = error.message;
+      } finally { saveBtn.disabled = false; }
     }
 
     async function loginForStatsEdit(pin) {
@@ -665,30 +723,6 @@
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Anmeldung fehlgeschlagen.');
-    }
-
-    async function saveStatsEdit() {
-      if (!statsEditEnabled || !currentPlayerId) return;
-      const payload = {};
-      statsEditorGrid.querySelectorAll('[data-stat-edit]').forEach(input => { payload[input.dataset.statEdit] = Number(input.value || 0); });
-      const button = document.getElementById('saveStatsEditBtn');
-      button.disabled = true;
-      statsEditorMessage.textContent = 'Speichere...';
-      try {
-        const response = await fetch(API_BASE + '/players/' + currentPlayerId + '/stats?season=' + encodeURIComponent(currentSeason), {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          if (response.status === 401 || response.status === 403) leaveStatsEditor();
-          throw new Error(result.error || 'Statistik konnte nicht gespeichert werden.');
-        }
-        fillStatsEditor(result);
-        statsEditorMessage.textContent = 'Gespeichert.';
-        await loadStats();
-      } catch (error) {
-        statsEditorMessage.textContent = error.message;
-      } finally { button.disabled = false; }
     }
 
     // Tab handling
@@ -781,7 +815,7 @@
         ]);
         const stats = await statsRes.json();
         const history = await historyRes.json();
-        if (statsEditEnabled) fillStatsEditor(stats);
+        currentStats = stats;
         segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
         if (segmentComparison) await loadSegmentComparison();
         const highscores = highscoresRes.ok ? await highscoresRes.json() : [];
@@ -793,6 +827,7 @@
         stats.max_score = maxHighscore > 0 ? maxHighscore : Number(stats.max_score || 0);
         renderSummary(stats);
         renderOverview(stats);
+        renderAvg(stats);
         renderScoring(stats);
         renderSegmentAnalysis();
         renderCheckout(stats);
@@ -1000,13 +1035,12 @@
 
     function renderOverview(stats) {
       const s = stats || {};
-      const container = document.getElementById('overviewStats');
-      container.innerHTML = `
-        <div class="stat-item"><div class="stat-label">Games gespielt</div><div class="stat-value">${Number(s.games_played || 0)}</div><div class="stat-sub">Gewonnen: ${Number(s.games_won || 0)}</div></div>
-        <div class="stat-item"><div class="stat-label">Legs gespielt</div><div class="stat-value">${Number(s.legs_played || 0)}</div><div class="stat-sub">Gewonnen: ${Number(s.legs_won || 0)}</div></div>
-        <div class="stat-item"><div class="stat-label">Win %</div><div class="stat-value">${winPct(s)}%</div><div class="stat-sub">Legs</div></div>
-        <div class="stat-item"><div class="stat-label">Total Darts</div><div class="stat-value">${Number(s.total_darts || 0).toLocaleString()}</div><div class="stat-sub">Total Scored: ${Number(s.total_scored || 0).toLocaleString()}</div></div>
-      `;
+      document.getElementById('overviewStats').innerHTML = [
+        statItem('Games gespielt', Number(s.games_played || 0), 'Gewonnen: ' + Number(s.games_won || 0), ['games_played', 'games_won'], ['Games gespielt', 'Games gewonnen']),
+        statItem('Legs gespielt', Number(s.legs_played || 0), 'Gewonnen: ' + Number(s.legs_won || 0), ['legs_played', 'legs_won'], ['Legs gespielt', 'Legs gewonnen']),
+        statItem('Win %', winPct(s) + '%', 'Legs'),
+        statItem('Total Darts', Number(s.total_darts || 0).toLocaleString(), 'Total Scored: ' + Number(s.total_scored || 0).toLocaleString(), ['total_darts', 'total_scored'], ['Total Darts', 'Total Scored'])
+      ].join('');
     }
 
     function winPct(s) {
@@ -1017,62 +1051,53 @@
 
     function renderAvg(stats) {
       const s = stats || {};
-      const container = document.getElementById('avgStats');
       const darts = Number(s.total_darts || 0);
       const scored = Number(s.total_scored || 0);
       const overallAvg = darts > 0 ? (scored / darts * 3).toFixed(2) : '0.00';
-      container.innerHTML = `
-        <div class="stat-item"><div class="stat-label">Overall Average</div><div class="stat-value">${overallAvg}</div><div class="stat-sub">3-Dart</div></div>
-        <div class="stat-item"><div class="stat-label">Highest Leg Avg</div><div class="stat-value">${Number(s.highest_leg_avg || 0).toFixed(2)}</div><div class="stat-sub">Bestes Leg</div></div>
-        <div class="stat-item"><div class="stat-label">First 9 Avg</div><div class="stat-value">${Number(s.avg_first9 || 0).toFixed(2)}</div><div class="stat-sub">Erste 9 Darts</div></div>
-        <div class="stat-item"><div class="stat-label">Max Score</div><div class="stat-value">${Number(s.max_score || 0)}</div><div class="stat-sub">Höchste Aufnahme</div></div>
-      `;
+      document.getElementById('avgStats').innerHTML = [
+        statItem('Overall Average', overallAvg, '3-Dart'),
+        statItem('Highest Leg Avg', Number(s.highest_leg_avg || 0).toFixed(2), 'Bestes Leg', ['highest_leg_avg'], ['Highest Leg Avg']),
+        statItem('First 9 Avg', Number(s.avg_first9 || 0).toFixed(2), 'Erste 9 Darts', ['avg_first9'], ['First 9 Avg']),
+        statItem('Max Score', Number(s.max_score || 0), 'Höchste Aufnahme', ['max_score'], ['Max Score'])
+      ].join('');
     }
 
     function renderScoring(stats) {
       const s = stats || {};
-      const highScoreContainer = document.getElementById('highScoreStats');
-      highScoreContainer.innerHTML = `
-        <div class="stat-item"><div class="stat-label">180er</div><div class="stat-value">${Number(s.count_180 || 0)}</div><div class="stat-sub">Max 180</div></div>
-        <div class="stat-item"><div class="stat-label">171+</div><div class="stat-value">${Number(s.count_171plus || 0)}</div><div class="stat-sub">171-180</div></div>
-        <div class="stat-item"><div class="stat-label">140+</div><div class="stat-value">${Number(s.count_140plus || 0)}</div><div class="stat-sub">140-170</div></div>
-        <div class="stat-item"><div class="stat-label">100+</div><div class="stat-value">${Number(s.count_100plus || 0)}</div><div class="stat-sub">100-139</div></div>
-      `;
-
-      const distContainer = document.getElementById('distributionStats');
+      document.getElementById('highScoreStats').innerHTML = [
+        statItem('180er', Number(s.count_180 || 0), 'Max 180', ['count_180'], ['180er']),
+        statItem('171+', Number(s.count_171plus || 0), '171-180', ['count_171plus'], ['171+']),
+        statItem('140+', Number(s.count_140plus || 0), '140-170', ['count_140plus'], ['140+']),
+        statItem('100+', Number(s.count_100plus || 0), '100-139', ['count_100plus'], ['100+'])
+      ].join('');
       const total100plus = Number(s.count_100plus || 0) + Number(s.count_140plus || 0) + Number(s.count_171plus || 0) + Number(s.count_180 || 0);
       const legsPlayed = Number(s.legs_played || 1);
-      distContainer.innerHTML = `
-        <div class="stat-item"><div class="stat-label">100+ pro Leg</div><div class="stat-value">${(total100plus / legsPlayed).toFixed(2)}</div><div class="stat-sub">Durchschnitt</div></div>
-        <div class="stat-item"><div class="stat-label">180er Quote</div><div class="stat-value">${legsPlayed > 0 ? ((Number(s.count_180 || 0) / legsPlayed) * 100).toFixed(1) : '0.0'}%</div><div class="stat-sub">Pro Leg</div></div>
-        <div class="stat-item"><div class="stat-label">High Finish</div><div class="stat-value">${Number(s.highest_checkout || 0)}</div><div class="stat-sub">Höchster Checkout</div></div>
-        <div class="stat-item"><div class="stat-label">Max Score</div><div class="stat-value">${Number(s.max_score || 0)}</div><div class="stat-sub">Einzelne Aufnahme</div></div>
-      `;
+      document.getElementById('distributionStats').innerHTML = [
+        statItem('100+ pro Leg', (total100plus / legsPlayed).toFixed(2), 'Durchschnitt'),
+        statItem('180er Quote', (legsPlayed > 0 ? ((Number(s.count_180 || 0) / legsPlayed) * 100).toFixed(1) : '0.0') + '%', 'Pro Leg'),
+        statItem('High Finish', Number(s.highest_checkout || 0), 'Höchster Checkout', ['highest_checkout'], ['Highest Checkout']),
+        statItem('Max Score', Number(s.max_score || 0), 'Einzelne Aufnahme', ['max_score'], ['Max Score'])
+      ].join('');
     }
 
     function renderCheckout(stats) {
       const s = stats || {};
-      const checkoutContainer = document.getElementById('checkoutStats');
-      const rules = [
-        ['single', 'Single-Out'],
-        ['double', 'Double-Out'],
-        ['master', 'Master-Out']
-      ];
-      checkoutContainer.innerHTML = rules.map(([rule, label]) => {
+      const rules = [['single', 'Single-Out'], ['double', 'Double-Out'], ['master', 'Master-Out']];
+      document.getElementById('checkoutStats').innerHTML = rules.map(([rule, label]) => {
         const attempts = Number(s['checkout_' + rule + '_attempts'] || 0);
         const success = Number(s['checkout_' + rule + '_success'] || 0);
         const highest = Math.min(170, Number(s['checkout_' + rule + '_highest'] || 0));
         const pct = attempts > 0 ? ((success / attempts) * 100).toFixed(1) : '0.0';
-        return `<div class="stat-item"><div class="stat-label">${label} Quote</div><div class="stat-value">${pct}%</div><div class="stat-sub">${success} / ${attempts} · High: ${highest}</div></div>`;
+        return statItem(label + ' Quote', pct + '%', success + ' / ' + attempts + ' · High: ' + highest,
+          ['checkout_' + rule + '_attempts', 'checkout_' + rule + '_success', 'checkout_' + rule + '_highest'],
+          [label + ' Versuche', label + ' Erfolge', label + ' Highest']);
       }).join('');
-
-      const rangeContainer = document.getElementById('checkoutRangeStats');
-      rangeContainer.innerHTML = `
-        <div class="stat-item"><div class="stat-label">160+</div><div class="stat-value">${Number(s.checkout_160plus || 0)}</div><div class="stat-sub">High Finishes</div></div>
-        <div class="stat-item"><div class="stat-label">120+</div><div class="stat-value">${Number(s.checkout_120plus || 0)}</div><div class="stat-sub">Medium Finishes</div></div>
-        <div class="stat-item"><div class="stat-label">100+</div><div class="stat-value">${Number(s.checkout_100plus || 0)}</div><div class="stat-sub">Standard Finishes</div></div>
-        <div class="stat-item"><div class="stat-label"><100</div><div class="stat-value">${Math.max(0, Number(s.checkout_success || 0) - Number(s.checkout_100plus || 0) - Number(s.checkout_120plus || 0) - Number(s.checkout_160plus || 0))}</div><div class="stat-sub">Rest</div></div>
-      `;
+      document.getElementById('checkoutRangeStats').innerHTML = [
+        statItem('160+', Number(s.checkout_160plus || 0), 'High Finishes', ['checkout_160plus'], ['Checkout 160+']),
+        statItem('120+', Number(s.checkout_120plus || 0), 'Medium Finishes', ['checkout_120plus'], ['Checkout 120+']),
+        statItem('100+', Number(s.checkout_100plus || 0), 'Standard Finishes', ['checkout_100plus'], ['Checkout 100+']),
+        statItem('<100', Math.max(0, Number(s.checkout_success || 0) - Number(s.checkout_100plus || 0) - Number(s.checkout_120plus || 0) - Number(s.checkout_160plus || 0)), 'Rest')
+      ].join('');
     }
 
     function renderSegmentAnalysis() {
@@ -1271,9 +1296,22 @@
         showPinDialog();
       }
     });
-    document.getElementById('cancelStatsEditBtn').addEventListener('click', leaveStatsEditor);
-    document.getElementById('saveStatsEditBtn').addEventListener('click', saveStatsEdit);
+    document.getElementById('statEditPopupCancel').addEventListener('click', closeStatEditPopup);
+    document.getElementById('statEditPopupSave').addEventListener('click', saveStatEditPopup);
+    document.getElementById('statEditPopup').addEventListener('keydown', event => { if (event.key === 'Enter') saveStatEditPopup(); });
     document.getElementById('cancelPinBtn').addEventListener('click', hidePinDialog);
+    ['overviewStats', 'avgStats', 'highScoreStats', 'distributionStats', 'checkoutStats', 'checkoutRangeStats'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', event => {
+        if (!statsEditEnabled) return;
+        const card = event.target.closest('.stat-item.editable');
+        if (card) openStatEditPopup(card);
+      });
+    });
+    document.addEventListener('click', event => {
+      if (statEditPopupOpen && !event.target.closest('#statEditPopup') && !event.target.closest('.stat-item.editable')) closeStatEditPopup();
+    });
+    document.addEventListener('keydown', event => { if (statEditPopupOpen && event.key === 'Escape') closeStatEditPopup(); });
     pinForm.addEventListener('submit', async event => {
       event.preventDefault();
       const submitButton = pinForm.querySelector('button[type="submit"]');
