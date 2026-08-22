@@ -414,6 +414,8 @@
           <option value="150">150er</option>
           <option value="140">140+</option>
           <option value="100">100+</option>
+          <option value="80">80+</option>
+          <option value="60">60+</option>
           <option value="checkout">Checkouts</option>
           <option value="checkout-single">Checkouts · Single-Out</option>
           <option value="checkout-double">Checkouts · Double-Out</option>
@@ -900,6 +902,7 @@
       if (filter === '180' || filter === '177' || filter === '174' || filter === '171' || filter === '167' || filter === '164' || filter === '161' || filter === '160' || filter === '157' || filter === '154' || filter === '151' || filter === '150') {
         return score === Number(filter);
       }
+      if (filter === '140' || filter === '100' || filter === '80' || filter === '60') return score >= Number(filter);
       return true;
     }
 
@@ -939,7 +942,7 @@
       if (entryMode !== mode) return false;
       if (mode === 'cricket') return kind === 'cricket' || (!entry.legWin && kind !== 'manual' && kind !== 'checkout');
       // Elimination-Siege enden immer exakt beim Zielscore (z.B. 301) und sind daher kein aussagekräftiger Highscore-Wert.
-      if (mode === 'elimination') return Number(entry.score || 0) >= 100 && !entry.legWin && kind !== 'manual' && kind !== 'checkout';
+      if (mode === 'elimination' || mode === 'cricket') return Number(entry.score || 0) >= 60 && !entry.legWin && kind !== 'manual' && kind !== 'checkout';
       return Number(entry.score || 0) >= 100 && !entry.legWin && kind !== 'checkout' && kind !== 'manual' && kind !== 'cricket' && kind !== 'elimination';
     }
 

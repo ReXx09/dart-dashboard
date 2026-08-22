@@ -2818,11 +2818,12 @@ function getTurnScoreHighscoreKind(score) {
   if (score === 150) return '150er';
   if (score >= 140) return '140+';
   if (score >= 100) return '100+';
+  if (score >= 80) return '80+';
+  if (score >= 60) return '60+';
   return null;
 }
 
 async function addTurnScoreHighscoreIfNeeded(player, state, source = 'live') {
-  if (state.game.mode === 'cricket') return;
   if (!Array.isArray(player.currentRoundPoints) || player.currentRoundPoints.length !== 3 || player.turnScoreRecorded) return;
   const turnScore = player.currentRoundPoints.reduce((sum, points) => sum + (Number(points) || 0), 0);
   const kind = getTurnScoreHighscoreKind(turnScore);

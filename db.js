@@ -1639,7 +1639,7 @@ class DataStore {
   async getHighscores(limit = 100, gameMode = '', includeActive = false) {
     const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
     const safeMode = String(gameMode || '').trim();
-    const validEncounter = includeActive ? '1 = 1' : "(duel_id IS NULL OR EXISTS (SELECT 1 FROM duels d WHERE d.id = highscores.duel_id AND d.status = 'finished'))";
+    const validEncounter = (includeActive ? '1 = 1' : "(duel_id IS NULL OR EXISTS (SELECT 1 FROM duels d WHERE d.id = highscores.duel_id AND d.status = 'finished'))") + " AND NOT (kind = 'elimination' AND leg_win = 1)";
     let rows = [];
 
     if (this.isSQLite()) {
