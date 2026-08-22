@@ -4007,6 +4007,11 @@ app.delete('/api/highscores/:id', requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'Ungültige ID.' });
   try {
+    const existing = await dataStore.getHighscore(id);
+    if (!existing) return res.status(404).json({ error: 'Highscore nicht gefunden.' });
+    if (String(existing.kind || '') !== 'manual') {
+      return res.status(409).json({ error: existing.duel_id ? `Automatischer Highscore gehört zu Begegnung #${existing.duel_id}. Bitte dort die Quelldaten korrigieren oder löschen.` : 'Automatische Highscores können nur über ihre Spieldaten korrigiert werden.' });
+    }
     await dataStore.deleteHighscore(id);
     res.json({ ok: true, highscores: await getHighscores() });
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht gelöscht werden: ' + err.message }); }
@@ -4020,16 +4025,23 @@ app.put('/api/highscores/:id', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Gültige ID, Spieler und positiver Score erforderlich.' });
   }
   try {
-    await dataStore.updateHighscore(id, player, score);
+    const existing = await dataStore.getHighscore(id);
+    if (!existing) return res.status(404).json({ error: 'Highscore nicht gefunden.' });
+    if (String(existing.kind || '') !== 'manual') {
+      return res.status(409).json({ error: existing.duel_id ? `Automatischer Highscore gehört zu Begegnung #${existing.duel_id}. Bitte dort die Quelldaten korrigieren.` : 'Automatische Highscores können nur über ihre Spieldaten korrigiert werden.' });
+    }
+    const matchingPlayers = (await dataStore.getPlayers()).filter(item => String(item.name || '').trim().toLowerCase() === player.toLowerCase());
+    const playerSlot = matchingPlayers.length === 1 ? Number(matchingPlayers[0].slot) : null;
+    await dataStore.updateHighscore(id, player, score, playerSlot);
     res.json({ ok: true, highscores: await getHighscores() });
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht bearbeitet werden: ' + err.message }); }
 });
 
 app.delete('/api/highscores', requireAdmin, async (_req, res) => {
   try {
-    await dataStore.clearAllHighscores();
-    res.json({ ok: true, highscores: [] });
-  } catch (err) { res.status(500).json({ error: 'Highscores konnten nicht gelöscht werden: ' + err.message }); }
+    await dataStore.clearManualHighscores();
+    res.json({ ok: true, highscores: await getHighscores() });
+  } catch (err) { res.status(500).json({ error: 'Manuelle Highscores konnten nicht gelöscht werden: ' + err.message }); }
 });
 
 // ── Täglicher Höchstwert ──
@@ -4367,6 +4379,23 @@ const EDITABLE_PLAYER_STAT_FIELDS = [
   'count_140plus', 'count_100plus', 'max_score', 'cricket_legs', 'cricket_won', 'cricket_mpr'
 ];
 
+function validatePlayerStatUpdates(updates, current = {}) {
+  const pairs = [
+    ['games_won', 'games_played', 'Gewonnene Matches dürfen gespielte Matches nicht überschreiten.'],
+    ['legs_won', 'legs_played', 'Gewonnene Legs dürfen gespielte Legs nicht überschreiten.'],
+    ['checkout_success', 'checkout_attempts', 'Checkout-Erfolge dürfen Checkout-Versuche nicht überschreiten.'],
+    ['checkout_single_success', 'checkout_single_attempts', 'Single-Out-Erfolge dürfen Versuche nicht überschreiten.'],
+    ['checkout_double_success', 'checkout_double_attempts', 'Double-Out-Erfolge dürfen Versuche nicht überschreiten.'],
+    ['checkout_master_success', 'checkout_master_attempts', 'Master-Out-Erfolge dürfen Versuche nicht überschreiten.']
+  ];
+  for (const [successField, attemptsField, message] of pairs) {
+    const success = Number(updates[successField] ?? current[successField]);
+    const attempts = Number(updates[attemptsField] ?? current[attemptsField]);
+    if (Number.isFinite(success) && Number.isFinite(attempts) && success > attempts) return message;
+  }
+  return null;
+}
+
 app.put('/api/players/:id/stats', requireAdmin, async (req, res) => {
   const playerId = Number(req.params.id);
   const season = String(req.query.season || req.body?.season || DEFAULT_STATS_SEASON).trim();
@@ -4383,6 +4412,9 @@ app.put('/api/players/:id/stats', requireAdmin, async (req, res) => {
       }
     }
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Keine Statistikfelder angegeben' });
+    const current = await dataStore.getPlayerStats(playerId, season);
+    const validationError = validatePlayerStatUpdates(updates, current || {});
+    if (validationError) return res.status(400).json({ error: validationError });
     await dataStore.updatePlayerStats(playerId, updates, season);
     res.json(await dataStore.getPlayerStats(playerId, season));
   } catch (err) {
@@ -4397,9 +4429,7 @@ app.post('/api/players/:id/stats/reset', requireAdmin, async (req, res) => {
   if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
   try {
     await dataStore.initPlayerStats(playerId, season);
-    const reset = Object.fromEntries(EDITABLE_PLAYER_STAT_FIELDS.map(field => [field, 0]));
-    await dataStore.updatePlayerStats(playerId, reset, season);
-    await dataStore.deletePlayerLegHistory(playerId, season);
+    await dataStore.resetPlayerStats(playerId, EDITABLE_PLAYER_STAT_FIELDS, season);
     res.json(await dataStore.getPlayerStats(playerId, season));
   } catch (err) {
     res.status(500).json({ error: 'Statistik konnte nicht zurückgesetzt werden: ' + err.message });
@@ -4594,5 +4624,6 @@ module.exports = {
   isValidEventEffectSound,
   scanSoundDirectory,
   normalizeLiveStateSnapshot,
-  getLiveDisplayState
+  getLiveDisplayState,
+  validatePlayerStatUpdates
 };

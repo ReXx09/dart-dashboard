@@ -787,18 +787,21 @@
     body.innerHTML = list.map((entry, idx) => {
       const kind = entry.kind || 'score';
       const isEditing = Number(editingHighscoreId) === Number(entry.id);
-      const action = isEditing
+      const isManual = kind === 'manual';
+      const action = isEditing && isManual
         ? '<input type="text" value="' + escapeAttr(entry.player) + '" data-hs-edit-player style="width:105px;padding:5px;background:#111;color:#f1f1f1;border:1px solid #555;border-radius:4px;margin-right:4px" aria-label="Spielername" />' +
           '<input type="number" min="1" value="' + Number(entry.score || 0) + '" data-hs-edit-score style="width:72px;padding:5px;background:#111;color:#f1f1f1;border:1px solid #555;border-radius:4px;margin-right:4px" aria-label="Score" />' +
           '<button class="btn-save" style="background:#2a9d8f;border:none;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-save-id="' + Number(entry.id) + '">Speichern</button>' +
           '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem" data-hs-cancel-edit>Abbrechen</button>'
-        : '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-edit-id="' + entry.id + '">Bearbeiten</button>' +
-          '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>';
+        : isManual
+          ? '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-edit-id="' + entry.id + '">Bearbeiten</button>' +
+            '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>'
+          : '<span style="color:#777;font-size:.68rem">' + (entry.duelId ? 'Quelle: Begegnung #' + Number(entry.duelId) : 'Automatisch erfasst') + '</span>';
       return '<tr>' +
         '<td style="padding:8px 10px;color:#666;font-weight:700">' + (idx + 1) + '</td>' +
         '<td style="padding:8px 10px;color:#f1f1f1">' + escapeHtml(entry.player) + '</td>' +
         '<td style="padding:8px 10px;text-align:right;color:#f4a261;font-weight:700">' + entry.score + '</td>' +
-        '<td style="padding:8px 10px;color:#888;font-size:.72rem">' + escapeHtml(kind) + (entry.legWin ? ' / LegWin' : '') + '</td>' +
+        '<td style="padding:8px 10px;color:#888;font-size:.72rem">' + escapeHtml(kind) + (entry.legWin ? ' / LegWin' : '') + (entry.gameMode ? ' / ' + escapeHtml(entry.gameMode) : '') + '</td>' +
         '<td style="padding:8px 10px;color:#666;font-size:.72rem">' + formatHSTime(entry.ts) + '</td>' +
           '<td style="padding:8px 10px;text-align:center">' + action + '</td>' +
         '</tr>';
@@ -847,7 +850,7 @@
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ player: player.trim(), score })
       });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
+      if (!response.ok) throw new Error(await getApiError(response));
       editingHighscoreId = null;
       await loadHighscores();
       showToast('Highscore bearbeitet ✓');
@@ -859,7 +862,7 @@
     if (btn) { btn.disabled = true; btn.textContent = '…'; }
     try {
       const r = await fetch('/api/highscores/' + id, { method: 'DELETE' });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) throw new Error(await getApiError(r));
       await loadHighscores();
       showToast('Highscore gelöscht ✓');
     } catch(e) {
@@ -870,6 +873,14 @@
 
   function escapeHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  async function getApiError(response) {
+    try {
+      const payload = await response.json();
+      return payload.error || 'HTTP ' + response.status;
+    } catch (_err) {
+      return 'HTTP ' + response.status;
+    }
   }
   function escapeAttr(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

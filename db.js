@@ -1817,18 +1817,32 @@ class DataStore {
     await this.my.query('DELETE FROM highscores WHERE id = ?', [safeId]);
   }
 
-  async updateHighscore(id, player, score) {
+  async getHighscore(id) {
+    const safeId = Number(id);
+    if (!Number.isFinite(safeId) || safeId <= 0) return null;
+    if (this.isSQLite()) return this.sqlite.get('SELECT * FROM highscores WHERE id = ?', [safeId]);
+    if (this.isPostgres()) return (await this.pg.query('SELECT * FROM highscores WHERE id = $1', [safeId])).rows[0] || null;
+    return (await this.my.query('SELECT * FROM highscores WHERE id = ?', [safeId]))[0][0] || null;
+  }
+
+  async updateHighscore(id, player, score, playerSlot = null) {
     const safeId = Number(id);
     if (!Number.isFinite(safeId) || safeId <= 0) return;
     if (this.isSQLite()) {
-      await this.sqlite.run('UPDATE highscores SET player = ?, score = ? WHERE id = ?', [player, score, safeId]);
+      await this.sqlite.run('UPDATE highscores SET player = ?, player_slot = ?, score = ? WHERE id = ?', [player, playerSlot, score, safeId]);
       return;
     }
     if (this.isPostgres()) {
-      await this.pg.query('UPDATE highscores SET player = $1, score = $2 WHERE id = $3', [player, score, safeId]);
+      await this.pg.query('UPDATE highscores SET player = $1, player_slot = $2, score = $3 WHERE id = $4', [player, playerSlot, score, safeId]);
       return;
     }
-    await this.my.query('UPDATE highscores SET player = ?, score = ? WHERE id = ?', [player, score, safeId]);
+    await this.my.query('UPDATE highscores SET player = ?, player_slot = ?, score = ? WHERE id = ?', [player, playerSlot, score, safeId]);
+  }
+
+  async clearManualHighscores() {
+    if (this.isSQLite()) return this.sqlite.run("DELETE FROM highscores WHERE kind = 'manual'");
+    if (this.isPostgres()) return this.pg.query("DELETE FROM highscores WHERE kind = 'manual'");
+    return this.my.query("DELETE FROM highscores WHERE kind = 'manual'");
   }
 
   async clearAllHighscores() {
@@ -1901,6 +1915,60 @@ class DataStore {
       return;
     }
     await this.my.query('DELETE FROM leg_history WHERE player_id = ? AND season = ?', [playerId, season]);
+  }
+
+  async resetPlayerStats(playerId, fields, season = DEFAULT_STATS_SEASON) {
+    const ts = Date.now();
+    const reset = Object.fromEntries(fields.map(field => [field, 0]));
+    Object.assign(reset, {
+      first_nine_total: 0,
+      first_nine_samples: 0,
+      first_nine_legacy: 0,
+      checkout_stats_version: 2,
+      checkout_tracking_since: ts
+    });
+    const updateFields = Object.keys(reset);
+    const values = Object.values(reset);
+    if (this.isSQLite()) {
+      await this.sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        await this.sqlite.run(`UPDATE player_stats SET ${updateFields.map(field => `${field} = ?`).join(', ')}, updated_at = ? WHERE player_id = ? AND season = ?`, [...values, ts, playerId, season]);
+        await this.sqlite.run('DELETE FROM leg_history WHERE player_id = ? AND season = ?', [playerId, season]);
+        await this.sqlite.exec('COMMIT');
+      } catch (err) {
+        await this.sqlite.exec('ROLLBACK');
+        throw err;
+      }
+      return;
+    }
+    if (this.isPostgres()) {
+      const client = await this.pg.connect();
+      try {
+        await client.query('BEGIN');
+        const assignments = updateFields.map((field, index) => `${field} = $${index + 1}`).join(', ');
+        await client.query(`UPDATE player_stats SET ${assignments}, updated_at = $${updateFields.length + 1} WHERE player_id = $${updateFields.length + 2} AND season = $${updateFields.length + 3}`, [...values, ts, playerId, season]);
+        await client.query('DELETE FROM leg_history WHERE player_id = $1 AND season = $2', [playerId, season]);
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+      return;
+    }
+    const connection = await this.my.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query(`UPDATE player_stats SET ${updateFields.map(field => `${field} = ?`).join(', ')}, updated_at = ? WHERE player_id = ? AND season = ?`, [...values, ts, playerId, season]);
+      await connection.query('DELETE FROM leg_history WHERE player_id = ? AND season = ?', [playerId, season]);
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
 
   async updatePlayerStats(playerId, updates, season = DEFAULT_STATS_SEASON) {

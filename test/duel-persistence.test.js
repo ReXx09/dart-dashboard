@@ -96,3 +96,40 @@ test('Abgeschlossene Begegnung wird mit Leg-History vollständig gelöscht', asy
     assert.equal(Number((await store.sqlite.get('SELECT COUNT(*) AS count FROM leg_history WHERE duel_id = ?', [duel.id])).count), 0);
   });
 });
+
+test('Statistik-Reset löscht First-9-Basis und Leg-History atomisch', async () => {
+  await withStore(async store => {
+    await store.initPlayerStats(1);
+    await store.updatePlayerStats(1, { avg_first9: 50, first_nine_total: 100, first_nine_samples: 2, first_nine_legacy: 1, legs_played: 2 });
+    await store.recordLegHistory(1, 50, 0, 0, 30);
+    await store.resetPlayerStats(1, ['avg_first9', 'legs_played']);
+
+    const stats = await store.getPlayerStats(1);
+    assert.equal(Number(stats.avg_first9), 0);
+    assert.equal(Number(stats.first_nine_total), 0);
+    assert.equal(Number(stats.first_nine_samples), 0);
+    assert.equal(Number(stats.first_nine_legacy), 0);
+    assert.equal(Number(stats.checkout_stats_version), 2);
+    assert.ok(Number(stats.checkout_tracking_since) > 0);
+    assert.equal(Number((await store.sqlite.get('SELECT COUNT(*) AS count FROM leg_history WHERE player_id = 1')).count), 0);
+  });
+});
+
+test('Highscore-Verwaltung ändert Spielerzuordnung und löscht nur manuelle Einträge', async () => {
+  await withStore(async store => {
+    await store.addHighscore({ player: 'Alt', score: 100, kind: 'manual' });
+    await store.addHighscore({ player: 'Claudia', score: 120, kind: 'checkout', playerSlot: 2 });
+    const manual = (await store.getHighscores()).find(entry => entry.kind === 'manual');
+
+    await store.updateHighscore(manual.id, 'Thomas', 101, 1);
+    const updated = await store.getHighscore(manual.id);
+    assert.equal(updated.player, 'Thomas');
+    assert.equal(Number(updated.player_slot), 1);
+
+    await store.clearManualHighscores();
+    const remaining = await store.getHighscores();
+    assert.equal(remaining.length, 1);
+    assert.equal(remaining[0].kind, 'checkout');
+    assert.equal(remaining[0].player, 'Claudia');
+  });
+});
