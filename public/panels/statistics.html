@@ -419,7 +419,7 @@
 
     <div class="edit-toolbar">
       <span class="edit-status" id="editStatus" hidden>Bearbeitungsmodus aktiv</span>
-      <button class="btn" id="recalcGamesBtn" type="button" hidden title="Games gespielt/gewonnen aus Duellen neu berechnen">↺ Games neu berechnen</button>
+      <button class="btn" id="recalcGamesBtn" type="button" hidden title="Matches gespielt/gewonnen aus Begegnungen neu berechnen">↺ Matches neu berechnen</button>
       <button class="btn" id="editStatsBtn" type="button">🔒 Statistik bearbeiten</button>
     </div>
 
@@ -1014,8 +1014,8 @@
         </div>
         <div class="summary-card" style="--accent:#f4a261">
           <div class="summary-label">Double-Out-Quote</div>
-          <div class="summary-value">${checkoutRulePct(s, 'double')}%</div>
-          <div class="summary-sub">Highest: ${Math.min(170, Number(s.checkout_double_highest || 0))}</div>
+          <div class="summary-value">${checkoutRulePct(s, 'double')}</div>
+          <div class="summary-sub">${checkoutRuleMeta(s, 'double')} · Highest: ${Math.min(170, Number(s.checkout_double_highest || 0))}</div>
         </div>
       `;
     }
@@ -1023,13 +1023,19 @@
     function checkoutRulePct(s, rule) {
       const attempts = Number(s['checkout_' + rule + '_attempts'] || 0);
       const success = Number(s['checkout_' + rule + '_success'] || 0);
-      return attempts > 0 ? ((success / attempts) * 100).toFixed(1) : '0.0';
+      return attempts > 0 ? ((success / attempts) * 100).toFixed(1) + '%' : '-';
+    }
+
+    function checkoutRuleMeta(s, rule) {
+      const attempts = Number(s['checkout_' + rule + '_attempts'] || 0);
+      const success = Number(s['checkout_' + rule + '_success'] || 0);
+      return success + '/' + attempts + ' Erfolge/Versuche';
     }
 
     function renderOverview(stats) {
       const s = stats || {};
       document.getElementById('overviewStats').innerHTML = [
-        statItem('Games gespielt', Number(s.games_played || 0), 'Gewonnen: ' + Number(s.games_won || 0), ['games_played', 'games_won'], ['Games gespielt', 'Games gewonnen']),
+        statItem('Matches gespielt', Number(s.games_played || 0), 'Gewonnen: ' + Number(s.games_won || 0), ['games_played', 'games_won'], ['Matches gespielt', 'Matches gewonnen']),
         statItem('Legs gespielt', Number(s.legs_played || 0), 'Gewonnen: ' + Number(s.legs_won || 0), ['legs_played', 'legs_won'], ['Legs gespielt', 'Legs gewonnen']),
         statItem('Win %', winPct(s) + '%', 'Legs'),
         statItem('Total Darts', Number(s.total_darts || 0).toLocaleString(), 'Total Scored: ' + Number(s.total_scored || 0).toLocaleString(), ['total_darts', 'total_scored'], ['Total Darts', 'Total Scored'])
@@ -1050,7 +1056,7 @@
       document.getElementById('avgStats').innerHTML = [
         statItem('Overall Average', overallAvg, '3-Dart'),
         statItem('Highest Leg Avg', Number(s.highest_leg_avg || 0).toFixed(2), 'Bestes Leg', ['highest_leg_avg'], ['Highest Leg Avg']),
-        statItem('First 9 Avg', Number(s.avg_first9 || 0).toFixed(2), 'Erste 9 Darts', ['avg_first9'], ['First 9 Avg']),
+        statItem('First 9 Avg', Number(s.avg_first9 || 0).toFixed(2), Number(s.first_nine_samples || 0) + ' gültige Legs', ['avg_first9'], ['First 9 Avg']),
         statItem('Max Score', Number(s.max_score || 0), 'Höchste Aufnahme', ['max_score'], ['Max Score'])
       ].join('');
     }

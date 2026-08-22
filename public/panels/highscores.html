@@ -190,6 +190,8 @@
     .metric-rank { color: #666; font-weight: 800; }
     .metric-player { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .metric-value { color: var(--accent); font-weight: 900; font-variant-numeric: tabular-nums; }
+    .metric-value-wrap { text-align: right; min-width: 0; }
+    .metric-meta { display: block; margin-top: 2px; color: #666; font-size: .58rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .metric-empty { color: #555; padding: 12px 0; font-size: .75rem; }
     .games-section { margin-top: 18px; }
     .game-highscore-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -665,14 +667,29 @@
 
     const METRICS = [
       ['count180', '180er', '#e63946', value => value],
-      ['checkoutRateSingle', 'Single-Out-Quote', '#f4a261', value => value === null ? '-' : value + '%'],
-      ['checkoutRateDouble', 'Double-Out-Quote', '#ff7f51', value => value === null ? '-' : value + '%'],
-      ['checkoutRateMaster', 'Master-Out-Quote', '#e9c46a', value => value === null ? '-' : value + '%'],
+      ['count171Plus', '171+ Aufnahmen', '#ef476f', value => value],
+      ['count140Plus', '140+ Aufnahmen', '#f78c6b', value => value],
+      ['count100Plus', '100+ Aufnahmen', '#ffd166', value => value],
+      ['checkoutRateSingle', 'Single-Out-Quote', '#f4a261', value => value === null ? '-' : value + '%', item => checkoutMeta(item, 'single')],
+      ['checkoutRateDouble', 'Double-Out-Quote', '#ff7f51', value => value === null ? '-' : value + '%', item => checkoutMeta(item, 'double')],
+      ['checkoutRateMaster', 'Master-Out-Quote', '#e9c46a', value => value === null ? '-' : value + '%', item => checkoutMeta(item, 'master')],
       ['threeDartAverage', '3-Dart-Average', '#2a9d8f', value => Number(value).toFixed(1)],
-      ['firstNineAverage', 'Erster-9-AVG', '#e76f51', value => Number(value).toFixed(1)],
+      ['firstNineAverage', 'Erster-9-AVG', '#e76f51', value => Number(value).toFixed(1), item => item.firstNineSamples + ' gültige Legs'],
       ['highestCheckout', 'Höchster Checkout', '#9b5de5', value => value],
-      ['gamesPlayed', 'Gespielte Spiele', '#457b9d', value => value]
+      ['legsPlayed', 'Gespielte Legs', '#457b9d', value => value],
+      ['legWinRate', 'Leg-Siegquote', '#118ab2', value => value === null ? '-' : value + '%', item => item.legsWon + '/' + item.legsPlayed],
+      ['matchesPlayed', 'Gespielte Matches', '#5c7cfa', value => value],
+      ['matchWinRate', 'Match-Siegquote', '#4dabf7', value => value === null ? '-' : value + '%', item => item.matchesWon + '/' + item.matchesPlayed],
+      ['soloMatchesPlayed', 'Solo-Matches', '#90be6d', value => value],
+      ['duelsPlayed', 'Duelle', '#43aa8b', value => value],
+      ['groupMatchesPlayed', 'Gruppenbegegnungen', '#577590', value => value],
+      ['tournamentMatchesPlayed', 'Turniermatches', '#b56576', value => value]
     ];
+
+    function checkoutMeta(item, rule) {
+      const values = item.checkoutByRule && item.checkoutByRule[rule];
+      return values ? values.success + '/' + values.attempts + ' Erfolge/Versuche' : '';
+    }
 
     document.querySelectorAll('.tab').forEach(button => {
       button.addEventListener('click', () => {
@@ -720,14 +737,15 @@
       const mode = document.getElementById('overviewMode').value;
       const metrics = overviewData && overviewData.metrics;
       if (!metrics) { grid.innerHTML = '<div class="metric-empty">Noch keine Statistikdaten vorhanden.</div>'; return; }
-      grid.innerHTML = METRICS.map(([key, title, accent, format]) => {
+      grid.innerHTML = METRICS.map(([key, title, accent, format, meta]) => {
         const rows = (metrics[key] || [])
           .filter(item => mode === 'gesamt' ? item.mode === 'gesamt' : item.mode === mode)
           .filter(item => selectedOverviewCategory === 'all' ? (mode === 'gesamt' ? item.category === 'all' : true) : item.category === selectedOverviewCategory)
           .filter(item => selectedOverviewPlayer === 'all' || String(item.profileId) === selectedOverviewPlayer)
           .slice(0, 3);
-        return '<article class="metric-card" style="--accent:' + accent + '"><h3>' + title + '</h3><ol class="metric-list">' +
-          (rows.length ? rows.map((item, index) => '<li><span class="metric-rank">' + (index + 1) + '</span><span class="metric-player">' + escapeHtml(item.player) + '</span><span class="metric-value">' + format(item[key]) + '</span></li>').join('') : '<li class="metric-empty">Noch keine Daten</li>') +
+        const tooltip = key.startsWith('checkoutRate') ? 'Versuch = Dart bei einem regelkonform in maximal drei Darts checkbaren Rest; Bogey-Reste sind ausgeschlossen.' : '';
+        return '<article class="metric-card" style="--accent:' + accent + '"' + (tooltip ? ' title="' + escapeHtml(tooltip) + '"' : '') + '><h3>' + title + '</h3><ol class="metric-list">' +
+          (rows.length ? rows.map((item, index) => '<li><span class="metric-rank">' + (index + 1) + '</span><span class="metric-player">' + escapeHtml(item.player) + '</span><span class="metric-value-wrap"><span class="metric-value">' + format(item[key]) + '</span>' + (meta ? '<span class="metric-meta">' + escapeHtml(meta(item)) + '</span>' : '') + '</span></li>').join('') : '<li class="metric-empty">Noch keine Daten</li>') +
           '</ol></article>';
       }).join('');
     }

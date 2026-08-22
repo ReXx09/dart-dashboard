@@ -44,9 +44,41 @@ function isCheckoutFinishSegment(segment, rule = DEFAULT_CHECKOUT_RULE) {
   return /^D(?:[1-9]|1[0-9]|20)$/.test(normalized) || normalized === 'DBULL';
 }
 
-function isCheckoutAttempt(remaining, segment, rule = DEFAULT_CHECKOUT_RULE) {
+const DART_SEGMENTS = [
+  ...Array.from({ length: 20 }, (_, index) => ({ segment: `S${index + 1}`, points: index + 1 })),
+  ...Array.from({ length: 20 }, (_, index) => ({ segment: `D${index + 1}`, points: (index + 1) * 2 })),
+  ...Array.from({ length: 20 }, (_, index) => ({ segment: `T${index + 1}`, points: (index + 1) * 3 })),
+  { segment: 'S25', points: 25 },
+  { segment: 'DBULL', points: 50 }
+];
+const finishableRestCache = new Map();
+
+function isRestFinishable(remaining, rule = DEFAULT_CHECKOUT_RULE, maxDarts = 3) {
   const rest = Number(remaining);
-  return rest > 0 && rest <= 170 && isCheckoutFinishSegment(segment, rule);
+  const safeRule = ['single', 'double', 'master'].includes(rule) ? rule : DEFAULT_CHECKOUT_RULE;
+  const darts = Math.max(1, Math.min(3, Number(maxDarts) || 3));
+  if (!Number.isInteger(rest) || rest <= 0 || rest > 170) return false;
+
+  const cacheKey = `${safeRule}:${darts}:${rest}`;
+  if (finishableRestCache.has(cacheKey)) return finishableRestCache.get(cacheKey);
+
+  const search = (currentRest, dartsLeft) => {
+    for (const dart of DART_SEGMENTS) {
+      if (!isValidCheckout(currentRest, dart.points, safeRule, dart.segment)) continue;
+      const nextRest = currentRest - dart.points;
+      if (nextRest === 0) return true;
+      if (dartsLeft > 1 && search(nextRest, dartsLeft - 1)) return true;
+    }
+    return false;
+  };
+
+  const result = search(rest, darts);
+  finishableRestCache.set(cacheKey, result);
+  return result;
+}
+
+function isCheckoutAttempt(remaining, rule = DEFAULT_CHECKOUT_RULE) {
+  return isRestFinishable(remaining, rule, 3);
 }
 
 function getCheckoutRuleStats(player, rule) {
@@ -61,6 +93,7 @@ module.exports = {
   isMasterPoints,
   isValidCheckout,
   isCheckoutFinishSegment,
+  isRestFinishable,
   isCheckoutAttempt,
   getCheckoutRuleStats
 };

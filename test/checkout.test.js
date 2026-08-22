@@ -8,6 +8,7 @@ const {
   getCheckoutRuleStats,
   getCheckoutValue,
   isCheckoutAttempt,
+  isRestFinishable,
   isValidCheckout,
   isValidEventEffectSound,
   scanSoundDirectory,
@@ -60,11 +61,22 @@ test('Überwerfen und Rest 1 sind Bust', () => {
   assert.equal(isValidCheckout(2, 1, 'master', 'S1'), false);
 });
 
-test('Checkout-Versuche zählen nur finishfähige Darts bis 170 Rest', () => {
-  assert.equal(isCheckoutAttempt(40, 'D20', 'double'), true);
-  assert.equal(isCheckoutAttempt(40, 'S20', 'double'), false);
-  assert.equal(isCheckoutAttempt(171, 'D20', 'double'), false);
-  assert.equal(isCheckoutAttempt(60, 'T20', 'master'), true);
+test('Checkout-Versuche zählen jeden Dart bei einem in drei Darts finishbaren Rest', () => {
+  assert.equal(isCheckoutAttempt(40, 'double'), true);
+  assert.equal(isCheckoutAttempt(170, 'double'), true);
+  assert.equal(isCheckoutAttempt(169, 'double'), false);
+  assert.equal(isCheckoutAttempt(171, 'double'), false);
+  assert.equal(isCheckoutAttempt(60, 'master'), true);
+});
+
+test('Finishbare Reste berücksichtigen Out-Regel und maximale Dartzahl', () => {
+  assert.equal(isRestFinishable(20, 'single', 1), true);
+  assert.equal(isRestFinishable(20, 'double', 1), true);
+  assert.equal(isRestFinishable(20, 'master', 1), true);
+  assert.equal(isRestFinishable(25, 'double', 1), false);
+  assert.equal(isRestFinishable(25, 'single', 1), true);
+  assert.equal(isRestFinishable(110, 'double', 2), true);
+  assert.equal(isRestFinishable(111, 'double', 2), false);
 });
 
 test('Checkout-Wert ist die Summe der gesamten Aufnahme', () => {

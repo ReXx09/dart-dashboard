@@ -6,6 +6,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { DataStore } = require('./db');
 const { aggregateDuelStats } = require('./lib/duel-stats');
+const { addDerivedMetrics, percentage } = require('./lib/highscore-overview');
 const {
   GAME_MODES,
   CHECKOUT_RULES,
@@ -16,6 +17,7 @@ const {
 } = require('./modes');
 const {
   isValidCheckout,
+  isRestFinishable,
   isCheckoutAttempt,
   getCheckoutRuleStats
 } = require('./modes/x01');
@@ -1478,15 +1480,19 @@ async function recordPlayerLegStats(player, state, options = {}) {
     // Update player stats
     const currentStats = await dataStore.getPlayerStats(player.slot) || {};
     const isTrackedDuel = Number(state.game?.duelId || 0) > 0;
+    const previousFirstNineTotal = Number(currentStats.first_nine_total || 0);
+    const previousFirstNineSamples = Number(currentStats.first_nine_samples || 0);
+    const firstNineTotal = previousFirstNineTotal + (firstNineAvg > 0 ? firstNineAvg : 0);
+    const firstNineSamples = previousFirstNineSamples + (firstNineAvg > 0 ? 1 : 0);
     const updates = {
       legs_played: (Number(currentStats.legs_played || 0)) + 1,
       legs_won: (Number(currentStats.legs_won || 0)) + (won ? 1 : 0),
       total_darts: (Number(currentStats.total_darts || 0)) + dartsThrawn,
       total_scored: (Number(currentStats.total_scored || 0)) + totalScored,
       highest_leg_avg: Math.max(Number(currentStats.highest_leg_avg || 0), legAvg),
-      avg_first9: firstNineAvg > 0
-        ? ((Number(currentStats.avg_first9 || 0) * Number(currentStats.legs_played || 0) + firstNineAvg) / (Number(currentStats.legs_played || 0) + 1))
-        : Number(currentStats.avg_first9 || 0),
+      avg_first9: firstNineSamples > 0 ? firstNineTotal / firstNineSamples : 0,
+      first_nine_total: firstNineTotal,
+      first_nine_samples: firstNineSamples,
       max_score: Math.max(Number(currentStats.max_score || 0), maxScore),
       count_180: (Number(currentStats.count_180 || 0)) + count180,
       count_171plus: (Number(currentStats.count_171plus || 0)) + count171,
@@ -1630,6 +1636,7 @@ function queueCompletedLegStats(state, winner, generation = liveLifecycleGenerat
 }
 
 async function recordCompletedDuelPlayerStats(duel) {
+  const usesCurrentCheckoutStats = Number(duel.checkout_stats_version || 1) >= 2;
   const checkoutRule = ['single', 'double', 'master'].includes(String(duel.checkout_rule || '').toLowerCase())
     ? String(duel.checkout_rule).toLowerCase()
     : null;
@@ -1668,6 +1675,10 @@ async function recordCompletedDuelPlayerStats(duel) {
   for (const row of bySlot.values()) {
     const current = await dataStore.getPlayerStats(row.playerId) || {};
     const previousLegs = Number(current.legs_played || 0);
+    const previousFirstNineTotal = Number(current.first_nine_total || 0);
+    const previousFirstNineSamples = Number(current.first_nine_samples || 0);
+    const firstNineTotal = previousFirstNineTotal + row.firstNine.reduce((sum, value) => sum + value, 0);
+    const firstNineSamples = previousFirstNineSamples + row.firstNine.length;
     const updates = {
       games_played: Number(current.games_played || 0) + 1,
       games_won: Number(current.games_won || 0) + (Number(duel.winner_slot) === row.playerId ? 1 : 0),
@@ -1676,16 +1687,18 @@ async function recordCompletedDuelPlayerStats(duel) {
       total_darts: Number(current.total_darts || 0) + row.darts,
       total_scored: Number(current.total_scored || 0) + row.scored,
       highest_leg_avg: Math.max(Number(current.highest_leg_avg || 0), ...((duel.legs || []).flatMap(leg => (leg.players || []).filter(player => Number(player.player_slot) === row.playerId).map(player => Number(player.average || 0))))),
-      avg_first9: row.firstNine.length ? ((Number(current.avg_first9 || 0) * previousLegs + row.firstNine.reduce((sum, value) => sum + value, 0)) / (previousLegs + row.firstNine.length)) : Number(current.avg_first9 || 0),
+      avg_first9: firstNineSamples > 0 ? firstNineTotal / firstNineSamples : 0,
+      first_nine_total: firstNineTotal,
+      first_nine_samples: firstNineSamples,
       count_180: Number(current.count_180 || 0) + row.count180,
       count_171plus: Number(current.count_171plus || 0) + row.count171plus,
       count_140plus: Number(current.count_140plus || 0) + row.count140plus,
       count_100plus: Number(current.count_100plus || 0) + row.count100plus,
-      checkout_attempts: Number(current.checkout_attempts || 0) + row.checkoutAttempts,
-      checkout_success: Number(current.checkout_success || 0) + row.checkoutSuccess,
+      checkout_attempts: Number(current.checkout_attempts || 0) + (usesCurrentCheckoutStats ? row.checkoutAttempts : 0),
+      checkout_success: Number(current.checkout_success || 0) + (usesCurrentCheckoutStats ? row.checkoutSuccess : 0),
       highest_checkout: Math.max(Number(current.highest_checkout || 0), row.highestCheckout)
     };
-    if (checkoutRule) {
+    if (checkoutRule && usesCurrentCheckoutStats) {
       const values = row.checkouts[checkoutRule];
       updates[`checkout_${checkoutRule}_attempts`] = Number(current[`checkout_${checkoutRule}_attempts`] || 0) + values[0];
       updates[`checkout_${checkoutRule}_success`] = Number(current[`checkout_${checkoutRule}_success`] || 0) + values[1];
@@ -1726,6 +1739,7 @@ async function recordDuelLegIfActive(state, winner) {
       count80plus: completeTurnScores.filter(score => score >= 80).length,
       count100plus: completeTurnScores.filter(score => score >= 100).length,
       count140plus: completeTurnScores.filter(score => score >= 140).length,
+      count171plus: completeTurnScores.filter(score => score >= 171).length,
       count180: completeTurnScores.filter(score => score === 180).length,
       checkoutAttempts: player.checkoutAttempts,
       checkoutSuccess: player.checkoutSuccess,
@@ -1884,7 +1898,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}, generation = live
   const isElimination = modeDef.type === 'elimination';
   const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
   const checkoutSegment = evt.segment || codeToSegment(evt.code) || null;
-  const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, checkoutSegment, checkoutRule);
+  const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, checkoutRule);
   if (checkoutAttempt) {
     player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
     getCheckoutRuleStats(player, checkoutRule).attempts += 1;
@@ -2241,7 +2255,7 @@ async function applyArduinoThrowFromMatrix(hit, generation = liveLifecycleGenera
   const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
   const throwSegment = codeToSegment(hit.code) || pointsToSegment(value) || 'MISS';
   const checkoutSegment = codeToSegment(hit.code) || pointsToSegment(value);
-  const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, checkoutSegment, checkoutRule);
+  const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, checkoutRule);
   if (checkoutAttempt) {
     player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
     getCheckoutRuleStats(player, checkoutRule).attempts += 1;
@@ -3480,7 +3494,7 @@ app.get('/api/duels/current', async (_req, res) => {
 
 app.get('/api/duels/top', async (req, res) => {
   try {
-    const duels = await dataStore.listDuels(100, 'finished');
+    const duels = await dataStore.listFinishedDuelsForStats();
     const top = duels
       .filter(duel => ['501', '301', '701'].includes(String(duel.mode)))
       .sort((a, b) => Number(b.total_legs || 0) - Number(a.total_legs || 0) || Number(b.participant_count || 0) - Number(a.participant_count || 0))
@@ -3558,9 +3572,9 @@ app.post('/api/duels/start', async (req, res) => {
     const tournamentName = String(req.body?.tournamentName || '').trim();
     const tournamentPlayers = selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null }));
     const tournament = matchType === 'tournament'
-      ? await dataStore.createTournament({ mode, tournamentName, players: tournamentPlayers, bestOf })
+      ? await dataStore.createTournament({ mode, tournamentName, checkoutRule, players: tournamentPlayers, bestOf })
       : null;
-    const duel = tournament ? tournament.duel : await dataStore.createDuel({ mode, matchType, tournamentName, players: tournamentPlayers });
+    const duel = tournament ? tournament.duel : await dataStore.createDuel({ mode, matchType, tournamentName, checkoutRule, players: tournamentPlayers });
     const activeSlots = tournament ? duel.players.map(player => Number(player.player_slot)) : slots;
     const fresh = await defaultLiveState(mode, activeSlots);
     fresh.game.duelId = duel.id;
@@ -3768,7 +3782,7 @@ app.post('/api/live/throw', async (req, res) => {
     const isElimination = modeDef.type === 'elimination';
     const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
     const incomingSegment = typeof req.body?.segment === 'string' ? req.body.segment.toUpperCase() : pointsToSegment(points);
-    const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, incomingSegment, checkoutRule);
+    const checkoutAttempt = !isCricket && !isElimination && isCheckoutAttempt(player.remaining, checkoutRule);
     if (checkoutAttempt) {
       player.checkoutAttempts = Number(player.checkoutAttempts || 0) + 1;
       getCheckoutRuleStats(player, checkoutRule).attempts += 1;
@@ -4062,17 +4076,28 @@ app.get('/api/highscores/overview', async (_req, res) => {
         mode: 'gesamt',
         category: 'all',
         count180: Number(stats.count_180 || 0),
+        count171Plus: Number(stats.count_171plus || 0),
+        count140Plus: Number(stats.count_140plus || 0),
+        count100Plus: Number(stats.count_100plus || 0),
         threeDartAverage: darts > 0 ? Number((totalScored / darts * 3).toFixed(1)) : 0,
         firstNineAverage: Number(stats.avg_first9 || 0),
+        firstNineSamples: Number(stats.first_nine_samples || 0),
+        firstNineLegacy: Boolean(Number(stats.first_nine_legacy || 0)),
         checkoutRate: checkoutAttempts > 0 ? Number((checkoutSuccess / checkoutAttempts * 100).toFixed(1)) : 0,
         checkoutAttempts,
         checkoutSuccess,
         checkoutByRule,
         highestCheckout: Number(stats.highest_checkout || 0),
+        matchesPlayed: Number(stats.games_played || 0),
+        matchesWon: Number(stats.games_won || 0),
         gamesPlayed: Number(stats.games_played || 0),
         gamesWon: Number(stats.games_won || 0),
+        legsPlayed: Number(stats.legs_played || 0),
         legsWon: Number(stats.legs_won || 0),
-        trackingSince: stats.updated_at ? Number(stats.updated_at) : null
+        legWinRate: percentage(stats.legs_won, stats.legs_played),
+        matchWinRate: percentage(stats.games_won, stats.games_played),
+        checkoutStatsVersion: Number(stats.checkout_stats_version || 1),
+        trackingSince: stats.checkout_tracking_since ? Number(stats.checkout_tracking_since) : null
       });
     }
 
@@ -4090,6 +4115,9 @@ app.get('/api/highscores/overview', async (_req, res) => {
           mode,
           category,
           count180: 0,
+          count171Plus: 0,
+          count140Plus: 0,
+          count100Plus: 0,
           darts: 0,
           totalScored: 0,
           firstNineTotal: 0,
@@ -4104,6 +4132,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
           },
           gamesPlayed: 0,
           gamesWon: 0,
+          legsPlayed: 0,
           legsWon: 0
         });
         const entry = grouped.get(key);
@@ -4112,14 +4141,18 @@ app.get('/api/highscores/overview', async (_req, res) => {
         for (const leg of duel.legs || []) {
           const legPlayer = (leg.players || []).find(item => Number(item.player_slot) === slot);
           if (!legPlayer) continue;
+          entry.legsPlayed += 1;
           entry.legsWon += Number(legPlayer.won || 0);
           entry.darts += Number(legPlayer.darts || 0);
           entry.totalScored += Number(legPlayer.scored || 0);
           entry.count180 += Number(legPlayer.count_180 || 0);
+          entry.count171Plus += Number(legPlayer.count_171plus || 0);
+          entry.count140Plus += Number(legPlayer.count_140plus || 0);
+          entry.count100Plus += Number(legPlayer.count_100plus || 0);
           entry.checkoutAttempts += Number(legPlayer.checkout_attempts || 0);
           entry.checkoutSuccess += Number(legPlayer.checkout_success || 0);
           entry.highestCheckout = Math.max(entry.highestCheckout, Number(legPlayer.checkout_highest || 0));
-          const checkoutRule = ['single', 'double', 'master'].includes(String(duel.checkout_rule || '').toLowerCase())
+          const checkoutRule = Number(duel.checkout_stats_version || 1) >= 2 && ['single', 'double', 'master'].includes(String(duel.checkout_rule || '').toLowerCase())
             ? String(duel.checkout_rule).toLowerCase()
             : null;
           if (checkoutRule) {
@@ -4134,10 +4167,11 @@ app.get('/api/highscores/overview', async (_req, res) => {
         }
       }
     }
-    const groupedEntries = Array.from(grouped.values()).map(entry => ({
+    const groupedEntries = Array.from(grouped.values()).map(entry => addDerivedMetrics({
       ...entry,
-      threeDartAverage: entry.darts > 0 ? Number((entry.totalScored / entry.darts * 3).toFixed(1)) : 0,
-      firstNineAverage: entry.firstNineCount > 0 ? Number((entry.firstNineTotal / entry.firstNineCount).toFixed(1)) : 0,
+      firstNineSamples: entry.firstNineCount,
+      matchesPlayed: entry.gamesPlayed,
+      matchesWon: entry.gamesWon,
       checkoutRate: entry.checkoutAttempts > 0 ? Number((entry.checkoutSuccess / entry.checkoutAttempts * 100).toFixed(1)) : 0,
       checkoutRateSingle: null,
       checkoutRateDouble: null,
@@ -4164,6 +4198,9 @@ app.get('/api/highscores/overview', async (_req, res) => {
           mode: 'gesamt',
           category: entry.category,
           count180: 0,
+          count171Plus: 0,
+          count140Plus: 0,
+          count100Plus: 0,
           darts: 0,
           totalScored: 0,
           firstNineTotal: 0,
@@ -4178,11 +4215,15 @@ app.get('/api/highscores/overview', async (_req, res) => {
           },
           gamesPlayed: 0,
           gamesWon: 0,
+          legsPlayed: 0,
           legsWon: 0
         });
       }
       const total = categoryGroups.get(key);
       total.count180 += entry.count180;
+      total.count171Plus += entry.count171Plus;
+      total.count140Plus += entry.count140Plus;
+      total.count100Plus += entry.count100Plus;
       total.darts += entry.darts;
       total.totalScored += entry.totalScored;
       total.firstNineTotal += entry.firstNineAverage * entry.firstNineCount;
@@ -4192,6 +4233,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
       total.highestCheckout = Math.max(total.highestCheckout, entry.highestCheckout);
       total.gamesPlayed += entry.gamesPlayed;
       total.gamesWon += entry.gamesWon;
+      total.legsPlayed += entry.legsPlayed;
       total.legsWon += entry.legsWon;
       for (const rule of ['single', 'double', 'master']) {
         total.checkoutByRule[rule].attempts += entry.checkoutByRule[rule].attempts;
@@ -4199,8 +4241,11 @@ app.get('/api/highscores/overview', async (_req, res) => {
         total.checkoutByRule[rule].highest = Math.max(total.checkoutByRule[rule].highest, entry.checkoutByRule[rule].highest);
       }
     }
-    const categoryEntries = Array.from(categoryGroups.values()).map(entry => ({
+    const categoryEntries = Array.from(categoryGroups.values()).map(entry => addDerivedMetrics({
       ...entry,
+      firstNineSamples: entry.firstNineCount,
+      matchesPlayed: entry.gamesPlayed,
+      matchesWon: entry.gamesWon,
       checkoutByRule: Object.fromEntries(['single', 'double', 'master'].map(rule => {
         const values = entry.checkoutByRule[rule];
         return [rule, {
@@ -4209,8 +4254,6 @@ app.get('/api/highscores/overview', async (_req, res) => {
           highest: Math.min(170, values.highest)
         }];
       })),
-      threeDartAverage: entry.darts > 0 ? Number((entry.totalScored / entry.darts * 3).toFixed(1)) : 0,
-      firstNineAverage: entry.firstNineCount > 0 ? Number((entry.firstNineTotal / entry.firstNineCount).toFixed(1)) : 0,
       checkoutRate: entry.checkoutAttempts > 0 ? Number((entry.checkoutSuccess / entry.checkoutAttempts * 100).toFixed(1)) : 0,
       checkoutRateSingle: entry.checkoutByRule.single.attempts > 0 ? Number((entry.checkoutByRule.single.success / entry.checkoutByRule.single.attempts * 100).toFixed(1)) : null,
       checkoutRateDouble: entry.checkoutByRule.double.attempts > 0 ? Number((entry.checkoutByRule.double.success / entry.checkoutByRule.double.attempts * 100).toFixed(1)) : null,
@@ -4218,6 +4261,13 @@ app.get('/api/highscores/overview', async (_req, res) => {
       gamesWon: entry.gamesWon,
       trackingSince: null
     }));
+    for (const entry of entries) {
+      const categoriesForPlayer = categoryEntries.filter(categoryEntry => categoryEntry.profileId === entry.profileId);
+      entry.soloMatchesPlayed = categoriesForPlayer.reduce((sum, item) => sum + Number(item.soloMatchesPlayed || 0), 0);
+      entry.duelsPlayed = categoriesForPlayer.reduce((sum, item) => sum + Number(item.duelsPlayed || 0), 0);
+      entry.groupMatchesPlayed = categoriesForPlayer.reduce((sum, item) => sum + Number(item.groupMatchesPlayed || 0), 0);
+      entry.tournamentMatchesPlayed = categoriesForPlayer.reduce((sum, item) => sum + Number(item.tournamentMatchesPlayed || 0), 0);
+    }
     const overviewEntries = entries.concat(groupedEntries, categoryEntries);
     const ranked = (field, predicate = value => value > 0) => overviewEntries
       .filter(entry => predicate(entry[field], entry))
@@ -4226,6 +4276,9 @@ app.get('/api/highscores/overview', async (_req, res) => {
     const categories = ['all', ...new Set(groupedEntries.map(entry => entry.category))];
     res.json({ trackingMode: 'gesamt', modes, categories, players: entries.map(entry => ({ profileId: entry.profileId, player: entry.player })), metrics: {
       count180: ranked('count180'),
+      count171Plus: ranked('count171Plus'),
+      count140Plus: ranked('count140Plus'),
+      count100Plus: ranked('count100Plus'),
       checkoutRate: ranked('checkoutRate', (_value, entry) => entry.checkoutAttempts > 0),
       checkoutRateSingle: overviewEntries.filter(entry => entry.checkoutByRule && entry.checkoutByRule.single.attempts > 0).map(entry => ({ ...entry, checkoutRateSingle: entry.checkoutByRule.single.rate })).sort((a, b) => b.checkoutRateSingle - a.checkoutRateSingle),
       checkoutRateDouble: overviewEntries.filter(entry => entry.checkoutByRule && entry.checkoutByRule.double.attempts > 0).map(entry => ({ ...entry, checkoutRateDouble: entry.checkoutByRule.double.rate })).sort((a, b) => b.checkoutRateDouble - a.checkoutRateDouble),
@@ -4233,6 +4286,14 @@ app.get('/api/highscores/overview', async (_req, res) => {
       threeDartAverage: ranked('threeDartAverage'),
       firstNineAverage: ranked('firstNineAverage'),
       highestCheckout: ranked('highestCheckout'),
+      legsPlayed: ranked('legsPlayed'),
+      legWinRate: ranked('legWinRate', value => value !== null),
+      matchesPlayed: ranked('matchesPlayed'),
+      matchWinRate: ranked('matchWinRate', value => value !== null),
+      soloMatchesPlayed: ranked('soloMatchesPlayed'),
+      duelsPlayed: ranked('duelsPlayed'),
+      groupMatchesPlayed: ranked('groupMatchesPlayed'),
+      tournamentMatchesPlayed: ranked('tournamentMatchesPlayed'),
       gamesPlayed: ranked('gamesPlayed'),
       gamesWon: ranked('gamesWon')
     }});
@@ -4529,6 +4590,7 @@ module.exports = {
   getCheckoutRuleStats,
   getCheckoutValue,
   isCheckoutAttempt,
+  isRestFinishable,
   isValidCheckout,
   isValidEventEffectSound,
   scanSoundDirectory,
