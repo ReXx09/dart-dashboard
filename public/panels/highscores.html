@@ -938,7 +938,8 @@
       const entryMode = String(entry.gameMode || '').toLowerCase();
       if (entryMode !== mode) return false;
       if (mode === 'cricket') return kind === 'cricket' || (!entry.legWin && kind !== 'manual' && kind !== 'checkout');
-      if (mode === 'elimination') return kind === 'elimination' || (!entry.legWin && kind !== 'manual' && kind !== 'checkout');
+      // Elimination-Siege enden immer exakt beim Zielscore (z.B. 301) und sind daher kein aussagekräftiger Highscore-Wert.
+      if (mode === 'elimination') return Number(entry.score || 0) >= 100 && !entry.legWin && kind !== 'manual' && kind !== 'checkout';
       return Number(entry.score || 0) >= 100 && !entry.legWin && kind !== 'checkout' && kind !== 'manual' && kind !== 'cricket' && kind !== 'elimination';
     }
 
