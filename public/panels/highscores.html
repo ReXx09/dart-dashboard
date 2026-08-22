@@ -452,9 +452,9 @@
 
     <div class="summary-grid">
       <div class="summary-card" style="--accent:#f4a261">
-        <div class="summary-label">Einträge gesamt</div>
+        <div class="summary-label">Gefilterte Einträge</div>
         <div class="summary-value" id="totalEntries">0</div>
-        <div class="summary-sub">aus der Datenbank</div>
+        <div class="summary-sub">passend zur Auswahl</div>
       </div>
       <div class="summary-card" style="--accent:#e63946">
         <div class="summary-label">Best Score</div>
@@ -950,8 +950,9 @@
       const grid = document.getElementById('gameHighscoreGrid');
       const modes = ['501', '301', '701', 'cricket', 'elimination', 'shanghai', 'atc', 'split'];
       const labels = { cricket: 'Cricket', elimination: '301-Elimination', shanghai: 'Shanghai', atc: 'Around the Clock', split: 'Split' };
+      const player = document.getElementById('playerFilter').value;
       grid.innerHTML = modes.map(mode => {
-        const rows = allScores.filter(entry => isGameHighscoreEntry(entry, mode)).sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 5);
+        const rows = allScores.filter(entry => (!player || String(entry.player || '') === player) && isGameHighscoreEntry(entry, mode)).sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 5);
         return '<article class="game-card"><h3>' + (labels[mode] || mode) + '</h3><ol>' +
           (rows.length ? rows.map((entry, index) => '<li><span class="rank">' + (index + 1) + '</span><span class="player">' + escapeHtml(entry.player) + '</span><span class="score">' + entry.score + '</span></li>').join('') : '<li class="metric-empty">Noch keine Daten</li>') +
           '</ol></article>';
@@ -984,13 +985,12 @@
     }
 
     function renderSummary(list, bestByPlayer) {
-      const categoryScores = selectedScoreCategory === 'all' ? allScores : allScores.filter(entry => String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single')) === selectedScoreCategory);
       const visibleGroups = groupScoreEntries(list);
-      document.getElementById('totalEntries').textContent = categoryScores.length;
+      document.getElementById('totalEntries').textContent = list.length;
       document.getElementById('visibleEntries').textContent = visibleGroups.length;
       document.getElementById('visibleMeta').textContent = LIST_LABELS[selectedFilter] || 'Liste';
 
-      const best = categoryScores.slice().sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0))[0];
+      const best = list.slice().sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0))[0];
       document.getElementById('bestScore').textContent = best ? best.score : '-';
       document.getElementById('bestScoreMeta').textContent = best ? (best.player + ' · ' + formatTime(best.ts)) : '-';
 
@@ -1076,8 +1076,8 @@
     function render() {
       renderPlayerFilter();
       const list = filterScores();
-      const categoryScores = selectedScoreCategory === 'all' ? allScores : allScores.filter(entry => String(entry.category || (Number(entry.duelId || 0) ? 'duel' : 'single')) === selectedScoreCategory);
-      const bestByPlayer = buildBestByPlayer(categoryScores);
+      const bestByPlayer = buildBestByPlayer(list);
+      renderGameHighscores();
       renderSummary(list, bestByPlayer);
       renderLegend();
       document.getElementById('listTitle').textContent = LIST_LABELS[selectedFilter] || 'Liste';
