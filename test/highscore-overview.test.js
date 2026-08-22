@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { addDerivedMetrics, percentage } = require('../lib/highscore-overview');
+const { addDerivedMetrics, percentage, resolvePlayerIdentity } = require('../lib/highscore-overview');
 const { validatePlayerStatUpdates } = require('../server');
 
 test('Legs und Matches bleiben getrennte Einheiten', () => {
@@ -42,4 +42,14 @@ test('Statistikänderungen weisen unmögliche Zähler ab', () => {
   assert.match(validatePlayerStatUpdates({ checkout_attempts: 4, checkout_success: 5 }), /Checkout/);
   assert.match(validatePlayerStatUpdates({ games_won: 3 }, { games_played: 2, games_won: 1 }), /Matches/);
   assert.equal(validatePlayerStatUpdates({ legs_played: 5, legs_won: 3 }), null);
+});
+
+test('Wiederverwendete Slots verbinden Legacy-Duelle nicht mit einem neuen Spieler', () => {
+  const profiles = new Map([['claudia', 24]]);
+  const claudia = resolvePlayerIdentity({ name: 'Claudia', slot: 7 }, profiles);
+  const oldTestPlayer = resolvePlayerIdentity({ name: 'Test-A', slot: 7 }, profiles);
+
+  assert.equal(claudia, 24);
+  assert.equal(oldTestPlayer, 'legacy:test-a');
+  assert.notEqual(claudia, oldTestPlayer);
 });

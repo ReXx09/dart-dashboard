@@ -6,7 +6,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { DataStore } = require('./db');
 const { aggregateDuelStats } = require('./lib/duel-stats');
-const { addDerivedMetrics, percentage } = require('./lib/highscore-overview');
+const { addDerivedMetrics, percentage, resolvePlayerIdentity } = require('./lib/highscore-overview');
 const {
   GAME_MODES,
   CHECKOUT_RULES,
@@ -4063,6 +4063,8 @@ app.get('/api/highscores/overview', async (_req, res) => {
   try {
     res.set('Cache-Control', 'no-store');
     const players = await dataStore.getPlayers();
+    const profiles = await dataStore.getProfiles();
+    const profileIdsByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
     const entries = [];
     for (const player of players) {
       if (!player.name) continue;
@@ -4083,7 +4085,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
         };
       }
       entries.push({
-        profileId: Number(player.slot),
+        profileId: resolvePlayerIdentity({ name: player.name, slot: player.slot }, profileIdsByName),
         player: player.name,
         mode: 'gesamt',
         category: 'all',
@@ -4120,9 +4122,10 @@ app.get('/api/highscores/overview', async (_req, res) => {
       const mode = String(duel.mode || '501');
       for (const player of duel.players || []) {
         const slot = Number(player.player_slot);
-        const key = category + ':' + mode + ':' + slot;
+        const profileId = resolvePlayerIdentity({ profileId: player.profile_id, name: player.player_name, slot }, profileIdsByName);
+        const key = category + ':' + mode + ':' + profileId;
         if (!grouped.has(key)) grouped.set(key, {
-          profileId: slot,
+          profileId,
           player: player.player_name,
           mode,
           category,
