@@ -124,7 +124,8 @@
     <div class="sec-hd"><span class="sec-title">Erweiterte Spielfunktionen</span><div class="sec-line"></div></div>
     <fieldset>
       <legend>Begegnungen verwalten</legend>
-      <div class="field-hint" style="margin:0 0 8px">Nur offene oder abgebrochene Begegnungen können hier vollständig entfernt werden. Abgeschlossene Begegnungen bleiben Bestandteil der Statistiken.</div>
+      <div class="field-hint" style="margin:0 0 8px">Auch abgeschlossene Begegnungen können vollständig aus Duellstatistik, Legs, Würfen und Highscores entfernt werden.</div>
+      <input id="adminDuelSearch" type="search" placeholder="Spieler, ID, Modus oder Status suchen" aria-label="Begegnungen durchsuchen" style="margin:0 8px 8px 0" />
       <button class="btn-save" id="refreshDuelsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Begegnungen laden</button>
       <div class="duel-list" id="adminDuelList"><div class="duel-row">Begegnungen werden geladen...</div></div>
     </fieldset>
@@ -978,7 +979,7 @@
   async function loadAdminDuels() {
     const list = document.getElementById('adminDuelList');
     try {
-      const response = await fetch('/api/duels?limit=100&status=all', { cache: 'no-store' });
+      const response = await fetch('/api/duels?limit=1000&status=all', { cache: 'no-store' });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const duels = await response.json();
       if (!duels.length) {
@@ -987,17 +988,27 @@
       }
       list.innerHTML = duels.map(duel => {
         const players = (duel.players || []).map(player => escapeHtml(player.player_name)).join(' · ');
-        const deleteButton = duel.status === 'finished' ? '' : '<button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '">🗑 Löschen</button>';
-        return '<div class="duel-row"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div>' + deleteButton + '</div>';
+        const deleteButton = '<button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '" data-duel-status="' + escapeHtml(duel.status || '') + '">🗑 Löschen</button>';
+        const searchValue = [duel.id, duel.mode, duel.status, formatAdminDuelStatus(duel), ...(duel.players || []).map(player => player.player_name)].join(' ').toLocaleLowerCase('de-DE');
+        return '<div class="duel-row" data-duel-search-value="' + escapeHtml(searchValue) + '"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div>' + deleteButton + '</div>';
       }).join('');
-      list.querySelectorAll('[data-duel-delete]').forEach(button => button.addEventListener('click', () => deleteAdminDuel(Number(button.dataset.duelDelete))));
+      list.querySelectorAll('[data-duel-delete]').forEach(button => button.addEventListener('click', () => deleteAdminDuel(Number(button.dataset.duelDelete), button.dataset.duelStatus)));
+      filterAdminDuels();
     } catch (err) {
       list.innerHTML = '<div class="duel-row" style="color:#e63946">Fehler beim Laden: ' + escapeHtml(err.message) + '</div>';
     }
   }
 
-  async function deleteAdminDuel(id) {
-    if (!confirm('Begegnung #' + id + ' vollständig löschen? Die gespeicherten Legs und Wurfdaten werden ebenfalls entfernt.')) return;
+  function filterAdminDuels() {
+    const search = document.getElementById('adminDuelSearch').value.trim().toLocaleLowerCase('de-DE');
+    document.querySelectorAll('#adminDuelList [data-duel-search-value]').forEach(row => {
+      row.hidden = search && !row.dataset.duelSearchValue.includes(search);
+    });
+  }
+
+  async function deleteAdminDuel(id, status) {
+    const warning = status === 'finished' ? 'ACHTUNG: Die abgeschlossene Begegnung #' + id + ' wird aus den Duellstatistiken entfernt. Legs, Würfe und Highscores werden ebenfalls gelöscht.' : 'Begegnung #' + id + ' vollständig löschen? Die gespeicherten Legs und Wurfdaten werden ebenfalls entfernt.';
+    if (!confirm(warning)) return;
     try {
       const response = await fetch('/api/duels/' + id, { method: 'DELETE' });
       const result = await response.json();
@@ -1008,6 +1019,7 @@
   }
 
   document.getElementById('refreshDuelsBtn').addEventListener('click', loadAdminDuels);
+  document.getElementById('adminDuelSearch').addEventListener('input', filterAdminDuels);
   loadAdminDuels();
 </script>
 </body>

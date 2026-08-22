@@ -1336,7 +1336,7 @@ class DataStore {
   }
 
   async listDuels(limit = 20, status = '') {
-    const safeLimit = Math.max(1, Math.min(100, Number(limit || 20)));
+    const safeLimit = Math.max(1, Math.min(1000, Number(limit || 20)));
     const safeStatus = ['active', 'finished', 'canceled'].includes(String(status || '').toLowerCase())
       ? String(status).toLowerCase()
       : '';
@@ -1483,6 +1483,7 @@ class DataStore {
         await this.sqlite.run('DELETE FROM duel_players WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
         const result = await this.sqlite.run('DELETE FROM duels WHERE id = ?', [safeId]);
         await this.sqlite.exec('COMMIT');
         return result.changes > 0;
@@ -1500,6 +1501,7 @@ class DataStore {
         await client.query('DELETE FROM duel_players WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM player_throw_segments WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM highscores WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM leg_history WHERE duel_id = $1', [safeId]);
         const result = await client.query('DELETE FROM duels WHERE id = $1', [safeId]);
         await client.query('COMMIT');
         return result.rowCount > 0;
@@ -1518,6 +1520,7 @@ class DataStore {
       await connection.query('DELETE FROM duel_players WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
+      await connection.query('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
       const [result] = await connection.query('DELETE FROM duels WHERE id = ?', [safeId]);
       await connection.commit();
       return result.affectedRows > 0;

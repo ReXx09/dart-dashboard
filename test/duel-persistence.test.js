@@ -74,3 +74,25 @@ test('Statistikabruf ist nicht auf 100 Begegnungen begrenzt', async () => {
     assert.equal(duels.length, 101);
   });
 });
+
+test('Abgeschlossene Begegnung wird mit Leg-History vollständig gelöscht', async () => {
+  await withStore(async store => {
+    const duel = await store.createDuel({
+      mode: '501',
+      matchType: 'direct',
+      players: [{ slot: 1, name: 'Claudia' }, { slot: 2, name: 'Andy' }]
+    });
+    await store.recordDuelLeg({
+      duelId: duel.id,
+      mode: '501',
+      winnerSlot: 1,
+      startedAt: Date.now() - 1000,
+      players: [{ slot: 1, name: 'Claudia' }, { slot: 2, name: 'Andy' }]
+    });
+    await store.recordLegHistory(1, 50.1, 40, 1, 30, '2026', duel.id);
+
+    assert.equal(await store.deleteDuel(duel.id), true);
+    assert.equal(await store.getDuel(duel.id), null);
+    assert.equal(Number((await store.sqlite.get('SELECT COUNT(*) AS count FROM leg_history WHERE duel_id = ?', [duel.id])).count), 0);
+  });
+});

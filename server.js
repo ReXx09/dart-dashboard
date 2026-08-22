@@ -3532,7 +3532,6 @@ app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
   try {
     const duel = await dataStore.getDuel(duelId);
     if (!duel) return res.status(404).json({ error: 'Begegnung nicht gefunden.' });
-    if (duel.status === 'finished') return res.status(409).json({ error: 'Abgeschlossene Begegnungen können nicht gelöscht werden.' });
     const state = await getLiveState();
     const isCurrentDuel = Number(state.game?.duelId) === duelId;
     const deleted = await dataStore.deleteDuel(duelId);
