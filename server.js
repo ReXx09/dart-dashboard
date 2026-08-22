@@ -4061,6 +4061,7 @@ app.get('/api/highscores/daily', async (_req, res) => {
 
 app.get('/api/highscores/overview', async (_req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const players = await dataStore.getPlayers();
     const entries = [];
     for (const player of players) {
@@ -4113,7 +4114,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
     }
 
     const grouped = new Map();
-    const duels = await dataStore.listDuels(100, 'finished');
+    const duels = await dataStore.listFinishedDuelsForStats();
     for (const duel of duels) {
       const category = ['single', 'duel', 'group', 'tournament'].includes(String(duel.category || '')) ? duel.category : 'duel';
       const mode = String(duel.mode || '501');
