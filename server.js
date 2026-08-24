@@ -3504,7 +3504,7 @@ app.get('/api/duel-stats', async (req, res) => {
   if (!['all', 'single', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, single, duel, group oder tournament sein.' });
   if (status !== 'finished') return res.status(400).json({ error: 'Statistiken werden nur für abgeschlossene Begegnungen geführt.' });
   try {
-    const duels = await dataStore.listDuels(100, status);
+    const duels = await dataStore.listFinishedDuelsForStats();
     const payload = aggregateDuelStats({ duels, slots, category, exactGroup });
     res.json(payload);
   } catch (err) { res.status(500).json({ error: 'Duellstatistik konnte nicht geladen werden: ' + err.message }); }

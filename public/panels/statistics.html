@@ -986,7 +986,7 @@
 
     async function loadEncounters() {
       try {
-        const response = await fetch(API_BASE + '/duels?limit=100&status=finished', { cache: 'no-store' });
+        const response = await fetch(API_BASE + '/duels?limit=300&status=finished', { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounters = await response.json();
         renderEncounters();
