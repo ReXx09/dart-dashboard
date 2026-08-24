@@ -147,7 +147,19 @@
     .encounter-nav button { flex: 1 1 140px; border: 0; background: transparent; color: #777; border-radius: 6px; padding: 8px 12px; cursor: pointer; font: inherit; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
     .encounter-nav button:hover { color: #ddd; }
     .encounter-nav button.active { background: #f4a261; color: #111; }
+    .encounter-filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 0 0 12px; padding: 10px 12px; background: #101010; border: 1px solid #222; border-radius: 10px; }
+    .encounter-filter-bar label { display: flex; flex-direction: column; gap: 4px; font-size: .64rem; text-transform: uppercase; letter-spacing: 1px; color: #777; font-weight: 700; margin: 0; }
+    .encounter-filter-bar select, .encounter-filter-bar input[type="date"] { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; border-radius: 8px; padding: 7px 9px; font-size: .78rem; font-family: inherit; }
+    .encounter-filter-reset { border: 1px solid #2a2a2a; background: #1b1b1b; color: #bbb; border-radius: 8px; padding: 8px 12px; cursor: pointer; font: inherit; font-size: .7rem; font-weight: 700; white-space: nowrap; }
+    .encounter-filter-reset:hover { border-color: #f4a261; color: #f4a261; }
+    .encounter-compact-toggle { flex-direction: row !important; align-items: center; gap: 6px !important; text-transform: none; letter-spacing: 0; font-size: .74rem; color: #bbb; cursor: pointer; margin-left: auto; }
+    .encounter-compact-toggle input { width: auto; }
     .encounter-score-grid { overflow-x: auto; border: 1px solid #262626; border-radius: 10px; }
+    .encounter-score-grid.compact .encounter-table th:nth-child(5), .encounter-score-grid.compact .encounter-table td:nth-child(5),
+    .encounter-score-grid.compact .encounter-table th:nth-child(6), .encounter-score-grid.compact .encounter-table td:nth-child(6),
+    .encounter-score-grid.compact .encounter-table th:nth-child(7), .encounter-score-grid.compact .encounter-table td:nth-child(7) { display: none; }
+    .encounter-score-grid.compact .encounter-table th, .encounter-score-grid.compact .encounter-table td { padding: 5px 8px; font-size: .7rem; }
+    .encounter-score-grid.compact .encounter-table .player-lines span, .encounter-score-grid.compact .encounter-table .metric-lines span { line-height: 1.3; }
     .encounter-table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: .76rem; }
     .encounter-table th { padding: 9px 10px; background: #151515; color: #666; text-align: left; text-transform: uppercase; letter-spacing: 1px; font-size: .6rem; white-space: nowrap; }
     .encounter-table td { padding: 8px 10px; border-top: 1px solid #202020; color: #bbb; vertical-align: middle; white-space: nowrap; }
@@ -544,6 +556,22 @@
           <button type="button" data-encounter-category="group" onclick="setEncounterCategory('group')">Begegnungen</button>
           <button type="button" data-encounter-category="tournament" onclick="setEncounterCategory('tournament')">Turniere</button>
         </nav>
+        <div class="encounter-filter-bar">
+          <label>Spiel
+            <select id="encounterModeFilter" aria-label="Nach Spielmodus filtern" onchange="setEncounterMode(this.value)"><option value="all">Alle Modi</option></select>
+          </label>
+          <label>Von
+            <input type="date" id="encounterDateFrom" aria-label="Begegnungen ab Datum" onchange="setEncounterDateRange()" />
+          </label>
+          <label>Bis
+            <input type="date" id="encounterDateTo" aria-label="Begegnungen bis Datum" onchange="setEncounterDateRange()" />
+          </label>
+          <button type="button" class="encounter-filter-reset" onclick="resetEncounterFilters()">Filter zurücksetzen</button>
+          <label class="encounter-compact-toggle">
+            <input type="checkbox" id="encounterCompactToggle" onchange="toggleEncounterCompact(this.checked)" />
+            Kompakte Ansicht
+          </label>
+        </div>
         <div class="encounter-score-grid" id="encounterScoreGrid">
           <div class="encounter-empty">Begegnungen werden geladen...</div>
         </div>
@@ -655,6 +683,10 @@
     let encounterDetail = null;
     let encounterDetailView = 'duel';
     let selectedEncounterCategory = 'duel';
+    let selectedEncounterMode = 'all';
+    let encounterDateFrom = '';
+    let encounterDateTo = '';
+    let encounterCompactView = localStorage.getItem('encounterCompactView') === 'true';
     let renderedScoreGroups = [];
 
     const LIST_LABELS = {
@@ -759,6 +791,59 @@
       renderEncounters();
     }
 
+    function populateEncounterModeFilter() {
+      const select = document.getElementById('encounterModeFilter');
+      if (!select) return;
+      const modes = Array.from(new Set(encounters.map(encounter => String(encounter.mode || '')).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
+      select.innerHTML = '<option value="all">Alle Modi</option>' + modes.map(mode => '<option value="' + escapeHtml(mode) + '">' + escapeHtml(mode) + '</option>').join('');
+      select.value = modes.includes(selectedEncounterMode) ? selectedEncounterMode : 'all';
+      selectedEncounterMode = select.value;
+    }
+
+    function setEncounterMode(mode) {
+      selectedEncounterMode = mode;
+      renderEncounters();
+    }
+
+    function setEncounterDateRange() {
+      encounterDateFrom = document.getElementById('encounterDateFrom').value;
+      encounterDateTo = document.getElementById('encounterDateTo').value;
+      renderEncounters();
+    }
+
+    function resetEncounterFilters() {
+      selectedEncounterMode = 'all';
+      encounterDateFrom = '';
+      encounterDateTo = '';
+      document.getElementById('encounterModeFilter').value = 'all';
+      document.getElementById('encounterDateFrom').value = '';
+      document.getElementById('encounterDateTo').value = '';
+      renderEncounters();
+    }
+
+    function toggleEncounterCompact(enabled) {
+      encounterCompactView = !!enabled;
+      localStorage.setItem('encounterCompactView', String(encounterCompactView));
+      document.getElementById('encounterScoreGrid').classList.toggle('compact', encounterCompactView);
+    }
+
+    function getFilteredEncounters() {
+      return encounters.filter(encounter => {
+        if (encounter.category !== selectedEncounterCategory) return false;
+        if (selectedEncounterMode !== 'all' && String(encounter.mode || '') !== selectedEncounterMode) return false;
+        const startedAt = Number(encounter.started_at || 0);
+        if (encounterDateFrom) {
+          const fromTs = new Date(encounterDateFrom + 'T00:00:00').getTime();
+          if (!startedAt || startedAt < fromTs) return false;
+        }
+        if (encounterDateTo) {
+          const toTs = new Date(encounterDateTo + 'T23:59:59.999').getTime();
+          if (!startedAt || startedAt > toTs) return false;
+        }
+        return true;
+      });
+    }
+
     function renderOverview() {
       const grid = document.getElementById('metricGrid');
       const mode = document.getElementById('overviewMode').value;
@@ -815,12 +900,13 @@
 
     function renderEncounters() {
       const grid = document.getElementById('encounterScoreGrid');
+      grid.classList.toggle('compact', encounterCompactView);
       if (!encounters.length) {
         grid.innerHTML = '<div class="encounter-empty">Noch keine Duelle oder Gruppen-Begegnungen gespeichert.</div>';
         return;
       }
-      const visible = encounters.filter(encounter => encounter.category === selectedEncounterCategory);
-      if (!visible.length) { grid.innerHTML = '<div class="encounter-empty">Noch keine Einträge in dieser Kategorie.</div>'; return; }
+      const visible = getFilteredEncounters();
+      if (!visible.length) { grid.innerHTML = '<div class="encounter-empty">Keine Begegnungen für die aktuellen Filter.</div>'; return; }
       grid.innerHTML = '<table class="encounter-table"><thead><tr><th>Begegnung</th><th>Spieler</th><th>Legs</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Checkout</th><th>Sieger</th><th>Details</th></tr></thead><tbody>' + visible.map(encounter => {
         const stats = aggregateEncounterPlayers(encounter);
         const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
@@ -910,9 +996,10 @@
 
     async function loadEncounters() {
       try {
-        const response = await fetch('/api/duels?limit=100&status=finished', { cache: 'no-store' });
+        const response = await fetch('/api/duels?limit=300&status=finished', { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounters = await response.json();
+        populateEncounterModeFilter();
         renderEncounters();
       } catch (_error) {
         document.getElementById('encounterScoreGrid').innerHTML = '<div class="encounter-empty">Begegnungen konnten nicht geladen werden.</div>';
@@ -1246,6 +1333,9 @@
       if (event.key === 'Escape') closeEncounterDialog();
     });
     document.getElementById('refreshBtn').addEventListener('click', () => loadScores());
+
+    document.getElementById('encounterCompactToggle').checked = encounterCompactView;
+    document.getElementById('encounterScoreGrid').classList.toggle('compact', encounterCompactView);
 
     loadScores();
     loadOverview();
