@@ -182,7 +182,8 @@
     .heatmap-cell strong { color: #f4a261; }
     .encounter-empty { color: #555; text-align: center; padding: 30px 16px; }
     .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-    .metric-card { background: #141414; border: 1px solid #1e1e1e; border-radius: 14px; overflow: hidden; min-width: 0; }
+    .metric-card { position: relative; background: #141414; border: 1px solid #1e1e1e; border-radius: 14px; min-width: 0; }
+    .metric-card:hover, .metric-card:focus-within { z-index: 4; }
     .metric-card h3 { padding: 12px 14px; font-size: .68rem; color: #aaa; text-transform: uppercase; letter-spacing: 1.2px; border-top: 3px solid var(--accent); }
     .metric-list { list-style: none; padding: 4px 14px 10px; }
     .metric-list li { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; padding: 9px 0; border-bottom: 1px solid #1e1e1e; font-size: .78rem; }
@@ -190,8 +191,34 @@
     .metric-rank { color: #666; font-weight: 800; }
     .metric-player { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .metric-value { color: var(--accent); font-weight: 900; font-variant-numeric: tabular-nums; }
-    .metric-value-wrap { text-align: right; min-width: 0; }
-    .metric-meta { display: block; margin-top: 2px; color: #666; font-size: .58rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .metric-value-wrap { position: relative; text-align: right; min-width: 0; }
+    .metric-value-wrap[data-tooltip] { cursor: help; outline: none; }
+    .metric-value-wrap[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      z-index: 5;
+      right: 0;
+      bottom: calc(100% + 8px);
+      width: max-content;
+      max-width: 210px;
+      padding: 6px 8px;
+      border: 1px solid #3a3a3a;
+      border-radius: 5px;
+      background: #080808;
+      color: #ccc;
+      box-shadow: 0 6px 18px rgba(0,0,0,.45);
+      font-size: .64rem;
+      font-weight: 500;
+      line-height: 1.35;
+      text-align: left;
+      white-space: normal;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(3px);
+      transition: opacity .12s ease, transform .12s ease;
+    }
+    .metric-value-wrap[data-tooltip]:hover::after,
+    .metric-value-wrap[data-tooltip]:focus-visible::after { opacity: 1; transform: translateY(0); }
     .metric-empty { color: #555; padding: 12px 0; font-size: .75rem; }
     .games-section { margin-top: 18px; }
     .game-highscore-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -745,7 +772,11 @@
           .slice(0, 3);
         const tooltip = key.startsWith('checkoutRate') ? 'Versuch = Dart bei einem regelkonform in maximal drei Darts checkbaren Rest; Bogey-Reste sind ausgeschlossen.' : '';
         return '<article class="metric-card" style="--accent:' + accent + '"' + (tooltip ? ' title="' + escapeHtml(tooltip) + '"' : '') + '><h3>' + title + '</h3><ol class="metric-list">' +
-          (rows.length ? rows.map((item, index) => '<li><span class="metric-rank">' + (index + 1) + '</span><span class="metric-player">' + escapeHtml(item.player) + '</span><span class="metric-value-wrap"><span class="metric-value">' + format(item[key]) + '</span>' + (meta ? '<span class="metric-meta">' + escapeHtml(meta(item)) + '</span>' : '') + '</span></li>').join('') : '<li class="metric-empty">Noch keine Daten</li>') +
+          (rows.length ? rows.map((item, index) => {
+            const hint = meta ? String(meta(item) || '').trim() : '';
+            const hintAttributes = hint ? ' data-tooltip="' + escapeHtml(hint) + '" tabindex="0" aria-label="' + escapeHtml(format(item[key]) + ', ' + hint) + '"' : '';
+            return '<li><span class="metric-rank">' + (index + 1) + '</span><span class="metric-player">' + escapeHtml(item.player) + '</span><span class="metric-value-wrap"' + hintAttributes + '><span class="metric-value">' + format(item[key]) + '</span></span></li>';
+          }).join('') : '<li class="metric-empty">Noch keine Daten</li>') +
           '</ol></article>';
       }).join('');
     }
@@ -794,7 +825,7 @@
         const stats = aggregateEncounterPlayers(encounter);
         const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
         const lines = field => stats.map(player => '<span>' + field(player) + '</span>').join('');
-        return '<tr><td><div class="encounter-kind">' + escapeHtml(encounter.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(encounter.mode) + '</div><div class="encounter-id">#' + Number(encounter.id) + ' · ' + escapeHtml(encounter.status || '') + '</div></td>' +
+        return '<tr><td><div class="encounter-kind">' + escapeHtml(encounter.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(encounter.mode) + '</div><div class="encounter-id" title="Begegnung #' + Number(encounter.id) + '">' + escapeHtml(formatTime(encounter.started_at)) + ' · ' + escapeHtml(encounter.status || '') + '</div></td>' +
           '<td class="player-lines">' + lines(player => escapeHtml(player.name)) + '</td><td>' + Number(encounter.total_legs || 0) + '</td>' +
           '<td class="metric-lines">' + lines(player => formatMetric(player.average)) + '</td><td class="metric-lines">' + lines(player => formatMetric(player.firstNineAvg)) + '</td>' +
           '<td class="metric-lines">' + lines(player => String(player.turns)) + '</td><td class="metric-lines">' + lines(player => player.checkoutSuccess + '/' + player.checkoutAttempts + ' · ' + (player.highestCheckout || '-')) + '</td>' +
@@ -831,7 +862,7 @@
         const response = await fetch('/api/duels/' + encodeURIComponent(id), { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounterDetail = await response.json();
-        document.getElementById('encounterDialogTitle').textContent = (encounterDetail.categoryLabel || 'Begegnung') + ' · ' + encounterDetail.mode + ' #' + encounterDetail.id;
+        document.getElementById('encounterDialogTitle').textContent = (encounterDetail.categoryLabel || 'Begegnung') + ' · ' + encounterDetail.mode + ' · ' + formatTime(encounterDetail.started_at);
         renderEncounterDetail();
       } catch (_error) { document.getElementById('encounterDialogContent').innerHTML = '<div class="encounter-empty">Begegnungsdaten konnten nicht geladen werden.</div>'; }
     }

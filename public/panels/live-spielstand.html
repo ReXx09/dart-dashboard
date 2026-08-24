@@ -1566,9 +1566,6 @@
     }
 
     function isMatchComplete(state, winner) {
-      if (String(state && state.game && state.game.matchType || '') === 'single') {
-        return Number(winner && winner.legs || 0) >= Math.max(1, Number(state && state.game && state.game.bestOf || 1));
-      }
       const legsToWin = Math.max(1, Number(state && state.game && state.game.legsToWin || 1));
       return Number(winner && winner.legs || 0) >= legsToWin;
     }
@@ -2650,7 +2647,7 @@
       const matchComplete = isMatchComplete(state, winner);
       const isGroupMatch = String(state.game && state.game.matchType) === 'group';
       const title = matchComplete
-        ? (isCricket || isElimination || isGroupMatch ? 'BEGEGNUNG GEWONNEN' : 'DUELL GEWONNEN')
+        ? (isSingleGame ? 'SOLOSPIEL GEWONNEN' : (isCricket || isElimination || isGroupMatch ? 'BEGEGNUNG GEWONNEN' : 'DUELL GEWONNEN'))
         : (isCricket ? 'CRICKET GEWONNEN' : isElimination ? 'ELIMINATION GEWONNEN' : 'LEG GEWONNEN');
       const subtitle = isCricket ? 'Cricket Punkte: ' + (winner.cricketPoints || 0) : isElimination ? 'Punkte: ' + (winner.totalScored || 0) : 'Checkout: ' + (checkoutValue || '-') + ' Punkte';
       const modeStats = isCricket

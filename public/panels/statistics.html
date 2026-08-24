@@ -875,7 +875,7 @@
         const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
         const lines = field => stats.map(player => '<span>' + field(player) + '</span>').join('');
         return '<tr>' +
-          '<td><div class="encounter-kind">' + escapeHtml(encounter.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(encounter.mode) + '</div><div class="encounter-id">#' + Number(encounter.id) + ' · ' + escapeHtml(encounter.status || '') + '</div></td>' +
+          '<td><div class="encounter-kind">' + escapeHtml(encounter.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(encounter.mode) + '</div><div class="encounter-id" title="Begegnung #' + Number(encounter.id) + '">' + escapeHtml(formatEncounterDate(encounter.started_at)) + ' · ' + escapeHtml(encounter.status || '') + '</div></td>' +
           '<td class="player-lines">' + lines(player => escapeHtml(player.name)) + '</td>' +
           '<td>' + Number(encounter.total_legs || 0) + '</td>' +
           '<td class="metric-lines">' + lines(player => formatMetric(player.average)) + '</td>' +
@@ -891,6 +891,12 @@
     function formatMetric(value) {
       const number = Number(value || 0);
       return number > 0 ? number.toFixed(2) : '-';
+    }
+
+    function formatEncounterDate(ts) {
+      if (!ts) return '-';
+      const date = new Date(ts);
+      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' · ' + date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     }
 
     function aggregateEncounterPlayers(encounter) {
@@ -925,7 +931,7 @@
         const response = await fetch(API_BASE + '/duels/' + encodeURIComponent(id), { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounterDetail = await response.json();
-        document.getElementById('encounterDialogTitle').textContent = (encounterDetail.categoryLabel || 'Begegnung') + ' · ' + encounterDetail.mode + ' #' + encounterDetail.id;
+        document.getElementById('encounterDialogTitle').textContent = (encounterDetail.categoryLabel || 'Begegnung') + ' · ' + encounterDetail.mode + ' · ' + formatEncounterDate(encounterDetail.started_at);
         renderEncounterDetail();
       } catch (_error) {
         document.getElementById('encounterDialogContent').innerHTML = '<div class="encounter-empty">Begegnungsdaten konnten nicht geladen werden.</div>';

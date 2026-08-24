@@ -480,23 +480,6 @@
       font-weight: 800;
       color: #f4a261;
     }
-    .winner-btn {
-      background: linear-gradient(135deg, #f4a261, #e63946);
-      border: none;
-      color: #fff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      padding: 16px 48px;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .winner-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 8px 30px rgba(244, 162, 97, 0.5);
-    }
     .confetti-container {
       position: fixed;
       inset: 0;
@@ -1348,7 +1331,13 @@
       const throws = Array.isArray(winner.throws) ? winner.throws : [];
       const dartsThrown = Number(winner.turns) || throws.length;
       const checkoutValue = !isCricket && !isElimination ? (Number(winner.lastCheckoutValue) || 0) : 0;
-      const title = isCricket ? 'CRICKET GEWONNEN' : isElimination ? 'ELIMINATION GEWONNEN' : 'LEG GEWONNEN';
+      const matchType = String(state.game && state.game.matchType || '');
+      const isSingleGame = matchType === 'single';
+      const isGroupMatch = matchType === 'group';
+      const isMatchComplete = Number(winner.legs || 0) >= Math.max(1, Number(state.game && state.game.legsToWin || 1));
+      const title = isMatchComplete
+        ? (isSingleGame ? 'SOLOSPIEL GEWONNEN' : (isCricket || isElimination || isGroupMatch ? 'BEGEGNUNG GEWONNEN' : 'DUELL GEWONNEN'))
+        : (isCricket ? 'CRICKET GEWONNEN' : isElimination ? 'ELIMINATION GEWONNEN' : 'LEG GEWONNEN');
       const subtitle = isCricket ? 'Cricket Punkte: ' + (winner.cricketPoints || 0) : isElimination ? 'Punkte: ' + (winner.totalScored || 0) : 'Checkout: ' + (checkoutValue || '-') + ' Punkte';
       const modeStats = isCricket
         ? '<div class="winner-stat"><div class="winner-stat-label">Geschlossene Zahlen</div><div class="winner-stat-value">' + (winner.cricketClosed ? Object.values(winner.cricketClosed).filter(Boolean).length : 0) + '/7</div></div>'
@@ -1364,7 +1353,7 @@
           '<div class="winner-stat"><div class="winner-stat-label">Schnitt</div><div class="winner-stat-value">' + stats.legAverage + '</div></div>' +
           '<div class="winner-stat"><div class="winner-stat-label">Erster-9-AVG</div><div class="winner-stat-value">' + stats.firstNineAverage + '</div></div>' +
           '<div class="winner-stat"><div class="winner-stat-label">Legs</div><div class="winner-stat-value">' + (winner.legs || 0) + '</div></div>' +
-        '</div><button class="winner-btn" onclick="hideWinnerOverlay(); nextLeg()">Nächstes Leg starten</button></div>';
+        '</div><div class="winner-subtitle">' + (isMatchComplete ? 'Begegnung beendet' : 'Nächstes Leg über die Browser-Ansicht starten') + '</div></div>';
 
       overlay.classList.add('show');
       overlay.style.display = 'flex';
@@ -1431,22 +1420,6 @@
       }
       document.body.appendChild(container);
       setTimeout(() => container.remove(), 3800);
-    }
-
-    // ── Next Leg ──
-    async function nextLeg() {
-      try {
-        var r = await fetch('/api/live/reset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ carryLegs: true })
-        });
-        if (!r.ok) { showToast('Fehler', true); return; }
-        liveState = await r.json();
-        renderState(liveState);
-        hideWinnerOverlay();
-        showToast('Nächstes Leg gestartet');
-      } catch(e) { showToast('Netzwerkfehler', true); }
     }
 
     // ── Toast ──
@@ -1666,24 +1639,6 @@
         if (!stateRes.ok) throw new Error('HTTP ' + stateRes.status);
         const state = await stateRes.json();
         liveState = state;
-        // Auto-Recovery NUR beim ersten Laden (nicht bei SSE-Updates)
-        if (isFirstLoad && state.game.status === 'leg-finished') {
-          isFirstLoad = false;
-          try {
-            const resetRes = await fetch('/api/live/reset', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ carryLegs: true })
-            });
-            if (resetRes.ok) {
-              const freshState = await resetRes.json();
-              liveState = freshState;
-              renderState(freshState);
-              showToast('↻ Neues Leg automatisch gestartet');
-              return;
-            }
-          } catch {}
-        }
         isFirstLoad = false;
         renderState(state);
       } catch(e) {
