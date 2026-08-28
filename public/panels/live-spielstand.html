@@ -2645,6 +2645,7 @@
       const dartsThrown = Number(winner.turns) || throws.length;
       const checkoutValue = !isCricket && !isElimination ? (Number(winner.lastCheckoutValue) || 0) : 0;
       const matchComplete = isMatchComplete(state, winner);
+      const isSingleGame = String(state.game && state.game.matchType || '') === 'single';
       const isGroupMatch = String(state.game && state.game.matchType) === 'group';
       const title = matchComplete
         ? (isSingleGame ? 'SOLOSPIEL GEWONNEN' : (isCricket || isElimination || isGroupMatch ? 'BEGEGNUNG GEWONNEN' : 'DUELL GEWONNEN'))
