@@ -633,6 +633,7 @@
     }
     .throw-correction-card h2 { margin: 0 0 6px; color: #f4a261; font-size: 1.2rem; text-align: center; }
     .throw-correction-card p { margin: 0 0 12px; color: #b9c2c7; font-size: .85rem; text-align: center; }
+    .throw-correction-card p.error { color: #ff9aa0; }
     .throw-correction-display { display: flex; gap: 8px; margin-bottom: 10px; }
     .throw-correction-display button,
     .throw-correction-display input {
@@ -3144,7 +3145,10 @@
       throwCorrectionSign = -1;
       throwCorrectionDigits = '';
       updateThrowCorrectionDisplay();
-      if (hint) hint.textContent = activePlayer ? '− zieht Punkte ab, + addiert Punkte. Spieler: ' + activePlayer.name : '− zieht Punkte ab, + addiert Punkte.';
+      if (hint) {
+        hint.textContent = activePlayer ? '− zieht Punkte ab, + addiert Punkte. Spieler: ' + activePlayer.name : '− zieht Punkte ab, + addiert Punkte.';
+        hint.classList.remove('error');
+      }
       overlay.classList.add('show');
     }
 
@@ -3177,7 +3181,11 @@
 
     async function applyLastThrowCorrection() {
       const amount = Number(throwCorrectionDigits || 0) * throwCorrectionSign;
-      if (!amount) { showToast('Bitte einen Korrekturwert eingeben.', true); return; }
+      const hint = document.getElementById('throwCorrectionHint');
+      if (!amount) {
+        if (hint) { hint.textContent = 'Bitte zuerst einen Korrekturwert eingeben.'; hint.classList.add('error'); }
+        return;
+      }
       const button = document.querySelector('.throw-correction-actions .apply');
       if (button) button.disabled = true;
       try {
@@ -3187,7 +3195,10 @@
           body: JSON.stringify({ delta: amount })
         });
         const payload = await r.json().catch(() => ({}));
-        if (!r.ok) { showToast(payload.error || 'Wurfkorrektur fehlgeschlagen', true); return; }
+        if (!r.ok) {
+          if (hint) { hint.textContent = payload.error || 'Wurfkorrektur fehlgeschlagen'; hint.classList.add('error'); }
+          return;
+        }
         liveState = payload;
         closeThrowCorrection();
         renderState(liveState);
