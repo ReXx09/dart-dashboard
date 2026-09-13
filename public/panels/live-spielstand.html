@@ -610,6 +610,65 @@
     .action-confirm-actions button:hover { border-color: #d7e0e5; background: #2d363b; }
     .action-confirm-actions .confirm-primary { border-color: #f4c542; background: #f4c542; color: #17120a; }
     .action-confirm-actions .confirm-primary:hover { border-color: #ffe27a; background: #ffe27a; }
+    .throw-correction-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 11500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      background: rgba(4, 7, 9, .86);
+      backdrop-filter: blur(5px);
+    }
+    .throw-correction-overlay.show { display: flex; }
+    .throw-correction-card {
+      width: min(430px, 100%);
+      padding: 18px;
+      background: #171b1e;
+      border: 1px solid #49545b;
+      border-top: 3px solid #f4a261;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
+    }
+    .throw-correction-card h2 { margin: 0 0 6px; color: #f4a261; font-size: 1.2rem; text-align: center; }
+    .throw-correction-card p { margin: 0 0 12px; color: #b9c2c7; font-size: .85rem; text-align: center; }
+    .throw-correction-display { display: flex; gap: 8px; margin-bottom: 10px; }
+    .throw-correction-display button,
+    .throw-correction-display input {
+      min-height: 58px;
+      border: 1px solid #536068;
+      border-radius: 9px;
+      background: #0f1315;
+      color: #fff;
+      font: inherit;
+      font-size: 1.7rem;
+      font-weight: 900;
+      text-align: center;
+    }
+    .throw-correction-display button { width: 76px; color: #f4c542; cursor: pointer; touch-action: manipulation; }
+    .throw-correction-display input { min-width: 0; flex: 1; }
+    .throw-correction-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .throw-correction-keypad button {
+      min-height: 62px;
+      border: 1px solid #344047;
+      border-radius: 9px;
+      background: #22292d;
+      color: #f1f1f1;
+      font: inherit;
+      font-size: 1.55rem;
+      font-weight: 800;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .throw-correction-keypad button:hover,
+    .throw-correction-keypad button:active { border-color: #f4a261; background: #343d42; color: #f4a261; }
+    .throw-correction-keypad .clear { color: #e98b91; }
+    .throw-correction-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .throw-correction-actions button { min-height: 48px; padding: 9px 10px; border: 1px solid #536068; border-radius: 8px; background: #22292d; color: #f1f1f1; font: inherit; font-weight: 700; cursor: pointer; }
+    .throw-correction-actions .apply { border-color: #2a9d8f; background: #2a9d8f; color: #fff; }
+    .throw-correction-actions .remove { border-color: #e63946; color: #ff9aa0; }
+    .throw-correction-actions .cancel { grid-column: 1 / -1; color: #aeb8bd; }
     @media (max-width: 480px) {
       .action-confirm-card { padding: 20px; }
       .action-confirm-actions { flex-direction: column-reverse; }
@@ -1225,6 +1284,35 @@
         <button type="button" class="confirm-primary" id="actionConfirmAccept">Bestätigen</button>
       </div>
     </div>
+  </div>
+  <div class="throw-correction-overlay" id="throwCorrectionOverlay" role="dialog" aria-modal="true" aria-labelledby="throwCorrectionTitle">
+    <section class="throw-correction-card">
+      <h2 id="throwCorrectionTitle">Letzten Wurf korrigieren</h2>
+      <p id="throwCorrectionHint">Korrektur für den letzten Wurf eingeben.</p>
+      <div class="throw-correction-display">
+        <button type="button" id="throwCorrectionSign" onclick="toggleCorrectionSign()">−</button>
+        <input id="throwCorrectionValue" type="text" value="0" readonly aria-label="Korrekturwert">
+      </div>
+      <div class="throw-correction-keypad" aria-label="Korrektur-Tastenfeld">
+        <button type="button" onclick="appendCorrectionDigit('1')">1</button>
+        <button type="button" onclick="appendCorrectionDigit('2')">2</button>
+        <button type="button" onclick="appendCorrectionDigit('3')">3</button>
+        <button type="button" onclick="appendCorrectionDigit('4')">4</button>
+        <button type="button" onclick="appendCorrectionDigit('5')">5</button>
+        <button type="button" onclick="appendCorrectionDigit('6')">6</button>
+        <button type="button" onclick="appendCorrectionDigit('7')">7</button>
+        <button type="button" onclick="appendCorrectionDigit('8')">8</button>
+        <button type="button" onclick="appendCorrectionDigit('9')">9</button>
+        <button type="button" class="clear" onclick="clearCorrectionValue()">C</button>
+        <button type="button" onclick="appendCorrectionDigit('0')">0</button>
+        <button type="button" class="clear" onclick="removeCorrectionDigit()">⌫</button>
+      </div>
+      <div class="throw-correction-actions">
+        <button type="button" class="apply" onclick="applyLastThrowCorrection()">Korrektur anwenden</button>
+        <button type="button" class="remove" onclick="removeLastThrowFromCorrection()">Wurf entfernen</button>
+        <button type="button" class="cancel" onclick="closeThrowCorrection()">Abbrechen</button>
+      </div>
+    </section>
   </div>
   <div class="match-menu-overlay" id="matchMenuOverlay" role="dialog" aria-modal="true" aria-labelledby="matchMenuTitle">
     <div class="match-menu-card">
@@ -2315,7 +2403,7 @@
         '<div class="ctrl-row action-row">' +
           '<button class="ctrl-btn miss" id="focusMissBtn" onclick="skipPlayer()" title="Fehlwurf">✖ Fehlwurf</button>' +
           '<button class="ctrl-btn restart' + (isActiveGame ? ' ' + presentation.className : '') + '" id="focusMatchBtn" onclick="openMatchMenu()" title="' + (isActiveGame ? presentation.title : 'Begegnung starten') + '">' + (isActiveGame ? '⚔ ' + presentation.label : '⚔ Begegnung starten') + '</button>' +
-          '<button class="ctrl-btn undo" id="focusUndoBtn" onclick="undoLastThrow()" title="Letzten Wurf zurücksetzen">↶ Letzten Wurf</button>' +
+          '<button class="ctrl-btn undo" id="focusUndoBtn" onclick="openThrowCorrection()" title="Letzten Wurf korrigieren oder entfernen">↶ Letzten Wurf</button>' +
         '</div>' +
       '</div>';
     }
@@ -3035,6 +3123,82 @@
         showToast('↶ Letzten Wurf zurückgesetzt');
       } catch(e) { showToast('Netzwerkfehler', true); }
       if (btn) setTimeout(() => btn.disabled = false, 1000);
+    }
+
+    let throwCorrectionSign = -1;
+    let throwCorrectionDigits = '';
+
+    function updateThrowCorrectionDisplay() {
+      const sign = document.getElementById('throwCorrectionSign');
+      const value = document.getElementById('throwCorrectionValue');
+      if (sign) sign.textContent = throwCorrectionSign < 0 ? '−' : '+';
+      if (value) value.value = throwCorrectionDigits || '0';
+    }
+
+    function openThrowCorrection() {
+      const overlay = document.getElementById('throwCorrectionOverlay');
+      const hint = document.getElementById('throwCorrectionHint');
+      if (!overlay) return;
+      const activePlayer = liveState && liveState.players && liveState.players[liveState.game.activePlayer];
+      const lastAction = liveState && liveState.lastAction;
+      throwCorrectionSign = -1;
+      throwCorrectionDigits = '';
+      updateThrowCorrectionDisplay();
+      if (hint) hint.textContent = activePlayer ? '− zieht Punkte ab, + addiert Punkte. Spieler: ' + activePlayer.name : '− zieht Punkte ab, + addiert Punkte.';
+      overlay.classList.add('show');
+    }
+
+    function closeThrowCorrection() {
+      const overlay = document.getElementById('throwCorrectionOverlay');
+      if (overlay) overlay.classList.remove('show');
+    }
+
+    function toggleCorrectionSign() {
+      throwCorrectionSign *= -1;
+      updateThrowCorrectionDisplay();
+    }
+
+    function appendCorrectionDigit(digit) {
+      if (throwCorrectionDigits.length >= 3) return;
+      throwCorrectionDigits += digit;
+      throwCorrectionDigits = throwCorrectionDigits.replace(/^0+(?=\d)/, '');
+      updateThrowCorrectionDisplay();
+    }
+
+    function clearCorrectionValue() {
+      throwCorrectionDigits = '';
+      updateThrowCorrectionDisplay();
+    }
+
+    function removeCorrectionDigit() {
+      throwCorrectionDigits = throwCorrectionDigits.slice(0, -1);
+      updateThrowCorrectionDisplay();
+    }
+
+    async function applyLastThrowCorrection() {
+      const amount = Number(throwCorrectionDigits || 0) * throwCorrectionSign;
+      if (!amount) { showToast('Bitte einen Korrekturwert eingeben.', true); return; }
+      const button = document.querySelector('.throw-correction-actions .apply');
+      if (button) button.disabled = true;
+      try {
+        const r = await fetch('/api/live/correct-last', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ delta: amount })
+        });
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok) { showToast(payload.error || 'Wurfkorrektur fehlgeschlagen', true); return; }
+        liveState = payload;
+        closeThrowCorrection();
+        renderState(liveState);
+        showToast((amount > 0 ? '+' : '−') + Math.abs(amount) + ' Punkte beim letzten Wurf korrigiert');
+      } catch (error) { showToast('Netzwerkfehler', true); }
+      finally { if (button) button.disabled = false; }
+    }
+
+    function removeLastThrowFromCorrection() {
+      closeThrowCorrection();
+      undoLastThrow();
     }
 
     // ── Täglicher Höchstwert ──

@@ -3979,6 +3979,72 @@ app.post('/api/live/undo', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Undo fehlgeschlagen: ' + err.message }); }
 });
 
+app.post('/api/live/correct-last', async (req, res) => {
+  const delta = Number(req.body && req.body.delta);
+  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 180) {
+    return res.status(400).json({ error: 'delta muss eine ganze Zahl zwischen -180 und 180 sein.' });
+  }
+
+  try {
+    cancelScheduledAutoAdvance();
+    const state = await getLiveState();
+    if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
+
+    let lastThrowTime = 0, lastThrowPlayer = -1, lastThrowIndex = -1;
+    state.players.forEach((player, idx) => {
+      const throws = Array.isArray(player.throws) ? player.throws : [];
+      for (let throwIndex = throws.length - 1; throwIndex >= 0; throwIndex -= 1) {
+        const candidate = throws[throwIndex];
+        if (candidate && candidate.source === 'manual-miss') continue;
+        if (candidate && Number(candidate.ts || 0) > lastThrowTime) {
+          lastThrowTime = Number(candidate.ts || 0);
+          lastThrowPlayer = idx;
+          lastThrowIndex = throwIndex;
+        }
+        break;
+      }
+    });
+
+    if (lastThrowPlayer === -1) return res.status(400).json({ error: 'Kein Wurf zum Korrigieren vorhanden.' });
+    const player = state.players[lastThrowPlayer];
+    const lastThrow = player.throws[lastThrowIndex];
+    const mode = state.game.mode || DEFAULT_MODE;
+    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+    if (modeDef.type === 'cricket' || modeDef.type === 'elimination') {
+      return res.status(400).json({ error: 'Diese Korrektur ist für diesen Spielmodus noch nicht verfügbar.' });
+    }
+
+    const oldPoints = Number(lastThrow.points) || 0;
+    const oldBust = !!lastThrow.bust;
+    const newPoints = oldPoints + delta;
+    if (newPoints < 0 || newPoints > 180) return res.status(400).json({ error: 'Der korrigierte Wurf muss zwischen 0 und 180 liegen.' });
+
+    const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
+    const remainingBeforeThrow = oldBust ? Number(player.remaining || 0) : Number(player.remaining || 0) + oldPoints;
+    const correctedSegment = newPoints === 0 ? 'MISS' : pointsToSegment(newPoints);
+    const correctedBust = !isValidCheckout(remainingBeforeThrow, newPoints, checkoutRule, correctedSegment);
+    lastThrow.points = newPoints;
+    lastThrow.remaining = correctedBust ? remainingBeforeThrow : remainingBeforeThrow - newPoints;
+    lastThrow.bust = correctedBust;
+    lastThrow.segment = correctedSegment;
+    lastThrow.correctedAt = Date.now();
+
+    player.remaining = lastThrow.remaining;
+    player.totalScored = Math.max(0, Number(player.totalScored || 0) - (oldBust ? 0 : oldPoints) + (correctedBust ? 0 : newPoints));
+    player.bestTurn = Math.max(0, ...(Array.isArray(player.throws) ? player.throws.map(item => Number(item.points) || 0) : []));
+    player.average = calculateCurrentRoundAverage(player);
+    if (Number.isFinite(Number(lastThrow.turnId))) restoreCurrentRoundPoints(player, lastThrow.turnId);
+    player.turnScoreRecorded = false;
+    state.game.currentThrow = player.currentRoundPoints.length;
+    state.game.activePlayer = lastThrowPlayer;
+    state.lastAction = { type: 'correction', player: player.name, playerSlot: player.slot, points: newPoints, delta, ts: Date.now(), mode, segment: correctedSegment };
+
+    const saved = await saveLiveState(state);
+    broadcastLiveState(saved);
+    res.json(saved);
+  } catch (err) { res.status(500).json({ error: 'Wurfkorrektur fehlgeschlagen: ' + err.message }); }
+});
+
 // ── Highscores ──
 app.get('/api/highscores', async (_req, res) => {
   try { res.json(await getHighscores(_req.query.gameMode)); }

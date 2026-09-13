@@ -147,19 +147,7 @@
     .encounter-nav button { flex: 1 1 140px; border: 0; background: transparent; color: #777; border-radius: 6px; padding: 8px 12px; cursor: pointer; font: inherit; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
     .encounter-nav button:hover { color: #ddd; }
     .encounter-nav button.active { background: #f4a261; color: #111; }
-    .encounter-filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 0 0 12px; padding: 10px 12px; background: #101010; border: 1px solid #222; border-radius: 10px; }
-    .encounter-filter-bar label { display: flex; flex-direction: column; gap: 4px; font-size: .64rem; text-transform: uppercase; letter-spacing: 1px; color: #777; font-weight: 700; margin: 0; }
-    .encounter-filter-bar select, .encounter-filter-bar input[type="date"] { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; border-radius: 8px; padding: 7px 9px; font-size: .78rem; font-family: inherit; }
-    .encounter-filter-reset { border: 1px solid #2a2a2a; background: #1b1b1b; color: #bbb; border-radius: 8px; padding: 8px 12px; cursor: pointer; font: inherit; font-size: .7rem; font-weight: 700; white-space: nowrap; }
-    .encounter-filter-reset:hover { border-color: #f4a261; color: #f4a261; }
-    .encounter-compact-toggle { flex-direction: row !important; align-items: center; gap: 6px !important; text-transform: none; letter-spacing: 0; font-size: .74rem; color: #bbb; cursor: pointer; margin-left: auto; }
-    .encounter-compact-toggle input { width: auto; }
     .encounter-score-grid { overflow-x: auto; border: 1px solid #262626; border-radius: 10px; }
-    .encounter-score-grid.compact .encounter-table th:nth-child(5), .encounter-score-grid.compact .encounter-table td:nth-child(5),
-    .encounter-score-grid.compact .encounter-table th:nth-child(6), .encounter-score-grid.compact .encounter-table td:nth-child(6),
-    .encounter-score-grid.compact .encounter-table th:nth-child(7), .encounter-score-grid.compact .encounter-table td:nth-child(7) { display: none; }
-    .encounter-score-grid.compact .encounter-table th, .encounter-score-grid.compact .encounter-table td { padding: 5px 8px; font-size: .7rem; }
-    .encounter-score-grid.compact .encounter-table .player-lines span, .encounter-score-grid.compact .encounter-table .metric-lines span { line-height: 1.3; }
     .encounter-table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: .76rem; }
     .encounter-table th { padding: 9px 10px; background: #151515; color: #666; text-align: left; text-transform: uppercase; letter-spacing: 1px; font-size: .6rem; white-space: nowrap; }
     .encounter-table td { padding: 8px 10px; border-top: 1px solid #202020; color: #bbb; vertical-align: middle; white-space: nowrap; }
@@ -194,8 +182,7 @@
     .heatmap-cell strong { color: #f4a261; }
     .encounter-empty { color: #555; text-align: center; padding: 30px 16px; }
     .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-    .metric-card { position: relative; background: #141414; border: 1px solid #1e1e1e; border-radius: 14px; min-width: 0; }
-    .metric-card:hover, .metric-card:focus-within { z-index: 4; }
+    .metric-card { background: #141414; border: 1px solid #1e1e1e; border-radius: 14px; overflow: hidden; min-width: 0; }
     .metric-card h3 { padding: 12px 14px; font-size: .68rem; color: #aaa; text-transform: uppercase; letter-spacing: 1.2px; border-top: 3px solid var(--accent); }
     .metric-list { list-style: none; padding: 4px 14px 10px; }
     .metric-list li { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; padding: 9px 0; border-bottom: 1px solid #1e1e1e; font-size: .78rem; }
@@ -203,34 +190,6 @@
     .metric-rank { color: #666; font-weight: 800; }
     .metric-player { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .metric-value { color: var(--accent); font-weight: 900; font-variant-numeric: tabular-nums; }
-    .metric-value-wrap { position: relative; text-align: right; min-width: 0; }
-    .metric-value-wrap[data-tooltip] { cursor: help; outline: none; }
-    .metric-value-wrap[data-tooltip]::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      z-index: 5;
-      right: 0;
-      bottom: calc(100% + 8px);
-      width: max-content;
-      max-width: 210px;
-      padding: 6px 8px;
-      border: 1px solid #3a3a3a;
-      border-radius: 5px;
-      background: #080808;
-      color: #ccc;
-      box-shadow: 0 6px 18px rgba(0,0,0,.45);
-      font-size: .64rem;
-      font-weight: 500;
-      line-height: 1.35;
-      text-align: left;
-      white-space: normal;
-      pointer-events: none;
-      opacity: 0;
-      transform: translateY(3px);
-      transition: opacity .12s ease, transform .12s ease;
-    }
-    .metric-value-wrap[data-tooltip]:hover::after,
-    .metric-value-wrap[data-tooltip]:focus-visible::after { opacity: 1; transform: translateY(0); }
     .metric-empty { color: #555; padding: 12px 0; font-size: .75rem; }
     .games-section { margin-top: 18px; }
     .game-highscore-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -556,22 +515,6 @@
           <button type="button" data-encounter-category="group" onclick="setEncounterCategory('group')">Begegnungen</button>
           <button type="button" data-encounter-category="tournament" onclick="setEncounterCategory('tournament')">Turniere</button>
         </nav>
-        <div class="encounter-filter-bar">
-          <label>Spiel
-            <select id="encounterModeFilter" aria-label="Nach Spielmodus filtern" onchange="setEncounterMode(this.value)"><option value="all">Alle Modi</option></select>
-          </label>
-          <label>Von
-            <input type="date" id="encounterDateFrom" aria-label="Begegnungen ab Datum" onchange="setEncounterDateRange()" />
-          </label>
-          <label>Bis
-            <input type="date" id="encounterDateTo" aria-label="Begegnungen bis Datum" onchange="setEncounterDateRange()" />
-          </label>
-          <button type="button" class="encounter-filter-reset" onclick="resetEncounterFilters()">Filter zurücksetzen</button>
-          <label class="encounter-compact-toggle">
-            <input type="checkbox" id="encounterCompactToggle" onchange="toggleEncounterCompact(this.checked)" />
-            Kompakte Ansicht
-          </label>
-        </div>
         <div class="encounter-score-grid" id="encounterScoreGrid">
           <div class="encounter-empty">Begegnungen werden geladen...</div>
         </div>
@@ -683,10 +626,6 @@
     let encounterDetail = null;
     let encounterDetailView = 'duel';
     let selectedEncounterCategory = 'duel';
-    let selectedEncounterMode = 'all';
-    let encounterDateFrom = '';
-    let encounterDateTo = '';
-    let encounterCompactView = localStorage.getItem('encounterCompactView') === 'true';
     let renderedScoreGroups = [];
 
     const LIST_LABELS = {
@@ -726,29 +665,14 @@
 
     const METRICS = [
       ['count180', '180er', '#e63946', value => value],
-      ['count171Plus', '171+ Aufnahmen', '#ef476f', value => value],
-      ['count140Plus', '140+ Aufnahmen', '#f78c6b', value => value],
-      ['count100Plus', '100+ Aufnahmen', '#ffd166', value => value],
-      ['checkoutRateSingle', 'Single-Out-Quote', '#f4a261', value => value === null ? '-' : value + '%', item => checkoutMeta(item, 'single')],
-      ['checkoutRateDouble', 'Double-Out-Quote', '#ff7f51', value => value === null ? '-' : value + '%', item => checkoutMeta(item, 'double')],
-      ['checkoutRateMaster', 'Master-Out-Quote', '#e9c46a', value => value === null ? '-' : value + '%', item => checkoutMeta(item, 'master')],
+      ['checkoutRateSingle', 'Single-Out-Quote', '#f4a261', value => value === null ? '-' : value + '%'],
+      ['checkoutRateDouble', 'Double-Out-Quote', '#ff7f51', value => value === null ? '-' : value + '%'],
+      ['checkoutRateMaster', 'Master-Out-Quote', '#e9c46a', value => value === null ? '-' : value + '%'],
       ['threeDartAverage', '3-Dart-Average', '#2a9d8f', value => Number(value).toFixed(1)],
-      ['firstNineAverage', 'Erster-9-AVG', '#e76f51', value => Number(value).toFixed(1), item => item.firstNineSamples + ' gültige Legs'],
+      ['firstNineAverage', 'Erster-9-AVG', '#e76f51', value => Number(value).toFixed(1)],
       ['highestCheckout', 'Höchster Checkout', '#9b5de5', value => value],
-      ['legsPlayed', 'Gespielte Legs', '#457b9d', value => value],
-      ['legWinRate', 'Leg-Siegquote', '#118ab2', value => value === null ? '-' : value + '%', item => item.legsWon + '/' + item.legsPlayed],
-      ['matchesPlayed', 'Gespielte Matches', '#5c7cfa', value => value],
-      ['matchWinRate', 'Match-Siegquote', '#4dabf7', value => value === null ? '-' : value + '%', item => item.matchesWon + '/' + item.matchesPlayed],
-      ['soloMatchesPlayed', 'Solo-Matches', '#90be6d', value => value],
-      ['duelsPlayed', 'Duelle', '#43aa8b', value => value],
-      ['groupMatchesPlayed', 'Gruppenbegegnungen', '#577590', value => value],
-      ['tournamentMatchesPlayed', 'Turniermatches', '#b56576', value => value]
+      ['gamesPlayed', 'Gespielte Spiele', '#457b9d', value => value]
     ];
-
-    function checkoutMeta(item, rule) {
-      const values = item.checkoutByRule && item.checkoutByRule[rule];
-      return values ? values.success + '/' + values.attempts + ' Erfolge/Versuche' : '';
-    }
 
     document.querySelectorAll('.tab').forEach(button => {
       button.addEventListener('click', () => {
@@ -791,77 +715,19 @@
       renderEncounters();
     }
 
-    function populateEncounterModeFilter() {
-      const select = document.getElementById('encounterModeFilter');
-      if (!select) return;
-      const modes = Array.from(new Set(encounters.map(encounter => String(encounter.mode || '')).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
-      select.innerHTML = '<option value="all">Alle Modi</option>' + modes.map(mode => '<option value="' + escapeHtml(mode) + '">' + escapeHtml(mode) + '</option>').join('');
-      select.value = modes.includes(selectedEncounterMode) ? selectedEncounterMode : 'all';
-      selectedEncounterMode = select.value;
-    }
-
-    function setEncounterMode(mode) {
-      selectedEncounterMode = mode;
-      renderEncounters();
-    }
-
-    function setEncounterDateRange() {
-      encounterDateFrom = document.getElementById('encounterDateFrom').value;
-      encounterDateTo = document.getElementById('encounterDateTo').value;
-      renderEncounters();
-    }
-
-    function resetEncounterFilters() {
-      selectedEncounterMode = 'all';
-      encounterDateFrom = '';
-      encounterDateTo = '';
-      document.getElementById('encounterModeFilter').value = 'all';
-      document.getElementById('encounterDateFrom').value = '';
-      document.getElementById('encounterDateTo').value = '';
-      renderEncounters();
-    }
-
-    function toggleEncounterCompact(enabled) {
-      encounterCompactView = !!enabled;
-      localStorage.setItem('encounterCompactView', String(encounterCompactView));
-      document.getElementById('encounterScoreGrid').classList.toggle('compact', encounterCompactView);
-    }
-
-    function getFilteredEncounters() {
-      return encounters.filter(encounter => {
-        if (encounter.category !== selectedEncounterCategory) return false;
-        if (selectedEncounterMode !== 'all' && String(encounter.mode || '') !== selectedEncounterMode) return false;
-        const startedAt = Number(encounter.started_at || 0);
-        if (encounterDateFrom) {
-          const fromTs = new Date(encounterDateFrom + 'T00:00:00').getTime();
-          if (!startedAt || startedAt < fromTs) return false;
-        }
-        if (encounterDateTo) {
-          const toTs = new Date(encounterDateTo + 'T23:59:59.999').getTime();
-          if (!startedAt || startedAt > toTs) return false;
-        }
-        return true;
-      });
-    }
-
     function renderOverview() {
       const grid = document.getElementById('metricGrid');
       const mode = document.getElementById('overviewMode').value;
       const metrics = overviewData && overviewData.metrics;
       if (!metrics) { grid.innerHTML = '<div class="metric-empty">Noch keine Statistikdaten vorhanden.</div>'; return; }
-      grid.innerHTML = METRICS.map(([key, title, accent, format, meta]) => {
+      grid.innerHTML = METRICS.map(([key, title, accent, format]) => {
         const rows = (metrics[key] || [])
           .filter(item => mode === 'gesamt' ? item.mode === 'gesamt' : item.mode === mode)
           .filter(item => selectedOverviewCategory === 'all' ? (mode === 'gesamt' ? item.category === 'all' : true) : item.category === selectedOverviewCategory)
           .filter(item => selectedOverviewPlayer === 'all' || String(item.profileId) === selectedOverviewPlayer)
           .slice(0, 3);
-        const tooltip = key.startsWith('checkoutRate') ? 'Versuch = Dart bei einem regelkonform in maximal drei Darts checkbaren Rest; Bogey-Reste sind ausgeschlossen.' : '';
-        return '<article class="metric-card" style="--accent:' + accent + '"' + (tooltip ? ' title="' + escapeHtml(tooltip) + '"' : '') + '><h3>' + title + '</h3><ol class="metric-list">' +
-          (rows.length ? rows.map((item, index) => {
-            const hint = meta ? String(meta(item) || '').trim() : '';
-            const hintAttributes = hint ? ' data-tooltip="' + escapeHtml(hint) + '" tabindex="0" aria-label="' + escapeHtml(format(item[key]) + ', ' + hint) + '"' : '';
-            return '<li><span class="metric-rank">' + (index + 1) + '</span><span class="metric-player">' + escapeHtml(item.player) + '</span><span class="metric-value-wrap"' + hintAttributes + '><span class="metric-value">' + format(item[key]) + '</span></span></li>';
-          }).join('') : '<li class="metric-empty">Noch keine Daten</li>') +
+        return '<article class="metric-card" style="--accent:' + accent + '"><h3>' + title + '</h3><ol class="metric-list">' +
+          (rows.length ? rows.map((item, index) => '<li><span class="metric-rank">' + (index + 1) + '</span><span class="metric-player">' + escapeHtml(item.player) + '</span><span class="metric-value">' + format(item[key]) + '</span></li>').join('') : '<li class="metric-empty">Noch keine Daten</li>') +
           '</ol></article>';
       }).join('');
     }
@@ -900,18 +766,17 @@
 
     function renderEncounters() {
       const grid = document.getElementById('encounterScoreGrid');
-      grid.classList.toggle('compact', encounterCompactView);
       if (!encounters.length) {
         grid.innerHTML = '<div class="encounter-empty">Noch keine Duelle oder Gruppen-Begegnungen gespeichert.</div>';
         return;
       }
-      const visible = getFilteredEncounters();
-      if (!visible.length) { grid.innerHTML = '<div class="encounter-empty">Keine Begegnungen für die aktuellen Filter.</div>'; return; }
+      const visible = encounters.filter(encounter => encounter.category === selectedEncounterCategory);
+      if (!visible.length) { grid.innerHTML = '<div class="encounter-empty">Noch keine Einträge in dieser Kategorie.</div>'; return; }
       grid.innerHTML = '<table class="encounter-table"><thead><tr><th>Begegnung</th><th>Spieler</th><th>Legs</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Checkout</th><th>Sieger</th><th>Details</th></tr></thead><tbody>' + visible.map(encounter => {
         const stats = aggregateEncounterPlayers(encounter);
         const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
         const lines = field => stats.map(player => '<span>' + field(player) + '</span>').join('');
-        return '<tr><td><div class="encounter-kind">' + escapeHtml(encounter.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(encounter.mode) + '</div><div class="encounter-id" title="Begegnung #' + Number(encounter.id) + '">' + escapeHtml(formatTime(encounter.started_at)) + ' · ' + escapeHtml(encounter.status || '') + '</div></td>' +
+        return '<tr><td><div class="encounter-kind">' + escapeHtml(encounter.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(encounter.mode) + '</div><div class="encounter-id">#' + Number(encounter.id) + ' · ' + escapeHtml(encounter.status || '') + '</div></td>' +
           '<td class="player-lines">' + lines(player => escapeHtml(player.name)) + '</td><td>' + Number(encounter.total_legs || 0) + '</td>' +
           '<td class="metric-lines">' + lines(player => formatMetric(player.average)) + '</td><td class="metric-lines">' + lines(player => formatMetric(player.firstNineAvg)) + '</td>' +
           '<td class="metric-lines">' + lines(player => String(player.turns)) + '</td><td class="metric-lines">' + lines(player => player.checkoutSuccess + '/' + player.checkoutAttempts + ' · ' + (player.highestCheckout || '-')) + '</td>' +
@@ -948,7 +813,7 @@
         const response = await fetch('/api/duels/' + encodeURIComponent(id), { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounterDetail = await response.json();
-        document.getElementById('encounterDialogTitle').textContent = (encounterDetail.categoryLabel || 'Begegnung') + ' · ' + encounterDetail.mode + ' · ' + formatTime(encounterDetail.started_at);
+        document.getElementById('encounterDialogTitle').textContent = (encounterDetail.categoryLabel || 'Begegnung') + ' · ' + encounterDetail.mode + ' #' + encounterDetail.id;
         renderEncounterDetail();
       } catch (_error) { document.getElementById('encounterDialogContent').innerHTML = '<div class="encounter-empty">Begegnungsdaten konnten nicht geladen werden.</div>'; }
     }
@@ -996,10 +861,9 @@
 
     async function loadEncounters() {
       try {
-        const response = await fetch('/api/duels?limit=300&status=finished', { cache: 'no-store' });
+        const response = await fetch('/api/duels?limit=100&status=finished', { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounters = await response.json();
-        populateEncounterModeFilter();
         renderEncounters();
       } catch (_error) {
         document.getElementById('encounterScoreGrid').innerHTML = '<div class="encounter-empty">Begegnungen konnten nicht geladen werden.</div>';
@@ -1333,9 +1197,6 @@
       if (event.key === 'Escape') closeEncounterDialog();
     });
     document.getElementById('refreshBtn').addEventListener('click', () => loadScores());
-
-    document.getElementById('encounterCompactToggle').checked = encounterCompactView;
-    document.getElementById('encounterScoreGrid').classList.toggle('compact', encounterCompactView);
 
     loadScores();
     loadOverview();
