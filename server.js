@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { DataStore } = require('./db');
 const { aggregateDuelStats } = require('./lib/duel-stats');
 const { addDerivedMetrics, percentage, resolvePlayerIdentity } = require('./lib/highscore-overview');
+const { removeLatestThrow, correctLatestThrow } = require('./lib/live-throws');
 const {
   GAME_MODES,
   CHECKOUT_RULES,
@@ -1426,14 +1427,6 @@ function queueArduinoProcessing(task, generation = liveLifecycleGeneration) {
 function advanceLiveTurn(state) {
   state.game.turnId = Math.max(1, Number(state.game.turnId || 1) + 1);
   return state.game.turnId;
-}
-
-function restoreCurrentRoundPoints(player, turnId) {
-  const throws = Array.isArray(player.throws) ? player.throws : [];
-  player.currentRoundPoints = throws
-    .filter(item => Number(item && item.turnId) === Number(turnId) && item.source !== 'manual-miss')
-    .map(item => Number(item.points) || 0);
-  player.turnScoreRecorded = false;
 }
 
 async function recordPlayerLegStats(player, state, options = {}) {
@@ -3926,52 +3919,15 @@ app.post('/api/live/undo', async (req, res) => {
     cancelScheduledAutoAdvance();
     const state = await getLiveState();
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
-    let lastThrowTime = 0, lastThrowPlayer = -1, lastThrowIndex = -1;
-
-    state.players.forEach((player, idx) => {
-      const throws = Array.isArray(player.throws) ? player.throws : [];
-      for (let throwIndex = throws.length - 1; throwIndex >= 0; throwIndex -= 1) {
-        const candidate = throws[throwIndex];
-        if (candidate && candidate.source === 'manual-miss') continue;
-        if (candidate && Number(candidate.ts || 0) > lastThrowTime) {
-          lastThrowTime = Number(candidate.ts || 0);
-          lastThrowPlayer = idx;
-          lastThrowIndex = throwIndex;
-        }
-        break;
-      }
-    });
-
-    if (lastThrowPlayer === -1) return res.status(400).json({ error: 'Kein Wurf zum Rückgängigmachen vorhanden.' });
-
-    const player = state.players[lastThrowPlayer];
-    const lastThrow = player.throws.splice(lastThrowIndex, 1)[0];
-
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     const isCricket = modeDef.type === 'cricket';
+    const result = removeLatestThrow(state, { isCricket, calculateAverage: calculateCurrentRoundAverage });
+    if (!result) return res.status(400).json({ error: 'Kein Wurf zum Rückgängigmachen vorhanden.' });
 
-    if (isCricket) {
-      player.totalScored = Math.max(0, Number(player.totalScored || 0) - lastThrow.points);
-    } else {
-      if (!lastThrow.bust) { player.remaining += lastThrow.points; player.totalScored -= lastThrow.points; }
-    }
-    player.turns = Math.max(0, player.turns - 1);
-    player.average = calculateCurrentRoundAverage(player);
-
-    if (Number.isFinite(Number(lastThrow.turnId))) {
-      restoreCurrentRoundPoints(player, lastThrow.turnId);
-    } else if (Array.isArray(player.currentRoundPoints) && player.currentRoundPoints.length > 0) {
-      player.currentRoundPoints.pop();
-      player.turnScoreRecorded = false;
-    } else {
-      player.currentRoundPoints = [];
-      player.turnScoreRecorded = false;
-    }
-
-    state.game.currentThrow = player.currentRoundPoints.length;
-    state.game.activePlayer = lastThrowPlayer;
-    state.lastAction = { type: 'undo', player: player.name, points: lastThrow.points, ts: Date.now() };
+    state.game.currentThrow = result.player.currentRoundPoints.length;
+    state.game.activePlayer = result.playerIndex;
+    state.lastAction = { type: 'undo', player: result.player.name, points: result.throwData.points, ts: Date.now() };
 
     const saved = await saveLiveState(state);
     broadcastLiveState(saved);
@@ -3990,54 +3946,23 @@ app.post('/api/live/correct-last', async (req, res) => {
     const state = await getLiveState();
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
 
-    let lastThrowTime = 0, lastThrowPlayer = -1, lastThrowIndex = -1;
-    state.players.forEach((player, idx) => {
-      const throws = Array.isArray(player.throws) ? player.throws : [];
-      for (let throwIndex = throws.length - 1; throwIndex >= 0; throwIndex -= 1) {
-        const candidate = throws[throwIndex];
-        if (candidate && candidate.source === 'manual-miss') continue;
-        if (candidate && Number(candidate.ts || 0) > lastThrowTime) {
-          lastThrowTime = Number(candidate.ts || 0);
-          lastThrowPlayer = idx;
-          lastThrowIndex = throwIndex;
-        }
-        break;
-      }
-    });
-
-    if (lastThrowPlayer === -1) return res.status(400).json({ error: 'Kein Wurf zum Korrigieren vorhanden.' });
-    const player = state.players[lastThrowPlayer];
-    const lastThrow = player.throws[lastThrowIndex];
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     if (modeDef.type === 'cricket' || modeDef.type === 'elimination') {
       return res.status(400).json({ error: 'Diese Korrektur ist für diesen Spielmodus noch nicht verfügbar.' });
     }
 
-    const oldPoints = Number(lastThrow.points) || 0;
-    const oldBust = !!lastThrow.bust;
-    const newPoints = oldPoints + delta;
-    if (newPoints < 0 || newPoints > 180) return res.status(400).json({ error: 'Der korrigierte Wurf muss zwischen 0 und 180 liegen.' });
+    const correction = correctLatestThrow(state, delta, {
+      checkoutRule: state.game.checkoutRule || DEFAULT_CHECKOUT_RULE,
+      isValidCheckout,
+      pointsToSegment,
+      calculateAverage: calculateCurrentRoundAverage
+    });
+    if (correction.error) return res.status(400).json({ error: correction.error });
 
-    const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
-    const remainingBeforeThrow = oldBust ? Number(player.remaining || 0) : Number(player.remaining || 0) + oldPoints;
-    const correctedSegment = newPoints === 0 ? 'MISS' : pointsToSegment(newPoints);
-    const correctedBust = !isValidCheckout(remainingBeforeThrow, newPoints, checkoutRule, correctedSegment);
-    lastThrow.points = newPoints;
-    lastThrow.remaining = correctedBust ? remainingBeforeThrow : remainingBeforeThrow - newPoints;
-    lastThrow.bust = correctedBust;
-    lastThrow.segment = correctedSegment;
-    lastThrow.correctedAt = Date.now();
-
-    player.remaining = lastThrow.remaining;
-    player.totalScored = Math.max(0, Number(player.totalScored || 0) - (oldBust ? 0 : oldPoints) + (correctedBust ? 0 : newPoints));
-    player.bestTurn = Math.max(0, ...(Array.isArray(player.throws) ? player.throws.map(item => Number(item.points) || 0) : []));
-    player.average = calculateCurrentRoundAverage(player);
-    if (Number.isFinite(Number(lastThrow.turnId))) restoreCurrentRoundPoints(player, lastThrow.turnId);
-    player.turnScoreRecorded = false;
-    state.game.currentThrow = player.currentRoundPoints.length;
-    state.game.activePlayer = lastThrowPlayer;
-    state.lastAction = { type: 'correction', player: player.name, playerSlot: player.slot, points: newPoints, delta, ts: Date.now(), mode, segment: correctedSegment };
+    state.game.currentThrow = correction.player.currentRoundPoints.length;
+    state.game.activePlayer = correction.playerIndex;
+    state.lastAction = { type: 'correction', player: correction.player.name, playerSlot: correction.player.slot, points: correction.newPoints, delta, ts: Date.now(), mode, segment: correction.correctedSegment };
 
     const saved = await saveLiveState(state);
     broadcastLiveState(saved);
