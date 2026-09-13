@@ -141,6 +141,7 @@ class DataStore {
     await this.ensureCheckoutStatsVersion();
     await this.ensureStatisticsAccuracySchema();
     await this.ensureThrowSegmentSchema();
+    await this.ensureThrowCorrectionSchema();
     await this.ensurePersistenceColumns();
     await this.ensureSeasonSchema();
     await this.ensurePerformanceIndexes();
@@ -320,6 +321,40 @@ class DataStore {
       try { await this.my.query("ALTER TABLE player_throw_segments ADD COLUMN season VARCHAR(32) NOT NULL DEFAULT '2026'"); } catch (_err) { }
       try { await this.my.query('CREATE INDEX idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at)'); } catch (_err) { }
     }
+  }
+
+  async ensureThrowCorrectionSchema() {
+    const sqlite = `
+      CREATE TABLE IF NOT EXISTS throw_corrections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_slot INTEGER NOT NULL,
+        turn_id INTEGER,
+        duel_id INTEGER,
+        original_points INTEGER NOT NULL,
+        corrected_points INTEGER NOT NULL,
+        delta INTEGER NOT NULL,
+        original_remaining INTEGER,
+        corrected_remaining INTEGER,
+        original_bust INTEGER NOT NULL DEFAULT 0,
+        corrected_bust INTEGER NOT NULL DEFAULT 0,
+        original_segment TEXT,
+        corrected_segment TEXT,
+        source TEXT,
+        corrected_at INTEGER NOT NULL,
+        season TEXT NOT NULL DEFAULT '2026'
+      );
+      CREATE INDEX IF NOT EXISTS idx_throw_corrections_player ON throw_corrections (player_slot, corrected_at);
+    `;
+    const postgres = sqlite.replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'BIGSERIAL PRIMARY KEY').replace(/INTEGER NOT NULL DEFAULT 0/g, 'INTEGER NOT NULL DEFAULT 0').replace(/INTEGER NOT NULL/g, 'INTEGER NOT NULL');
+    const mysql = sqlite
+      .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/g, 'BIGINT PRIMARY KEY AUTO_INCREMENT')
+      .replace(/TEXT/g, 'VARCHAR(64)')
+      .replace(/INTEGER NOT NULL DEFAULT 0/g, 'TINYINT NOT NULL DEFAULT 0')
+      .replace(/INTEGER NOT NULL/g, 'INT NOT NULL')
+      .replace(/INTEGER/g, 'BIGINT');
+    if (this.isSQLite()) await this.sqlite.exec(sqlite);
+    else if (this.isPostgres()) await this.pg.query(postgres);
+    else await this.my.query(mysql);
   }
 
   async ensureDuelSchema() {
@@ -1418,6 +1453,30 @@ class DataStore {
     if (this.isSQLite()) await this.sqlite.run(sql, values);
     else if (this.isPostgres()) await this.pg.query(sql, values);
     else await this.my.query(sql, values);
+  }
+
+  async recordThrowCorrection(correction) {
+    const values = [
+      Number(correction.playerSlot),
+      Number(correction.turnId) > 0 ? Number(correction.turnId) : null,
+      Number(correction.duelId) > 0 ? Number(correction.duelId) : null,
+      Number(correction.originalPoints || 0),
+      Number(correction.correctedPoints || 0),
+      Number(correction.delta || 0),
+      Number.isFinite(Number(correction.originalRemaining)) ? Number(correction.originalRemaining) : null,
+      Number.isFinite(Number(correction.correctedRemaining)) ? Number(correction.correctedRemaining) : null,
+      correction.originalBust ? 1 : 0,
+      correction.correctedBust ? 1 : 0,
+      correction.originalSegment ? String(correction.originalSegment) : null,
+      correction.correctedSegment ? String(correction.correctedSegment) : null,
+      correction.source ? String(correction.source) : 'live-correction',
+      Number(correction.correctedAt) || Date.now(),
+      correction.season || DEFAULT_STATS_SEASON
+    ];
+    const columns = 'player_slot, turn_id, duel_id, original_points, corrected_points, delta, original_remaining, corrected_remaining, original_bust, corrected_bust, original_segment, corrected_segment, source, corrected_at, season';
+    if (this.isSQLite()) await this.sqlite.run(`INSERT INTO throw_corrections (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
+    else if (this.isPostgres()) await this.pg.query(`INSERT INTO throw_corrections (${columns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`, values);
+    else await this.my.query(`INSERT INTO throw_corrections (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
   }
 
   async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON, duelLegId = null) {

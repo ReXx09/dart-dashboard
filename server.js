@@ -3977,6 +3977,25 @@ app.post('/api/live/correct-last', async (req, res) => {
     state.lastAction = { type: 'correction', player: correction.player.name, playerSlot: correction.player.slot, points: correction.newPoints, delta, ts: Date.now(), mode, segment: correction.correctedSegment };
 
     const saved = await saveLiveState(state);
+    queueLiveDetailWrite(
+      () => dataStore.recordThrowCorrection({
+        playerSlot: correction.player.slot,
+        turnId: correction.throwData.turnId,
+        duelId: state.game.duelId,
+        originalPoints: correction.oldPoints,
+        correctedPoints: correction.newPoints,
+        delta,
+        originalRemaining: correction.oldRemaining,
+        correctedRemaining: correction.correctedRemaining,
+        originalBust: correction.oldBust,
+        correctedBust: correction.correctedBust,
+        originalSegment: correction.oldSegment,
+        correctedSegment: correction.correctedSegment,
+        correctedAt: state.lastAction.ts,
+        season: DEFAULT_STATS_SEASON
+      }),
+      'Wurfkorrektur'
+    );
     broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Wurfkorrektur fehlgeschlagen: ' + err.message }); }

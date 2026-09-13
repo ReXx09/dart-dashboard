@@ -49,3 +49,53 @@ test('Wurfdetails speichern Aufnahme, Restscore und Quelle', async () => {
     for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
   }
 });
+
+test('Wurfkorrekturen speichern Vorher- und Nachher-Werte', async () => {
+  const sqliteFile = path.join(os.tmpdir(), `dart-dashboard-corrections-${process.pid}-${Date.now()}.db`);
+  const previousClient = process.env.DB_CLIENT;
+  const previousFile = process.env.DB_SQLITE_FILE;
+  process.env.DB_CLIENT = 'sqlite';
+  process.env.DB_SQLITE_FILE = sqliteFile;
+  const store = new DataStore();
+
+  try {
+    await store.init({});
+    await store.recordThrowCorrection({
+      playerSlot: 1,
+      turnId: 4,
+      duelId: 7,
+      originalPoints: 60,
+      correctedPoints: 55,
+      delta: -5,
+      originalRemaining: 441,
+      correctedRemaining: 446,
+      originalBust: false,
+      correctedBust: false,
+      originalSegment: 'T20',
+      correctedSegment: 'S55',
+      correctedAt: 5678,
+      season: '2026'
+    });
+
+    const row = await store.sqlite.get('SELECT player_slot, turn_id, duel_id, original_points, corrected_points, delta, original_remaining, corrected_remaining, original_segment, corrected_segment, source, corrected_at FROM throw_corrections');
+    assert.deepEqual(row, {
+      player_slot: 1,
+      turn_id: 4,
+      duel_id: 7,
+      original_points: 60,
+      corrected_points: 55,
+      delta: -5,
+      original_remaining: 441,
+      corrected_remaining: 446,
+      original_segment: 'T20',
+      corrected_segment: 'S55',
+      source: 'live-correction',
+      corrected_at: 5678
+    });
+  } finally {
+    if (store.sqlite) await store.sqlite.close();
+    if (previousClient === undefined) delete process.env.DB_CLIENT; else process.env.DB_CLIENT = previousClient;
+    if (previousFile === undefined) delete process.env.DB_SQLITE_FILE; else process.env.DB_SQLITE_FILE = previousFile;
+    for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
+  }
+});
