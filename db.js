@@ -58,13 +58,14 @@ function getThrowCorrectionValues(correction) {
     correction.correctedBust ? 1 : 0,
     correction.originalSegment ? String(correction.originalSegment) : null,
     correction.correctedSegment ? String(correction.correctedSegment) : null,
+    correction.action ? String(correction.action) : 'correction',
     correction.source ? String(correction.source) : 'live-correction',
     Number(correction.correctedAt) || Date.now(),
     correction.season || DEFAULT_STATS_SEASON
   ];
 }
 
-const THROW_CORRECTION_COLUMNS = 'player_slot, turn_id, duel_id, original_points, corrected_points, delta, original_remaining, corrected_remaining, original_bust, corrected_bust, original_segment, corrected_segment, source, corrected_at, season';
+const THROW_CORRECTION_COLUMNS = 'player_slot, turn_id, duel_id, original_points, corrected_points, delta, original_remaining, corrected_remaining, original_bust, corrected_bust, original_segment, corrected_segment, action, source, corrected_at, season';
 
 class DataStore {
   constructor() {
@@ -361,6 +362,7 @@ class DataStore {
         corrected_bust INTEGER NOT NULL DEFAULT 0,
         original_segment TEXT,
         corrected_segment TEXT,
+        action TEXT NOT NULL DEFAULT 'correction',
         source TEXT,
         corrected_at INTEGER NOT NULL,
         season TEXT NOT NULL DEFAULT '2026'
@@ -377,6 +379,20 @@ class DataStore {
     if (this.isSQLite()) await this.sqlite.exec(sqlite);
     else if (this.isPostgres()) await this.pg.query(postgres);
     else await this.my.query(mysql);
+    const alterQueries = this.isSQLite()
+      ? ['ALTER TABLE throw_corrections ADD COLUMN action TEXT NOT NULL DEFAULT \'correction\'']
+      : this.isPostgres()
+        ? ["ALTER TABLE throw_corrections ADD COLUMN IF NOT EXISTS action TEXT NOT NULL DEFAULT 'correction'"]
+        : ["ALTER TABLE throw_corrections ADD COLUMN action VARCHAR(64) NOT NULL DEFAULT 'correction'"];
+    for (const query of alterQueries) {
+      try {
+        if (this.isSQLite()) await this.sqlite.run(query);
+        else if (this.isPostgres()) await this.pg.query(query);
+        else await this.my.query(query);
+      } catch (error) {
+        if (!/duplicate|already exists/i.test(String(error.message || ''))) throw error;
+      }
+    }
   }
 
   async ensureDuelSchema() {
@@ -1479,9 +1495,9 @@ class DataStore {
 
   async recordThrowCorrection(correction) {
     const values = getThrowCorrectionValues(correction);
-    if (this.isSQLite()) await this.sqlite.run(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
-    else if (this.isPostgres()) await this.pg.query(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`, values);
-    else await this.my.query(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
+    if (this.isSQLite()) await this.sqlite.run(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
+    else if (this.isPostgres()) await this.pg.query(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`, values);
+    else await this.my.query(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
   }
 
   async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON, duelLegId = null) {
@@ -1803,8 +1819,8 @@ class DataStore {
     const payload = JSON.stringify(state);
     const updatedAt = Date.now();
     const correctionValues = getThrowCorrectionValues(correction);
-    const sqliteCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const postgresCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`;
+    const sqliteCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const postgresCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`;
 
     if (this.isSQLite()) {
       await this.sqlite.exec('BEGIN IMMEDIATE');
@@ -1848,6 +1864,63 @@ class DataStore {
         'INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)',
         [payload, updatedAt]
       );
+      await connection.query(sqliteCorrection, correctionValues);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async saveLiveStateWithUndo(state, undo) {
+    const payload = JSON.stringify(state);
+    const updatedAt = Date.now();
+    const correctionValues = getThrowCorrectionValues({
+      ...undo,
+      action: 'undo',
+      source: undo.source || 'live-undo'
+    });
+    const sqliteCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const postgresCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`;
+
+    if (this.isSQLite()) {
+      await this.sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        await this.sqlite.run('DELETE FROM player_throw_segments WHERE player_slot = ? AND thrown_at = ? AND (? IS NULL OR duel_id = ?)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null, Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
+        await this.sqlite.run('INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at', [payload, updatedAt]);
+        await this.sqlite.run(sqliteCorrection, correctionValues);
+        await this.sqlite.exec('COMMIT');
+      } catch (error) {
+        await this.sqlite.exec('ROLLBACK');
+        throw error;
+      }
+      return;
+    }
+
+    if (this.isPostgres()) {
+      const client = await this.pg.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM player_throw_segments WHERE player_slot = $1 AND thrown_at = $2 AND ($3 IS NULL OR duel_id = $3)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
+        await client.query('INSERT INTO live_state (id, payload, updated_at) VALUES (1, $1, $2) ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at', [payload, updatedAt]);
+        await client.query(postgresCorrection, correctionValues);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+      return;
+    }
+
+    const connection = await this.my.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query('DELETE FROM player_throw_segments WHERE player_slot = ? AND thrown_at = ? AND (? IS NULL OR duel_id = ?)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null, Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
+      await connection.query('INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)', [payload, updatedAt]);
       await connection.query(sqliteCorrection, correctionValues);
       await connection.commit();
     } catch (error) {

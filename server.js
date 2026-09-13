@@ -3941,7 +3941,28 @@ app.post('/api/live/undo', async (req, res) => {
     state.game.activePlayer = result.playerIndex;
     state.lastAction = { type: 'undo', player: result.player.name, points: result.throwData.points, ts: Date.now() };
 
-    const saved = await saveLiveState(state);
+    const undoRecord = {
+      playerSlot: result.player.slot,
+      turnId: result.throwData.turnId,
+      duelId: state.game.duelId,
+      thrownAt: result.throwData.ts,
+      originalPoints: result.throwData.points,
+      correctedPoints: 0,
+      delta: -Number(result.throwData.points || 0),
+      originalRemaining: result.throwData.remaining,
+      correctedRemaining: result.player.remaining,
+      originalBust: result.throwData.bust,
+      correctedBust: false,
+      originalSegment: result.throwData.segment,
+      correctedSegment: null,
+      correctedAt: state.lastAction.ts
+    };
+    const saved = typeof dataStore.saveLiveStateWithUndo === 'function'
+      ? await dataStore.saveLiveStateWithUndo(state, undoRecord).then(() => state)
+      : await saveLiveState(state);
+    if (typeof dataStore.saveLiveStateWithUndo !== 'function') {
+      queueLiveDetailWrite(() => dataStore.recordThrowCorrection(undoRecord), 'Wurf-Undo');
+    }
     broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Undo fehlgeschlagen: ' + err.message }); }

@@ -130,3 +130,50 @@ test('Live-State und Korrektur werden atomar gespeichert', async () => {
     for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
   }
 });
+
+test('Undo entfernt Wurfprojektion und schreibt Undo-Audit atomar', async () => {
+  const sqliteFile = path.join(os.tmpdir(), `dart-dashboard-undo-${process.pid}-${Date.now()}.db`);
+  const previousClient = process.env.DB_CLIENT;
+  const previousFile = process.env.DB_SQLITE_FILE;
+  process.env.DB_CLIENT = 'sqlite';
+  process.env.DB_SQLITE_FILE = sqliteFile;
+  const store = new DataStore();
+
+  try {
+    await store.init({});
+    await store.recordThrowSegments([{
+      playerSlot: 1,
+      segment: 'T20',
+      points: 60,
+      mode: '501',
+      thrownAt: 1234,
+      duelId: 7,
+      turnId: 4,
+      remaining: 441,
+      source: 'manual'
+    }]);
+    await store.saveLiveStateWithUndo({ game: { mode: '501' }, players: [], lastAction: { type: 'undo' } }, {
+      playerSlot: 1,
+      thrownAt: 1234,
+      duelId: 7,
+      turnId: 4,
+      originalPoints: 60,
+      correctedPoints: 0,
+      delta: -60,
+      originalRemaining: 441,
+      correctedRemaining: 501,
+      originalSegment: 'T20',
+      correctedAt: 6789
+    });
+
+    const segmentCount = await store.sqlite.get('SELECT COUNT(*) AS count FROM player_throw_segments');
+    const audit = await store.sqlite.get('SELECT action, original_points, corrected_points, source FROM throw_corrections');
+    assert.equal(Number(segmentCount.count), 0);
+    assert.deepEqual(audit, { action: 'undo', original_points: 60, corrected_points: 0, source: 'live-undo' });
+  } finally {
+    if (store.sqlite) await store.sqlite.close();
+    if (previousClient === undefined) delete process.env.DB_CLIENT; else process.env.DB_CLIENT = previousClient;
+    if (previousFile === undefined) delete process.env.DB_SQLITE_FILE; else process.env.DB_SQLITE_FILE = previousFile;
+    for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
+  }
+});
