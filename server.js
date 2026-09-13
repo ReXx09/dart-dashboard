@@ -3811,13 +3811,6 @@ app.post('/api/live/throw', async (req, res) => {
       ? req.body.source.trim()
       : 'manual';
     player.throws.push({ points, remaining: player.remaining, bust, ts: thrownAt, mode, segment: throwSegment, turnId: state.game.turnId || 1, source: throwSource });
-    queueLiveThrowSegment(player.slot, throwSegment, points, mode, bust, thrownAt, state.game.duelId, {
-      duelLegId: state.game.duelLegId,
-      turnId: state.game.turnId || 1,
-      remaining: player.remaining,
-      source: throwSource
-    });
-
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
 
@@ -3881,7 +3874,26 @@ app.post('/api/live/throw', async (req, res) => {
     }
 
     if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
-    const saved = await saveLiveState(state);
+    const throwRecord = {
+      playerSlot: player.slot,
+      segment: throwSegment,
+      points,
+      mode,
+      bust,
+      thrownAt,
+      duelId: state.game.duelId,
+      duelLegId: state.game.duelLegId,
+      turnId: state.game.turnId || 1,
+      remaining: player.remaining,
+      source: throwSource,
+      season: DEFAULT_STATS_SEASON
+    };
+    const saved = typeof dataStore.saveLiveStateWithThrow === 'function'
+      ? await dataStore.saveLiveStateWithThrow(state, throwRecord).then(() => state)
+      : await saveLiveState(state);
+    if (typeof dataStore.saveLiveStateWithThrow !== 'function') {
+      queueLiveDetailWrite(() => dataStore.recordThrowSegments([throwRecord]), 'Wurfdetail');
+    }
     broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Wurf konnte nicht gespeichert werden: ' + err.message }); }

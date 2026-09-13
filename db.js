@@ -1815,6 +1815,70 @@ class DataStore {
     );
   }
 
+  async saveLiveStateWithThrow(state, throwData) {
+    const payload = JSON.stringify(state);
+    const updatedAt = Date.now();
+    const values = [
+      Number(throwData.playerSlot),
+      String(throwData.segment || 'MISS').toUpperCase(),
+      Number(throwData.points || 0),
+      throwData.mode ? String(throwData.mode) : null,
+      throwData.bust ? 1 : 0,
+      Number(throwData.thrownAt) || Date.now(),
+      Number(throwData.duelId) > 0 ? Number(throwData.duelId) : null,
+      Number(throwData.duelLegId) > 0 ? Number(throwData.duelLegId) : null,
+      Number(throwData.turnId) > 0 ? Number(throwData.turnId) : null,
+      Number.isFinite(Number(throwData.remaining)) ? Number(throwData.remaining) : null,
+      throwData.source ? String(throwData.source) : null,
+      throwData.season || DEFAULT_STATS_SEASON
+    ];
+    const columns = 'player_slot, segment, points, mode, bust, thrown_at, duel_id, duel_leg_id, turn_id, remaining, source, season';
+    const sqliteThrow = `INSERT INTO player_throw_segments (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const postgresThrow = `INSERT INTO player_throw_segments (${columns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`;
+
+    if (this.isSQLite()) {
+      await this.sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        await this.sqlite.run('INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at', [payload, updatedAt]);
+        await this.sqlite.run(sqliteThrow, values);
+        await this.sqlite.exec('COMMIT');
+      } catch (error) {
+        await this.sqlite.exec('ROLLBACK');
+        throw error;
+      }
+      return;
+    }
+
+    if (this.isPostgres()) {
+      const client = await this.pg.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('INSERT INTO live_state (id, payload, updated_at) VALUES (1, $1, $2) ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at', [payload, updatedAt]);
+        await client.query(postgresThrow, values);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+      return;
+    }
+
+    const connection = await this.my.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query('INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)', [payload, updatedAt]);
+      await connection.query(sqliteThrow, values);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   async saveLiveStateWithCorrection(state, correction) {
     const payload = JSON.stringify(state);
     const updatedAt = Date.now();

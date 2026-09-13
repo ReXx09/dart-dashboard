@@ -177,3 +177,40 @@ test('Undo entfernt Wurfprojektion und schreibt Undo-Audit atomar', async () => 
     for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
   }
 });
+
+test('Normaler Wurf und Live-State werden atomar gespeichert', async () => {
+  const sqliteFile = path.join(os.tmpdir(), `dart-dashboard-throw-atomic-${process.pid}-${Date.now()}.db`);
+  const previousClient = process.env.DB_CLIENT;
+  const previousFile = process.env.DB_SQLITE_FILE;
+  process.env.DB_CLIENT = 'sqlite';
+  process.env.DB_SQLITE_FILE = sqliteFile;
+  const store = new DataStore();
+
+  try {
+    await store.init({});
+    const state = { game: { mode: '501' }, players: [{ slot: 1, remaining: 441 }], lastAction: { type: 'throw' } };
+    await store.saveLiveStateWithThrow(state, {
+      playerSlot: 1,
+      segment: 'T20',
+      points: 60,
+      mode: '501',
+      bust: false,
+      thrownAt: 1234,
+      duelId: 7,
+      duelLegId: 3,
+      turnId: 4,
+      remaining: 441,
+      source: 'manual'
+    });
+
+    const savedState = await store.getLiveState(null);
+    const segment = await store.sqlite.get('SELECT player_slot, points, duel_id, duel_leg_id, turn_id, remaining, source FROM player_throw_segments');
+    assert.deepEqual(savedState, state);
+    assert.deepEqual(segment, { player_slot: 1, points: 60, duel_id: 7, duel_leg_id: 3, turn_id: 4, remaining: 441, source: 'manual' });
+  } finally {
+    if (store.sqlite) await store.sqlite.close();
+    if (previousClient === undefined) delete process.env.DB_CLIENT; else process.env.DB_CLIENT = previousClient;
+    if (previousFile === undefined) delete process.env.DB_SQLITE_FILE; else process.env.DB_SQLITE_FILE = previousFile;
+    for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
+  }
+});

@@ -45,7 +45,7 @@ Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnun
 
 - [x] Datenbanktabellen für Würfe und Aufnahmen prüfen oder ergänzen.
 - [ ] Datenbankmigration für fehlende Felder erstellen.
-- [ ] Neue Würfe atomar in der Datenbank speichern.
+- [x] Neue Würfe atomar in der Datenbank speichern.
 - [ ] Aufnahmeabschluss und Legabschluss aus den Wurf-Daten ableiten.
 - [x] Korrekturen transaktional speichern.
 - [ ] Prüfen, ob eine Korrektur bereits gespeicherte Statistikwerte aktualisieren muss.
