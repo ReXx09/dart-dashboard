@@ -25,7 +25,7 @@ Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnun
 - [ ] Entitäten festlegen: Spieler, Begegnung, Leg, Aufnahme und Wurf.
 - [ ] Pflichtfelder für jeden Wurf definieren: `matchId`, `legId`, `turnId`, `playerSlot`, `points`, `segment`, `bust`, `remaining`, `source`, `ts`.
 - [ ] Regeln für Fehlwürfe, automatische Würfe und manuelle Würfe vereinheitlichen.
-- [ ] Korrekturen nachvollziehbar modellieren: ursprünglicher Wert, Delta, neuer Wert, Zeitpunkt und Quelle.
+- [x] Korrekturen nachvollziehbar modellieren: ursprünglicher Wert, Delta, neuer Wert, Zeitpunkt und Quelle.
 - [ ] Definition für Aufnahmensumme, Average, Busts, Checkout und Highscore festlegen.
 - [ ] Umgang mit historischen und unvollständigen Legacy-Daten festlegen.
 
@@ -47,7 +47,7 @@ Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnun
 - [ ] Datenbankmigration für fehlende Felder erstellen.
 - [ ] Neue Würfe atomar in der Datenbank speichern.
 - [ ] Aufnahmeabschluss und Legabschluss aus den Wurf-Daten ableiten.
-- [ ] Korrekturen transaktional speichern.
+- [x] Korrekturen transaktional speichern.
 - [ ] Prüfen, ob eine Korrektur bereits gespeicherte Statistikwerte aktualisieren muss.
 - [ ] Prüfen, ob Highscores nach einer Korrektur neu berechnet oder ersetzt werden müssen.
 - [ ] JSON-/Live-State nur noch als Projektion oder Cache verwenden.

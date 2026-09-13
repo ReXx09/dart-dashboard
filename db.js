@@ -44,6 +44,28 @@ function toBool(value) {
   return false;
 }
 
+function getThrowCorrectionValues(correction) {
+  return [
+    Number(correction.playerSlot),
+    Number(correction.turnId) > 0 ? Number(correction.turnId) : null,
+    Number(correction.duelId) > 0 ? Number(correction.duelId) : null,
+    Number(correction.originalPoints || 0),
+    Number(correction.correctedPoints || 0),
+    Number(correction.delta || 0),
+    Number.isFinite(Number(correction.originalRemaining)) ? Number(correction.originalRemaining) : null,
+    Number.isFinite(Number(correction.correctedRemaining)) ? Number(correction.correctedRemaining) : null,
+    correction.originalBust ? 1 : 0,
+    correction.correctedBust ? 1 : 0,
+    correction.originalSegment ? String(correction.originalSegment) : null,
+    correction.correctedSegment ? String(correction.correctedSegment) : null,
+    correction.source ? String(correction.source) : 'live-correction',
+    Number(correction.correctedAt) || Date.now(),
+    correction.season || DEFAULT_STATS_SEASON
+  ];
+}
+
+const THROW_CORRECTION_COLUMNS = 'player_slot, turn_id, duel_id, original_points, corrected_points, delta, original_remaining, corrected_remaining, original_bust, corrected_bust, original_segment, corrected_segment, source, corrected_at, season';
+
 class DataStore {
   constructor() {
     this.client = String(process.env.DB_CLIENT || 'sqlite').toLowerCase();
@@ -1456,27 +1478,10 @@ class DataStore {
   }
 
   async recordThrowCorrection(correction) {
-    const values = [
-      Number(correction.playerSlot),
-      Number(correction.turnId) > 0 ? Number(correction.turnId) : null,
-      Number(correction.duelId) > 0 ? Number(correction.duelId) : null,
-      Number(correction.originalPoints || 0),
-      Number(correction.correctedPoints || 0),
-      Number(correction.delta || 0),
-      Number.isFinite(Number(correction.originalRemaining)) ? Number(correction.originalRemaining) : null,
-      Number.isFinite(Number(correction.correctedRemaining)) ? Number(correction.correctedRemaining) : null,
-      correction.originalBust ? 1 : 0,
-      correction.correctedBust ? 1 : 0,
-      correction.originalSegment ? String(correction.originalSegment) : null,
-      correction.correctedSegment ? String(correction.correctedSegment) : null,
-      correction.source ? String(correction.source) : 'live-correction',
-      Number(correction.correctedAt) || Date.now(),
-      correction.season || DEFAULT_STATS_SEASON
-    ];
-    const columns = 'player_slot, turn_id, duel_id, original_points, corrected_points, delta, original_remaining, corrected_remaining, original_bust, corrected_bust, original_segment, corrected_segment, source, corrected_at, season';
-    if (this.isSQLite()) await this.sqlite.run(`INSERT INTO throw_corrections (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
-    else if (this.isPostgres()) await this.pg.query(`INSERT INTO throw_corrections (${columns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`, values);
-    else await this.my.query(`INSERT INTO throw_corrections (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
+    const values = getThrowCorrectionValues(correction);
+    if (this.isSQLite()) await this.sqlite.run(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
+    else if (this.isPostgres()) await this.pg.query(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`, values);
+    else await this.my.query(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
   }
 
   async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON, duelLegId = null) {
@@ -1792,6 +1797,65 @@ class DataStore {
       'INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)',
       [payload, updatedAt]
     );
+  }
+
+  async saveLiveStateWithCorrection(state, correction) {
+    const payload = JSON.stringify(state);
+    const updatedAt = Date.now();
+    const correctionValues = getThrowCorrectionValues(correction);
+    const sqliteCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const postgresCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`;
+
+    if (this.isSQLite()) {
+      await this.sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        await this.sqlite.run(
+          'INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at',
+          [payload, updatedAt]
+        );
+        await this.sqlite.run(sqliteCorrection, correctionValues);
+        await this.sqlite.exec('COMMIT');
+      } catch (error) {
+        await this.sqlite.exec('ROLLBACK');
+        throw error;
+      }
+      return;
+    }
+
+    if (this.isPostgres()) {
+      const client = await this.pg.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          'INSERT INTO live_state (id, payload, updated_at) VALUES (1, $1, $2) ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at',
+          [payload, updatedAt]
+        );
+        await client.query(postgresCorrection, correctionValues);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+      return;
+    }
+
+    const connection = await this.my.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query(
+        'INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)',
+        [payload, updatedAt]
+      );
+      await connection.query(sqliteCorrection, correctionValues);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   async getHighscores(limit = 100, gameMode = '', includeActive = false) {

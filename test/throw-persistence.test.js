@@ -99,3 +99,34 @@ test('Wurfkorrekturen speichern Vorher- und Nachher-Werte', async () => {
     for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
   }
 });
+
+test('Live-State und Korrektur werden atomar gespeichert', async () => {
+  const sqliteFile = path.join(os.tmpdir(), `dart-dashboard-atomic-${process.pid}-${Date.now()}.db`);
+  const previousClient = process.env.DB_CLIENT;
+  const previousFile = process.env.DB_SQLITE_FILE;
+  process.env.DB_CLIENT = 'sqlite';
+  process.env.DB_SQLITE_FILE = sqliteFile;
+  const store = new DataStore();
+
+  try {
+    await store.init({});
+    const state = { game: { mode: '501' }, players: [], lastAction: { type: 'correction' } };
+    await store.saveLiveStateWithCorrection(state, {
+      playerSlot: 1,
+      originalPoints: 20,
+      correctedPoints: 25,
+      delta: 5,
+      correctedAt: 6789
+    });
+
+    const savedState = await store.getLiveState(null);
+    const correctionCount = await store.sqlite.get('SELECT COUNT(*) AS count FROM throw_corrections');
+    assert.deepEqual(savedState, state);
+    assert.equal(Number(correctionCount.count), 1);
+  } finally {
+    if (store.sqlite) await store.sqlite.close();
+    if (previousClient === undefined) delete process.env.DB_CLIENT; else process.env.DB_CLIENT = previousClient;
+    if (previousFile === undefined) delete process.env.DB_SQLITE_FILE; else process.env.DB_SQLITE_FILE = previousFile;
+    for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
+  }
+});
