@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const { DataStore } = require('./db');
 const { aggregateDuelStats } = require('./lib/duel-stats');
 const { addDerivedMetrics, percentage, resolvePlayerIdentity } = require('./lib/highscore-overview');
-const { removeLatestThrow, correctLatestThrow } = require('./lib/live-throws');
+const { removeLatestThrow, correctLatestThrow, summarizePlayerThrows } = require('./lib/live-throws');
 const {
   GAME_MODES,
   CHECKOUT_RULES,
@@ -1712,31 +1712,26 @@ async function recordDuelLegIfActive(state, winner) {
   const profiles = await dataStore.getProfiles();
   const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
   const players = (Array.isArray(state.players) ? state.players : []).map(player => {
-    const throws = Array.isArray(player.throws) ? player.throws : [];
-    const firstNine = throws.slice(0, 9);
-    const firstNineScored = firstNine.reduce((sum, item) => sum + (item.bust ? 0 : Number(item.points || 0)), 0);
-    const firstNineAvg = firstNine.length >= 9 ? roundAverage(firstNineScored / 9 * 3) : 0;
-    const turnScores = getTurnScoresFromThrows(throws);
-    const completeTurnScores = getTurnScoresFromThrows(throws, false);
+    const throwSummary = summarizePlayerThrows(player);
     return {
       slot: player.slot,
       profileId: profileByName.get(String(player.name || '').trim().toLowerCase()) || null,
       name: player.name,
       turns: player.turns,
       totalScored: player.totalScored,
-      average: Number(player.turns || 0) > 0 ? roundAverage(Number(player.totalScored || 0) / Number(player.turns) * 3) : 0,
-      firstNineAvg,
-      bestTurn: Math.max(...turnScores, 0),
-      count60plus: completeTurnScores.filter(score => score >= 60).length,
-      count80plus: completeTurnScores.filter(score => score >= 80).length,
-      count100plus: completeTurnScores.filter(score => score >= 100).length,
-      count140plus: completeTurnScores.filter(score => score >= 140).length,
-      count171plus: completeTurnScores.filter(score => score >= 171).length,
-      count180: completeTurnScores.filter(score => score === 180).length,
+      average: throwSummary.average,
+      firstNineAvg: throwSummary.firstNineAvg,
+      bestTurn: throwSummary.bestTurn,
+      count60plus: throwSummary.count60plus,
+      count80plus: throwSummary.count80plus,
+      count100plus: throwSummary.count100plus,
+      count140plus: throwSummary.count140plus,
+      count171plus: throwSummary.count171plus,
+      count180: throwSummary.count180,
       checkoutAttempts: player.checkoutAttempts,
       checkoutSuccess: player.checkoutSuccess,
       lastCheckoutValue: player.lastCheckoutValue,
-      busts: throws.filter(item => item.bust).length
+      busts: throwSummary.busts
     };
   });
   const legsToWin = Math.max(1, Number(state.game?.legsToWin || 1));

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   findLatestCorrectableThrow,
+  summarizePlayerThrows,
   removeLatestThrow,
   correctLatestThrow
 } = require('../lib/live-throws');
@@ -41,6 +42,27 @@ test('findLatestCorrectableThrow überspringt manuelle Fehlwürfe', () => {
   assert.equal(latest.player.name, 'Alice');
   assert.equal(latest.throwIndex, 1);
   assert.equal(latest.throwData.points, 60);
+});
+
+test('summarizePlayerThrows leitet Aufnahme- und Leg-Werte aus Würfen ab', () => {
+  const summary = summarizePlayerThrows({
+    throws: [
+      { points: 60, bust: false },
+      { points: 40, bust: false },
+      { points: 0, bust: true },
+      { points: 100, bust: false },
+      { points: 71, bust: false },
+      { points: 0, bust: false }
+    ]
+  });
+
+  assert.equal(summary.darts, 6);
+  assert.equal(summary.totalScored, 271);
+  assert.equal(summary.average, 135.5);
+  assert.equal(summary.bestTurn, 171);
+  assert.equal(summary.count100plus, 2);
+  assert.equal(summary.busts, 1);
+  assert.deepEqual(summary.completeTurnScores, [100, 171]);
 });
 
 test('correctLatestThrow aktualisiert Wurf, Aufnahme und Restscore', () => {
