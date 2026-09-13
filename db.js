@@ -250,11 +250,19 @@ class DataStore {
           bust INTEGER NOT NULL DEFAULT 0,
           thrown_at INTEGER NOT NULL,
           duel_id INTEGER,
+          duel_leg_id INTEGER,
+          turn_id INTEGER,
+          remaining INTEGER,
+          source TEXT,
           season TEXT NOT NULL DEFAULT '2026'
         );
         CREATE INDEX IF NOT EXISTS idx_throw_segments_player ON player_throw_segments (player_slot, thrown_at);
       `);
       try { await this.sqlite.run('ALTER TABLE player_throw_segments ADD COLUMN duel_id INTEGER'); } catch (_err) { }
+      try { await this.sqlite.run('ALTER TABLE player_throw_segments ADD COLUMN duel_leg_id INTEGER'); } catch (_err) { }
+      try { await this.sqlite.run('ALTER TABLE player_throw_segments ADD COLUMN turn_id INTEGER'); } catch (_err) { }
+      try { await this.sqlite.run('ALTER TABLE player_throw_segments ADD COLUMN remaining INTEGER'); } catch (_err) { }
+      try { await this.sqlite.run('ALTER TABLE player_throw_segments ADD COLUMN source TEXT'); } catch (_err) { }
       try { await this.sqlite.run("ALTER TABLE player_throw_segments ADD COLUMN season TEXT NOT NULL DEFAULT '2026'"); } catch (_err) { }
       await this.sqlite.exec('CREATE INDEX IF NOT EXISTS idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at);');
       return;
@@ -269,6 +277,10 @@ class DataStore {
           bust INTEGER NOT NULL DEFAULT 0,
           thrown_at BIGINT NOT NULL,
           duel_id INTEGER,
+          duel_leg_id INTEGER,
+          turn_id INTEGER,
+          remaining INTEGER,
+          source TEXT,
           season TEXT NOT NULL DEFAULT '2026'
         );
         CREATE INDEX IF NOT EXISTS idx_throw_segments_player ON player_throw_segments (player_slot, thrown_at);`
@@ -281,6 +293,10 @@ class DataStore {
           bust TINYINT NOT NULL DEFAULT 0,
           thrown_at BIGINT NOT NULL,
           duel_id BIGINT NULL,
+          duel_leg_id BIGINT NULL,
+          turn_id BIGINT NULL,
+          remaining INT NULL,
+          source VARCHAR(64) NULL,
           season VARCHAR(32) NOT NULL DEFAULT '2026',
           INDEX idx_throw_segments_player (player_slot, thrown_at),
           INDEX idx_throw_segments_duel (duel_id, player_slot, thrown_at)
@@ -289,10 +305,18 @@ class DataStore {
     else await this.my.query(query);
     if (this.isPostgres()) {
       try { await this.pg.query('ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS duel_id INTEGER'); } catch (_err) { }
+      await this.pg.query('ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS duel_leg_id INTEGER');
+      await this.pg.query('ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS turn_id INTEGER');
+      await this.pg.query('ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS remaining INTEGER');
+      await this.pg.query('ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS source TEXT');
       await this.pg.query("ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS season TEXT NOT NULL DEFAULT '2026'");
       await this.pg.query('CREATE INDEX IF NOT EXISTS idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at)');
     } else {
       try { await this.my.query('ALTER TABLE player_throw_segments ADD COLUMN duel_id BIGINT NULL'); } catch (_err) { }
+      try { await this.my.query('ALTER TABLE player_throw_segments ADD COLUMN duel_leg_id BIGINT NULL'); } catch (_err) { }
+      try { await this.my.query('ALTER TABLE player_throw_segments ADD COLUMN turn_id BIGINT NULL'); } catch (_err) { }
+      try { await this.my.query('ALTER TABLE player_throw_segments ADD COLUMN remaining INT NULL'); } catch (_err) { }
+      try { await this.my.query('ALTER TABLE player_throw_segments ADD COLUMN source VARCHAR(64) NULL'); } catch (_err) { }
       try { await this.my.query("ALTER TABLE player_throw_segments ADD COLUMN season VARCHAR(32) NOT NULL DEFAULT '2026'"); } catch (_err) { }
       try { await this.my.query('CREATE INDEX idx_throw_segments_duel ON player_throw_segments (duel_id, player_slot, thrown_at)'); } catch (_err) { }
     }
@@ -1359,11 +1383,8 @@ class DataStore {
     return Promise.all(rows.map(row => this.getDuel(row.id)));
   }
 
-  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now(), duelId = null, season = DEFAULT_STATS_SEASON) {
-    const values = [Number(playerSlot), String(segment || 'MISS').toUpperCase(), Number(points || 0), mode ? String(mode) : null, bust ? 1 : 0, Number(thrownAt) || Date.now(), Number(duelId) > 0 ? Number(duelId) : null, season];
-    if (this.isSQLite()) await this.sqlite.run('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values);
-    else if (this.isPostgres()) await this.pg.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', values);
-    else await this.my.query('INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values);
+  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now(), duelId = null, season = DEFAULT_STATS_SEASON, details = {}) {
+    return this.recordThrowSegments([{ playerSlot, segment, points, mode, bust, thrownAt, duelId, season, ...details }]);
   }
 
   async recordThrowSegments(segments) {
@@ -1381,15 +1402,19 @@ class DataStore {
         segment.bust ? 1 : 0,
         thrownAt,
         Number(segment.duelId) > 0 ? Number(segment.duelId) : null,
+        Number(segment.duelLegId) > 0 ? Number(segment.duelLegId) : null,
+        Number(segment.turnId) > 0 ? Number(segment.turnId) : null,
+        Number.isFinite(Number(segment.remaining)) ? Number(segment.remaining) : null,
+        segment.source ? String(segment.source) : null,
         segment.season || DEFAULT_STATS_SEASON
       );
       if (this.isPostgres()) {
-        const offset = index * 8;
-        return '(' + Array.from({ length: 8 }, (_value, column) => '$' + (offset + column + 1)).join(', ') + ')';
+        const offset = index * 12;
+        return '(' + Array.from({ length: 12 }, (_value, column) => '$' + (offset + column + 1)).join(', ') + ')';
       }
-      return '(?, ?, ?, ?, ?, ?, ?, ?)';
+      return '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
     }).join(', ');
-    const sql = 'INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES ' + placeholders;
+    const sql = 'INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, duel_leg_id, turn_id, remaining, source, season) VALUES ' + placeholders;
     if (this.isSQLite()) await this.sqlite.run(sql, values);
     else if (this.isPostgres()) await this.pg.query(sql, values);
     else await this.my.query(sql, values);

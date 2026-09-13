@@ -186,7 +186,7 @@ function startLiveDetailDrain() {
             await dataStore.recordThrowSegments(segmentBatch);
           } else {
             for (const segment of segmentBatch) {
-              await dataStore.recordThrowSegment(segment.playerSlot, segment.segment, segment.points, segment.mode, segment.bust, segment.thrownAt, segment.duelId);
+              await dataStore.recordThrowSegment(segment.playerSlot, segment.segment, segment.points, segment.mode, segment.bust, segment.thrownAt, segment.duelId, segment.season, segment);
             }
           }
         } catch (error) {
@@ -210,7 +210,7 @@ function startLiveDetailDrain() {
   return liveDetailDrainPromise;
 }
 
-function queueLiveThrowSegment(playerSlot, segment, points, mode, bust, thrownAt, duelId) {
+function queueLiveThrowSegment(playerSlot, segment, points, mode, bust, thrownAt, duelId, details = {}) {
   liveDetailPendingSegments.push({
     playerSlot: Number(playerSlot),
     segment: String(segment || 'MISS').toUpperCase(),
@@ -218,7 +218,11 @@ function queueLiveThrowSegment(playerSlot, segment, points, mode, bust, thrownAt
     mode: mode ? String(mode) : null,
     bust: !!bust,
     thrownAt: Number(thrownAt) || Date.now(),
-    duelId: Number(duelId) > 0 ? Number(duelId) : null
+    duelId: Number(duelId) > 0 ? Number(duelId) : null,
+    duelLegId: Number(details.duelLegId) > 0 ? Number(details.duelLegId) : null,
+    turnId: Number(details.turnId) > 0 ? Number(details.turnId) : null,
+    remaining: Number.isFinite(Number(details.remaining)) ? Number(details.remaining) : null,
+    source: details.source ? String(details.source) : null
   });
   if (liveDetailPendingSegments.length >= LIVE_DETAIL_BATCH_SIZE) {
     if (liveDetailFlushTimer) clearTimeout(liveDetailFlushTimer);
@@ -3803,8 +3807,16 @@ app.post('/api/live/throw', async (req, res) => {
     if (!Array.isArray(player.throws)) player.throws = [];
     const throwSegment = incomingSegment;
     const thrownAt = Date.now();
-    player.throws.push({ points, remaining: player.remaining, bust, ts: thrownAt, mode, segment: throwSegment, turnId: state.game.turnId || 1 });
-    queueLiveThrowSegment(player.slot, throwSegment, points, mode, bust, thrownAt, state.game.duelId);
+    const throwSource = typeof req.body?.source === 'string' && req.body.source.trim()
+      ? req.body.source.trim()
+      : 'manual';
+    player.throws.push({ points, remaining: player.remaining, bust, ts: thrownAt, mode, segment: throwSegment, turnId: state.game.turnId || 1, source: throwSource });
+    queueLiveThrowSegment(player.slot, throwSegment, points, mode, bust, thrownAt, state.game.duelId, {
+      duelLegId: state.game.duelLegId,
+      turnId: state.game.turnId || 1,
+      remaining: player.remaining,
+      source: throwSource
+    });
 
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;

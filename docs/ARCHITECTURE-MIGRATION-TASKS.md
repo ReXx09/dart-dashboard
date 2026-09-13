@@ -8,9 +8,9 @@ Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnun
 
 - [x] Backup lokal erstellen.
 - [x] GitHub-Sicherungsbranch erstellen und pushen.
-- [ ] Arbeitsbranch für die Umsetzung vom Sicherungsbranch ableiten.
-- [ ] Vor jedem größeren Schritt Tests ausführen.
-- [ ] Nach jedem stabilen Schritt einen kleinen Commit erstellen.
+- [x] Arbeitsbranch für die Umsetzung vom Sicherungsbranch ableiten.
+- [x] Vor jedem größeren Schritt Tests ausführen.
+- [x] Nach jedem stabilen Schritt einen kleinen Commit erstellen.
 
 ## Phase 1: Ist-Zustand dokumentieren
 
@@ -31,19 +31,19 @@ Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnun
 
 ## Phase 3: Zentrale Serverlogik bauen
 
-- [ ] Neue gemeinsame Wurf-Logik in `lib/live-throws.js` erstellen.
-- [ ] Funktion zum Finden des letzten korrigierbaren Wurfs auslagern.
-- [ ] Funktion zum Anwenden einer Wurfkorrektur auslagern.
-- [ ] Funktion zum vollständigen Zurücksetzen eines Wurfs auslagern.
-- [ ] Gemeinsame Neuberechnung für Restscore, Aufnahme, Average und Bust-Status erstellen.
-- [ ] `currentRoundPoints` und `turnScoreRecorded` zentral synchronisieren.
-- [ ] `/api/live/undo` auf die gemeinsame Logik umstellen.
-- [ ] `/api/live/correct-last` auf die gemeinsame Logik umstellen.
+- [x] Neue gemeinsame Wurf-Logik in `lib/live-throws.js` erstellen.
+- [x] Funktion zum Finden des letzten korrigierbaren Wurfs auslagern.
+- [x] Funktion zum Anwenden einer Wurfkorrektur auslagern.
+- [x] Funktion zum vollständigen Zurücksetzen eines Wurfs auslagern.
+- [x] Gemeinsame Neuberechnung für Restscore, Aufnahme, Average und Bust-Status erstellen.
+- [x] `currentRoundPoints` und `turnScoreRecorded` zentral synchronisieren.
+- [x] `/api/live/undo` auf die gemeinsame Logik umstellen.
+- [x] `/api/live/correct-last` auf die gemeinsame Logik umstellen.
 - [ ] `/api/live/throw` ebenfalls auf die gemeinsame Logik vorbereiten.
 
 ## Phase 4: Datenbank als verbindliche Quelle
 
-- [ ] Datenbanktabellen für Würfe und Aufnahmen prüfen oder ergänzen.
+- [x] Datenbanktabellen für Würfe und Aufnahmen prüfen oder ergänzen.
 - [ ] Datenbankmigration für fehlende Felder erstellen.
 - [ ] Neue Würfe atomar in der Datenbank speichern.
 - [ ] Aufnahmeabschluss und Legabschluss aus den Wurf-Daten ableiten.
@@ -84,7 +84,7 @@ Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnun
 
 ## Phase 8: Tests und Freigabe
 
-- [ ] Unit-Tests für Wurfkorrektur und Undo ergänzen.
+- [x] Unit-Tests für Wurfkorrektur und Undo ergänzen.
 - [ ] Tests für Aufnahme- und Leg-Summen ergänzen.
 - [ ] Tests für Bust- und Checkout-Neuberechnung ergänzen.
 - [ ] Tests für Highscore-Neuberechnung ergänzen.
