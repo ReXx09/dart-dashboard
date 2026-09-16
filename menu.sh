@@ -104,6 +104,7 @@ action_label() {
     pin-hash)           printf 'Admin-PIN-Assistent' ;;
     raspi-update)       printf 'Raspberry-Pi-Firmware aktualisieren' ;;
     build-start)        printf 'Install/Update + Build + Start' ;;
+    dev-build-start)    printf 'Dev-Pull + Build + Start' ;;
     start)              printf 'Container Start' ;;
     stop)               printf 'Container Stop' ;;
     restart)            printf 'Container Restart' ;;
@@ -217,12 +218,13 @@ ui_pause() {
 submenu_einrichtung_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(printf 'System vorbereiten oder den Dienst neu bauen und starten.\n\nENTER = ausfuehren   ESC = zurueck')" 16 76 5 \
+    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(printf 'System vorbereiten, Dev-Branch testen oder den Dienst neu bauen und starten.\n\nDev-Branch: ${DART_DEV_BRANCH:-refactor-central-data}\n\nENTER = ausfuehren   ESC = zurueck')" 18 80 6 \
       "1" "Systemcheck + Auto-Installation" \
       "2" "Install/Update + Build + Start" \
+      "3" "Dev-Pull + Build + Start" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
-    case "$choice" in 1) execute_action check 1 0 ;; 2) execute_action build-start 1 0 ;; 0|"") return 0 ;; esac
+    case "$choice" in 1) execute_action check 1 0 ;; 2) execute_action build-start 1 0 ;; 3) execute_action dev-build-start 1 0 ;; 0|"") return 0 ;; esac
   done
 }
 
@@ -271,9 +273,10 @@ submenu_einrichtung_text() {
     printf '\n-- Einrichtung --------------------------------\n'
     printf '1) Systemcheck + Auto-Installation\n'
     printf '2) Install/Update + Build + Start\n'
+    printf '3) Dev-Pull + Build + Start (%s)\n' "${DART_DEV_BRANCH:-refactor-central-data}"
     printf '0) Zurueck\n\n'
-    read -r -p 'Option [0-2]: ' c
-    case "$c" in 1) execute_action check 1 0 ;; 2) execute_action build-start 1 0 ;; 0|'') return 0 ;; esac
+    read -r -p 'Option [0-3]: ' c
+    case "$c" in 1) execute_action check 1 0 ;; 2) execute_action build-start 1 0 ;; 3) execute_action dev-build-start 1 0 ;; 0|'') return 0 ;; esac
   done
 }
 
