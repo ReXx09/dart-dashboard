@@ -1,15 +1,33 @@
 #!/usr/bin/env bash
 
+switch_to_remote_branch() {
+  local target_branch="$1"
+  if ! command_exists git || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    msg_warn 'Kein Git-Repository gefunden - nutze lokalen Code ohne Branch-Wechsel.'
+    return 0
+  fi
+  if [[ -n "$(git status --porcelain)" ]]; then
+    msg_fail 'Lokale Git-Aenderungen vorhanden. Branch-Wechsel abgebrochen.'
+    msg_info 'Bitte zuerst git status pruefen und Aenderungen sichern.'
+    return 1
+  fi
+
+  msg_run "Hole Branch '${target_branch}' aus GitHub..."
+  git fetch origin "$target_branch"
+  if git show-ref --verify --quiet "refs/heads/${target_branch}"; then
+    git switch "$target_branch"
+  else
+    git switch --track -c "$target_branch" "origin/${target_branch}"
+  fi
+  git pull --ff-only origin "$target_branch"
+  msg_ok "Branch aktiv: ${target_branch}"
+}
+
 build_and_start() {
   ensure_docker_ready
   ensure_env_file
 
-  msg_run 'Aktualisiere lokalen Code aus Git...'
-  if command_exists git && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git pull
-  else
-    msg_warn 'Kein Git-Repository gefunden - nutze lokalen Code ohne git pull.'
-  fi
+  switch_to_remote_branch master
 
   init_compose_build_args
 
@@ -32,25 +50,7 @@ dev_build_and_start() {
   ensure_env_file
 
   local dev_branch="${DART_DEV_BRANCH:-refactor-central-data}"
-  if ! command_exists git || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    msg_fail 'Kein Git-Repository gefunden. Dev-Pull ist nicht moeglich.'
-    return 1
-  fi
-  if ! git diff --quiet || ! git diff --cached --quiet; then
-    msg_fail 'Lokale Git-Aenderungen vorhanden. Dev-Pull abgebrochen.'
-    msg_info 'Bitte zuerst git status pruefen und Aenderungen sichern.'
-    return 1
-  fi
-
-  msg_run "Hole Dev-Branch '${dev_branch}' aus GitHub..."
-  git fetch origin "$dev_branch"
-  if git show-ref --verify --quiet "refs/heads/${dev_branch}"; then
-    git switch "$dev_branch"
-  else
-    git switch --track -c "$dev_branch" "origin/${dev_branch}"
-  fi
-  git pull --ff-only origin "$dev_branch"
-  msg_ok "Dev-Branch aktiv: ${dev_branch}"
+  switch_to_remote_branch "$dev_branch"
 
   init_compose_build_args
   msg_run 'Baue Dev-Container mit aktuellem Code...'
