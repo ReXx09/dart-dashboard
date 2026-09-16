@@ -27,6 +27,46 @@ build_and_start() {
   show_network_hint
 }
 
+dev_build_and_start() {
+  ensure_docker_ready
+  ensure_env_file
+
+  local dev_branch="${DART_DEV_BRANCH:-refactor-central-data}"
+  if ! command_exists git || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    msg_fail 'Kein Git-Repository gefunden. Dev-Pull ist nicht moeglich.'
+    return 1
+  fi
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    msg_fail 'Lokale Git-Aenderungen vorhanden. Dev-Pull abgebrochen.'
+    msg_info 'Bitte zuerst git status pruefen und Aenderungen sichern.'
+    return 1
+  fi
+
+  msg_run "Hole Dev-Branch '${dev_branch}' aus GitHub..."
+  git fetch origin "$dev_branch"
+  if git show-ref --verify --quiet "refs/heads/${dev_branch}"; then
+    git switch "$dev_branch"
+  else
+    git switch --track -c "$dev_branch" "origin/${dev_branch}"
+  fi
+  git pull --ff-only origin "$dev_branch"
+  msg_ok "Dev-Branch aktiv: ${dev_branch}"
+
+  init_compose_build_args
+  msg_run 'Baue Dev-Container mit aktuellem Code...'
+  if [[ ${#COMPOSE_BUILD_ARGS[@]} -gt 0 ]]; then
+    $COMPOSE_CMD "${COMPOSE_BUILD_ARGS[@]}" up -d --build
+  else
+    $COMPOSE_CMD build --no-cache
+    msg_run 'Starte Dev-Container...'
+    $COMPOSE_CMD up -d
+  fi
+
+  msg_info 'Container Status:'
+  $COMPOSE_CMD ps
+  show_network_hint
+}
+
 start_existing() {
   ensure_docker_ready
   ensure_env_file
