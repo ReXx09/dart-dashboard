@@ -543,6 +543,9 @@
             <option value="group">Gruppen mit 3–8 Spielern</option>
             <option value="tournament">Turniere</option>
           </select>
+          <select id="encounterPlayer" aria-label="Spieler filtern">
+            <option value="all" selected>Alle Spieler</option>
+          </select>
         </div>
         <div class="stats-grid" id="encounterStats"></div>
         <div class="encounter-grid" id="encounterList">
@@ -591,6 +594,7 @@
     let currentStatsMode = '';
     let encounters = [];
     let selectedEncounterCategory = 'all';
+    let selectedEncounterPlayer = 'all';
     let segmentAnalysis = null;
     let segmentComparison = false;
     let segmentComparisonData = [];
@@ -756,6 +760,7 @@
         const profiles = profilesRes ? await profilesRes.json() : [];
         const namedPlayers = Array.isArray(players) ? players.filter(p => String(p.name || '').trim()) : [];
         availablePlayers = namedPlayers;
+        renderEncounterPlayerFilter();
         selectedComparisonPlayerOrder = namedPlayers.slice(0, 2).map(player => String(player.slot));
         selectedComparisonPlayerSlots = new Set(selectedComparisonPlayerOrder);
         playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
@@ -994,7 +999,10 @@
 
     function renderEncounters() {
       const list = document.getElementById('encounterList');
-      const visible = encounters.filter(encounter => selectedEncounterCategory === 'all' || encounter.category === selectedEncounterCategory);
+      const visible = encounters.filter(encounter => {
+        if (selectedEncounterCategory !== 'all' && encounter.category !== selectedEncounterCategory) return false;
+        return encounterHasPlayer(encounter, selectedEncounterPlayer);
+      });
       if (!visible.length) {
         list.innerHTML = '<div class="encounter-empty">Noch keine Begegnungen in dieser Kategorie.</div>';
         return;
@@ -1016,6 +1024,37 @@
           '<td><div class="encounter-actions"><button class="encounter-action" type="button" onclick="openEncounterDetail(' + Number(encounter.id) + ',\'throws\')">Würfe</button><button class="encounter-action" type="button" onclick="openEncounterDetail(' + Number(encounter.id) + ',\'duel\')">Duell</button><button class="encounter-action" type="button" onclick="openEncounterDetail(' + Number(encounter.id) + ',\'heatmap\')">Heatmap</button></div></td>' +
         '</tr>';
       }).join('') + '</tbody></table>';
+    }
+
+    function encounterHasPlayer(encounter, playerKey) {
+      if (!playerKey || playerKey === 'all') return true;
+      const [type, rawValue] = String(playerKey).split(':');
+      const value = Number(rawValue);
+      return (encounter.players || []).some(player => {
+        if (type === 'profile' && Number(player.profile_id || 0) === value) return true;
+        if (type === 'slot' && Number(player.player_slot || 0) === value) return true;
+        return type === 'profile' && String(player.player_name || '').trim().toLowerCase() === String(rawValue || '').trim().toLowerCase();
+      });
+    }
+
+    function renderEncounterPlayerFilter() {
+      const select = document.getElementById('encounterPlayer');
+      const options = ['<option value="all">Alle Spieler</option>'];
+      const seen = new Set();
+      availablePlayers.forEach(player => {
+        const slot = Number(player.slot || 0);
+        const profileId = Number(player.profileId || player.profile_id || 0);
+        const key = profileId > 0 ? 'profile:' + profileId : 'slot:' + slot;
+        if (!slot || seen.has(key)) return;
+        seen.add(key);
+        options.push('<option value="' + key + '">' + escapeHtml(player.name || ('Slot ' + slot)) + '</option>');
+      });
+      select.innerHTML = options.join('');
+      select.value = selectedEncounterPlayer;
+      if (select.value !== selectedEncounterPlayer) {
+        selectedEncounterPlayer = 'all';
+        select.value = 'all';
+      }
     }
 
     function formatMetric(value) {
@@ -1395,6 +1434,11 @@
       document.querySelectorAll('[data-encounter-category]').forEach(button => button.classList.toggle('active', button.dataset.encounterCategory === selectedEncounterCategory));
       renderEncounters();
       loadEncounterStats();
+    });
+
+    document.getElementById('encounterPlayer').addEventListener('change', event => {
+      selectedEncounterPlayer = event.target.value;
+      renderEncounters();
     });
 
     document.getElementById('segmentTypeSelect').addEventListener('change', event => {

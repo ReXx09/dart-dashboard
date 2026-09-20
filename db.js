@@ -1474,6 +1474,13 @@ class DataStore {
       duel = duelRows[0]; players = playerRows; legs = legRows; legPlayers = legPlayerRows;
     }
     if (!duel) return null;
+    if (!duel.checkout_rule) {
+      let checkoutRuleRow;
+      if (this.isSQLite()) checkoutRuleRow = await this.sqlite.get('SELECT checkout_rule FROM highscores WHERE duel_id = ? AND kind = \'checkout\' AND checkout_rule IS NOT NULL ORDER BY ts DESC LIMIT 1', [safeId]);
+      else if (this.isPostgres()) checkoutRuleRow = (await this.pg.query('SELECT checkout_rule FROM highscores WHERE duel_id = $1 AND kind = \'checkout\' AND checkout_rule IS NOT NULL ORDER BY ts DESC LIMIT 1', [safeId])).rows[0];
+      else checkoutRuleRow = (await this.my.query('SELECT checkout_rule FROM highscores WHERE duel_id = ? AND kind = \'checkout\' AND checkout_rule IS NOT NULL ORDER BY ts DESC LIMIT 1', [safeId]))[0][0];
+      if (checkoutRuleRow?.checkout_rule) duel.checkout_rule = String(checkoutRuleRow.checkout_rule).toLowerCase();
+    }
     const legPlayersById = new Map();
     for (const player of legPlayers) {
       const key = String(player.duel_leg_id);
