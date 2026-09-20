@@ -760,7 +760,7 @@
         const profiles = profilesRes ? await profilesRes.json() : [];
         const namedPlayers = Array.isArray(players) ? players.filter(p => String(p.name || '').trim()) : [];
         availablePlayers = namedPlayers;
-        renderEncounterPlayerFilter();
+        renderEncounterPlayerFilter(profiles);
         selectedComparisonPlayerOrder = namedPlayers.slice(0, 2).map(player => String(player.slot));
         selectedComparisonPlayerSlots = new Set(selectedComparisonPlayerOrder);
         playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
@@ -1037,7 +1037,7 @@
       });
     }
 
-    function renderEncounterPlayerFilter() {
+    function renderEncounterPlayerFilter(profiles = []) {
       const select = document.getElementById('encounterPlayer');
       const options = ['<option value="all">Alle Spieler</option>'];
       const seen = new Set();
@@ -1048,6 +1048,12 @@
         if (!slot || seen.has(key)) return;
         seen.add(key);
         options.push('<option value="' + key + '">' + escapeHtml(player.name || ('Slot ' + slot)) + '</option>');
+      });
+      profiles.filter(profile => profile && Number(profile.id) > 0 && String(profile.name || '').trim()).forEach(profile => {
+        const key = 'profile:' + Number(profile.id);
+        if (seen.has(key)) return;
+        seen.add(key);
+        options.push('<option value="' + key + '">' + escapeHtml(profile.name) + ' · Profil</option>');
       });
       select.innerHTML = options.join('');
       select.value = selectedEncounterPlayer;
