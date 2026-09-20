@@ -4106,6 +4106,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
     const players = await dataStore.getPlayers();
     const profiles = await dataStore.getProfiles();
     const profileIdsByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
+    const profilesById = new Map(profiles.map(profile => [Number(profile.id), profile]));
     const entries = [];
     for (const player of players) {
       if (!player.name) continue;
@@ -4154,6 +4155,15 @@ app.get('/api/highscores/overview', async (_req, res) => {
         checkoutStatsVersion: Number(stats.checkout_stats_version || 1),
         trackingSince: stats.checkout_tracking_since ? Number(stats.checkout_tracking_since) : null
       });
+    }
+
+    // Legacy databases may have profiles but no backfilled players.profile_id.
+    // Resolve those slot entries by the profile name before building totals.
+    for (const entry of entries) {
+      const profileId = Number(entry.profileId || 0);
+      if (profileId > 0 && profilesById.has(profileId)) continue;
+      const profileIdByName = Number(profileIdsByName.get(String(entry.player || '').trim().toLowerCase()) || 0);
+      if (profileIdByName > 0) entry.profileId = profileIdByName;
     }
 
     const grouped = new Map();
@@ -4345,6 +4355,25 @@ app.get('/api/highscores/overview', async (_req, res) => {
       },
       gamesPlayed: 0, gamesWon: 0, legsPlayed: 0, legsWon: 0
     }]));
+    for (const entry of entries) {
+      const profileId = Number(entry.profileId || 0);
+      if (profileId <= 0 || profileStatsById.has(profileId)) continue;
+      profileStatsById.set(profileId, {
+        profileId,
+        player: entry.player,
+        mode: 'gesamt',
+        category: 'all',
+        count180: 0, count171Plus: 0, count140Plus: 0, count100Plus: 0,
+        darts: 0, totalScored: 0, firstNineTotal: 0, firstNineCount: 0,
+        checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0,
+        checkoutByRule: {
+          single: { attempts: 0, success: 0, highest: 0 },
+          double: { attempts: 0, success: 0, highest: 0 },
+          master: { attempts: 0, success: 0, highest: 0 }
+        },
+        gamesPlayed: 0, gamesWon: 0, legsPlayed: 0, legsWon: 0
+      });
+    }
     const profileStatsFromSlots = new Set();
     for (const entry of entries) {
       const total = profileStatsById.get(Number(entry.profileId));
