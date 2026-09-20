@@ -919,12 +919,13 @@
         list.innerHTML = '<div class="encounter-empty">Noch keine Begegnungen in dieser Kategorie.</div>';
         return;
       }
-      list.innerHTML = '<table class="encounter-table"><thead><tr><th>Begegnung</th><th>Spieler</th><th>Legs</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Checkout</th><th>Sieger</th><th>Details</th></tr></thead><tbody>' + visible.map(encounter => {
+      list.innerHTML = '<table class="encounter-table"><thead><tr><th>Begegnung</th><th>Finish</th><th>Spieler</th><th>Legs</th><th>Schnitt</th><th>1.-9. AVG</th><th>Turns</th><th>Checkout</th><th>Sieger</th><th>Details</th></tr></thead><tbody>' + visible.map(encounter => {
         const stats = aggregateEncounterPlayers(encounter);
         const winner = encounter.winner_slot ? (encounter.players || []).find(player => Number(player.player_slot) === Number(encounter.winner_slot)) : null;
         const lines = field => stats.map(player => '<span>' + field(player) + '</span>').join('');
         return '<tr>' +
           '<td><div class="encounter-kind">' + escapeHtml(encounter.categoryLabel || 'Begegnung') + ' · ' + escapeHtml(encounter.mode) + '</div><div class="encounter-id" title="Begegnung #' + Number(encounter.id) + '">' + escapeHtml(formatEncounterDate(encounter.started_at)) + ' · ' + escapeHtml(encounter.status || '') + '</div></td>' +
+          '<td>' + escapeHtml(formatCheckoutRule(encounter.checkout_rule)) + '</td>' +
           '<td class="player-lines">' + lines(player => escapeHtml(player.name)) + '</td>' +
           '<td>' + Number(encounter.total_legs || 0) + '</td>' +
           '<td class="metric-lines">' + lines(player => formatMetric(player.average)) + '</td>' +
@@ -946,6 +947,10 @@
       if (!ts) return '-';
       const date = new Date(ts);
       return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' · ' + date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatCheckoutRule(rule) {
+      return ({ single: 'Single-Out', double: 'Double-Out', master: 'Master-Out' })[String(rule || '').toLowerCase()] || '-';
     }
 
     function aggregateEncounterPlayers(encounter) {
@@ -1141,8 +1146,10 @@
         const attempts = Number(s['checkout_' + rule + '_attempts'] || 0);
         const success = Number(s['checkout_' + rule + '_success'] || 0);
         const highest = Math.min(170, Number(s['checkout_' + rule + '_highest'] || 0));
-        const pct = attempts > 0 ? ((success / attempts) * 100).toFixed(1) : '0.0';
-        return statItem(label + ' Quote', pct + '%', success + ' / ' + attempts + ' · High: ' + highest,
+        const hasAttempts = attempts > 0;
+        const pct = hasAttempts ? ((success / attempts) * 100).toFixed(1) + '%' : '-';
+        const meta = hasAttempts ? success + ' / ' + attempts + ' · High: ' + highest : 'Keine Versuche erfasst';
+        return statItem(label + ' Quote', pct, meta,
           ['checkout_' + rule + '_attempts', 'checkout_' + rule + '_success', 'checkout_' + rule + '_highest'],
           [label + ' Versuche', label + ' Erfolge', label + ' Highest']);
       }).join('');
