@@ -1709,13 +1709,11 @@ async function recordDuelLegIfActive(state, winner) {
   const duelId = Number(state.game?.duelId || 0);
   const mode = String(state.game?.mode || '');
   if (!duelId || !GAME_MODES[mode]) return;
-  const profiles = await dataStore.getProfiles();
-  const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
   const players = (Array.isArray(state.players) ? state.players : []).map(player => {
     const throwSummary = summarizePlayerThrows(player);
     return {
       slot: player.slot,
-      profileId: profileByName.get(String(player.name || '').trim().toLowerCase()) || null,
+      profileId: Number(player.profileId || 0) || null,
       name: player.name,
       turns: player.turns,
       totalScored: player.totalScored,
@@ -2757,7 +2755,7 @@ async function savePlayers(list) {
 async function getActivePlayersForLive() {
   const players = (await getPlayers()).filter(p => p.active && String(p.name || '').trim());
   return players.map((p, index) => ({
-    slot: p.slot, name: String(p.name).trim(),
+    slot: p.slot, name: String(p.name).trim(), profileId: p.profileId || null,
     color: p.color || ['#e63946','#f4a261','#2a9d8f','#457b9d','#9b5de5','#f77f00'][index % 6]
   }));
 }
@@ -3550,10 +3548,8 @@ app.post('/api/duels/start', async (req, res) => {
     const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());
     if (selectedPlayers.length !== slots.length) return res.status(400).json({ error: 'Alle ausgewählten Slots müssen einen Spielernamen haben.' });
     invalidateLiveLifecycle();
-    const profiles = await dataStore.getProfiles();
-    const profileByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
     const tournamentName = String(req.body?.tournamentName || '').trim();
-    const tournamentPlayers = selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: profileByName.get(String(player.name).trim().toLowerCase()) || null }));
+    const tournamentPlayers = selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: Number(player.profileId || 0) || null }));
     const tournament = matchType === 'tournament'
       ? await dataStore.createTournament({ mode, tournamentName, checkoutRule, players: tournamentPlayers, bestOf })
       : null;

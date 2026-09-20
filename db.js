@@ -159,6 +159,8 @@ class DataStore {
     }
 
     await this.ensureDuelSchema();
+    await this.ensurePlayerProfileSchema();
+    await this.ensureHighscoreProfileSchema();
     await this.ensureHighscoreModeColumn();
     await this.ensureCheckoutRuleColumns();
     await this.ensureCheckoutStatsVersion();
@@ -169,6 +171,58 @@ class DataStore {
     await this.ensureSeasonSchema();
     await this.ensurePerformanceIndexes();
     await this.seedFromLegacyJson();
+  }
+
+  async ensurePlayerProfileSchema() {
+    const query = this.isSQLite() || this.isPostgres()
+      ? 'ALTER TABLE players ADD COLUMN profile_id INTEGER'
+      : 'ALTER TABLE players ADD COLUMN profile_id INT NULL';
+    try {
+      if (this.isSQLite()) await this.sqlite.run(query);
+      else if (this.isPostgres()) await this.pg.query(query);
+      else await this.my.query(query);
+    } catch (error) {
+      if (!/duplicate|already exists/i.test(String(error.message || ''))) throw error;
+    }
+
+    const profiles = await this.getProfiles();
+    const profileIdsByName = new Map();
+    for (const profile of profiles) {
+      const name = String(profile.name || '').trim().toLowerCase();
+      if (!name || profileIdsByName.has(name)) profileIdsByName.set(name, null);
+      else profileIdsByName.set(name, Number(profile.id));
+    }
+    const players = await this.getPlayers();
+    for (const player of players) {
+      if (Number(player.profileId || 0) > 0) continue;
+      const profileId = profileIdsByName.get(String(player.name || '').trim().toLowerCase());
+      if (!profileId) continue;
+      if (this.isSQLite()) await this.sqlite.run('UPDATE players SET profile_id = ? WHERE slot = ?', [profileId, player.slot]);
+      else if (this.isPostgres()) await this.pg.query('UPDATE players SET profile_id = $1 WHERE slot = $2', [profileId, player.slot]);
+      else await this.my.query('UPDATE players SET profile_id = ? WHERE slot = ?', [profileId, player.slot]);
+    }
+
+    const backfill = this.isSQLite()
+      ? 'UPDATE duel_players SET profile_id = (SELECT profile_id FROM players WHERE players.slot = duel_players.player_slot) WHERE profile_id IS NULL'
+      : this.isPostgres()
+        ? 'UPDATE duel_players SET profile_id = players.profile_id FROM players WHERE players.slot = duel_players.player_slot AND duel_players.profile_id IS NULL AND players.profile_id IS NOT NULL'
+        : 'UPDATE duel_players dp JOIN players p ON p.slot = dp.player_slot SET dp.profile_id = p.profile_id WHERE dp.profile_id IS NULL AND p.profile_id IS NOT NULL';
+    if (this.isSQLite()) await this.sqlite.run(backfill);
+    else if (this.isPostgres()) await this.pg.query(backfill);
+    else await this.my.query(backfill);
+  }
+
+  async ensureHighscoreProfileSchema() {
+    const query = this.isSQLite() || this.isPostgres()
+      ? 'ALTER TABLE highscores ADD COLUMN profile_id INTEGER'
+      : 'ALTER TABLE highscores ADD COLUMN profile_id INT NULL';
+    try {
+      if (this.isSQLite()) await this.sqlite.run(query);
+      else if (this.isPostgres()) await this.pg.query(query);
+      else await this.my.query(query);
+    } catch (error) {
+      if (!/duplicate|already exists/i.test(String(error.message || ''))) throw error;
+    }
   }
 
   async ensureSeasonSchema() {
@@ -830,7 +884,8 @@ class DataStore {
         slot INTEGER PRIMARY KEY,
         name TEXT NOT NULL DEFAULT '',
         active INTEGER NOT NULL DEFAULT 0,
-        color TEXT
+        color TEXT,
+        profile_id INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS live_state (
@@ -916,7 +971,8 @@ class DataStore {
         slot INTEGER PRIMARY KEY,
         name TEXT NOT NULL DEFAULT '',
         active BOOLEAN NOT NULL DEFAULT FALSE,
-        color TEXT
+        color TEXT,
+        profile_id INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS live_state (
@@ -1002,7 +1058,8 @@ class DataStore {
         slot INT PRIMARY KEY,
         name VARCHAR(255) NOT NULL DEFAULT '',
         active TINYINT(1) NOT NULL DEFAULT 0,
-        color VARCHAR(32) NULL
+        color VARCHAR(32) NULL,
+        profile_id INT NULL
       );
     `);
 
@@ -1156,12 +1213,10 @@ class DataStore {
     if (this.isSQLite()) {
       await this.sqlite.exec('BEGIN TRANSACTION');
       try {
-        await this.sqlite.run('DELETE FROM profiles');
         for (const p of safeList) {
-          await this.sqlite.run(
-            'INSERT INTO profiles (name, color) VALUES (?, ?)',
-            [String(p.name || '').trim(), p.color || null]
-          );
+          const id = Number(p.id || 0);
+          if (id > 0) await this.sqlite.run('UPDATE profiles SET name = ?, color = ? WHERE id = ?', [String(p.name || '').trim(), p.color || null, id]);
+          else await this.sqlite.run('INSERT INTO profiles (name, color) VALUES (?, ?)', [String(p.name || '').trim(), p.color || null]);
         }
         await this.sqlite.exec('COMMIT');
       } catch (err) {
@@ -1174,12 +1229,10 @@ class DataStore {
       const client = await this.pg.connect();
       try {
         await client.query('BEGIN');
-        await client.query('DELETE FROM profiles');
         for (const p of safeList) {
-          await client.query(
-            'INSERT INTO profiles (name, color) VALUES ($1, $2)',
-            [String(p.name || '').trim(), p.color || null]
-          );
+          const id = Number(p.id || 0);
+          if (id > 0) await client.query('UPDATE profiles SET name = $1, color = $2 WHERE id = $3', [String(p.name || '').trim(), p.color || null, id]);
+          else await client.query('INSERT INTO profiles (name, color) VALUES ($1, $2)', [String(p.name || '').trim(), p.color || null]);
         }
         await client.query('COMMIT');
       } catch (err) {
@@ -1192,12 +1245,10 @@ class DataStore {
     }
     const connection = await this.my.getConnection();
     try {
-      await connection.query('DELETE FROM profiles');
       for (const p of safeList) {
-        await connection.query(
-          'INSERT INTO profiles (name, color) VALUES (?, ?)',
-          [String(p.name || '').trim(), p.color || null]
-        );
+        const id = Number(p.id || 0);
+        if (id > 0) await connection.query('UPDATE profiles SET name = ?, color = ? WHERE id = ?', [String(p.name || '').trim(), p.color || null, id]);
+        else await connection.query('INSERT INTO profiles (name, color) VALUES (?, ?)', [String(p.name || '').trim(), p.color || null]);
       }
     } finally {
       connection.release();
@@ -1207,12 +1258,12 @@ class DataStore {
   async getPlayers() {
     let rows = [];
     if (this.isSQLite()) {
-      rows = await this.sqlite.all('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
+      rows = await this.sqlite.all('SELECT slot, name, active, color, profile_id FROM players ORDER BY slot ASC');
     } else if (this.isPostgres()) {
-      const result = await this.pg.query('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
+      const result = await this.pg.query('SELECT slot, name, active, color, profile_id FROM players ORDER BY slot ASC');
       rows = result.rows;
     } else {
-      const result = await this.my.query('SELECT slot, name, active, color FROM players ORDER BY slot ASC');
+      const result = await this.my.query('SELECT slot, name, active, color, profile_id FROM players ORDER BY slot ASC');
       rows = result[0];
     }
 
@@ -1224,7 +1275,8 @@ class DataStore {
         slot: Number(row.slot),
         name: String(row.name || ''),
         active: toBool(row.active),
-        color: row.color || undefined
+        color: row.color || undefined,
+        profileId: Number(row.profile_id || 0) || null
       };
     });
   }
@@ -1688,8 +1740,8 @@ class DataStore {
         await this.sqlite.run('DELETE FROM players');
         for (const p of safeList) {
           await this.sqlite.run(
-            'INSERT INTO players (slot, name, active, color) VALUES (?, ?, ?, ?)',
-            [Number(p.slot || 0), String(p.name || ''), toBool(p.active) ? 1 : 0, p.color || null]
+            'INSERT INTO players (slot, name, active, color, profile_id) VALUES (?, ?, ?, ?, ?)',
+            [Number(p.slot || 0), String(p.name || ''), toBool(p.active) ? 1 : 0, p.color || null, Number(p.profileId || 0) || null]
           );
         }
         await this.sqlite.exec('COMMIT');
@@ -1719,8 +1771,8 @@ class DataStore {
         await client.query('DELETE FROM players');
         for (const p of safeList) {
           await client.query(
-            'INSERT INTO players (slot, name, active, color) VALUES ($1, $2, $3, $4)',
-            [Number(p.slot || 0), String(p.name || ''), toBool(p.active), p.color || null]
+            'INSERT INTO players (slot, name, active, color, profile_id) VALUES ($1, $2, $3, $4, $5)',
+            [Number(p.slot || 0), String(p.name || ''), toBool(p.active), p.color || null, Number(p.profileId || 0) || null]
           );
         }
         await client.query('COMMIT');
@@ -1751,8 +1803,8 @@ class DataStore {
       await conn.query('DELETE FROM players');
       for (const p of safeList) {
         await conn.query(
-          'INSERT INTO players (slot, name, active, color) VALUES (?, ?, ?, ?)',
-          [Number(p.slot || 0), String(p.name || ''), toBool(p.active) ? 1 : 0, p.color || null]
+          'INSERT INTO players (slot, name, active, color, profile_id) VALUES (?, ?, ?, ?, ?)',
+          [Number(p.slot || 0), String(p.name || ''), toBool(p.active) ? 1 : 0, p.color || null, Number(p.profileId || 0) || null]
         );
       }
       await conn.commit();
@@ -2003,18 +2055,18 @@ class DataStore {
 
     if (this.isSQLite()) {
       rows = await this.sqlite.all(
-        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId, event_key AS eventKey FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, player_slot AS playerSlot, profile_id AS profileId, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId, event_key AS eventKey FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
     } else if (this.isPostgres()) {
       const result = await this.pg.query(
-        'SELECT id, player, player_slot AS "playerSlot", score, kind, category, game_mode AS "gameMode", checkout_rule AS "checkoutRule", leg_win AS "legWin", ts, duel_id AS "duelId", event_key AS "eventKey" FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = $1 ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
+        'SELECT id, player, player_slot AS "playerSlot", profile_id AS "profileId", score, kind, category, game_mode AS "gameMode", checkout_rule AS "checkoutRule", leg_win AS "legWin", ts, duel_id AS "duelId", event_key AS "eventKey" FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = $1 ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT $' + (safeMode ? '2' : '1'),
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result.rows;
     } else {
       const result = await this.my.query(
-        'SELECT id, player, player_slot AS playerSlot, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId, event_key AS eventKey FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
+        'SELECT id, player, player_slot AS playerSlot, profile_id AS profileId, score, kind, category, game_mode AS gameMode, checkout_rule AS checkoutRule, leg_win AS legWin, ts, duel_id AS duelId, event_key AS eventKey FROM highscores WHERE ' + validEncounter + (safeMode ? ' AND game_mode = ? ' : ' ') + 'ORDER BY score DESC, ts DESC LIMIT ?',
         safeMode ? [safeMode, safeLimit] : [safeLimit]
       );
       rows = result[0];
@@ -2024,6 +2076,7 @@ class DataStore {
       id: Number(r.id || 0),
       player: String(r.player || ''),
       playerSlot: Number(r.playerSlot || 0) || null,
+      profileId: Number(r.profileId || 0) || null,
       score: Number(r.score || 0),
       kind: r.kind || null,
       category: ['single', 'duel', 'group', 'tournament'].includes(String(r.category || '')) ? String(r.category) : (Number(r.duelId || 0) > 0 ? 'duel' : 'single'),
@@ -2050,6 +2103,15 @@ class DataStore {
     const ts = Number(entry && entry.ts ? entry.ts : Date.now());
     const duelId = Number(entry && entry.duelId) > 0 ? Number(entry.duelId) : null;
     const playerSlot = Number(entry && entry.playerSlot) > 0 ? Number(entry.playerSlot) : null;
+    let profileId = Number(entry && entry.profileId) > 0 ? Number(entry.profileId) : null;
+    if (!profileId && duelId && playerSlot) {
+      const duelPlayer = (await this.getDuel(duelId))?.players?.find(item => Number(item.player_slot) === playerSlot);
+      profileId = Number(duelPlayer?.profile_id || 0) || null;
+    }
+    if (!profileId && playerSlot) {
+      const player = (await this.getPlayers()).find(item => Number(item.slot) === playerSlot);
+      profileId = Number(player?.profileId || 0) || null;
+    }
     const eventKey = entry && entry.eventKey ? String(entry.eventKey) : null;
     let category = ['single', 'duel', 'group', 'tournament'].includes(String(entry && entry.category || '')) ? String(entry.category) : null;
     if (duelId && !category) {
@@ -2067,23 +2129,23 @@ class DataStore {
 
     if (this.isSQLite()) {
       await this.sqlite.run(
-        'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin ? 1 : 0, ts, duelId, eventKey]
+        'INSERT INTO highscores (player, player_slot, profile_id, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [player, playerSlot, profileId, score, kind, category, gameMode, checkoutRule, legWin ? 1 : 0, ts, duelId, eventKey]
       );
       return;
     }
 
     if (this.isPostgres()) {
       await this.pg.query(
-        'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-        [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin, ts, duelId, eventKey]
+        'INSERT INTO highscores (player, player_slot, profile_id, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
+        [player, playerSlot, profileId, score, kind, category, gameMode, checkoutRule, legWin, ts, duelId, eventKey]
       );
       return;
     }
 
     await this.my.query(
-      'INSERT INTO highscores (player, player_slot, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [player, playerSlot, score, kind, category, gameMode, checkoutRule, legWin ? 1 : 0, ts, duelId, eventKey]
+      'INSERT INTO highscores (player, player_slot, profile_id, score, kind, category, game_mode, checkout_rule, leg_win, ts, duel_id, event_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [player, playerSlot, profileId, score, kind, category, gameMode, checkoutRule, legWin ? 1 : 0, ts, duelId, eventKey]
     );
   }
 

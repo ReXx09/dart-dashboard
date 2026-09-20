@@ -766,7 +766,7 @@
           namedPlayers.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.slot;
-            opt.textContent = `P${p.slot} · ${p.name}`;
+            opt.textContent = p.profileId ? `${p.name} · Profil` : `P${p.slot} · ${p.name}`;
             playerGroup.appendChild(opt);
           });
           playerSelect.appendChild(playerGroup);

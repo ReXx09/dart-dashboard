@@ -244,7 +244,7 @@
         ).join('');
 
         const profileOpts = profiles.map(pr =>
-          `<option value="${escHtml(pr.name)}"${pr.name === p.name ? ' selected' : ''}>${escHtml(pr.name)}</option>`
+          `<option value="${pr.id}"${Number(pr.id) === Number(p.profileId) ? ' selected' : ''}>${escHtml(pr.name)}</option>`
         ).join('');
 
         card.innerHTML = `
@@ -296,6 +296,7 @@
 
     function setName(idx, val) {
       players[idx].name = val;
+      players[idx].profileId = null;
       const info = document.getElementById(`info-${idx}`);
       if (info) info.textContent = val ? `Slot ${players[idx].slot}: ${val}` : 'Kein Name';
       renderSummary();
@@ -440,10 +441,10 @@
     }
 
     function applyProfile(idx, sel) {
-      const name = sel.value;
-      players[idx].name = name;
-      if (name) {
-        const profile = profiles.find(pr => pr.name === name);
+      const profile = profiles.find(pr => Number(pr.id) === Number(sel.value));
+      players[idx].profileId = profile ? Number(profile.id) : null;
+      players[idx].name = profile ? profile.name : '';
+      if (profile) {
         if (profile && profile.color) {
           players[idx].color = profile.color;
         }
