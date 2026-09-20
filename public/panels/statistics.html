@@ -586,6 +586,7 @@
   <script>
     const API_BASE = '/api';
     let currentPlayerId = null;
+    let currentProfileId = null;
     let currentSeason = '2026';
     let currentStatsMode = '';
     let encounters = [];
@@ -757,31 +758,30 @@
         availablePlayers = namedPlayers;
         selectedComparisonPlayerOrder = namedPlayers.slice(0, 2).map(player => String(player.slot));
         selectedComparisonPlayerSlots = new Set(selectedComparisonPlayerOrder);
-        const assignedNames = new Set(namedPlayers.map(p => String(p.name).trim().toLowerCase()));
-
         playerSelect.innerHTML = '<option value="">-- Spieler wählen --</option>';
         if (namedPlayers.length) {
           const playerGroup = document.createElement('optgroup');
           playerGroup.label = 'Spieler-Slots';
           namedPlayers.forEach(p => {
             const opt = document.createElement('option');
-            opt.value = p.slot;
+            opt.value = p.profileId ? `profile:${p.profileId}` : `slot:${p.slot}`;
             opt.textContent = p.profileId ? `${p.name} · Profil` : `P${p.slot} · ${p.name}`;
             playerGroup.appendChild(opt);
           });
           playerSelect.appendChild(playerGroup);
         }
 
+        const assignedProfileIds = new Set(namedPlayers.map(p => Number(p.profileId || 0)).filter(Boolean));
         const unassignedProfiles = Array.isArray(profiles)
-          ? profiles.filter(profile => profile.name && !assignedNames.has(String(profile.name).trim().toLowerCase()))
+          ? profiles.filter(profile => profile.name && !assignedProfileIds.has(Number(profile.id)))
           : [];
         if (unassignedProfiles.length) {
           const profileGroup = document.createElement('optgroup');
           profileGroup.label = 'Profile ohne Spielerslot';
           unassignedProfiles.forEach(profile => {
             const opt = document.createElement('option');
-            opt.disabled = true;
-            opt.textContent = `${profile.name} · zuerst einem Slot zuweisen`;
+            opt.value = `profile:${profile.id}`;
+            opt.textContent = `${profile.name} · Profil`;
             profileGroup.appendChild(opt);
           });
           playerSelect.appendChild(profileGroup);
@@ -793,7 +793,22 @@
 
     // Load stats for current player
     async function loadStats() {
-      if (!currentPlayerId) return;
+      if (!currentPlayerId && !currentProfileId) return;
+      if (currentProfileId) {
+        const response = await fetch(`${API_BASE}/highscores/overview`, { cache: 'no-store' });
+        const overview = response.ok ? await response.json() : null;
+        const profileEntry = overview?.profileStats?.find(item => Number(item.profileId) === currentProfileId) || {};
+        currentStats = profileEntry;
+        segmentAnalysis = null;
+        renderSummary(profileEntry);
+        renderOverview(profileEntry);
+        renderAvg(profileEntry);
+        renderScoring(profileEntry);
+        renderCheckout(profileEntry);
+        renderHistory([]);
+        renderEncounterStats(profileEntry);
+        return;
+      }
       try {
         const [statsRes, historyRes, segmentRes, highscoresRes] = await Promise.all([
           fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${currentSeason}`, { cache: 'no-store' }),
@@ -828,7 +843,7 @@
 
     function renderEncounterStats(data) {
       const container = document.getElementById('encounterStats');
-      if (!currentPlayerId) {
+      if (!currentPlayerId && !currentProfileId) {
         container.innerHTML = '<div class="stat-item"><div class="stat-label">Begegnungswerte</div><div class="stat-value">-</div><div class="stat-sub">Spieler auswählen</div></div>';
         document.getElementById('encounterPlayerStatus').textContent = 'Wähle einen Spieler für seine Begegnungswerte.';
         return;
@@ -852,9 +867,10 @@
     }
 
     async function loadEncounterStats() {
-      if (!currentPlayerId) { renderEncounterStats(null); return; }
+      if (!currentPlayerId && !currentProfileId) { renderEncounterStats(null); return; }
       try {
-        const response = await fetch(`${API_BASE}/duel-stats?playerSlots=${currentPlayerId}&category=${selectedEncounterCategory}&status=finished`, { cache: 'no-store' });
+        const identityQuery = currentProfileId ? `profileIds=${currentProfileId}` : `playerSlots=${currentPlayerId}`;
+        const response = await fetch(`${API_BASE}/duel-stats?${identityQuery}&category=${selectedEncounterCategory}&status=finished`, { cache: 'no-store' });
         renderEncounterStats(response.ok ? await response.json() : null);
       } catch (_error) { renderEncounterStats(null); }
     }
@@ -1237,7 +1253,8 @@
     // Event listeners
     playerSelect.addEventListener('change', () => {
       leaveStatsEditor();
-      currentPlayerId = playerSelect.value ? Number(playerSelect.value) : null;
+      currentPlayerId = playerSelect.value.startsWith('slot:') ? Number(playerSelect.value.slice(5)) : null;
+      currentProfileId = playerSelect.value.startsWith('profile:') ? Number(playerSelect.value.slice(8)) : null;
       loadStats();
     });
 

@@ -3487,6 +3487,7 @@ app.get('/api/duels/top', async (req, res) => {
 
 app.get('/api/duel-stats', async (req, res) => {
   const slots = String(req.query.playerSlots || '').split(',').map(Number).filter(Number.isInteger).filter(slot => slot > 0).sort((a, b) => a - b);
+  const profileIds = String(req.query.profileIds || '').split(',').map(Number).filter(Number.isInteger).filter(profileId => profileId > 0).sort((a, b) => a - b);
   if (slots.length > 8) return res.status(400).json({ error: 'playerSlots darf höchstens 8 Slots enthalten.' });
   const exactGroup = String(req.query.exact || 'false').toLowerCase() === 'true';
   const category = String(req.query.category || 'all').trim().toLowerCase();
@@ -3495,7 +3496,7 @@ app.get('/api/duel-stats', async (req, res) => {
   if (status !== 'finished') return res.status(400).json({ error: 'Statistiken werden nur für abgeschlossene Begegnungen geführt.' });
   try {
     const duels = await dataStore.listFinishedDuelsForStats();
-    const payload = aggregateDuelStats({ duels, slots, category, exactGroup });
+    const payload = aggregateDuelStats({ duels, slots, profileIds, category, exactGroup });
     res.json(payload);
   } catch (err) { res.status(500).json({ error: 'Duellstatistik konnte nicht geladen werden: ' + err.message }); }
 });
@@ -4329,7 +4330,45 @@ app.get('/api/highscores/overview', async (_req, res) => {
       .sort((a, b) => b[field] - a[field]);
     const modes = ['gesamt', ...new Set(groupedEntries.map(entry => entry.mode))];
     const categories = ['all', ...new Set(groupedEntries.map(entry => entry.category))];
-    res.json({ trackingMode: 'gesamt', modes, categories, players: entries.map(entry => ({ profileId: entry.profileId, player: entry.player })), metrics: {
+    const profileStatsById = new Map(profiles.map(profile => [Number(profile.id), {
+      profileId: Number(profile.id),
+      player: profile.name,
+      mode: 'gesamt',
+      category: 'all',
+      count180: 0, count171Plus: 0, count140Plus: 0, count100Plus: 0,
+      darts: 0, totalScored: 0, firstNineTotal: 0, firstNineCount: 0,
+      checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0,
+      checkoutByRule: {
+        single: { attempts: 0, success: 0, highest: 0 },
+        double: { attempts: 0, success: 0, highest: 0 },
+        master: { attempts: 0, success: 0, highest: 0 }
+      },
+      gamesPlayed: 0, gamesWon: 0, legsPlayed: 0, legsWon: 0
+    }]));
+    for (const entry of groupedEntries) {
+      const total = profileStatsById.get(Number(entry.profileId));
+      if (!total) continue;
+      for (const field of ['count180', 'count171Plus', 'count140Plus', 'count100Plus', 'darts', 'totalScored', 'firstNineCount', 'checkoutAttempts', 'checkoutSuccess', 'gamesPlayed', 'gamesWon', 'legsPlayed', 'legsWon']) total[field] += Number(entry[field] || 0);
+      total.firstNineTotal += Number(entry.firstNineAverage || 0) * Number(entry.firstNineCount || 0);
+      total.highestCheckout = Math.max(total.highestCheckout, Number(entry.highestCheckout || 0));
+      for (const rule of ['single', 'double', 'master']) {
+        total.checkoutByRule[rule].attempts += Number(entry.checkoutByRule?.[rule]?.attempts || 0);
+        total.checkoutByRule[rule].success += Number(entry.checkoutByRule?.[rule]?.success || 0);
+        total.checkoutByRule[rule].highest = Math.max(total.checkoutByRule[rule].highest, Number(entry.checkoutByRule?.[rule]?.highest || 0));
+      }
+    }
+    const profileStats = Array.from(profileStatsById.values()).map(entry => addDerivedMetrics({
+      ...entry,
+      firstNineSamples: entry.firstNineCount,
+      matchesPlayed: entry.gamesPlayed,
+      matchesWon: entry.gamesWon,
+      checkoutRate: entry.checkoutAttempts > 0 ? Number((entry.checkoutSuccess / entry.checkoutAttempts * 100).toFixed(1)) : 0,
+      checkoutByRule: Object.fromEntries(['single', 'double', 'master'].map(rule => {
+        const value = entry.checkoutByRule[rule];
+        return [rule, { ...value, rate: value.attempts > 0 ? Number((value.success / value.attempts * 100).toFixed(1)) : 0, highest: Math.min(170, value.highest) }];
+      }))
+    }));
+    res.json({ trackingMode: 'gesamt', modes, categories, players: profiles.map(profile => ({ profileId: Number(profile.id), player: profile.name })), profileStats, metrics: {
       count180: ranked('count180'),
       count171Plus: ranked('count171Plus'),
       count140Plus: ranked('count140Plus'),
