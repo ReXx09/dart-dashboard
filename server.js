@@ -3457,10 +3457,19 @@ app.get('/api/duels', async (req, res) => {
   const category = String(req.query.category || 'all').trim().toLowerCase();
   const requestedStatus = String(req.query.status || 'finished').trim().toLowerCase();
   const status = requestedStatus === 'all' ? '' : requestedStatus;
+  const month = String(req.query.month || '').trim();
+  const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
   if (!['all', 'single', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, single, duel, group oder tournament sein.' });
   if (requestedStatus && !['all', 'active', 'finished', 'canceled'].includes(requestedStatus)) return res.status(400).json({ error: 'status muss all, active, finished oder canceled sein.' });
+  if (month && (!/^(?:[1-9]|1[0-2])$/.test(month) || !/^\d{4}$/.test(season))) return res.status(400).json({ error: 'month muss 1 bis 12 und season ein vierstelliges Jahr sein.' });
   try {
-    const duels = await dataStore.listDuels(req.query.limit || 20, status);
+    let duels = await dataStore.listDuels(req.query.limit || 20, status);
+    if (month) {
+      duels = duels.filter(duel => {
+        const date = new Date(Number(duel.started_at));
+        return date.getFullYear() === Number(season) && date.getMonth() + 1 === Number(month);
+      });
+    }
     res.json(category === 'all' ? duels : duels.filter(duel => duel.category === category));
   }
   catch (err) { res.status(500).json({ error: 'Begegnungen konnten nicht geladen werden: ' + err.message }); }
@@ -3492,10 +3501,19 @@ app.get('/api/duel-stats', async (req, res) => {
   const exactGroup = String(req.query.exact || 'false').toLowerCase() === 'true';
   const category = String(req.query.category || 'all').trim().toLowerCase();
   const status = String(req.query.status || 'finished').trim().toLowerCase();
+  const month = String(req.query.month || '').trim();
+  const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
   if (!['all', 'single', 'duel', 'group', 'tournament'].includes(category)) return res.status(400).json({ error: 'category muss all, single, duel, group oder tournament sein.' });
   if (status !== 'finished') return res.status(400).json({ error: 'Statistiken werden nur für abgeschlossene Begegnungen geführt.' });
+  if (month && (!/^(?:[1-9]|1[0-2])$/.test(month) || !/^\d{4}$/.test(season))) return res.status(400).json({ error: 'month muss 1 bis 12 und season ein vierstelliges Jahr sein.' });
   try {
-    const duels = await dataStore.listFinishedDuelsForStats();
+    let duels = await dataStore.listFinishedDuelsForStats();
+    if (month) {
+      duels = duels.filter(duel => {
+        const date = new Date(Number(duel.started_at));
+        return date.getFullYear() === Number(season) && date.getMonth() + 1 === Number(month);
+      });
+    }
     const payload = aggregateDuelStats({ duels, slots, profileIds, category, exactGroup });
     res.json(payload);
   } catch (err) { res.status(500).json({ error: 'Duellstatistik konnte nicht geladen werden: ' + err.message }); }

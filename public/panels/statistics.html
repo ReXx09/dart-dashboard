@@ -42,7 +42,7 @@
     }
     .toolbar {
       display: grid;
-      grid-template-columns: minmax(220px, 340px) 1fr auto;
+      grid-template-columns: minmax(220px, 340px) minmax(120px, 180px) minmax(140px, 1fr) auto;
       gap: 12px;
       align-items: center;
       background: #141414;
@@ -401,6 +401,24 @@
         </select>
       </div>
       <div>
+        <label for="monthSelect">Monat</label>
+        <select id="monthSelect">
+          <option value="all">Alle Monate</option>
+          <option value="1">Januar</option>
+          <option value="2">Februar</option>
+          <option value="3">März</option>
+          <option value="4">April</option>
+          <option value="5">Mai</option>
+          <option value="6">Juni</option>
+          <option value="7">Juli</option>
+          <option value="8">August</option>
+          <option value="9">September</option>
+          <option value="10">Oktober</option>
+          <option value="11">November</option>
+          <option value="12">Dezember</option>
+        </select>
+      </div>
+      <div>
         <label for="statsModeSelect">Spielmodus</label>
         <select id="statsModeSelect">
           <option value="">Alle Modi</option>
@@ -591,6 +609,7 @@
     let currentPlayerId = null;
     let currentProfileId = null;
     let currentSeason = '2026';
+    let currentMonth = 'all';
     let currentStatsMode = '';
     let encounters = [];
     let selectedEncounterCategory = 'all';
@@ -609,6 +628,7 @@
     // DOM Elements
     const playerSelect = document.getElementById('playerSelect');
     const seasonSelect = document.getElementById('seasonSelect');
+    const monthSelect = document.getElementById('monthSelect');
     const statsModeSelect = document.getElementById('statsModeSelect');
     const refreshBtn = document.getElementById('refreshBtn');
     const summaryGrid = document.getElementById('summaryGrid');
@@ -988,7 +1008,8 @@
       if (!currentPlayerId && !currentProfileId) { renderEncounterStats(null); return; }
       try {
         const identityQuery = currentProfileId ? `profileIds=${currentProfileId}` : `playerSlots=${currentPlayerId}`;
-        const response = await fetch(`${API_BASE}/duel-stats?${identityQuery}&category=${selectedEncounterCategory}&status=finished`, { cache: 'no-store' });
+        const monthQuery = currentMonth === 'all' ? '' : `&month=${encodeURIComponent(currentMonth)}&season=${encodeURIComponent(currentSeason)}`;
+        const response = await fetch(`${API_BASE}/duel-stats?${identityQuery}&category=${selectedEncounterCategory}&status=finished${monthQuery}`, { cache: 'no-store' });
         renderEncounterStats(response.ok ? await response.json() : null);
       } catch (_error) { renderEncounterStats(null); }
     }
@@ -1165,7 +1186,8 @@
 
     async function loadEncounters() {
       try {
-        const response = await fetch(API_BASE + '/duels?limit=300&status=finished', { cache: 'no-store' });
+        const monthQuery = currentMonth === 'all' ? '' : '&month=' + encodeURIComponent(currentMonth) + '&season=' + encodeURIComponent(currentSeason);
+        const response = await fetch(API_BASE + '/duels?limit=300&status=finished' + monthQuery, { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         encounters = await response.json();
         renderEncounters();
@@ -1428,6 +1450,14 @@
       leaveStatsEditor();
       currentSeason = seasonSelect.value;
       loadStats();
+      loadEncounters();
+      loadEncounterStats();
+    });
+
+    monthSelect.addEventListener('change', () => {
+      currentMonth = monthSelect.value;
+      loadEncounters();
+      loadEncounterStats();
     });
 
     statsModeSelect.addEventListener('change', () => {
