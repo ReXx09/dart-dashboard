@@ -437,7 +437,7 @@
 
     <div class="tab-panel active" id="tab-overview">
       <div class="section">
-        <h2 class="section-title">Allgemein</h2>
+        <h2 class="section-title" id="overviewTitle">Allgemein</h2>
         <div class="stats-grid" id="overviewStats"></div>
       </div>
       <div class="section">
@@ -794,6 +794,7 @@
     // Load stats for current player
     async function loadStats() {
       if (!currentPlayerId && !currentProfileId) return;
+      document.getElementById('overviewTitle').textContent = 'Allgemein';
       if (currentProfileId) {
         const assignedPlayer = availablePlayers.find(player => Number(player.profileId || 0) === currentProfileId);
         if (assignedPlayer) {
@@ -871,6 +872,85 @@
         loadEncounterStats();
       } catch (e) {
         console.error('Failed to load stats:', e);
+      }
+    }
+
+    async function loadGlobalOverview() {
+      currentPlayerId = null;
+      currentProfileId = null;
+      currentStats = {};
+      segmentAnalysis = null;
+      try {
+        const response = await fetch(`${API_BASE}/highscores/overview`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const overview = await response.json();
+        const totals = (overview.profileStats || []).reduce((total, entry) => {
+          total.gamesPlayed += Number(entry.gamesPlayed || 0);
+          total.gamesWon += Number(entry.gamesWon || 0);
+          total.legsPlayed += Number(entry.legsPlayed || 0);
+          total.legsWon += Number(entry.legsWon || 0);
+          total.darts += Number(entry.darts || 0);
+          total.scored += Number(entry.totalScored || 0);
+          total.count180 += Number(entry.count180 || 0);
+          total.count171plus += Number(entry.count171Plus || 0);
+          total.count140plus += Number(entry.count140Plus || 0);
+          total.count100plus += Number(entry.count100Plus || 0);
+          total.firstNineTotal += Number(entry.firstNineTotal || 0);
+          total.firstNineSamples += Number(entry.firstNineSamples || 0);
+          total.highestCheckout = Math.max(total.highestCheckout, Number(entry.highestCheckout || 0));
+          total.highestLegAvg = Math.max(total.highestLegAvg, Number(entry.highestLegAvg || 0));
+          for (const rule of ['single', 'double', 'master']) {
+            total.checkout[rule].attempts += Number(entry.checkoutByRule?.[rule]?.attempts || 0);
+            total.checkout[rule].success += Number(entry.checkoutByRule?.[rule]?.success || 0);
+            total.checkout[rule].highest = Math.max(total.checkout[rule].highest, Number(entry.checkoutByRule?.[rule]?.highest || 0));
+          }
+          return total;
+        }, {
+          gamesPlayed: 0, gamesWon: 0, legsPlayed: 0, legsWon: 0, darts: 0, scored: 0,
+          count180: 0, count171plus: 0, count140plus: 0, count100plus: 0,
+          firstNineTotal: 0, firstNineSamples: 0, highestCheckout: 0, highestLegAvg: 0,
+          checkout: {
+            single: { attempts: 0, success: 0, highest: 0 },
+            double: { attempts: 0, success: 0, highest: 0 },
+            master: { attempts: 0, success: 0, highest: 0 }
+          }
+        });
+        const stats = {
+          games_played: totals.gamesPlayed,
+          games_won: totals.gamesWon,
+          legs_played: totals.legsPlayed,
+          legs_won: totals.legsWon,
+          total_darts: totals.darts,
+          total_scored: totals.scored,
+          count_180: totals.count180,
+          count_171plus: totals.count171plus,
+          count_140plus: totals.count140plus,
+          count_100plus: totals.count100plus,
+          avg_first9: totals.firstNineSamples > 0 ? totals.firstNineTotal / totals.firstNineSamples : 0,
+          first_nine_samples: totals.firstNineSamples,
+          highest_leg_avg: totals.highestLegAvg,
+          highest_checkout: totals.highestCheckout,
+          max_score: 0
+        };
+        for (const rule of ['single', 'double', 'master']) {
+          stats[`checkout_${rule}_attempts`] = totals.checkout[rule].attempts;
+          stats[`checkout_${rule}_success`] = totals.checkout[rule].success;
+          stats[`checkout_${rule}_highest`] = totals.checkout[rule].highest;
+        }
+        const highscores = await fetch('/api/highscores', { cache: 'no-store' }).then(result => result.ok ? result.json() : []);
+        stats.max_score = highscores.reduce((max, entry) => Math.max(max, Number(entry.score || 0)), 0);
+        currentStats = stats;
+        renderSummary(stats);
+        renderOverview(stats);
+        renderAvg(stats);
+        renderScoring(stats);
+        renderSegmentAnalysis();
+        renderCheckout(stats);
+        renderHistory([]);
+        renderEncounterStats(null);
+        document.getElementById('overviewTitle').textContent = 'Gesamtübersicht aller Spieler und Profile';
+      } catch (error) {
+        console.error('Gesamtübersicht konnte nicht geladen werden:', error);
       }
     }
 
@@ -1295,7 +1375,8 @@
       leaveStatsEditor();
       currentPlayerId = playerSelect.value.startsWith('slot:') ? Number(playerSelect.value.slice(5)) : null;
       currentProfileId = playerSelect.value.startsWith('profile:') ? Number(playerSelect.value.slice(8)) : null;
-      loadStats();
+      if (currentPlayerId || currentProfileId) loadStats();
+      else loadGlobalOverview();
     });
 
     seasonSelect.addEventListener('change', () => {
@@ -1409,15 +1490,24 @@
     });
     loadEncounters();
 
+    function applyPlayerSelection(value) {
+      const selectedValue = String(value || '');
+      currentPlayerId = selectedValue.startsWith('slot:') ? Number(selectedValue.slice(5)) : null;
+      currentProfileId = selectedValue.startsWith('profile:') ? Number(selectedValue.slice(8)) : null;
+    }
+
     // Init
     loadPlayers().then(() => {
       // Try to restore last selected player from localStorage
       const saved = localStorage.getItem('stats_player');
-      if (saved && playerSelect.querySelector(`option[value="${saved}"]`)) {
-        playerSelect.value = saved;
-        currentPlayerId = Number(saved);
+      const savedOption = saved && playerSelect.querySelector(`option[value="${saved}"]`);
+      const initialValue = savedOption ? saved : '';
+      if (initialValue) {
+        playerSelect.value = initialValue;
+        applyPlayerSelection(initialValue);
+        localStorage.setItem('stats_player', initialValue);
         loadStats();
-      }
+      } else loadGlobalOverview();
     });
 
     // Save player selection
