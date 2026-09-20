@@ -4126,7 +4126,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
         };
       }
       entries.push({
-        profileId: resolvePlayerIdentity({ name: player.name, slot: player.slot }, profileIdsByName),
+        profileId: resolvePlayerIdentity({ profileId: player.profileId ?? player.profile_id, name: player.name, slot: player.slot }, profileIdsByName),
         player: player.name,
         mode: 'gesamt',
         category: 'all',
@@ -4345,9 +4345,26 @@ app.get('/api/highscores/overview', async (_req, res) => {
       },
       gamesPlayed: 0, gamesWon: 0, legsPlayed: 0, legsWon: 0
     }]));
+    const profileStatsFromSlots = new Set();
+    for (const entry of entries) {
+      const total = profileStatsById.get(Number(entry.profileId));
+      if (!total) continue;
+      const hasStats = Number(entry.gamesPlayed || 0) > 0 || Number(entry.legsPlayed || 0) > 0 || Number(entry.darts || 0) > 0;
+      if (!hasStats) continue;
+      profileStatsFromSlots.add(Number(entry.profileId));
+      for (const field of ['count180', 'count171Plus', 'count140Plus', 'count100Plus', 'darts', 'totalScored', 'firstNineSamples', 'checkoutAttempts', 'checkoutSuccess', 'gamesPlayed', 'gamesWon', 'legsPlayed', 'legsWon']) total[field] += Number(entry[field] || 0);
+      total.firstNineTotal += Number(entry.firstNineAverage || 0) * Number(entry.firstNineSamples || 0);
+      total.highestCheckout = Math.max(total.highestCheckout, Number(entry.highestCheckout || 0));
+      for (const rule of ['single', 'double', 'master']) {
+        total.checkoutByRule[rule].attempts += Number(entry.checkoutByRule?.[rule]?.attempts || 0);
+        total.checkoutByRule[rule].success += Number(entry.checkoutByRule?.[rule]?.success || 0);
+        total.checkoutByRule[rule].highest = Math.max(total.checkoutByRule[rule].highest, Number(entry.checkoutByRule?.[rule]?.highest || 0));
+      }
+    }
     for (const entry of groupedEntries) {
       const total = profileStatsById.get(Number(entry.profileId));
       if (!total) continue;
+      if (profileStatsFromSlots.has(Number(entry.profileId))) continue;
       for (const field of ['count180', 'count171Plus', 'count140Plus', 'count100Plus', 'darts', 'totalScored', 'firstNineCount', 'checkoutAttempts', 'checkoutSuccess', 'gamesPlayed', 'gamesWon', 'legsPlayed', 'legsWon']) total[field] += Number(entry[field] || 0);
       total.firstNineTotal += Number(entry.firstNineAverage || 0) * Number(entry.firstNineCount || 0);
       total.highestCheckout = Math.max(total.highestCheckout, Number(entry.highestCheckout || 0));
