@@ -75,10 +75,10 @@
       justify-content: center;
     }
     .topbar .audio-btn:not(.active) { border-color: #7a3035; color: #ff9aa0; }
-    .daily-hs { min-height: 28px; width: clamp(180px, 18vw, 210px); flex: 0 0 clamp(180px, 18vw, 210px); font-size: .78rem; color: #f4a261; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 5px 10px; white-space: nowrap; display: grid; grid-template-columns: 78px minmax(0, 1fr); align-items: center; gap: 6px; }
+    .daily-hs { min-height: 28px; width: clamp(180px, 18vw, 210px); flex: 0 0 clamp(180px, 18vw, 210px); font-size: .78rem; color: #f4a261; background: #1a1a1a; border: 1px solid var(--hs-color, #333); border-radius: 8px; padding: 5px 10px; white-space: nowrap; display: grid; grid-template-columns: 78px minmax(0, 1fr); align-items: center; gap: 6px; box-shadow: inset 0 0 12px var(--hs-glow, transparent); }
     .daily-hs .hs-label, .daily-hs .hs-val { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; text-align: left; }
-    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; text-align: left; }
+    .daily-hs .hs-label { color: var(--hs-color, #777); font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; text-align: left; }
+    .daily-hs .hs-val { color: var(--hs-color, #f4a261); font-weight: 800; font-variant-numeric: tabular-nums; text-align: left; }
     main {
       padding: 6px;
       width: 100%;
@@ -3265,6 +3265,14 @@
       const showCheckout = mode === 'checkout' || (mode === 'alternate' && Math.floor(Date.now() / dailyDisplaySettings.intervalMs) % 2 === 0);
       const best = showCheckout ? data && data.bestCheckout : data && data.best;
       const label = showCheckout ? 'Höchster Checkout' : 'Tages-Highscore';
+      const playerName = String(best && best.player || '').trim().toLowerCase();
+      const player = liveState && Array.isArray(liveState.players)
+        ? liveState.players.find(item => Number(item.slot) === Number(best && best.playerSlot))
+          || liveState.players.find(item => String(item.name || '').trim().toLowerCase() === playerName)
+        : null;
+      const playerColor = player && player.color ? player.color : '#333';
+      el.style.setProperty('--hs-color', playerColor);
+      el.style.setProperty('--hs-glow', player && player.color ? colorToRgba(player.color, .14) : 'transparent');
       const labelEl = el.querySelector('.hs-label');
       if (labelEl) labelEl.textContent = showCheckout ? 'Checkout' : 'Tages-HS';
       if (best) {
