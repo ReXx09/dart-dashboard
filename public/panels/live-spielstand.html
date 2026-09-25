@@ -1835,7 +1835,7 @@
       const rows = new Map();
       (duel && duel.players || []).forEach(player => rows.set(Number(player.player_slot), {
         name: player.player_name || 'Spieler', wins: 0, legs: 0, darts: 0, scored: 0,
-        checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, bestLeg: null,
+        checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, bestLeg: null, bestTurn: 0,
         count60plus: 0, count80plus: 0, count100plus: 0, count140plus: 0, count180: 0, firstNineTotal: 0, firstNineCount: 0
       }));
       (selectedLegs || duel && duel.legs || []).forEach(leg => (leg.players || []).forEach(player => {
@@ -1845,6 +1845,7 @@
         row.wins += Number(player.won || 0);
         row.darts += Number(player.darts || 0);
         row.scored += Number(player.scored || 0);
+        row.bestTurn = Math.max(row.bestTurn, Number(player.best_turn || 0));
         row.checkoutAttempts += Number(player.checkout_attempts || 0);
         row.checkoutSuccess += Number(player.checkout_success || 0);
         row.highestCheckout = Math.max(row.highestCheckout, Number(player.checkout_highest || 0));
@@ -1894,13 +1895,14 @@
       const legNavigation = '<div class="duel-leg-nav"><button type="button" onclick="changeDuelStatsLeg(-1)" ' + (duelStatsLegIndex < 0 ? 'disabled' : '') + '>‹ Zurück</button><strong>' + viewLabel + '</strong><button type="button" onclick="changeDuelStatsLeg(1)" ' + (duelStatsLegIndex >= legs.length - 1 ? 'disabled' : '') + '>Vor ›</button></div>';
       const labels = [
         [duelStatsLegIndex < 0 ? 'Legs gewonnen' : 'Leg gewonnen', item => item.wins],
-        ['Schnitt', item => item.average],
+        ['3-Dart-AVG', item => item.average],
         ['Scoring', item => item.scoring],
         ['Erster-9-AVG', item => item.firstNineAverage],
         ['Checkout', item => item.checkoutRate],
         ['Checkout-Rate', item => item.checkoutCount],
         ['Höchstes Finish', item => item.highestCheckout || '-'],
         ['Würfe', item => item.darts],
+        ['Beste Runde', item => item.bestTurn || '-'],
         ['Bestes Leg', item => item.bestLeg],
         ['60+', item => item.count60plus],
         ['80+', item => item.count80plus],
@@ -2588,7 +2590,7 @@
       if (lastThrow && lastThrow.bust) {
         if (isEventAnimationEnabled('bust')) showBustOverlay(active); else hideBustOverlay();
         const soundKey = [lastThrow.ts, lastThrow.playerSlot, 'bust'].join(':');
-        if (isEventEnabled('bust') && claimEventSound(soundKey)) {
+        if (state.game.status !== 'leg-finished' && isEventEnabled('bust') && claimEventSound(soundKey)) {
           playConfiguredEventSound('bust', playBustSound);
         }
       } else {
@@ -2602,16 +2604,18 @@
         if (eliminatedPlayer && eliminatorPlayer) {
           if (isEventAnimationEnabled('elimination')) showEliminationOverlay(eliminatedPlayer, eliminatorPlayer); else hideEliminationOverlay();
           const soundKey = [lastThrow.ts, lastThrow.playerSlot, 'elimination'].join(':');
-          if (isEventEnabled('elimination') && claimEventSound(soundKey)) {
+          if (state.game.status !== 'leg-finished' && isEventEnabled('elimination') && claimEventSound(soundKey)) {
             playConfiguredEventSound('elimination', playEliminationSound);
           }
         }
       } else {
         hideEliminationOverlay();
       }
-      playTripleEventSound(lastThrow);
-      playDoubleEventSound(lastThrow);
-      playBullEventSound(lastThrow);
+      if (state.game.status !== 'leg-finished') {
+        playTripleEventSound(lastThrow);
+        playDoubleEventSound(lastThrow);
+        playBullEventSound(lastThrow);
+      }
 
       const isCricket = mode === 'cricket';
       const isElimination = mode === 'elimination';
@@ -2758,7 +2762,8 @@
 
       overlay.classList.add('show');
       overlay.style.display = 'flex';
-      playConfiguredEventSound('winner', () => {}, currentWinnerKey);
+      const winnerSoundKey = ['winner', state.game.duelId || 'live', winner.slot, winner.legs || 0, state.game.mode || '501'].join(':');
+      if (claimEventSound(winnerSoundKey)) playConfiguredEventSound('winner', () => {}, winnerSoundKey);
       if (eventEffects && eventEffects.winner && eventEffects.winner.animation === 'fireworks' && isEventEnabled('winner')) createFireworks();
       else createConfetti();
     }
