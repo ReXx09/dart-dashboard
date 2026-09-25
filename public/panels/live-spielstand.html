@@ -65,7 +65,18 @@
     .topbar .restart-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
     .topbar .restart-btn { border-color: #f4a261; color: #f4a261; }
     .topbar .audio-btn.active { border-color: #2a9d8f; color: #7ac29a; }
-    .daily-hs { min-height: 28px; font-size: .78rem; color: #f4a261; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 5px 10px; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .topbar .fs-btn,
+    .topbar .audio-btn {
+      width: 34px;
+      height: 30px;
+      padding: 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .topbar .audio-btn:not(.active) { border-color: #7a3035; color: #ff9aa0; }
+    .daily-hs { min-height: 28px; width: clamp(180px, 18vw, 210px); flex: 0 0 clamp(180px, 18vw, 210px); font-size: .78rem; color: #f4a261; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 5px 10px; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .daily-hs .hs-label, .daily-hs .hs-val { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
     .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
     main {
@@ -1367,7 +1378,7 @@
       <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
     </div>
     <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
-    <button class="audio-btn" id="audioUnlockBtn" onclick="toggleMobileAudio()" title="Ton einschalten">🔇 Ton aus</button>
+    <button class="audio-btn" id="audioUnlockBtn" onclick="toggleMobileAudio()" title="Ton einschalten" aria-label="Ton einschalten">🔇</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
   </div>
 
@@ -1534,8 +1545,9 @@
     function updateAudioButton() {
       const button = document.getElementById('audioUnlockBtn');
       if (!button) return;
-      button.textContent = mobileAudioUnlocked ? '🔊 Ton an' : '🔇 Ton aus';
+      button.textContent = mobileAudioUnlocked ? '🔊' : '🔇';
       button.title = mobileAudioUnlocked ? 'Ton ausschalten' : 'Ton einschalten';
+      button.setAttribute('aria-label', button.title);
       button.classList.toggle('active', mobileAudioUnlocked);
     }
     function toggleMobileAudio() {
