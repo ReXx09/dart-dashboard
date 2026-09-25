@@ -35,7 +35,7 @@
     .topbar h2 { font-size: clamp(.78rem, 1.2vw, 1rem); font-weight: 700; text-align: center; min-width: 0; white-space: nowrap; }
     .topbar-info { min-width: 0; max-width: 34%; overflow: hidden; text-overflow: ellipsis; padding: 2px 9px; border: 1px solid transparent; border-radius: 8px; font-size: clamp(.85rem, 1.8vw, 1.5rem); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; line-height: 1.05; white-space: nowrap; }
     .topbar-mode { color: #f4c542; background: rgba(244,197,66,.1); border-color: rgba(244,197,66,.45); text-align: center; }
-    .topbar-checkout { color: #ff9aa0; background: rgba(230,57,70,.12); border-color: rgba(230,57,70,.5); text-align: left; }
+    .topbar-checkout { color: #ff9aa0; background: rgba(230,57,70,.12); border-color: rgba(230,57,70,.5); text-align: center; }
     .topbar-separator { color: #d7e0e5; font-size: 1.55rem; font-weight: 400; line-height: .7; }
     .topbar .fs-btn, .topbar .audio-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
     .topbar .fs-btn, .topbar .audio-btn { width: 34px; height: 30px; padding: 5px; display: inline-flex; align-items: center; justify-content: center; }
@@ -53,9 +53,9 @@
       border-radius: 8px;
       padding: 5px 10px;
       white-space: nowrap;
-      display: flex;
+      display: grid;
+      grid-template-columns: 78px minmax(0, 1fr);
       align-items: center;
-      justify-content: flex-start;
       gap: 6px;
     }
     .daily-hs .hs-label,
@@ -64,8 +64,8 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
-    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; text-align: left; }
+    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; text-align: left; }
     main {
       padding: 6px;
       max-width: none;

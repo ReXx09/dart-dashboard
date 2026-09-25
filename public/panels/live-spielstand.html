@@ -43,7 +43,7 @@
     .topbar h2 { font-size: clamp(.78rem, 1.2vw, 1rem); font-weight: 700; text-align: center; min-width: 0; white-space: nowrap; }
     .topbar-info { min-width: 0; max-width: 34%; overflow: hidden; text-overflow: ellipsis; padding: 2px 9px; border: 1px solid transparent; border-radius: 8px; font-size: clamp(.85rem, 1.8vw, 1.5rem); font-weight: 1000; text-transform: uppercase; letter-spacing: 1px; line-height: 1.05; white-space: nowrap; }
     .topbar-mode { color: #f4c542; background: rgba(244,197,66,.1); border-color: rgba(244,197,66,.45); text-align: center; }
-    .topbar-checkout { color: #ff9aa0; background: rgba(230,57,70,.12); border-color: rgba(230,57,70,.5); text-align: left; }
+    .topbar-checkout { color: #ff9aa0; background: rgba(230,57,70,.12); border-color: rgba(230,57,70,.5); text-align: center; }
     .topbar-separator { color: #d7e0e5; font-size: 1.55rem; font-weight: 400; line-height: .7; }
     .topbar .clock { font-size: .9rem; font-weight: 600; color: #f4a261; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
     .topbar .fs-btn,
@@ -75,10 +75,10 @@
       justify-content: center;
     }
     .topbar .audio-btn:not(.active) { border-color: #7a3035; color: #ff9aa0; }
-    .daily-hs { min-height: 28px; width: clamp(180px, 18vw, 210px); flex: 0 0 clamp(180px, 18vw, 210px); font-size: .78rem; color: #f4a261; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 5px 10px; white-space: nowrap; display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
+    .daily-hs { min-height: 28px; width: clamp(180px, 18vw, 210px); flex: 0 0 clamp(180px, 18vw, 210px); font-size: .78rem; color: #f4a261; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 5px 10px; white-space: nowrap; display: grid; grid-template-columns: 78px minmax(0, 1fr); align-items: center; gap: 6px; }
     .daily-hs .hs-label, .daily-hs .hs-val { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
-    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; text-align: left; }
+    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; text-align: left; }
     main {
       padding: 6px;
       width: 100%;
