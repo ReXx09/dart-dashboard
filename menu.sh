@@ -102,6 +102,7 @@ action_label() {
     quickstart)         printf 'Schnellstart-Assistent' ;;
     check)              printf 'Systemcheck + Auto-Installation' ;;
     pin-hash)           printf 'Admin-PIN-Assistent' ;;
+    system-update)      printf 'Systempakete aktualisieren' ;;
     raspi-update)       printf 'Raspberry-Pi-Firmware aktualisieren' ;;
     build-start)        printf 'Install/Update + Build + Start' ;;
     dev-build-start)    printf 'Dev-Pull + Build + Start' ;;
@@ -218,13 +219,31 @@ ui_pause() {
 submenu_einrichtung_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(printf 'System vorbereiten, Dev-Branch testen oder den Dienst neu bauen und starten.\n\nDev-Branch: ${DART_DEV_BRANCH:-refactor-central-data}\n\nENTER = ausfuehren   ESC = zurueck')" 18 80 6 \
+    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(printf 'System vorbereiten.\n\nENTER = ausfuehren   ESC = zurueck')" 16 80 4 \
       "1" "Systemcheck + Auto-Installation" \
-      "2" "Install/Update + Build + Start" \
-      "3" "Dev-Pull + Build + Start" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
-    case "$choice" in 1) execute_action check 1 0 ;; 2) execute_action build-start 1 0 ;; 3) execute_action dev-build-start 1 0 ;; 0|"") return 0 ;; esac
+    case "$choice" in 1) execute_action check 1 0 ;; 0|"") return 0 ;; esac
+  done
+}
+
+submenu_updates_whiptail() {
+  while true; do
+    local choice
+    choice="$(whiptail --title "Loewen Dart | Updates" --menu "System, Raspberry-Pi-Firmware oder Dashboard aktualisieren.\n\nENTER = ausfuehren   ESC = zurueck" 18 84 6 \
+      "1" "Systempakete: apt update + apt upgrade" \
+      "2" "Raspberry-Pi-Firmware: rpi-update" \
+      "3" "Dashboard: Install/Update + Build + Start" \
+      "4" "Dashboard Dev: Pull + Build + Start" \
+      "0" "Zurueck" \
+      3>&1 1>&2 2>&3)" || return 0
+    case "$choice" in
+      1) execute_action system-update 0 0 ;;
+      2) execute_action raspi-update 0 0 ;;
+      3) execute_action build-start 1 0 ;;
+      4) execute_action dev-build-start 1 0 ;;
+      0|"") return 0 ;;
+    esac
   done
 }
 
@@ -272,11 +291,28 @@ submenu_einrichtung_text() {
   while true; do
     printf '\n-- Einrichtung --------------------------------\n'
     printf '1) Systemcheck + Auto-Installation\n'
-    printf '2) Install/Update + Build + Start\n'
-    printf '3) Dev-Pull + Build + Start (%s)\n' "${DART_DEV_BRANCH:-refactor-central-data}"
     printf '0) Zurueck\n\n'
-    read -r -p 'Option [0-3]: ' c
-    case "$c" in 1) execute_action check 1 0 ;; 2) execute_action build-start 1 0 ;; 3) execute_action dev-build-start 1 0 ;; 0|'') return 0 ;; esac
+    read -r -p 'Option [0-1]: ' c
+    case "$c" in 1) execute_action check 1 0 ;; 0|'') return 0 ;; esac
+  done
+}
+
+submenu_updates_text() {
+  while true; do
+    printf '\n-- Updates ------------------------------------\n'
+    printf '1) Systempakete: apt update + apt upgrade\n'
+    printf '2) Raspberry-Pi-Firmware: rpi-update\n'
+    printf '3) Dashboard: Install/Update + Build + Start\n'
+    printf '4) Dashboard Dev: Pull + Build + Start (%s)\n' "${DART_DEV_BRANCH:-refactor-central-data}"
+    printf '0) Zurueck\n\n'
+    read -r -p 'Option [0-4]: ' c
+    case "$c" in
+      1) execute_action system-update 0 0 ;;
+      2) execute_action raspi-update 0 0 ;;
+      3) execute_action build-start 1 0 ;;
+      4) execute_action dev-build-start 1 0 ;;
+      0|'') return 0 ;;
+    esac
   done
 }
 
@@ -303,14 +339,12 @@ submenu_monitoring_text() {
 submenu_system_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart | Systempflege" --menu "PIN-Schutz und Raspberry-Pi-Systempflege.\n\nPIN-Hash wird nur als Hash in .env gespeichert.\n\nENTER = ausfuehren   ESC = zurueck" 18 84 6 \
+    choice="$(whiptail --title "Loewen Dart | Systempflege" --menu "PIN-Schutz und administrative Systemfunktionen.\n\nPIN-Hash wird nur als Hash in .env gespeichert.\n\nENTER = ausfuehren   ESC = zurueck" 16 84 4 \
       "1" "Admin-PIN-Assistent starten" \
-      "2" "Raspberry-Pi-Firmware aktualisieren" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
     case "$choice" in
       1) execute_action pin-hash ;;
-      2) execute_action raspi-update 0 0 ;;
       0|"") return 0 ;;
     esac
   done
@@ -320,12 +354,10 @@ submenu_system_text() {
   while true; do
     printf '\n-- Systempflege -------------------------------\n'
     printf '1) Admin-PIN-Assistent starten\n'
-    printf '2) Raspberry-Pi-Firmware aktualisieren\n'
     printf '0) Zurueck\n\n'
-    read -r -p 'Option [0-2]: ' c
+    read -r -p 'Option [0-1]: ' c
     case "$c" in
       1) execute_action pin-hash ;;
-      2) execute_action raspi-update 0 0 ;;
       0|"") return 0 ;;
     esac
   done
@@ -336,25 +368,27 @@ submenu_system_text() {
 main_menu_whiptail() {
   while true; do
     local choice status_line; status_line="$(menu_status_line)"
-    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 22 84 9 \
+    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 24 84 10 \
       "0" "Schnellstart-Assistent (komplette Einrichtung)" \
       "1" "Einrichtung >" \
-      "2" "Status & Monitoring >" \
-      "3" "Docker >" \
-      "4" "Systempflege >" \
-      "5" "Repo in anderen Ordner klonen" \
-      "6" "Hilfe fuer Einsteiger" \
-      "7" "Beenden" \
+      "2" "Updates >" \
+      "3" "Status & Monitoring >" \
+      "4" "Docker >" \
+      "5" "Systempflege >" \
+      "6" "Repo in anderen Ordner klonen" \
+      "7" "Hilfe fuer Einsteiger" \
+      "8" "Beenden" \
       3>&1 1>&2 2>&3)" || exit 0
     case "$choice" in
       0) execute_action quickstart 1 0 ;;
       1) submenu_einrichtung_whiptail ;;
-      2) submenu_monitoring_whiptail ;;
-      3) submenu_docker_whiptail ;;
-      4) submenu_system_whiptail ;;
-      5) execute_action clone 1 0 ;;
-      6) execute_action help-guide ;;
-      7) printf 'Beendet.\n'; exit 0 ;;
+      2) submenu_updates_whiptail ;;
+      3) submenu_monitoring_whiptail ;;
+      4) submenu_docker_whiptail ;;
+      5) submenu_system_whiptail ;;
+      6) execute_action clone 1 0 ;;
+      7) execute_action help-guide ;;
+      8) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
     esac
   done
@@ -366,22 +400,24 @@ main_menu_text() {
     printf ' Status: %s\n\n' "$(menu_status_line)"
     printf ' 0) Schnellstart-Assistent\n'
     printf ' 1) Einrichtung >\n'
-    printf ' 2) Status & Monitoring >\n'
-    printf ' 3) Docker >\n'
-    printf ' 4) Systempflege >\n'
-    printf ' 5) Repo klonen\n'
-    printf ' 6) Hilfe fuer Einsteiger\n'
-    printf ' 7) Beenden\n\n'
-    read -r -p 'Option [0-7]: ' c
+    printf ' 2) Updates >\n'
+    printf ' 3) Status & Monitoring >\n'
+    printf ' 4) Docker >\n'
+    printf ' 5) Systempflege >\n'
+    printf ' 6) Repo klonen\n'
+    printf ' 7) Hilfe fuer Einsteiger\n'
+    printf ' 8) Beenden\n\n'
+    read -r -p 'Option [0-8]: ' c
     case "$c" in
       0) execute_action quickstart 1 0 ;;
       1) submenu_einrichtung_text ;;
-      2) submenu_monitoring_text ;;
-      3) submenu_docker_text ;;
-      4) submenu_system_text ;;
-      5) execute_action clone 1 0 ;;
-      6) execute_action help-guide ;;
-      7) printf 'Beendet.\n'; exit 0 ;;
+      2) submenu_updates_text ;;
+      3) submenu_monitoring_text ;;
+      4) submenu_docker_text ;;
+      5) submenu_system_text ;;
+      6) execute_action clone 1 0 ;;
+      7) execute_action help-guide ;;
+      8) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n'; sleep 1 ;;
     esac
   done

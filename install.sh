@@ -16,6 +16,7 @@ run_action() {
     quickstart)     run_quickstart_wizard ;;
     check)          run_system_check_and_install ;;
     pin-hash)       generate_admin_pin_hash ;;
+    system-update)  run_system_update ;;
     raspi-update)   run_raspi_update ;;
     build-start)    build_and_start ;;
     dev-build-start) dev_build_and_start ;;
@@ -53,6 +54,7 @@ Actions:
   quickstart      Komplettassistent (Pruefen + Einrichten + Start + Tests)
   check           Systemcheck + Auto-Installation
   pin-hash        Gefuehrter Admin-PIN-Assistent, Hash in .env speichern
+  system-update   Debian/Raspberry-Pi-Systempakete aktualisieren
   raspi-update    Raspberry-Pi-Firmware aktualisieren (mit Bestaetigung)
   build-start     Install/Update + Build + Start
   dev-build-start  Dev-Branch pullen + Build + Start (DART_DEV_BRANCH oder refactor-central-data)
@@ -94,7 +96,7 @@ if [[ $# -eq 0 || "${1:-}" == "menu" ]]; then
 fi
 
 case "${1:-}" in
-  quickstart|check|pin-hash|raspi-update|build-start|dev-build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|arduino-status|arduino-connect|arduino-disconnect|help-guide)
+  quickstart|check|pin-hash|system-update|raspi-update|build-start|dev-build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|arduino-status|arduino-connect|arduino-disconnect|help-guide)
     run_action "$1"
     ;;
   -h|--help|help)
