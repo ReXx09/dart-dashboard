@@ -34,6 +34,10 @@ function readJson(filePath, fallback) {
 }
 
 const DEFAULT_STATS_SEASON = String(process.env.DART_SEASON || '2026');
+function seasonFromTimestamp(timestamp = Date.now()) {
+  const date = new Date(Number(timestamp));
+  return Number.isNaN(date.getTime()) ? DEFAULT_STATS_SEASON : String(date.getFullYear());
+}
 
 function toBool(value) {
   if (value === true || value === 1 || value === '1') return true;
@@ -61,7 +65,7 @@ function getThrowCorrectionValues(correction) {
     correction.action ? String(correction.action) : 'correction',
     correction.source ? String(correction.source) : 'live-correction',
     Number(correction.correctedAt) || Date.now(),
-    correction.season || DEFAULT_STATS_SEASON
+    correction.season || seasonFromTimestamp(correction.correctedAt)
   ];
 }
 
@@ -1515,7 +1519,41 @@ class DataStore {
     return Promise.all(rows.map(row => this.getDuel(row.id)));
   }
 
-  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now(), duelId = null, season = DEFAULT_STATS_SEASON, details = {}) {
+  async listAvailableSeasons() {
+    const queries = this.isSQLite()
+      ? [
+        'SELECT started_at AS ts FROM duels WHERE started_at IS NOT NULL',
+        'SELECT ts FROM leg_history WHERE ts IS NOT NULL',
+        'SELECT thrown_at AS ts FROM player_throw_segments WHERE thrown_at IS NOT NULL',
+        'SELECT ts FROM highscores WHERE ts IS NOT NULL'
+      ]
+      : this.isPostgres()
+        ? [
+          'SELECT started_at AS ts FROM duels WHERE started_at IS NOT NULL',
+          'SELECT ts FROM leg_history WHERE ts IS NOT NULL',
+          'SELECT thrown_at AS ts FROM player_throw_segments WHERE thrown_at IS NOT NULL',
+          'SELECT ts FROM highscores WHERE ts IS NOT NULL'
+        ]
+        : [
+          'SELECT started_at AS ts FROM duels WHERE started_at IS NOT NULL',
+          'SELECT ts FROM leg_history WHERE ts IS NOT NULL',
+          'SELECT thrown_at AS ts FROM player_throw_segments WHERE thrown_at IS NOT NULL',
+          'SELECT ts FROM highscores WHERE ts IS NOT NULL'
+        ];
+    const rows = [];
+    for (const query of queries) {
+      if (this.isSQLite()) rows.push(...await this.sqlite.all(query));
+      else if (this.isPostgres()) rows.push(...(await this.pg.query(query)).rows);
+      else rows.push(...(await this.my.query(query))[0]);
+    }
+    return [...new Set(rows.map(row => {
+      const timestamp = Number(row.ts);
+      if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
+      return new Date(timestamp).getFullYear();
+    }).filter(year => Number.isInteger(year) && year >= 2000 && year <= 2200))].sort((a, b) => b - a);
+  }
+
+  async recordThrowSegment(playerSlot, segment, points, mode, bust, thrownAt = Date.now(), duelId = null, season = seasonFromTimestamp(thrownAt), details = {}) {
     return this.recordThrowSegments([{ playerSlot, segment, points, mode, bust, thrownAt, duelId, season, ...details }]);
   }
 
@@ -1538,7 +1576,7 @@ class DataStore {
         Number(segment.turnId) > 0 ? Number(segment.turnId) : null,
         Number.isFinite(Number(segment.remaining)) ? Number(segment.remaining) : null,
         segment.source ? String(segment.source) : null,
-        segment.season || DEFAULT_STATS_SEASON
+        segment.season || seasonFromTimestamp(thrownAt)
       );
       if (this.isPostgres()) {
         const offset = index * 12;
@@ -1559,22 +1597,23 @@ class DataStore {
     else await this.my.query(`INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, values);
   }
 
-  async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON, duelLegId = null) {
+  async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON, duelLegId = null, profileId = null) {
     const slot = Number(playerSlot);
     const encounterId = Number(duelId) > 0 ? Number(duelId) : null;
     const legId = Number(duelLegId) > 0 ? Number(duelLegId) : null;
+    const identityProfileId = Number(profileId) > 0 ? Number(profileId) : null;
     let rows;
     if (this.isSQLite()) rows = await this.sqlite.all(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) ORDER BY thrown_at ASC',
-      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) AND (? IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = ?)) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId, identityProfileId, identityProfileId]
     );
     else if (this.isPostgres()) rows = (await this.pg.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND season = $2 AND ($3 = \'\' OR mode = $3) AND ($4 IS NULL OR duel_id = $4) AND ($5 IS NULL OR duel_leg_id = $5) ORDER BY thrown_at ASC',
-      [slot, season, String(mode || ''), encounterId, legId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND season = $2 AND ($3 = \'\' OR mode = $3) AND ($4 IS NULL OR duel_id = $4) AND ($5 IS NULL OR duel_leg_id = $5) AND ($6 IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = $6)) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), encounterId, legId, identityProfileId]
     )).rows;
     else rows = (await this.my.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) ORDER BY thrown_at ASC',
-      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) AND (? IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = ?)) ORDER BY thrown_at ASC',
+      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId, identityProfileId, identityProfileId]
     ))[0];
 
     const bySegment = new Map();
@@ -1889,7 +1928,7 @@ class DataStore {
       Number(throwData.turnId) > 0 ? Number(throwData.turnId) : null,
       Number.isFinite(Number(throwData.remaining)) ? Number(throwData.remaining) : null,
       throwData.source ? String(throwData.source) : null,
-      throwData.season || DEFAULT_STATS_SEASON
+      throwData.season || seasonFromTimestamp(throwData.thrownAt)
     ];
     const columns = 'player_slot, segment, points, mode, bust, thrown_at, duel_id, duel_leg_id, turn_id, remaining, source, season';
     const sqliteThrow = `INSERT INTO player_throw_segments (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -2371,7 +2410,7 @@ class DataStore {
     return Number((await this.my.query(sql, [slot]))[0]?.[0]?.count || 0);
   }
 
-  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn, season = DEFAULT_STATS_SEASON, duelId = null) {
+  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn, season = seasonFromTimestamp(), duelId = null) {
     const ts = Date.now();
 
     if (this.isSQLite()) {

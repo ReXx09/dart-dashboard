@@ -29,6 +29,10 @@ const {
 } = require('./modes/cricket');
 
 const DEFAULT_STATS_SEASON = String(process.env.DART_SEASON || '2026');
+function seasonFromTimestamp(timestamp = Date.now()) {
+  const date = new Date(Number(timestamp));
+  return Number.isNaN(date.getTime()) ? DEFAULT_STATS_SEASON : String(date.getFullYear());
+}
 const {
   calculateEliminationPoints,
   checkEliminationWin,
@@ -1436,8 +1440,9 @@ function advanceLiveTurn(state) {
 async function recordPlayerLegStats(player, state, options = {}) {
   try {
     if (!options.skipDuel) await recordDuelLegIfActive(state, player);
+    const statsSeason = seasonFromTimestamp();
     // Ensure player has stats entry
-    await dataStore.initPlayerStats(player.slot);
+    await dataStore.initPlayerStats(player.slot, statsSeason);
 
     // Calculate leg average: (total_scored / darts_thrown) * 3
     const dartsThrawn = Number(player.turns || 0);
@@ -1472,10 +1477,10 @@ async function recordPlayerLegStats(player, state, options = {}) {
     
     // Record leg in history
     const won = player.remaining === 0 ? 1 : 0;
-    await dataStore.recordLegHistory(player.slot, legAvg, checkout, won, dartsThrawn, undefined, state.game?.duelId || null);
+    await dataStore.recordLegHistory(player.slot, legAvg, checkout, won, dartsThrawn, statsSeason, state.game?.duelId || null);
 
     // Update player stats
-    const currentStats = await dataStore.getPlayerStats(player.slot) || {};
+    const currentStats = await dataStore.getPlayerStats(player.slot, statsSeason) || {};
     const isTrackedDuel = Number(state.game?.duelId || 0) > 0;
     const previousFirstNineTotal = Number(currentStats.first_nine_total || 0);
     const previousFirstNineSamples = Number(currentStats.first_nine_samples || 0);
@@ -1525,7 +1530,7 @@ async function recordPlayerLegStats(player, state, options = {}) {
       updates.cricket_won = (Number(currentStats.cricket_won || 0)) + (won ? 1 : 0);
     }
 
-    await dataStore.updatePlayerStats(player.slot, updates);
+    await dataStore.updatePlayerStats(player.slot, updates, statsSeason);
   } catch (err) {
     console.error('[Stats] Error recording player leg stats:', err);
   }
@@ -1633,6 +1638,7 @@ async function recordCompletedDuelPlayerStats(duel) {
   const checkoutRule = ['single', 'double', 'master'].includes(String(duel.checkout_rule || '').toLowerCase())
     ? String(duel.checkout_rule).toLowerCase()
     : null;
+  const duelSeason = seasonFromTimestamp(duel.started_at);
   const bySlot = new Map();
   for (const player of duel.players || []) {
     bySlot.set(Number(player.player_slot), {
@@ -1666,7 +1672,7 @@ async function recordCompletedDuelPlayerStats(duel) {
     }
   }
   for (const row of bySlot.values()) {
-    const current = await dataStore.getPlayerStats(row.playerId) || {};
+    const current = await dataStore.getPlayerStats(row.playerId, duelSeason) || {};
     const previousLegs = Number(current.legs_played || 0);
     const previousFirstNineTotal = Number(current.first_nine_total || 0);
     const previousFirstNineSamples = Number(current.first_nine_samples || 0);
@@ -1697,10 +1703,10 @@ async function recordCompletedDuelPlayerStats(duel) {
       updates[`checkout_${checkoutRule}_success`] = Number(current[`checkout_${checkoutRule}_success`] || 0) + values[1];
       updates[`checkout_${checkoutRule}_highest`] = Math.max(Number(current[`checkout_${checkoutRule}_highest`] || 0), values[2]);
     }
-    await dataStore.updatePlayerStats(row.playerId, updates);
+    await dataStore.updatePlayerStats(row.playerId, updates, duelSeason);
     for (const leg of duel.legs || []) {
       const legPlayer = (leg.players || []).find(player => Number(player.player_slot) === row.playerId);
-      if (legPlayer) await dataStore.recordLegHistory(row.playerId, Number(legPlayer.average || 0), Number(legPlayer.checkout_highest || 0), Number(legPlayer.won || 0), Number(legPlayer.darts || 0), undefined, duel.id);
+      if (legPlayer) await dataStore.recordLegHistory(row.playerId, Number(legPlayer.average || 0), Number(legPlayer.checkout_highest || 0), Number(legPlayer.won || 0), Number(legPlayer.darts || 0), duelSeason, duel.id);
     }
   }
 }
@@ -3268,6 +3274,16 @@ app.get('/api/players', async (_req, res) => {
   catch (err) { res.status(500).json({ error: 'Spieler konnten nicht geladen werden: ' + err.message }); }
 });
 
+app.get('/api/seasons', async (_req, res) => {
+  try {
+    const seasons = await dataStore.listAvailableSeasons();
+    res.set('Cache-Control', 'no-store');
+    res.json(seasons.length ? seasons : [Number(DEFAULT_STATS_SEASON)]);
+  } catch (err) {
+    res.status(500).json({ error: 'Saisons konnten nicht geladen werden: ' + err.message });
+  }
+});
+
 app.put('/api/players', requireLocalNetwork, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
   try {
@@ -3896,7 +3912,7 @@ app.post('/api/live/throw', async (req, res) => {
       turnId: state.game.turnId || 1,
       remaining: player.remaining,
       source: throwSource,
-      season: DEFAULT_STATS_SEASON
+      season: seasonFromTimestamp(thrownAt)
     };
     const saved = typeof dataStore.saveLiveStateWithThrow === 'function'
       ? await dataStore.saveLiveStateWithThrow(state, throwRecord).then(() => state)
@@ -4033,7 +4049,7 @@ app.post('/api/live/correct-last', async (req, res) => {
       originalSegment: correction.oldSegment,
       correctedSegment: correction.correctedSegment,
       correctedAt: state.lastAction.ts,
-      season: DEFAULT_STATS_SEASON
+      season: seasonFromTimestamp(state.lastAction.ts)
     };
     const saved = typeof dataStore.saveLiveStateWithCorrection === 'function'
       ? await dataStore.saveLiveStateWithCorrection(state, correctionRecord).then(() => state)
@@ -4487,9 +4503,10 @@ app.get('/api/players/:id/segment-analysis', async (req, res) => {
     const mode = String(req.query.mode || '').trim();
     const duelId = Number(req.query.duelId || 0) || null;
     const duelLegId = Number(req.query.duelLegId || 0) || null;
+    const profileId = Number(req.query.profileId || 0) || null;
     const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
     if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
-    res.json(await dataStore.getSegmentAnalysis(playerId, mode, duelId, season, duelLegId));
+    res.json(await dataStore.getSegmentAnalysis(playerId, mode, duelId, season, duelLegId, profileId));
   } catch (err) {
     res.status(500).json({ error: 'Segmentanalyse konnte nicht geladen werden: ' + err.message });
   }
