@@ -219,11 +219,16 @@ ui_pause() {
 submenu_einrichtung_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(printf 'System vorbereiten.\n\nENTER = ausfuehren   ESC = zurueck')" 16 80 4 \
-      "1" "Systemcheck + Auto-Installation" \
+    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(printf 'System vorbereiten oder komplett einrichten.\n\nENTER = ausfuehren   ESC = zurueck')" 18 84 5 \
+      "1" "Schnellstart-Assistent (komplette Einrichtung)" \
+      "2" "Systemcheck + Auto-Installation" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
-    case "$choice" in 1) execute_action check 1 0 ;; 0|"") return 0 ;; esac
+    case "$choice" in
+      1) execute_action quickstart 1 0 ;;
+      2) execute_action check 1 0 ;;
+      0|"") return 0 ;;
+    esac
   done
 }
 
@@ -290,10 +295,15 @@ submenu_monitoring_whiptail() {
 submenu_einrichtung_text() {
   while true; do
     printf '\n-- Einrichtung --------------------------------\n'
-    printf '1) Systemcheck + Auto-Installation\n'
+    printf '1) Schnellstart-Assistent (komplette Einrichtung)\n'
+    printf '2) Systemcheck + Auto-Installation\n'
     printf '0) Zurueck\n\n'
-    read -r -p 'Option [0-1]: ' c
-    case "$c" in 1) execute_action check 1 0 ;; 0|'') return 0 ;; esac
+    read -r -p 'Option [0-2]: ' c
+    case "$c" in
+      1) execute_action quickstart 1 0 ;;
+      2) execute_action check 1 0 ;;
+      0|'') return 0 ;;
+    esac
   done
 }
 
@@ -368,8 +378,7 @@ submenu_system_text() {
 main_menu_whiptail() {
   while true; do
     local choice status_line; status_line="$(menu_status_line)"
-    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 24 84 10 \
-      "0" "Schnellstart-Assistent (komplette Einrichtung)" \
+    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 22 84 9 \
       "1" "Einrichtung >" \
       "2" "Updates >" \
       "3" "Status & Monitoring >" \
@@ -380,7 +389,6 @@ main_menu_whiptail() {
       "8" "Beenden" \
       3>&1 1>&2 2>&3)" || exit 0
     case "$choice" in
-      0) execute_action quickstart 1 0 ;;
       1) submenu_einrichtung_whiptail ;;
       2) submenu_updates_whiptail ;;
       3) submenu_monitoring_whiptail ;;
@@ -398,7 +406,6 @@ main_menu_text() {
   while true; do
     print_header
     printf ' Status: %s\n\n' "$(menu_status_line)"
-    printf ' 0) Schnellstart-Assistent\n'
     printf ' 1) Einrichtung >\n'
     printf ' 2) Updates >\n'
     printf ' 3) Status & Monitoring >\n'
@@ -407,9 +414,8 @@ main_menu_text() {
     printf ' 6) Repo klonen\n'
     printf ' 7) Hilfe fuer Einsteiger\n'
     printf ' 8) Beenden\n\n'
-    read -r -p 'Option [0-8]: ' c
+    read -r -p 'Option [1-8]: ' c
     case "$c" in
-      0) execute_action quickstart 1 0 ;;
       1) submenu_einrichtung_text ;;
       2) submenu_updates_text ;;
       3) submenu_monitoring_text ;;
