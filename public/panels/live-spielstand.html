@@ -85,7 +85,7 @@
       min-height: 0;
     }
     .focus-player.single { grid-template-columns: 1fr; }
-    .focus-player.has-others { flex: 1; max-height: 70%; min-height: 0; }
+    .focus-player.has-others { flex: 1 1 auto; min-height: 0; }
 
     .compact-players {
       display: flex;
@@ -384,9 +384,8 @@
       flex-direction: column;
       gap: 4px;
       overflow: hidden;
-      flex-shrink: 0;
-      /* Höhe: h4 (~18px) + gap (4px) + leg-list max-height (285px) + padding (10px) = ~317px */
-      height: 317px;
+      flex: 1 1 auto;
+      min-height: 0;
     }
     .focus-leg-card h4 {
       color: #777;
@@ -402,6 +401,7 @@
       gap: 4px;
       min-height: 0;
       overflow: hidden;
+      justify-content: flex-end;
     }
     .focus-controls-card {
       background: #141414;
@@ -774,8 +774,9 @@
       display: grid;
       gap: 3px;
       overflow: auto;
-      /* 25% reduziert: 380px → 285px */
-      max-height: 285px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
     }
     .leg-item { 
       display: grid;
