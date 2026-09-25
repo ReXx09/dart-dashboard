@@ -191,7 +191,10 @@
     .focus-checkout-label { justify-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #2a9d8f; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; }
     .focus-player-line { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 2px; min-width: 0; flex-shrink: 0; }
     .focus-player-name { min-width: 0; justify-self: start; overflow: hidden; text-overflow: ellipsis; font-size: 2rem; font-weight: 800; white-space: nowrap; }
-    .focus-match-details { min-width: 0; justify-self: center; overflow: hidden; text-overflow: ellipsis; color: #f4a261; font-size: 1rem; font-weight: 900; letter-spacing: 1px; text-align: center; text-transform: uppercase; white-space: nowrap; }
+    .focus-match-details { min-width: 0; max-width: 100%; justify-self: center; display: inline-flex; align-items: center; gap: 7px; overflow: hidden; padding: 4px 10px; color: #f4a261; background: linear-gradient(135deg, rgba(244,162,97,.14), rgba(42,157,143,.08)); border: 1px solid rgba(244,162,97,.4); border-radius: 999px; box-shadow: inset 0 0 14px rgba(244,162,97,.06); font-size: 1rem; font-weight: 900; letter-spacing: 1px; line-height: 1.1; text-align: center; text-transform: uppercase; white-space: nowrap; }
+    .focus-match-details > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .focus-match-details .match-format { color: #9de0d1; }
+    .focus-match-details .match-format::before { content: '·'; color: #77888a; margin-right: 7px; }
     .focus-switch-timer { display: inline-flex; visibility: hidden; justify-self: end; align-items: center; color: #f4a261; background: rgba(244,162,97,.1); border: 1px solid rgba(244,162,97,.45); border-radius: 8px; padding: 6px 12px; font-size: .72rem; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
     .focus-switch-timer.visible { visibility: visible; }
     .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; flex-shrink: 0; }
@@ -2281,7 +2284,8 @@
       const typeLabels = { direct: 'Direktes Duell', group: 'Mehrspieler', tournament: 'Turnier' };
       const typeLabel = typeLabels[String(game.matchType || '')] || 'Solospiel';
       const bestOf = Number(game.bestOf || 1);
-      return typeLabel + ' · ' + (bestOf > 1 ? 'Best-of-' + bestOf : 'Einzelleg');
+      const formatLabel = bestOf > 1 ? 'Best-of-' + bestOf : 'Einzelleg';
+      return '<span class="match-type">' + escapeHtml(typeLabel) + '</span><span class="match-format">' + escapeHtml(formatLabel) + '</span>';
     }
 
     function renderFocusPlayer(p, idx, state) {
@@ -2322,7 +2326,7 @@
       const bigScoreValue = isElimination ? totalScored : p.remaining;
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-match-details">' + escapeHtml(getFocusMatchDetails(state)) + '</span><span class="focus-switch-timer"></span></div>' +
+        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-match-details">' + getFocusMatchDetails(state) + '</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe / Zahlen</h4>' +
@@ -2462,7 +2466,7 @@
       const legStats = getLiveLegStats(p);
       
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-match-details">' + escapeHtml(getFocusMatchDetails(state)) + '</span><span class="focus-switch-timer"></span></div>' +
+        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-match-details">' + getFocusMatchDetails(state) + '</span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Letzte Würfe</h4>' +
