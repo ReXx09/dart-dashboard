@@ -191,7 +191,7 @@
     .focus-checkout-label { justify-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #2a9d8f; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; }
     .focus-player-line { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 2px; min-width: 0; flex-shrink: 0; }
     .focus-player-name { min-width: 0; justify-self: start; overflow: hidden; text-overflow: ellipsis; font-size: 2rem; font-weight: 800; white-space: nowrap; }
-    .focus-match-details { min-width: 0; justify-self: center; overflow: hidden; text-overflow: ellipsis; color: #f4a261; font-size: .78rem; font-weight: 800; letter-spacing: 1px; text-align: center; text-transform: uppercase; white-space: nowrap; }
+    .focus-match-details { min-width: 0; justify-self: center; overflow: hidden; text-overflow: ellipsis; color: #f4a261; font-size: 1rem; font-weight: 900; letter-spacing: 1px; text-align: center; text-transform: uppercase; white-space: nowrap; }
     .focus-switch-timer { display: inline-flex; visibility: hidden; justify-self: end; align-items: center; color: #f4a261; background: rgba(244,162,97,.1); border: 1px solid rgba(244,162,97,.45); border-radius: 8px; padding: 6px 12px; font-size: .72rem; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
     .focus-switch-timer.visible { visibility: visible; }
     .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; flex-shrink: 0; }
@@ -1178,6 +1178,7 @@
       .duel-stats-card { padding: 12px 8px; }
       .duel-stats-cell { min-height: 32px; padding: 5px 3px; font-size: .72rem; }
       .duel-stats-cell.player, .duel-stats-cell.value { font-size: .78rem; }
+      .focus-match-details { font-size: .85rem; }
     }
 
     /* Toast */
@@ -1532,6 +1533,10 @@
       button.classList.toggle('active', mobileAudioUnlocked);
     }
     function toggleMobileAudio() {
+      if (mobileAudioUnlocked && (!mobileAudioContext || mobileAudioContext.state !== 'running')) {
+        unlockMobileAudio();
+        return;
+      }
       if (mobileAudioUnlocked) {
         mobileAudioUnlocked = false;
         localStorage.setItem('liveAudioEnabled', 'false');
