@@ -39,9 +39,9 @@
     }
     .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
     .topbar a:hover { color: #fff; }
-    .topbar-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: clamp(20px, 4vw, 56px); }
-    .topbar h2 { font-size: 1rem; font-weight: 700; text-align: center; min-width: 0; white-space: nowrap; }
-    .topbar-info { min-width: auto; padding: 2px 11px; border: 1px solid transparent; border-radius: 8px; font-size: 1.9rem; font-weight: 1000; text-transform: uppercase; letter-spacing: 1px; line-height: 1.05; white-space: nowrap; }
+    .topbar-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: clamp(8px, 2.5vw, 32px); }
+    .topbar h2 { font-size: clamp(.78rem, 1.2vw, 1rem); font-weight: 700; text-align: center; min-width: 0; white-space: nowrap; }
+    .topbar-info { min-width: 0; max-width: 34%; overflow: hidden; text-overflow: ellipsis; padding: 2px 9px; border: 1px solid transparent; border-radius: 8px; font-size: clamp(.85rem, 1.8vw, 1.5rem); font-weight: 1000; text-transform: uppercase; letter-spacing: 1px; line-height: 1.05; white-space: nowrap; }
     .topbar-mode { color: #f4c542; background: rgba(244,197,66,.1); border-color: rgba(244,197,66,.45); text-align: center; }
     .topbar-checkout { color: #ff9aa0; background: rgba(230,57,70,.12); border-color: rgba(230,57,70,.5); text-align: center; }
     .topbar-separator { color: #d7e0e5; font-size: 1.55rem; font-weight: 400; line-height: .7; }
@@ -1268,6 +1268,8 @@
     }
 
     @media (min-width: 768px) and (max-width: 1600px) and (min-height: 600px) and (max-height: 1024px) {
+      .topbar-info { font-size: clamp(.85rem, 1.55vw, 1.15rem); letter-spacing: .7px; }
+      .topbar-center { gap: clamp(6px, 1.5vw, 18px); }
       .focus-player.has-others { max-height: none; }
       .focus-player.single { grid-template-rows: minmax(0, 1fr) auto; }
       .focus-card { min-height: 0; padding: 6px; }
