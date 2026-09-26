@@ -540,7 +540,7 @@ function normalizeBackupAreas(areas) {
 
 function normalizeBackupDestination(destination) {
   const value = String(destination || 'local').trim().toLowerCase();
-  return ['local', 'usb', 'nextcloud'].includes(value) ? value : 'local';
+  return ['local', 'browser', 'usb', 'nextcloud'].includes(value) ? value : 'local';
 }
 
 function copyDirectoryContents(sourceDir, targetDir) {
@@ -610,7 +610,7 @@ async function createAdminBackup(areas, destination = 'local') {
   }
   const manifest = { id: backupId, createdAt: new Date().toISOString(), areas: selectedAreas, files };
   fs.writeFileSync(path.join(backupDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
-  let delivery = { provider: 'local', path: backupDir };
+  let delivery = { provider: selectedDestination === 'browser' ? 'browser' : 'local', path: backupDir };
   if (selectedDestination === 'usb') {
     if (!BACKUP_USB_PATH) throw new Error('USB-Ziel ist nicht konfiguriert. BACKUP_USB_PATH setzen.');
     const targetDir = path.join(BACKUP_USB_PATH, backupId);
@@ -3272,6 +3272,31 @@ app.post('/api/admin/backups/restore-json', requireAdmin, async (req, res) => {
       fs.renameSync(temporary, write.target);
     }
     res.json({ ok: true, restored: files.map(file => file.name) });
+  } catch (err) {
+    res.status(400).json({ error: 'Backup konnte nicht wiederhergestellt werden: ' + err.message });
+  }
+});
+
+app.post('/api/admin/backups/:id/restore', requireAdmin, async (req, res) => {
+  const backupId = String(req.params.id || '');
+  if (!/^[0-9TZ]+$/.test(backupId)) return res.status(400).json({ error: 'Ungültige Backup-ID.' });
+  const backupDir = path.join(ADMIN_BACKUP_DIR, backupId);
+  const manifest = readJson(path.join(backupDir, 'manifest.json'), null);
+  if (!manifest || !Array.isArray(manifest.files)) return res.status(404).json({ error: 'Backup nicht gefunden.' });
+  const targets = { ...ADMIN_BACKUP_SOURCES, database: dataStore.isSQLite() ? dataStore.sqliteFile : null };
+  try {
+    const restored = [];
+    for (const file of manifest.files) {
+      const name = path.basename(String(file.file || ''));
+      const target = targets[file.area];
+      const source = path.join(backupDir, name);
+      if (!target || !name || !fs.existsSync(source)) continue;
+      if (file.area !== 'database') JSON.parse(fs.readFileSync(source, 'utf8'));
+      fs.copyFileSync(source, target);
+      restored.push(file.area);
+    }
+    if (!restored.length) return res.status(400).json({ error: 'Dieses Backup enthält keine wiederherstellbaren Dateien.' });
+    res.json({ ok: true, restored, restartRequired: restored.includes('database') });
   } catch (err) {
     res.status(400).json({ error: 'Backup konnte nicht wiederhergestellt werden: ' + err.message });
   }

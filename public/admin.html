@@ -13,7 +13,7 @@
     header .sub{font-size:.75rem;color:#555;margin-top:2px}
     .back-link{color:#666;text-decoration:none;font-size:.82rem;padding:7px 14px;border:1px solid #252525;border-radius:8px;transition:color .2s,border-color .2s;white-space:nowrap;margin-left:auto}
     .back-link:hover{color:#f1f1f1;border-color:#555}
-    .admin-nav{display:flex;gap:6px;overflow-x:auto;padding:10px 28px;background:#0f0f0f;border-bottom:1px solid #202020;scrollbar-width:thin}
+    .admin-nav{position:sticky;top:0;z-index:50;display:flex;gap:6px;overflow-x:auto;padding:10px 28px;background:rgba(15,15,15,.97);border-bottom:1px solid #202020;box-shadow:0 4px 14px rgba(0,0,0,.28);scrollbar-width:thin}
     .admin-tab{flex:0 0 auto;background:#151515;border:1px solid #292929;color:#888;padding:8px 13px;border-radius:8px;cursor:pointer;font:inherit;font-size:.76rem;white-space:nowrap;transition:background .2s,border-color .2s,color .2s}
     .admin-tab:hover{color:#f1f1f1;border-color:#457b9d}
     .admin-tab.is-active{background:#16232d;border-color:#457b9d;color:#d9f0ff;box-shadow:0 0 0 1px rgba(69,123,157,.2)}
@@ -355,6 +355,7 @@
       <div class="field-row" style="margin-top:14px"><label for="restoreBackupFiles">JSON wiederherstellen</label><input id="restoreBackupFiles" type="file" accept=".json,application/json" multiple /></div>
       <div class="field-hint" style="margin-left:142px">Nur JSON-Konfigurationen werden online wiederhergestellt. Die SQLite-Datenbank bleibt geschützt und wird nicht im laufenden Betrieb überschrieben.</div>
       <button class="btn-save" id="restoreBackupBtn" style="background:#f4a261;color:#111">Ausgewählte JSON-Backups wiederherstellen</button>
+      <button class="btn-save" id="restorePiBackupBtn" type="button" style="background:#2a9d8f;color:#111">Backup vom Pi-Speicher auswählen</button>
       <div id="backupList" style="margin-top:12px;color:#888;font-size:.8rem">Noch keine Backups geladen.</div>
     </div>
     <fieldset>
@@ -370,10 +371,22 @@
   </div>
 
 </main>
+<dialog id="piBackupDialog" style="background:#141414;color:#f1f1f1;border:1px solid #444;border-top:3px solid #2a9d8f;border-radius:10px;padding:18px;max-width:420px;width:calc(100% - 32px)">
+  <form method="dialog">
+    <h3 style="margin:0 0 12px">Backup vom Pi-Speicher wiederherstellen</h3>
+    <label for="piBackupSelect" style="display:block;color:#888;font-size:.75rem;margin-bottom:6px">Backup auswählen</label>
+    <select id="piBackupSelect" style="width:100%;background:#0d0d0d;color:#f1f1f1;border:1px solid #333;border-radius:7px;padding:9px"></select>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn-save" value="cancel" type="submit" style="background:#222">Abbrechen</button>
+      <button class="btn-save" id="confirmPiRestoreBtn" value="default" type="button" style="background:#2a9d8f;color:#111">Wiederherstellen</button>
+    </div>
+  </form>
+</dialog>
 <div class="toast" id="toast"></div>
 <script>
   const adminTabs = Array.from(document.querySelectorAll('[data-admin-tab]'));
   const adminPanels = Array.from(document.querySelectorAll('[data-admin-panel]'));
+  let adminBackups = [];
 
   function activateAdminTab(tabId, updateUrl = true) {
     const id = adminTabs.some(tab => tab.dataset.adminTab === tabId) ? tabId : 'overview';
@@ -420,13 +433,44 @@
     nextcloudOption.disabled = data.destinations?.nextcloud !== true;
     nextcloudOption.textContent = data.destinations?.nextcloud === true ? 'Nextcloud' : 'Nextcloud (nicht konfiguriert)';
     if (destinationSelect.selectedOptions[0]?.disabled) destinationSelect.value = 'local';
+    adminBackups = data.backups || [];
+    const piBackupSelect = document.getElementById('piBackupSelect');
+    piBackupSelect.innerHTML = adminBackups.map(backup => '<option value="' + escapeHtml(backup.id) + '">' + escapeHtml(backup.createdAt || backup.id) + ' · ' + escapeHtml((backup.areas || []).join(', ')) + '</option>').join('');
+    document.getElementById('restorePiBackupBtn').disabled = adminBackups.length === 0;
     const target = document.getElementById('backupList');
     target.innerHTML = data.backups.length ? data.backups.map(backup => {
       const links = (backup.files || []).map(file => '<a href="/api/admin/backups/' + encodeURIComponent(backup.id) + '/' + encodeURIComponent(file.file) + '" download>' + escapeHtml(file.file) + '</a>').join(' · ');
-      const destination = backup.destination?.provider ? ' · ' + escapeHtml(backup.destination.provider) : '';
+      const destinationLabels = { local: 'Pi-Speicher', browser: 'Browser-PC-Download', usb: 'USB', nextcloud: 'Nextcloud' };
+      const destination = backup.destination?.provider ? ' · ' + escapeHtml(destinationLabels[backup.destination.provider] || backup.destination.provider) : '';
       return '<div style="margin-bottom:8px">' + escapeHtml(backup.createdAt || backup.id) + destination + '<br><span style="color:#666">' + escapeHtml((backup.areas || []).join(', ')) + '</span><br>' + links + '</div>';
     }).join('') : 'Noch keine Backups vorhanden.';
   }
+
+  function openPiBackupDialog() {
+    if (!adminBackups.length) { showToast('Keine Backups auf dem Pi-Speicher vorhanden.', true); return; }
+    const dialog = document.getElementById('piBackupDialog');
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+  }
+
+  document.getElementById('backupDestination').addEventListener('change', event => {
+    if (event.target.value === 'local') openPiBackupDialog();
+  });
+  document.getElementById('restorePiBackupBtn').addEventListener('click', openPiBackupDialog);
+  document.getElementById('confirmPiRestoreBtn').addEventListener('click', async function() {
+    const dialog = document.getElementById('piBackupDialog');
+    const backupId = document.getElementById('piBackupSelect').value;
+    if (!backupId || !confirm('Das ausgewählte Pi-Backup wirklich wiederherstellen?')) return;
+    this.disabled = true;
+    try {
+      const response = await fetch('/api/admin/backups/' + encodeURIComponent(backupId) + '/restore', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Wiederherstellung fehlgeschlagen');
+      dialog.close();
+      showToast(result.restartRequired ? 'Backup wiederhergestellt. Server bitte neu starten ✓' : 'Backup wiederhergestellt. Seiten bitte neu laden ✓');
+      await loadAdminBackups();
+    } catch (error) { showToast(error.message, true); }
+    this.disabled = false;
+  });
 
   document.getElementById('adminLoginBtn').addEventListener('click', async () => {
     const pin = document.getElementById('adminPin').value;
@@ -487,7 +531,7 @@
     const areas = Array.from(document.querySelectorAll('.admin-backup-area:checked')).map(input => input.value);
     const destination = document.getElementById('backupDestination').value;
     try {
-      const response = await fetch('/api/admin/backups', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ areas, destination: destination === 'browser' ? 'local' : destination }) });
+      const response = await fetch('/api/admin/backups', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ areas, destination }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Backup fehlgeschlagen');
       if (destination === 'browser') {
