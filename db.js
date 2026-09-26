@@ -1674,6 +1674,7 @@ class DataStore {
     else if (this.isPostgres()) await this.pg.query('UPDATE duels SET status = \'canceled\', ended_at = $1, updated_at = $2 WHERE id = $3', values);
     else await this.my.query('UPDATE duels SET status = \'canceled\', ended_at = ?, updated_at = ? WHERE id = ?', values);
     await this.deleteDuelHighscores(id);
+    await this.deleteDuelEliminations(id);
     const safeId = Number(id);
     if (this.isSQLite()) await this.sqlite.run('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
     else if (this.isPostgres()) await this.pg.query('DELETE FROM leg_history WHERE duel_id = $1', [safeId]);
@@ -1689,6 +1690,14 @@ class DataStore {
     else await this.my.query('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
   }
 
+  async deleteDuelEliminations(id) {
+    const safeId = Number(id);
+    if (!Number.isFinite(safeId) || safeId <= 0) return;
+    if (this.isSQLite()) await this.sqlite.run('DELETE FROM duel_eliminations WHERE duel_id = ?', [safeId]);
+    else if (this.isPostgres()) await this.pg.query('DELETE FROM duel_eliminations WHERE duel_id = $1', [safeId]);
+    else await this.my.query('DELETE FROM duel_eliminations WHERE duel_id = ?', [safeId]);
+  }
+
   async deleteDuel(id) {
     const safeId = Number(id);
     if (!Number.isFinite(safeId) || safeId <= 0) throw new Error('Ungültige Begegnungs-ID.');
@@ -1700,6 +1709,7 @@ class DataStore {
         await this.sqlite.run('DELETE FROM duel_players WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM duel_eliminations WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
         const result = await this.sqlite.run('DELETE FROM duels WHERE id = ?', [safeId]);
         await this.sqlite.exec('COMMIT');
@@ -1718,6 +1728,7 @@ class DataStore {
         await client.query('DELETE FROM duel_players WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM player_throw_segments WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM highscores WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM duel_eliminations WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM leg_history WHERE duel_id = $1', [safeId]);
         const result = await client.query('DELETE FROM duels WHERE id = $1', [safeId]);
         await client.query('COMMIT');
@@ -1737,6 +1748,7 @@ class DataStore {
       await connection.query('DELETE FROM duel_players WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
+      await connection.query('DELETE FROM duel_eliminations WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
       const [result] = await connection.query('DELETE FROM duels WHERE id = ?', [safeId]);
       await connection.commit();
@@ -1787,7 +1799,7 @@ class DataStore {
   }
 
   async getEliminationLeaderboard() {
-    const query = "SELECT eliminator_name AS player, COUNT(*) AS made, 0 AS taken FROM duel_eliminations GROUP BY eliminator_name UNION ALL SELECT eliminated_name AS player, 0 AS made, COUNT(*) AS taken FROM duel_eliminations GROUP BY eliminated_name UNION ALL SELECT p.player_name AS player, SUM(p.eliminations) AS made, 0 AS taken FROM duel_leg_players p JOIN duel_legs l ON l.id = p.duel_leg_id JOIN duels d ON d.id = p.duel_id WHERE lower(COALESCE(l.mode, d.mode, '')) = 'elimination' AND p.eliminations > 0 AND NOT EXISTS (SELECT 1 FROM duel_eliminations e WHERE e.duel_leg_id = p.duel_leg_id) GROUP BY p.player_name UNION ALL SELECT p.player_name AS player, 0 AS made, SUM(p.eliminated) AS taken FROM duel_leg_players p JOIN duel_legs l ON l.id = p.duel_leg_id JOIN duels d ON d.id = p.duel_id WHERE lower(COALESCE(l.mode, d.mode, '')) = 'elimination' AND p.eliminated > 0 AND NOT EXISTS (SELECT 1 FROM duel_eliminations e WHERE e.duel_leg_id = p.duel_leg_id) GROUP BY p.player_name";
+    const query = "SELECT e.eliminator_name AS player, COUNT(*) AS made, 0 AS taken FROM duel_eliminations e JOIN duels d ON d.id = e.duel_id GROUP BY e.eliminator_name UNION ALL SELECT e.eliminated_name AS player, 0 AS made, COUNT(*) AS taken FROM duel_eliminations e JOIN duels d ON d.id = e.duel_id GROUP BY e.eliminated_name UNION ALL SELECT p.player_name AS player, SUM(p.eliminations) AS made, 0 AS taken FROM duel_leg_players p JOIN duel_legs l ON l.id = p.duel_leg_id JOIN duels d ON d.id = p.duel_id WHERE lower(COALESCE(l.mode, d.mode, '')) = 'elimination' AND p.eliminations > 0 AND NOT EXISTS (SELECT 1 FROM duel_eliminations e WHERE e.duel_leg_id = p.duel_leg_id) GROUP BY p.player_name UNION ALL SELECT p.player_name AS player, 0 AS made, SUM(p.eliminated) AS taken FROM duel_leg_players p JOIN duel_legs l ON l.id = p.duel_leg_id JOIN duels d ON d.id = p.duel_id WHERE lower(COALESCE(l.mode, d.mode, '')) = 'elimination' AND p.eliminated > 0 AND NOT EXISTS (SELECT 1 FROM duel_eliminations e WHERE e.duel_leg_id = p.duel_leg_id) GROUP BY p.player_name";
     const rows = this.isSQLite()
       ? await this.sqlite.all(query)
       : this.isPostgres()
