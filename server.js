@@ -4549,6 +4549,13 @@ app.get('/api/highscores/overview', async (_req, res) => {
       }))
     }));
     const eliminationLeaderboard = await dataStore.getEliminationLeaderboard();
+    const eliminationMadeByName = new Map(eliminationLeaderboard.made.map(entry => [String(entry.player || '').trim().toLowerCase(), Number(entry.score || 0)]));
+    const eliminationTakenByName = new Map(eliminationLeaderboard.taken.map(entry => [String(entry.player || '').trim().toLowerCase(), Number(entry.score || 0)]));
+    for (const entry of profileStats) {
+      const nameKey = String(entry.player || '').trim().toLowerCase();
+      entry.eliminationsMade = eliminationMadeByName.get(nameKey) || 0;
+      entry.eliminationsTaken = eliminationTakenByName.get(nameKey) || 0;
+    }
     res.json({ trackingMode: 'gesamt', modes, categories, players: profiles.map(profile => ({ profileId: Number(profile.id), player: profile.name })), profileStats, metrics: {
       count180: ranked('count180'),
       count171Plus: ranked('count171Plus'),
@@ -4593,6 +4600,16 @@ app.get('/api/players/:id/stats', async (req, res) => {
       await dataStore.initPlayerStats(playerId, season);
       stats = await dataStore.getPlayerStats(playerId, season);
     }
+    const player = (await dataStore.getPlayers()).find(item => Number(item.slot) === playerId);
+    const eliminationLeaderboard = await dataStore.getEliminationLeaderboard();
+    const playerName = String(player?.name || '').trim().toLowerCase();
+    const made = eliminationLeaderboard.made.find(entry => String(entry.player || '').trim().toLowerCase() === playerName);
+    const taken = eliminationLeaderboard.taken.find(entry => String(entry.player || '').trim().toLowerCase() === playerName);
+    stats = {
+      ...(stats || {}),
+      eliminations_made: Number(made?.score || 0),
+      eliminations_taken: Number(taken?.score || 0)
+    };
     res.json(stats || {});
   } catch (err) {
     res.status(500).json({ error: 'Stats konnten nicht geladen werden: ' + err.message });

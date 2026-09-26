@@ -944,6 +944,8 @@
           total.firstNineSamples += Number(entry.firstNineSamples || 0);
           total.highestCheckout = Math.max(total.highestCheckout, Number(entry.highestCheckout || 0));
           total.highestLegAvg = Math.max(total.highestLegAvg, Number(entry.highestLegAvg || 0));
+          total.eliminationsMade += Number(entry.eliminationsMade || 0);
+          total.eliminationsTaken += Number(entry.eliminationsTaken || 0);
           for (const rule of ['single', 'double', 'master']) {
             total.checkout[rule].attempts += Number(entry.checkoutByRule?.[rule]?.attempts || 0);
             total.checkout[rule].success += Number(entry.checkoutByRule?.[rule]?.success || 0);
@@ -954,6 +956,7 @@
           gamesPlayed: 0, gamesWon: 0, legsPlayed: 0, legsWon: 0, darts: 0, scored: 0,
           count180: 0, count171plus: 0, count140plus: 0, count100plus: 0,
           firstNineTotal: 0, firstNineSamples: 0, highestCheckout: 0, highestLegAvg: 0,
+          eliminationsMade: 0, eliminationsTaken: 0,
           checkout: {
             single: { attempts: 0, success: 0, highest: 0 },
             double: { attempts: 0, success: 0, highest: 0 },
@@ -975,6 +978,8 @@
           first_nine_samples: totals.firstNineSamples,
           highest_leg_avg: totals.highestLegAvg,
           highest_checkout: totals.highestCheckout,
+          eliminations_made: totals.eliminationsMade,
+          eliminations_taken: totals.eliminationsTaken,
           max_score: 0
         };
         for (const rule of ['single', 'double', 'master']) {
@@ -1239,6 +1244,16 @@
           <div class="summary-value">${Number(s.count_180 || 0)}</div>
           <div class="summary-sub">Max Score: ${Number(s.max_score || 0)}</div>
         </div>
+        <div class="summary-card" style="--accent:#2a9d8f">
+          <div class="summary-label">Eliminierungen</div>
+          <div class="summary-value">${Number(s.eliminations_made || s.eliminationsMade || 0)}</div>
+          <div class="summary-sub">Selbst eliminiert</div>
+        </div>
+        <div class="summary-card" style="--accent:#e63946">
+          <div class="summary-label">Eliminiert worden</div>
+          <div class="summary-value">${Number(s.eliminations_taken || s.eliminationsTaken || 0)}</div>
+          <div class="summary-sub">Gegnerische Treffer</div>
+        </div>
         <div class="summary-card" style="--accent:#f4a261">
           <div class="summary-label">Double-Out-Quote</div>
           <div class="summary-value">${checkoutRulePct(s, 'double')}</div>
@@ -1265,7 +1280,9 @@
         statItem('Matches gespielt', Number(s.games_played || 0), 'Gewonnen: ' + Number(s.games_won || 0), ['games_played', 'games_won'], ['Matches gespielt', 'Matches gewonnen']),
         statItem('Legs gespielt', Number(s.legs_played || 0), 'Gewonnen: ' + Number(s.legs_won || 0), ['legs_played', 'legs_won'], ['Legs gespielt', 'Legs gewonnen']),
         statItem('Win %', winPct(s) + '%', 'Legs'),
-        statItem('Total Darts', Number(s.total_darts || 0).toLocaleString(), 'Total Scored: ' + Number(s.total_scored || 0).toLocaleString(), ['total_darts', 'total_scored'], ['Total Darts', 'Total Scored'])
+        statItem('Total Darts', Number(s.total_darts || 0).toLocaleString(), 'Total Scored: ' + Number(s.total_scored || 0).toLocaleString(), ['total_darts', 'total_scored'], ['Total Darts', 'Total Scored']),
+        statItem('Eliminierungen', Number(s.eliminations_made || s.eliminationsMade || 0), 'Selbst eliminiert'),
+        statItem('Eliminiert worden', Number(s.eliminations_taken || s.eliminationsTaken || 0), 'Gegnerische Treffer')
       ].join('');
     }
 
