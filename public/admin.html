@@ -297,6 +297,11 @@
   <div class="section" data-admin-panel="data">
     <div class="sec-hd"><span class="sec-title">Statistik-Verwaltung</span><div class="sec-line"></div></div>
     <fieldset>
+      <legend>Profil- und Slot-Zuordnung</legend>
+      <div id="adminProfileAssignments" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><div style="color:#666;font-size:.8rem">Profile werden geladen...</div></div>
+      <div class="field-hint" style="margin:10px 0 0">Die Zuordnung verwendet stabile Profil-IDs. Historische Highscores und Statistiken werden dabei nicht umbenannt oder gelöscht.</div>
+    </fieldset>
+    <fieldset>
       <div class="admin-player-tools">
         <input id="adminPlayerSearch" type="search" placeholder="Spieler oder Profil suchen" aria-label="Spieler oder Profil suchen" />
         <select id="adminPlayerSelect" aria-label="Spieler oder Profil auswählen"><option value="">Spieler auswählen</option></select>
@@ -342,6 +347,9 @@
       <div class="field-row"><label for="backupDestination">Ziel</label><select id="backupDestination"><option value="local">Pi-Speicher</option><option value="browser">Browser-PC (Download)</option><option value="usb" disabled>USB (nicht konfiguriert)</option><option value="nextcloud" disabled>Nextcloud (nicht konfiguriert)</option></select></div>
       <div class="field-hint" style="margin-left:142px">Browser-PC lädt die ausgewählten Dateien in den Download-Ordner dieses Rechners.</div>
       <button class="btn-save" id="createBackupBtn">Ausgewählte Bereiche sichern</button>
+      <div class="field-row" style="margin-top:14px"><label for="restoreBackupFiles">JSON wiederherstellen</label><input id="restoreBackupFiles" type="file" accept=".json,application/json" multiple /></div>
+      <div class="field-hint" style="margin-left:142px">Nur JSON-Konfigurationen werden online wiederhergestellt. Die SQLite-Datenbank bleibt geschützt und wird nicht im laufenden Betrieb überschrieben.</div>
+      <button class="btn-save" id="restoreBackupBtn" style="background:#f4a261;color:#111">Ausgewählte JSON-Backups wiederherstellen</button>
       <div id="backupList" style="margin-top:12px;color:#888;font-size:.8rem">Noch keine Backups geladen.</div>
     </div>
     <fieldset>
@@ -490,6 +498,22 @@
         showToast('Backup auf dem Browser-PC gespeichert ✓');
       } else showToast('Backup erstellt: ' + result.id);
       await loadAdminBackups();
+    } catch (error) { showToast(error.message, true); }
+    this.disabled = false;
+  });
+
+  document.getElementById('restoreBackupBtn').addEventListener('click', async function() {
+    const input = document.getElementById('restoreBackupFiles');
+    if (!input.files.length || !confirm('Ausgewählte JSON-Konfigurationen wirklich wiederherstellen?')) return;
+    this.disabled = true;
+    try {
+      const files = [];
+      for (const file of input.files) files.push({ name: file.name, content: await file.text() });
+      const response = await fetch('/api/admin/backups/restore-json', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Wiederherstellung fehlgeschlagen');
+      input.value = '';
+      showToast('JSON-Backup wiederhergestellt. Betroffene Seiten bitte neu laden ✓');
     } catch (error) { showToast(error.message, true); }
     this.disabled = false;
   });
@@ -963,6 +987,7 @@
       adminPlayers = await playersResponse.json();
       adminProfiles = profilesResponse.ok ? await profilesResponse.json() : [];
       renderAdminPlayerOptions();
+      renderAdminProfileAssignments();
     } catch (err) {
       showToast('Spieler konnten nicht geladen werden: ' + err.message, true);
     }
@@ -980,6 +1005,37 @@
     select.innerHTML = '<option value="">Spieler auswählen</option>' +
       profileOptions.map(({ profile, assignedPlayer }) => '<option value="' + Number(profile.id) + '"' + (assignedPlayer ? '' : ' disabled') + '>' + escapeHtml(profile.name) + (assignedPlayer ? '' : ' · kein Slot') + '</option>').join('');
     if (selectedAdminProfile && profileOptions.some(({ profile, assignedPlayer }) => Number(profile.id) === selectedAdminProfile && assignedPlayer)) select.value = String(selectedAdminProfile);
+  }
+
+  function renderAdminProfileAssignments() {
+    const target = document.getElementById('adminProfileAssignments');
+    if (!target) return;
+    target.innerHTML = adminPlayers.map(player => {
+      const profileId = Number(player.profileId || 0);
+      const options = '<option value="">Kein Profil</option>' + adminProfiles.map(profile => '<option value="' + Number(profile.id) + '"' + (Number(profile.id) === profileId ? ' selected' : '') + '>' + escapeHtml(profile.name) + '</option>').join('');
+      return '<label style="display:grid;gap:5px;color:#777;font-size:.7rem;text-transform:uppercase;letter-spacing:.7px">Slot ' + Number(player.slot) + ' · ' + escapeHtml(player.name || 'leer') + '<select data-admin-slot="' + Number(player.slot) + '" style="width:100%;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit">' + options + '</select></label>';
+    }).join('');
+    target.querySelectorAll('[data-admin-slot]').forEach(select => select.addEventListener('change', saveAdminProfileAssignment));
+  }
+
+  async function saveAdminProfileAssignment(event) {
+    const select = event.target;
+    select.disabled = true;
+    try {
+      const response = await fetch('/api/admin/players/' + Number(select.dataset.adminSlot) + '/profile', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profileId: Number(select.value) || null })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
+      const player = adminPlayers.find(item => Number(item.slot) === Number(select.dataset.adminSlot));
+      if (player) { player.profileId = result.player.profileId; player.name = result.player.name; }
+      renderAdminProfileAssignments();
+      renderAdminPlayerOptions();
+      showToast('Profilzuordnung gespeichert ✓');
+    } catch (error) {
+      showToast('Profilzuordnung nicht gespeichert: ' + error.message, true);
+      select.disabled = false;
+    }
   }
 
   function loadAdminStatsByProfile(profileId) {

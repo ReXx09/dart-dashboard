@@ -3205,6 +3205,27 @@ app.put('/api/admin/auth/config', requireAdminPinChange, (req, res) => {
   res.json({ enabled: adminAuthEnabled });
 });
 
+app.put('/api/admin/players/:slot/profile', requireAdmin, async (req, res) => {
+  const slot = Number(req.params.slot);
+  const profileId = Number(req.body?.profileId || 0) || null;
+  if (!Number.isInteger(slot) || slot < 1 || slot > 8) return res.status(400).json({ error: 'Ungültiger Slot.' });
+  try {
+    const players = await dataStore.getPlayers();
+    const player = players.find(item => Number(item.slot) === slot);
+    if (!player) return res.status(404).json({ error: 'Spieler-Slot nicht gefunden.' });
+    const profiles = await dataStore.getProfiles();
+    const profile = profileId ? profiles.find(item => Number(item.id) === profileId) : null;
+    if (profileId && !profile) return res.status(404).json({ error: 'Profil nicht gefunden.' });
+    player.profileId = profile ? Number(profile.id) : null;
+    if (profile) player.name = profile.name;
+    await savePlayers(players);
+    broadcastReload();
+    res.json({ ok: true, player });
+  } catch (err) {
+    res.status(500).json({ error: 'Profilzuordnung konnte nicht gespeichert werden: ' + err.message });
+  }
+});
+
 app.get('/api/admin/backups', requireAdmin, (_req, res) => {
   res.json({
     areas: Object.keys(ADMIN_BACKUP_SOURCES),
@@ -3223,6 +3244,36 @@ app.post('/api/admin/backups', requireAdmin, async (req, res) => {
     res.status(201).json(manifest);
   } catch (err) {
     res.status(400).json({ error: 'Backup konnte nicht erstellt werden: ' + err.message });
+  }
+});
+
+app.post('/api/admin/backups/restore-json', requireAdmin, async (req, res) => {
+  const files = Array.isArray(req.body?.files) ? req.body.files : [];
+  const allowed = new Map([
+    ['players.json', PLAYERS_FILE],
+    ['live-state.json', LIVE_STATE_FILE],
+    ['highscores.json', HIGHSCORES_FILE],
+    ['settings.json', SETTINGS_FILE],
+    ['matrix-mapping.json', MATRIX_MAPPING_FILE]
+  ]);
+  if (!files.length || files.length > allowed.size) return res.status(400).json({ error: 'Keine gültigen JSON-Backupdateien ausgewählt.' });
+  try {
+    const writes = [];
+    for (const file of files) {
+      const name = String(file?.name || '');
+      const target = allowed.get(name);
+      if (!target || typeof file?.content !== 'string') return res.status(400).json({ error: 'Nicht unterstützte Backup-Datei: ' + name });
+      const parsed = JSON.parse(file.content);
+      writes.push({ target, content: JSON.stringify(parsed, null, 2) + '\n' });
+    }
+    for (const write of writes) {
+      const temporary = write.target + '.restore-' + process.pid;
+      fs.writeFileSync(temporary, write.content, 'utf8');
+      fs.renameSync(temporary, write.target);
+    }
+    res.json({ ok: true, restored: files.map(file => file.name) });
+  } catch (err) {
+    res.status(400).json({ error: 'Backup konnte nicht wiederhergestellt werden: ' + err.message });
   }
 });
 
