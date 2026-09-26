@@ -272,12 +272,17 @@
         <input id="hsNewPlayer" type="text" placeholder="Spieler für neuen Highscore" aria-label="Spieler für neuen Highscore" style="flex:1;min-width:180px;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit" />
         <input id="hsNewScore" type="number" min="1" placeholder="Score" aria-label="Score für neuen Highscore" style="width:110px;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit" />
         <button class="btn-save" id="saveHsBtn" style="background:#2a9d8f;padding:7px 14px;font-size:.78rem">Highscore speichern</button>
-        <button class="btn-save" id="resetHsBtn" style="background:#8b0000;padding:7px 14px;font-size:.78rem">Highscores zurücksetzen</button>
+        <button class="btn-save" id="resetHsBtn" style="background:#8b0000;padding:7px 14px;font-size:.78rem">Alle manuellen zurücksetzen</button>
+      </div>
+      <div class="field-inline" style="margin:0 0 10px">
+        <label style="font-size:.78rem;color:#888"><input type="checkbox" id="hsSelectVisible" /> Alle sichtbaren manuellen auswählen</label>
+        <button class="btn-save" id="resetSelectedHsBtn" style="background:#8b0000;padding:6px 12px;font-size:.76rem">Auswahl zurücksetzen</button>
       </div>
       <div style="max-height:400px;overflow-y:auto;border:1px solid #1e1e1e;border-radius:8px">
         <table style="width:100%;border-collapse:collapse;font-size:.78rem">
           <thead>
             <tr style="background:#0d0d0d;position:sticky;top:0">
+              <th style="padding:8px 10px;text-align:left;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Auswahl</th>
               <th style="padding:8px 10px;text-align:left;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">#</th>
               <th style="padding:8px 10px;text-align:left;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Spieler</th>
               <th style="padding:8px 10px;text-align:right;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Score</th>
@@ -286,8 +291,8 @@
               <th style="padding:8px 10px;text-align:center;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2a2a2a">Aktion</th>
             </tr>
           </thead>
-          <tbody id="hsTableBody">
-            <tr><td colspan="6" style="padding:30px;text-align:center;color:#555">Lade Highscores...</td></tr>
+              <tbody id="hsTableBody">
+            <tr><td colspan="7" style="padding:30px;text-align:center;color:#555">Lade Highscores...</td></tr>
           </tbody>
         </table>
       </div>
@@ -747,7 +752,7 @@
       renderMonthFilter();
       renderHighscores();
     } catch(e) {
-      document.getElementById('hsTableBody').innerHTML = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#e63946">Fehler beim Laden: ' + e.message + '</td></tr>';
+      document.getElementById('hsTableBody').innerHTML = '<tr><td colspan="7" style="padding:30px;text-align:center;color:#e63946">Fehler beim Laden: ' + e.message + '</td></tr>';
     }
   }
 
@@ -823,7 +828,7 @@
     document.getElementById('hsCount').textContent = list.length + ' / ' + hsData.length;
     const body = document.getElementById('hsTableBody');
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#555">Keine Highscore-Einträge vorhanden.</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" style="padding:30px;text-align:center;color:#555">Keine Highscore-Einträge vorhanden.</td></tr>';
       return;
     }
     body.innerHTML = list.map((entry, idx) => {
@@ -840,6 +845,7 @@
             '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>'
           : '<span style="color:#777;font-size:.68rem">' + (entry.duelId ? 'Quelle: Begegnung #' + Number(entry.duelId) : 'Automatisch erfasst') + '</span>';
       return '<tr>' +
+        '<td style="padding:8px 10px;text-align:center">' + (isManual ? '<input type="checkbox" class="hs-select" value="' + Number(entry.id) + '" aria-label="Highscore von ' + escapeAttr(entry.player) + ' auswählen" />' : '<span style="color:#555">-</span>') + '</td>' +
         '<td style="padding:8px 10px;color:#666;font-weight:700">' + (idx + 1) + '</td>' +
         '<td style="padding:8px 10px;color:#f1f1f1">' + escapeHtml(entry.player) + '</td>' +
         '<td style="padding:8px 10px;text-align:right;color:#f4a261;font-weight:700">' + entry.score + '</td>' +
@@ -860,6 +866,7 @@
         }
       });
     });
+    body.querySelectorAll('.hs-select').forEach(input => input.addEventListener('change', updateSelectedHighscoreState));
     body.querySelectorAll('[data-hs-edit-id]').forEach(btn => {
       btn.addEventListener('click', function() {
         editingHighscoreId = Number(this.dataset.hsEditId);
@@ -880,6 +887,11 @@
         renderHighscores();
       });
     });
+  }
+
+  function updateSelectedHighscoreState() {
+    const selected = document.querySelectorAll('#hsTableBody .hs-select:checked').length;
+    document.getElementById('resetSelectedHsBtn').disabled = selected === 0;
   }
 
   async function editHighscore(id, player, score) {
@@ -947,6 +959,23 @@
     } catch (err) { showToast('Fehler beim Zurücksetzen: ' + err.message, true); }
   }
 
+  async function resetSelectedHighscores() {
+    const inputs = [...document.querySelectorAll('#hsTableBody .hs-select:checked')];
+    const ids = inputs.map(input => Number(input.value)).filter(Boolean);
+    if (!ids.length) return;
+    const names = inputs.map(input => input.getAttribute('aria-label').replace(/^Highscore von | auswählen$/g, '')).join(', ');
+    if (!confirm(ids.length + ' ausgewählte(n) Highscore(s) wirklich löschen?\n\n' + names)) return;
+    try {
+      const response = await fetch('/api/highscores/selected', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids })
+      });
+      if (!response.ok) throw new Error(await getApiError(response));
+      document.getElementById('hsSelectVisible').checked = false;
+      await loadHighscores();
+      showToast(ids.length + ' ausgewählte Highscore(s) gelöscht ✓');
+    } catch (err) { showToast('Fehler beim Zurücksetzen: ' + err.message, true); }
+  }
+
   function escapeHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -965,6 +994,11 @@
   document.getElementById('refreshHsBtn').addEventListener('click', loadHighscores);
   document.getElementById('saveHsBtn').addEventListener('click', saveHighscore);
   document.getElementById('resetHsBtn').addEventListener('click', resetHighscores);
+  document.getElementById('resetSelectedHsBtn').addEventListener('click', resetSelectedHighscores);
+  document.getElementById('hsSelectVisible').addEventListener('change', function() {
+    document.querySelectorAll('#hsTableBody .hs-select').forEach(input => { input.checked = this.checked; });
+    updateSelectedHighscoreState();
+  });
   document.getElementById('hsPlayerSearch').addEventListener('input', renderHighscores);
   document.getElementById('hsPlayerSelect').addEventListener('change', renderHighscores);
   document.getElementById('hsMonthFilter').addEventListener('change', renderHighscores);
