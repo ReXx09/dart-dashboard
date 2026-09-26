@@ -4549,8 +4549,22 @@ app.get('/api/highscores/overview', async (_req, res) => {
       }))
     }));
     const eliminationLeaderboard = await dataStore.getEliminationLeaderboard();
-    const eliminationMadeByName = new Map(eliminationLeaderboard.made.map(entry => [String(entry.player || '').trim().toLowerCase(), Number(entry.score || 0)]));
-    const eliminationTakenByName = new Map(eliminationLeaderboard.taken.map(entry => [String(entry.player || '').trim().toLowerCase(), Number(entry.score || 0)]));
+    const eliminationMade = eliminationLeaderboard.made.map(entry => ({
+      ...entry,
+      eliminationsMade: Number(entry.made || 0),
+      mode: 'gesamt',
+      category: 'all',
+      profileId: resolvePlayerIdentity({ name: entry.player }, profileIdsByName)
+    }));
+    const eliminationTaken = eliminationLeaderboard.taken.map(entry => ({
+      ...entry,
+      eliminationsTaken: Number(entry.taken || 0),
+      mode: 'gesamt',
+      category: 'all',
+      profileId: resolvePlayerIdentity({ name: entry.player }, profileIdsByName)
+    }));
+    const eliminationMadeByName = new Map(eliminationMade.map(entry => [String(entry.player || '').trim().toLowerCase(), entry.eliminationsMade]));
+    const eliminationTakenByName = new Map(eliminationTaken.map(entry => [String(entry.player || '').trim().toLowerCase(), entry.eliminationsTaken]));
     for (const entry of profileStats) {
       const nameKey = String(entry.player || '').trim().toLowerCase();
       entry.eliminationsMade = eliminationMadeByName.get(nameKey) || 0;
@@ -4578,8 +4592,8 @@ app.get('/api/highscores/overview', async (_req, res) => {
       tournamentMatchesPlayed: ranked('tournamentMatchesPlayed'),
       gamesPlayed: ranked('gamesPlayed'),
       gamesWon: ranked('gamesWon'),
-      eliminationsMade: eliminationLeaderboard.made,
-      eliminationsTaken: eliminationLeaderboard.taken
+      eliminationsMade: eliminationMade,
+      eliminationsTaken: eliminationTaken
     }});
   } catch (err) {
     res.status(500).json({ error: 'Highscore-Übersicht konnte nicht geladen werden: ' + err.message });
@@ -4607,8 +4621,8 @@ app.get('/api/players/:id/stats', async (req, res) => {
     const taken = eliminationLeaderboard.taken.find(entry => String(entry.player || '').trim().toLowerCase() === playerName);
     stats = {
       ...(stats || {}),
-      eliminations_made: Number(made?.score || 0),
-      eliminations_taken: Number(taken?.score || 0)
+      eliminations_made: Number(made?.made || 0),
+      eliminations_taken: Number(taken?.taken || 0)
     };
     res.json(stats || {});
   } catch (err) {
