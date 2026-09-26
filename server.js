@@ -1762,6 +1762,27 @@ function cancelScheduledAutoAdvance() {
   autoAdvanceTimer = null;
 }
 
+function finishEliminationIfComplete(state) {
+  if (!state || state.game.status === 'leg-finished' || state.game.mode !== 'elimination' || !checkEliminationWin(state)) return false;
+  const winner = getEliminationWinner(state);
+  if (!winner) return false;
+
+  winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
+  state.game.status = 'leg-finished';
+  state.lastAction = {
+    ...(state.lastAction || {}),
+    eliminationWin: true,
+    winner: winner.name,
+    winnerSlot: winner.slot
+  };
+  queueLiveDetailWrite(
+    () => addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, gameMode: state.game.mode, duelId: state.game.duelId, playerSlot: winner.slot }),
+    'Leg-Highscore'
+  );
+  queueCompletedLegStats(state, winner, liveLifecycleGeneration);
+  return true;
+}
+
 function completeAutoAdvance(state, source) {
   if (!state || !Array.isArray(state.players) || state.players.length === 0) return false;
   const currentIndex = Number.isInteger(state.game.activePlayer) ? state.game.activePlayer : 0;
@@ -1778,6 +1799,7 @@ function completeAutoAdvance(state, source) {
   if (state.game.activePlayer === 0) {
     state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
   }
+  finishEliminationIfComplete(state);
   state.lastAction.autoAdvancePending = false;
   state.lastAction.autoAdvanced = true;
   state.lastAction.nextSource = source;
@@ -3964,21 +3986,7 @@ app.post('/api/live/next-player', async (req, res) => {
     state.players[nextIndex].currentRoundPoints = [];
     state.players[nextIndex].turnScoreRecorded = false;
     state.lastAction = { type: 'next-player', player: state.players[nextIndex].name, playerSlot: state.players[nextIndex].slot, ts: Date.now() };
-    if (state.game.mode === 'elimination' && checkEliminationWin(state)) {
-      const winner = getEliminationWinner(state);
-      if (winner) {
-        winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
-        state.game.status = 'leg-finished';
-        state.lastAction.eliminationWin = true;
-        state.lastAction.winner = winner.name;
-        state.lastAction.winnerSlot = winner.slot;
-        queueLiveDetailWrite(
-          () => addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, gameMode: state.game.mode, duelId: state.game.duelId, playerSlot: winner.slot }),
-          'Leg-Highscore'
-        );
-        queueCompletedLegStats(state, winner, liveLifecycleGeneration);
-      }
-    }
+    finishEliminationIfComplete(state);
     const saved = await saveLiveState(state);
     broadcastLiveState(saved);
     res.json(saved);
