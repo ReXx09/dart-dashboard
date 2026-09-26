@@ -2849,6 +2849,7 @@ function sanitizePlayerState(player, fallback) {
   const legs = Math.max(0, Number(player?.legs || base.legs || 0));
   const turns = Math.max(0, Number(player?.turns || base.turns || 0));
   const totalScored = Math.max(0, Number(player?.totalScored || base.totalScored || 0));
+  const eliminatedCount = Math.max(0, Number(player?.eliminatedCount || base.eliminatedCount || 0));
   const bestTurn = Math.max(0, Number(player?.bestTurn || base.bestTurn || 0));
   const remaining = Math.max(0, Number(player?.remaining || base.remaining || 501));
   const color = String(player?.color || base.color || '#e63946');
@@ -2880,6 +2881,7 @@ function sanitizePlayerState(player, fallback) {
     legs,
     turns,
     totalScored,
+    eliminatedCount,
     bestTurn,
     throws,
     currentRoundPoints,
