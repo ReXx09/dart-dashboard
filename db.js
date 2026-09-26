@@ -1799,7 +1799,7 @@ class DataStore {
   }
 
   async getEliminationLeaderboard() {
-    const query = "SELECT e.eliminator_name AS player, COUNT(*) AS made, 0 AS taken FROM duel_eliminations e JOIN duels d ON d.id = e.duel_id GROUP BY e.eliminator_name UNION ALL SELECT e.eliminated_name AS player, 0 AS made, COUNT(*) AS taken FROM duel_eliminations e JOIN duels d ON d.id = e.duel_id GROUP BY e.eliminated_name UNION ALL SELECT p.player_name AS player, SUM(p.eliminations) AS made, 0 AS taken FROM duel_leg_players p JOIN duel_legs l ON l.id = p.duel_leg_id JOIN duels d ON d.id = p.duel_id WHERE lower(COALESCE(l.mode, d.mode, '')) = 'elimination' AND p.eliminations > 0 AND NOT EXISTS (SELECT 1 FROM duel_eliminations e WHERE e.duel_leg_id = p.duel_leg_id) GROUP BY p.player_name UNION ALL SELECT p.player_name AS player, 0 AS made, SUM(p.eliminated) AS taken FROM duel_leg_players p JOIN duel_legs l ON l.id = p.duel_leg_id JOIN duels d ON d.id = p.duel_id WHERE lower(COALESCE(l.mode, d.mode, '')) = 'elimination' AND p.eliminated > 0 AND NOT EXISTS (SELECT 1 FROM duel_eliminations e WHERE e.duel_leg_id = p.duel_leg_id) GROUP BY p.player_name";
+    const query = "SELECT e.eliminator_name AS player, COUNT(*) AS made, 0 AS taken FROM duel_eliminations e JOIN duels d ON d.id = e.duel_id GROUP BY e.eliminator_name UNION ALL SELECT e.eliminated_name AS player, 0 AS made, COUNT(*) AS taken FROM duel_eliminations e JOIN duels d ON d.id = e.duel_id GROUP BY e.eliminated_name";
     const rows = this.isSQLite()
       ? await this.sqlite.all(query)
       : this.isPostgres()
