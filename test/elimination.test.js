@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const { checkEliminationWin } = require('../modes/elimination');
 
-function createState(throwRound, currentThrow, activePlayer, scores = [301, 180, 120]) {
+function createState(throwRound, currentThrow, activePlayer, scores = [200, 180, 120]) {
   return {
     game: {
       mode: 'elimination',
@@ -24,4 +24,8 @@ test('Elimination beendet ein Leg nicht vor der zehnten Aufnahme', () => {
 
 test('Elimination beendet das Leg nach dem letzten Dart der zehnten Aufnahme', () => {
   assert.equal(checkEliminationWin(createState(10, 3, 2)), true);
+});
+
+test('Elimination beendet das Leg sofort bei Erreichen von 301 Punkten', () => {
+  assert.equal(checkEliminationWin(createState(4, 1, 1, [301, 97, 120])), true);
 });
