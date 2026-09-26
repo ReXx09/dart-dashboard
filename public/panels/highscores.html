@@ -736,9 +736,13 @@
 
     async function loadOverview() {
       try {
-        const response = await fetch('/api/highscores/overview', { cache: 'no-store' });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        overviewData = await response.json();
+        const [overviewResponse, scoresResponse] = await Promise.all([
+          fetch('/api/highscores/overview', { cache: 'no-store' }),
+          fetch('/api/highscores', { cache: 'no-store' })
+        ]);
+        if (!overviewResponse.ok) throw new Error('HTTP ' + overviewResponse.status);
+        overviewData = await overviewResponse.json();
+        const overviewScores = scoresResponse.ok ? await scoresResponse.json() : [];
         const modeSelect = document.getElementById('overviewMode');
         modeSelect.innerHTML = (overviewData.modes || ['gesamt']).map(mode => '<option value="' + escapeHtml(mode) + '">' + escapeHtml(mode === 'gesamt' ? 'Gesamt' : mode) + '</option>').join('');
         const categoryLabels = { all: 'Alle Kategorien', single: 'Solospiele', duel: 'Duelle', group: 'Begegnungen', tournament: 'Turniere' };
@@ -747,12 +751,22 @@
         if ([...categorySelect.options].some(option => option.value === selectedOverviewCategory)) categorySelect.value = selectedOverviewCategory;
         else selectedOverviewCategory = 'all';
         const playerSelect = document.getElementById('overviewPlayer');
+        const profileByName = new Map((overviewData.players || []).map(item => [String(item.player || '').trim().toLocaleLowerCase('de-DE'), String(item.profileId || '')]));
+        const highscoreProfileIds = new Set();
+        overviewScores.forEach(entry => {
+          const profileId = Number(entry.profileId || 0);
+          if (profileId > 0) highscoreProfileIds.add(String(profileId));
+          else {
+            const matchingProfileId = profileByName.get(String(entry.player || '').trim().toLocaleLowerCase('de-DE'));
+            if (matchingProfileId) highscoreProfileIds.add(matchingProfileId);
+          }
+        });
         const playerNames = new Map();
         (overviewData.players || []).forEach(item => {
-          if (item && item.profileId && item.player) playerNames.set(String(item.profileId), item.player);
+          if (item && item.profileId && item.player && highscoreProfileIds.has(String(item.profileId))) playerNames.set(String(item.profileId), item.player);
         });
         Object.values(overviewData.metrics || {}).flat().forEach(item => {
-          if (item && item.profileId && item.player) playerNames.set(String(item.profileId), item.player);
+          if (item && item.profileId && item.player && highscoreProfileIds.has(String(item.profileId))) playerNames.set(String(item.profileId), item.player);
         });
         playerSelect.innerHTML = '<option value="all">Alle Spieler</option>' + Array.from(playerNames.entries())
           .sort((a, b) => a[1].localeCompare(b[1], 'de'))
