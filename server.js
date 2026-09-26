@@ -3962,6 +3962,21 @@ app.post('/api/live/next-player', async (req, res) => {
     state.players[nextIndex].currentRoundPoints = [];
     state.players[nextIndex].turnScoreRecorded = false;
     state.lastAction = { type: 'next-player', player: state.players[nextIndex].name, playerSlot: state.players[nextIndex].slot, ts: Date.now() };
+    if (state.game.mode === 'elimination' && checkEliminationWin(state)) {
+      const winner = getEliminationWinner(state);
+      if (winner) {
+        winner.legs = Math.max(0, Number(winner.legs || 0)) + 1;
+        state.game.status = 'leg-finished';
+        state.lastAction.eliminationWin = true;
+        state.lastAction.winner = winner.name;
+        state.lastAction.winnerSlot = winner.slot;
+        queueLiveDetailWrite(
+          () => addHighscore(winner.name, winner.totalScored || 0, { kind: 'elimination', legWin: true, gameMode: state.game.mode, duelId: state.game.duelId, playerSlot: winner.slot }),
+          'Leg-Highscore'
+        );
+        queueCompletedLegStats(state, winner, liveLifecycleGeneration);
+      }
+    }
     const saved = await saveLiveState(state);
     broadcastLiveState(saved);
     res.json(saved);

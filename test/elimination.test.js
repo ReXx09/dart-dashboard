@@ -24,6 +24,8 @@ test('Elimination beendet ein Leg nicht vor der zehnten Aufnahme', () => {
 
 test('Elimination beendet das Leg nach dem letzten Dart der zehnten Aufnahme', () => {
   assert.equal(checkEliminationWin(createState(10, 3, 2)), true);
+  assert.equal(checkEliminationWin(createState(10, 3, 0)), false);
+  assert.equal(checkEliminationWin(createState(11, 0, 0)), true);
 });
 
 test('Elimination beendet das Leg sofort bei Erreichen von 301 Punkten', () => {

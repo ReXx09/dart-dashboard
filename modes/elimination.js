@@ -11,8 +11,11 @@ function checkEliminationWin(state) {
   const targetScore = Number(modeDef.targetScore || 301);
   if (state.players.some(player => calculateEliminationPoints(player) >= targetScore)) return true;
 
+  const throwRound = Number(state.game.throwRound || 0);
+  if (throwRound > 10) return true;
+
   const lastPlayerIndex = Math.max(0, state.players.length - 1);
-  return Number(state.game.throwRound || 0) >= 10
+  return throwRound === 10
     && Number(state.game.currentThrow || 0) >= 3
     && Number(state.game.activePlayer || 0) === lastPlayerIndex;
 }
