@@ -40,6 +40,14 @@ function applyEliminationHit(state, player, value) {
 
       other.totalScored = 0;
       other.eliminatedCount = Number(other.eliminatedCount || 0) + 1;
+      if (!Array.isArray(state.eliminationEvents)) state.eliminationEvents = [];
+      state.eliminationEvents.push({
+        eliminatorSlot: player.slot,
+        eliminatorName: player.name,
+        eliminatedSlot: other.slot,
+        eliminatedName: other.name,
+        createdAt: Date.now()
+      });
       state.lastAction = {
         type: 'elimination',
         source: 'elimination',

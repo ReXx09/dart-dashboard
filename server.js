@@ -1748,8 +1748,10 @@ async function recordDuelLegIfActive(state, winner) {
     winnerSlot: winner.slot,
     startedAt: Number(state.game.startedAt || Date.now()),
     players,
+    eliminationEvents: mode === 'elimination' ? (Array.isArray(state.eliminationEvents) ? state.eliminationEvents : []) : [],
     matchComplete
   });
+  state.eliminationEvents = [];
   if (matchComplete && state.game?.tournamentId && state.game?.tournamentMatchId) {
     return dataStore.advanceTournament(state.game.tournamentId, state.game.tournamentMatchId, winner.slot, state.players);
   }
@@ -4477,6 +4479,7 @@ app.get('/api/highscores/overview', async (_req, res) => {
         return [rule, { ...value, rate: value.attempts > 0 ? Number((value.success / value.attempts * 100).toFixed(1)) : 0, highest: Math.min(170, value.highest) }];
       }))
     }));
+    const eliminationLeaderboard = await dataStore.getEliminationLeaderboard();
     res.json({ trackingMode: 'gesamt', modes, categories, players: profiles.map(profile => ({ profileId: Number(profile.id), player: profile.name })), profileStats, metrics: {
       count180: ranked('count180'),
       count171Plus: ranked('count171Plus'),
@@ -4498,7 +4501,9 @@ app.get('/api/highscores/overview', async (_req, res) => {
       groupMatchesPlayed: ranked('groupMatchesPlayed'),
       tournamentMatchesPlayed: ranked('tournamentMatchesPlayed'),
       gamesPlayed: ranked('gamesPlayed'),
-      gamesWon: ranked('gamesWon')
+      gamesWon: ranked('gamesWon'),
+      eliminationsMade: eliminationLeaderboard.made,
+      eliminationsTaken: eliminationLeaderboard.taken
     }});
   } catch (err) {
     res.status(500).json({ error: 'Highscore-Übersicht konnte nicht geladen werden: ' + err.message });

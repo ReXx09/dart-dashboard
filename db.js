@@ -163,6 +163,7 @@ class DataStore {
     }
 
     await this.ensureDuelSchema();
+    await this.ensureEliminationSchema();
     await this.ensurePlayerProfileSchema();
     await this.ensureHighscoreProfileSchema();
     await this.ensureHighscoreModeColumn();
@@ -175,6 +176,13 @@ class DataStore {
     await this.ensureSeasonSchema();
     await this.ensurePerformanceIndexes();
     await this.seedFromLegacyJson();
+  }
+
+  async ensureEliminationSchema() {
+    const sql = 'CREATE TABLE IF NOT EXISTS duel_eliminations (id ' + (this.isSQLite() ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : this.isPostgres() ? 'BIGSERIAL PRIMARY KEY' : 'BIGINT PRIMARY KEY AUTO_INCREMENT') + ', duel_id ' + (this.isMySQL() ? 'BIGINT' : 'BIGINT') + ' NOT NULL, duel_leg_id BIGINT NOT NULL, eliminator_slot INT NOT NULL, eliminator_name VARCHAR(255) NOT NULL, eliminated_slot INT NOT NULL, eliminated_name VARCHAR(255) NOT NULL, created_at BIGINT NOT NULL)';
+    if (this.isSQLite()) await this.sqlite.run(sql);
+    else if (this.isPostgres()) await this.pg.query(sql);
+    else await this.my.query(sql);
   }
 
   async ensurePlayerProfileSchema() {
@@ -1741,7 +1749,7 @@ class DataStore {
     }
   }
 
-  async recordDuelLeg({ duelId, mode, winnerSlot, startedAt, endedAt = Date.now(), players, matchComplete = true }) {
+  async recordDuelLeg({ duelId, mode, winnerSlot, startedAt, endedAt = Date.now(), players, eliminationEvents = [], matchComplete = true }) {
     const duel = await this.getDuel(duelId);
     if (!duel) throw new Error('Begegnung nicht gefunden.');
     const expectedSlots = duel.players.map(player => Number(player.player_slot)).sort((a, b) => a - b).join('-');
@@ -1763,12 +1771,41 @@ class DataStore {
       else if (this.isPostgres()) await this.pg.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_60plus, count_80plus, count_100plus, count_140plus, count_171plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, eliminations, eliminated, won) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)', stats);
       else await this.my.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_60plus, count_80plus, count_100plus, count_140plus, count_171plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, eliminations, eliminated, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
     }
+    for (const event of Array.isArray(eliminationEvents) ? eliminationEvents : []) {
+      const values = [Number(duelId), legId, Number(event.eliminatorSlot), String(event.eliminatorName || 'Spieler'), Number(event.eliminatedSlot), String(event.eliminatedName || 'Spieler'), Number(event.createdAt || endedAt)];
+      const query = 'INSERT INTO duel_eliminations (duel_id, duel_leg_id, eliminator_slot, eliminator_name, eliminated_slot, eliminated_name, created_at) VALUES (' + (this.isPostgres() ? '$1, $2, $3, $4, $5, $6, $7' : '?, ?, ?, ?, ?, ?, ?') + ')';
+      if (this.isSQLite()) await this.sqlite.run(query, values);
+      else if (this.isPostgres()) await this.pg.query(query, values);
+      else await this.my.query(query, values);
+    }
     const status = matchComplete ? 'finished' : 'active';
     const matchWinner = matchComplete ? Number(winnerSlot || 0) || null : null;
     if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET total_legs = ?, status = ?, ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', [legNumber, status, endedAt, matchWinner, endedAt, Number(duelId)]);
     else if (this.isPostgres()) await this.pg.query('UPDATE duels SET total_legs = $1, status = $2, ended_at = $3, winner_slot = $4, updated_at = $5 WHERE id = $6', [legNumber, status, endedAt, matchWinner, endedAt, Number(duelId)]);
     else await this.my.query('UPDATE duels SET total_legs = ?, status = ?, ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', [legNumber, status, endedAt, matchWinner, endedAt, Number(duelId)]);
     return this.getDuel(duelId);
+  }
+
+  async getEliminationLeaderboard() {
+    const rows = this.isSQLite()
+      ? await this.sqlite.all("SELECT eliminator_name AS player, COUNT(*) AS made, 0 AS taken FROM duel_eliminations GROUP BY eliminator_name UNION ALL SELECT eliminated_name AS player, 0 AS made, COUNT(*) AS taken FROM duel_eliminations GROUP BY eliminated_name")
+      : this.isPostgres()
+        ? (await this.pg.query("SELECT eliminator_name AS player, COUNT(*) AS made, 0 AS taken FROM duel_eliminations GROUP BY eliminator_name UNION ALL SELECT eliminated_name AS player, 0 AS made, COUNT(*) AS taken FROM duel_eliminations GROUP BY eliminated_name")).rows
+        : (await this.my.query("SELECT eliminator_name AS player, COUNT(*) AS made, 0 AS taken FROM duel_eliminations GROUP BY eliminator_name UNION ALL SELECT eliminated_name AS player, 0 AS made, COUNT(*) AS taken FROM duel_eliminations GROUP BY eliminated_name"))[0];
+    const totals = new Map();
+    for (const row of rows) {
+      const player = String(row.player || '').trim();
+      if (!player) continue;
+      const current = totals.get(player.toLowerCase()) || { player, made: 0, taken: 0 };
+      current.made += Number(row.made || 0);
+      current.taken += Number(row.taken || 0);
+      totals.set(player.toLowerCase(), current);
+    }
+    const values = [...totals.values()];
+    return {
+      made: values.filter(row => row.made > 0).sort((a, b) => b.made - a.made || a.player.localeCompare(b.player, 'de')),
+      taken: values.filter(row => row.taken > 0).sort((a, b) => b.taken - a.taken || a.player.localeCompare(b.player, 'de'))
+    };
   }
 
   async savePlayers(list) {
