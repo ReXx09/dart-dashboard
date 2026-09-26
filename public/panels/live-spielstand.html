@@ -1075,6 +1075,9 @@
     .duel-stats-cell.player { color: #f4c542; font-size: 1.05rem; font-weight: 800; }
     .duel-stats-cell.player.second { color: #d7e0e5; }
     .duel-stats-cell.value { color: #fff; font-size: 1.05rem; font-weight: 700; }
+    .elimination-made { color: #7ac29a; }
+    .elimination-taken { color: #ff9aa0; }
+    .elimination-divider { color: #777; }
     .duel-stats-close {
       display: block;
       margin: 20px auto 0;
@@ -1859,7 +1862,7 @@
       const rows = new Map();
       (duel && duel.players || []).forEach(player => rows.set(Number(player.player_slot), {
         name: player.player_name || 'Spieler', wins: 0, legs: 0, darts: 0, scored: 0,
-        checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, bestLeg: null, bestTurn: 0,
+        checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0, bestLeg: null, bestTurn: 0, finalScore: 0, eliminations: 0, eliminated: 0,
         count60plus: 0, count80plus: 0, count100plus: 0, count140plus: 0, count180: 0, firstNineTotal: 0, firstNineCount: 0
       }));
       (selectedLegs || duel && duel.legs || []).forEach(leg => (leg.players || []).forEach(player => {
@@ -1869,6 +1872,9 @@
         row.wins += Number(player.won || 0);
         row.darts += Number(player.darts || 0);
         row.scored += Number(player.scored || 0);
+        row.finalScore = Number(player.scored || 0);
+        row.eliminations += Number(player.eliminations || 0);
+        row.eliminated += Number(player.eliminated || 0);
         row.bestTurn = Math.max(row.bestTurn, Number(player.best_turn || 0));
         row.checkoutAttempts += Number(player.checkout_attempts || 0);
         row.checkoutSuccess += Number(player.checkout_success || 0);
@@ -1934,6 +1940,10 @@
         ['140+', item => item.count140plus],
         ['180', item => item.count180]
       ];
+      if (String(state.game && state.game.mode) === 'elimination') {
+        labels.splice(1, 0, ['Endpunktzahl', item => item.finalScore || 0]);
+        labels.splice(2, 0, ['Eliminierungen', item => '<span class="elimination-made" title="Eliminiert">+' + item.eliminations + '</span><span class="elimination-divider"> / </span><span class="elimination-taken" title="Wurde eliminiert">-' + item.eliminated + '</span>']);
+      }
       const gridColumns = 'minmax(110px, 1fr) ' + stats.map(() => 'minmax(105px, 1fr)').join(' ');
       overlay.innerHTML = '<div class="duel-stats-card"><div class="duel-stats-title">' + (isSingleGame ? 'Solospiel' : 'Begegnung') + ' · ' + escapeHtml(duel.id) + '</div>' +
         '<div class="duel-stats-score">' + escapeHtml(state.game.mode || '501') + ' · ' + stats.map(item => item.wins).join(' : ') + '</div>' +

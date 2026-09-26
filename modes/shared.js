@@ -3,7 +3,7 @@ const GAME_MODES = {
   '301':   { label: '301',   type: 'x01',  startScore: 301,  cricketNumbers: null,   description: '301' },
   '701':   { label: '701',   type: 'x01',  startScore: 701,  cricketNumbers: null,   description: '701' },
   'cricket': { label: 'Cricket', type: 'cricket', startScore: 0, cricketNumbers: [15,16,17,18,19,20,25], description: 'Cricket' },
-  'elimination': { label: '301-Elimination', type: 'elimination', startScore: 0, targetScore: 301, cricketNumbers: null, description: '301-Elimination: bis 301 oder maximal 10 Aufnahmen' },
+  'elimination': { label: '301-Elimination', type: 'elimination', startScore: 0, targetScore: 301, cricketNumbers: null, description: '301-Elimination: maximal 10 Aufnahmen' },
   'shanghai': { label: 'Shanghai', type: 'shanghai', startScore: 0, cricketNumbers: null, description: 'Shanghai' },
   'atc':    { label: 'Around the Clock', type: 'atc', startScore: 0, cricketNumbers: null, description: 'Around the Clock' },
   'split':  { label: 'Split', type: 'split', startScore: 0, cricketNumbers: null, description: 'Split Score' }

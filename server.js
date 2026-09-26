@@ -1735,7 +1735,9 @@ async function recordDuelLegIfActive(state, winner) {
       checkoutAttempts: player.checkoutAttempts,
       checkoutSuccess: player.checkoutSuccess,
       lastCheckoutValue: player.lastCheckoutValue,
-      busts: throwSummary.busts
+      busts: throwSummary.busts,
+      eliminations: mode === 'elimination' ? (Array.isArray(player.throws) ? player.throws.filter(throwData => throwData && throwData.elimination).length : 0) : 0,
+      eliminated: mode === 'elimination' ? Number(player.eliminatedCount || 0) : 0
     };
   });
   const legsToWin = Math.max(1, Number(state.game?.legsToWin || 1));
@@ -1934,6 +1936,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}, generation = live
     cricketPointsAwarded,
     remaining: player.remaining,
     bust,
+    elimination: Boolean(eliminationAction),
     ts: thrownAt,
     source: 'arduino',
     turnId: state.game.turnId || 1,
@@ -2289,6 +2292,7 @@ async function applyArduinoThrowFromMatrix(hit, generation = liveLifecycleGenera
     cricketPointsAwarded,
     remaining: player.remaining,
     bust,
+    elimination: Boolean(eliminationAction),
     ts: thrownAt,
     source: 'arduino-matrix',
     turnId: state.game.turnId || 1,
@@ -3836,7 +3840,7 @@ app.post('/api/live/throw', async (req, res) => {
     const throwSource = typeof req.body?.source === 'string' && req.body.source.trim()
       ? req.body.source.trim()
       : 'manual';
-    player.throws.push({ points, remaining: player.remaining, bust, ts: thrownAt, mode, segment: throwSegment, turnId: state.game.turnId || 1, source: throwSource });
+    player.throws.push({ points, remaining: player.remaining, bust, elimination: Boolean(eliminationAction), ts: thrownAt, mode, segment: throwSegment, turnId: state.game.turnId || 1, source: throwSource });
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
 

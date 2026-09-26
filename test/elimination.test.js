@@ -17,6 +17,8 @@ function createState(throwRound, currentThrow, activePlayer, scores = [301, 180,
 
 test('Elimination beendet ein Leg nicht vor der zehnten Aufnahme', () => {
   assert.equal(checkEliminationWin(createState(7, 3, 2)), false);
+  assert.equal(checkEliminationWin(createState(8, 3, 2)), false);
+  assert.equal(checkEliminationWin(createState(9, 3, 2)), false);
   assert.equal(checkEliminationWin(createState(10, 2, 2)), false);
 });
 

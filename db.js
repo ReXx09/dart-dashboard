@@ -829,6 +829,8 @@ class DataStore {
           'ALTER TABLE duels ADD COLUMN checkout_stats_version INTEGER NOT NULL DEFAULT 1',
           'ALTER TABLE tournaments ADD COLUMN checkout_rule TEXT',
           'ALTER TABLE duel_leg_players ADD COLUMN count_171plus INTEGER NOT NULL DEFAULT 0',
+          'ALTER TABLE duel_leg_players ADD COLUMN eliminations INTEGER NOT NULL DEFAULT 0',
+          'ALTER TABLE duel_leg_players ADD COLUMN eliminated INTEGER NOT NULL DEFAULT 0',
           'ALTER TABLE player_stats ADD COLUMN first_nine_total REAL NOT NULL DEFAULT 0',
           'ALTER TABLE player_stats ADD COLUMN first_nine_samples INTEGER NOT NULL DEFAULT 0',
           'ALTER TABLE player_stats ADD COLUMN first_nine_legacy INTEGER NOT NULL DEFAULT 0',
@@ -840,6 +842,8 @@ class DataStore {
             'ALTER TABLE duels ADD COLUMN IF NOT EXISTS checkout_stats_version INTEGER NOT NULL DEFAULT 1',
             'ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS checkout_rule TEXT',
             'ALTER TABLE duel_leg_players ADD COLUMN IF NOT EXISTS count_171plus INTEGER NOT NULL DEFAULT 0',
+            'ALTER TABLE duel_leg_players ADD COLUMN IF NOT EXISTS eliminations INTEGER NOT NULL DEFAULT 0',
+            'ALTER TABLE duel_leg_players ADD COLUMN IF NOT EXISTS eliminated INTEGER NOT NULL DEFAULT 0',
             'ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS first_nine_total NUMERIC NOT NULL DEFAULT 0',
             'ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS first_nine_samples INTEGER NOT NULL DEFAULT 0',
             'ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS first_nine_legacy INTEGER NOT NULL DEFAULT 0',
@@ -850,6 +854,8 @@ class DataStore {
             'ALTER TABLE duels ADD COLUMN checkout_stats_version INT NOT NULL DEFAULT 1',
             'ALTER TABLE tournaments ADD COLUMN checkout_rule VARCHAR(16) NULL',
             'ALTER TABLE duel_leg_players ADD COLUMN count_171plus INT NOT NULL DEFAULT 0',
+            'ALTER TABLE duel_leg_players ADD COLUMN eliminations INT NOT NULL DEFAULT 0',
+            'ALTER TABLE duel_leg_players ADD COLUMN eliminated INT NOT NULL DEFAULT 0',
             'ALTER TABLE player_stats ADD COLUMN first_nine_total DECIMAL(12,4) NOT NULL DEFAULT 0',
             'ALTER TABLE player_stats ADD COLUMN first_nine_samples INT NOT NULL DEFAULT 0',
             'ALTER TABLE player_stats ADD COLUMN first_nine_legacy TINYINT NOT NULL DEFAULT 0',
@@ -1752,10 +1758,10 @@ class DataStore {
     else await this.my.query('UPDATE player_throw_segments SET duel_leg_id = ? WHERE duel_id = ? AND thrown_at >= ? AND thrown_at <= ? AND duel_leg_id IS NULL', [legId, Number(duelId), Number(startedAt || endedAt), endedAt]);
 
     for (const player of Array.isArray(players) ? players : []) {
-      const stats = [legId, Number(duelId), Number(player.slot), String(player.name || 'Spieler'), Number(player.turns || 0), Number(player.totalScored || 0), Number(player.average || 0), Number(player.firstNineAvg || 0), Number(player.bestTurn || 0), Number(player.count60plus || 0), Number(player.count80plus || 0), Number(player.count100plus || 0), Number(player.count140plus || 0), Number(player.count171plus || 0), Number(player.count180 || 0), Number(player.checkoutAttempts || 0), Number(player.checkoutSuccess || 0), Number(player.lastCheckoutValue || 0), Number(player.busts || 0), Number(player.slot) === Number(winnerSlot) ? 1 : 0];
-      if (this.isSQLite()) await this.sqlite.run('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_60plus, count_80plus, count_100plus, count_140plus, count_171plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
-      else if (this.isPostgres()) await this.pg.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_60plus, count_80plus, count_100plus, count_140plus, count_171plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)', stats);
-      else await this.my.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_60plus, count_80plus, count_100plus, count_140plus, count_171plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
+      const stats = [legId, Number(duelId), Number(player.slot), String(player.name || 'Spieler'), Number(player.turns || 0), Number(player.totalScored || 0), Number(player.average || 0), Number(player.firstNineAvg || 0), Number(player.bestTurn || 0), Number(player.count60plus || 0), Number(player.count80plus || 0), Number(player.count100plus || 0), Number(player.count140plus || 0), Number(player.count171plus || 0), Number(player.count180 || 0), Number(player.checkoutAttempts || 0), Number(player.checkoutSuccess || 0), Number(player.lastCheckoutValue || 0), Number(player.busts || 0), Number(player.eliminations || 0), Number(player.eliminated || 0), Number(player.slot) === Number(winnerSlot) ? 1 : 0];
+      if (this.isSQLite()) await this.sqlite.run('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_60plus, count_80plus, count_100plus, count_140plus, count_171plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, eliminations, eliminated, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
+      else if (this.isPostgres()) await this.pg.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_60plus, count_80plus, count_100plus, count_140plus, count_171plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, eliminations, eliminated, won) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)', stats);
+      else await this.my.query('INSERT INTO duel_leg_players (duel_leg_id, duel_id, player_slot, player_name, darts, scored, average, first_nine_avg, best_turn, count_60plus, count_80plus, count_100plus, count_140plus, count_171plus, count_180, checkout_attempts, checkout_success, checkout_highest, busts, eliminations, eliminated, won) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', stats);
     }
     const status = matchComplete ? 'finished' : 'active';
     const matchWinner = matchComplete ? Number(winnerSlot || 0) || null : null;

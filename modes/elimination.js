@@ -38,6 +38,7 @@ function applyEliminationHit(state, player, value) {
       if (otherPoints === 0 && currentPlayerScore === 0) continue;
 
       other.totalScored = 0;
+      other.eliminatedCount = Number(other.eliminatedCount || 0) + 1;
       state.lastAction = {
         type: 'elimination',
         source: 'elimination',
