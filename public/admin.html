@@ -268,6 +268,12 @@
           <option value="score">Höchster Score zuerst</option>
         </select>
       </div>
+      <div class="field-inline" style="margin:12px 0">
+        <input id="hsNewPlayer" type="text" placeholder="Spieler für neuen Highscore" aria-label="Spieler für neuen Highscore" style="flex:1;min-width:180px;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit" />
+        <input id="hsNewScore" type="number" min="1" placeholder="Score" aria-label="Score für neuen Highscore" style="width:110px;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit" />
+        <button class="btn-save" id="saveHsBtn" style="background:#2a9d8f;padding:7px 14px;font-size:.78rem">Highscore speichern</button>
+        <button class="btn-save" id="resetHsBtn" style="background:#8b0000;padding:7px 14px;font-size:.78rem">Highscores zurücksetzen</button>
+      </div>
       <div style="max-height:400px;overflow-y:auto;border:1px solid #1e1e1e;border-radius:8px">
         <table style="width:100%;border-collapse:collapse;font-size:.78rem">
           <thead>
@@ -333,7 +339,8 @@
       <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="highscores" checked /> Highscores</label></div>
       <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="settings" checked /> Einstellungen</label></div>
       <div class="field-row"><label><input class="admin-backup-area" type="checkbox" value="matrixMapping" checked /> Matrix-Mapping</label></div>
-      <div class="field-row"><label for="backupDestination">Ziel</label><select id="backupDestination"><option value="local">Pi-Speicher</option><option value="usb" disabled>USB (nicht konfiguriert)</option><option value="nextcloud" disabled>Nextcloud (nicht konfiguriert)</option></select></div>
+      <div class="field-row"><label for="backupDestination">Ziel</label><select id="backupDestination"><option value="local">Pi-Speicher</option><option value="browser">Browser-PC (Download)</option><option value="usb" disabled>USB (nicht konfiguriert)</option><option value="nextcloud" disabled>Nextcloud (nicht konfiguriert)</option></select></div>
+      <div class="field-hint" style="margin-left:142px">Browser-PC lädt die ausgewählten Dateien in den Download-Ordner dieses Rechners.</div>
       <button class="btn-save" id="createBackupBtn">Ausgewählte Bereiche sichern</button>
       <div id="backupList" style="margin-top:12px;color:#888;font-size:.8rem">Noch keine Backups geladen.</div>
     </div>
@@ -467,10 +474,21 @@
     const areas = Array.from(document.querySelectorAll('.admin-backup-area:checked')).map(input => input.value);
     const destination = document.getElementById('backupDestination').value;
     try {
-      const response = await fetch('/api/admin/backups', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ areas, destination }) });
+      const response = await fetch('/api/admin/backups', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ areas, destination: destination === 'browser' ? 'local' : destination }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Backup fehlgeschlagen');
-      showToast('Backup erstellt: ' + result.id);
+      if (destination === 'browser') {
+        for (const file of result.files || []) {
+          const fileResponse = await fetch('/api/admin/backups/' + encodeURIComponent(result.id) + '/' + encodeURIComponent(file.file));
+          if (!fileResponse.ok) throw new Error('Datei konnte nicht geladen werden: ' + file.file);
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(await fileResponse.blob());
+          link.download = file.file;
+          link.click();
+          URL.revokeObjectURL(link.href);
+        }
+        showToast('Backup auf dem Browser-PC gespeichert ✓');
+      } else showToast('Backup erstellt: ' + result.id);
       await loadAdminBackups();
     } catch (error) { showToast(error.message, true); }
     this.disabled = false;
@@ -871,6 +889,40 @@
     }
   }
 
+  async function saveHighscore() {
+    const playerInput = document.getElementById('hsNewPlayer');
+    const scoreInput = document.getElementById('hsNewScore');
+    const player = playerInput.value.trim();
+    const score = Number(scoreInput.value);
+    if (!player || !Number.isFinite(score) || score <= 0) {
+      showToast('Spielername und positiver Score erforderlich.', true);
+      return;
+    }
+    try {
+      const response = await fetch('/api/highscores', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, score })
+      });
+      if (!response.ok) throw new Error(await getApiError(response));
+      playerInput.value = '';
+      scoreInput.value = '';
+      await loadHighscores();
+      await loadHighscorePlayers();
+      showToast('Highscore gespeichert ✓');
+    } catch (err) { showToast('Fehler beim Speichern: ' + err.message, true); }
+  }
+
+  async function resetHighscores() {
+    if (!confirm('Alle manuell gespeicherten Highscores wirklich zurücksetzen? Automatische Begegnungs-Highscores bleiben erhalten.')) return;
+    try {
+      const response = await fetch('/api/highscores', { method: 'DELETE' });
+      if (!response.ok) throw new Error(await getApiError(response));
+      await loadHighscores();
+      await loadHighscorePlayers();
+      showToast('Highscores zurückgesetzt ✓');
+    } catch (err) { showToast('Fehler beim Zurücksetzen: ' + err.message, true); }
+  }
+
   function escapeHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -887,6 +939,8 @@
   }
 
   document.getElementById('refreshHsBtn').addEventListener('click', loadHighscores);
+  document.getElementById('saveHsBtn').addEventListener('click', saveHighscore);
+  document.getElementById('resetHsBtn').addEventListener('click', resetHighscores);
   document.getElementById('hsPlayerSearch').addEventListener('input', renderHighscores);
   document.getElementById('hsPlayerSelect').addEventListener('change', renderHighscores);
   document.getElementById('hsMonthFilter').addEventListener('change', renderHighscores);
@@ -898,6 +952,7 @@
   let adminPlayers = [];
   let adminProfiles = [];
   let selectedAdminPlayer = null;
+  let selectedAdminProfile = null;
 
   async function loadAdminPlayers() {
     try {
@@ -916,17 +971,23 @@
   function renderAdminPlayerOptions() {
     const select = document.getElementById('adminPlayerSelect');
     const search = document.getElementById('adminPlayerSearch').value.trim().toLocaleLowerCase('de-DE');
-    const namedPlayers = adminPlayers
-      .filter(player => player.name && String(player.name).toLocaleLowerCase('de-DE').includes(search))
-      .map(player => ({ id: Number(player.slot), label: 'S' + player.slot + ' · ' + player.name, name: player.name }));
-    const assignedNames = new Set(namedPlayers.map(player => String(player.name).toLocaleLowerCase('de-DE')));
-    const unassignedProfiles = adminProfiles
+    const profileOptions = adminProfiles
       .filter(profile => profile.name && String(profile.name).toLocaleLowerCase('de-DE').includes(search))
-      .filter(profile => !assignedNames.has(String(profile.name).toLocaleLowerCase('de-DE')));
+      .map(profile => {
+        const assignedPlayer = adminPlayers.find(player => Number(player.profileId || 0) === Number(profile.id));
+        return { profile, assignedPlayer };
+      });
     select.innerHTML = '<option value="">Spieler auswählen</option>' +
-      namedPlayers.map(player => '<option value="' + player.id + '">' + escapeHtml(player.label) + '</option>').join('') +
-      (unassignedProfiles.length ? '<optgroup label="Profile ohne Slot">' + unassignedProfiles.map(profile => '<option disabled>' + escapeHtml(profile.name) + ' · kein Slot</option>').join('') + '</optgroup>' : '');
-    if (selectedAdminPlayer && namedPlayers.some(player => player.id === selectedAdminPlayer)) select.value = String(selectedAdminPlayer);
+      profileOptions.map(({ profile, assignedPlayer }) => '<option value="' + Number(profile.id) + '"' + (assignedPlayer ? '' : ' disabled') + '>' + escapeHtml(profile.name) + (assignedPlayer ? '' : ' · kein Slot') + '</option>').join('');
+    if (selectedAdminProfile && profileOptions.some(({ profile, assignedPlayer }) => Number(profile.id) === selectedAdminProfile && assignedPlayer)) select.value = String(selectedAdminProfile);
+  }
+
+  function loadAdminStatsByProfile(profileId) {
+    selectedAdminProfile = Number(profileId) || null;
+    const profile = adminProfiles.find(item => Number(item.id) === selectedAdminProfile);
+    const assignedPlayer = profile && adminPlayers.find(player => Number(player.profileId || 0) === selectedAdminProfile);
+    selectedAdminPlayer = assignedPlayer ? Number(assignedPlayer.slot) : null;
+    return loadAdminStats(selectedAdminPlayer);
   }
 
   async function loadAdminStats(playerId) {
@@ -978,7 +1039,7 @@
   }
 
   document.getElementById('adminPlayerSearch').addEventListener('input', renderAdminPlayerOptions);
-  document.getElementById('adminPlayerSelect').addEventListener('change', event => loadAdminStats(event.target.value));
+  document.getElementById('adminPlayerSelect').addEventListener('change', event => loadAdminStatsByProfile(event.target.value));
   document.getElementById('saveStatsBtn').addEventListener('click', saveAdminStats);
   document.getElementById('resetStatsBtn').addEventListener('click', resetAdminStats);
   loadAdminPlayers();

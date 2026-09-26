@@ -4104,7 +4104,13 @@ app.post('/api/highscores', requireAdmin, async (req, res) => {
   const score = Number(req.body && req.body.score);
   if (!player || !Number.isFinite(score) || score <= 0) return res.status(400).json({ error: 'player und positive score erforderlich.' });
   try {
-    await addHighscore(player, score, { kind: 'manual' });
+    const matchingPlayers = (await dataStore.getPlayers()).filter(item => String(item.name || '').trim().toLowerCase() === player.toLowerCase());
+    const matchingProfiles = (await dataStore.getProfiles()).filter(item => String(item.name || '').trim().toLowerCase() === player.toLowerCase());
+    await addHighscore(player, score, {
+      kind: 'manual',
+      playerSlot: matchingPlayers.length === 1 ? Number(matchingPlayers[0].slot) : null,
+      profileId: matchingProfiles.length === 1 ? Number(matchingProfiles[0].id) : null
+    });
     res.json({ ok: true, highscores: await getHighscores() });
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht gespeichert werden: ' + err.message }); }
 });
