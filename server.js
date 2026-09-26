@@ -2461,7 +2461,7 @@ function parseArduinoLine(line) {
         state.game.activePlayer = nextIdx;
         state.game.currentThrow = 0;
         advanceLiveTurn(state);
-        state.game.throwRound = (state.game.throwRound || 1) + 1;
+        if (nextIdx === 0) state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
         state.lastAction = { type: 'player-switch-btn', player: state.players[nextIdx].name, playerSlot: state.players[nextIdx].slot, ts: Date.now() };
         const saved = await saveLiveState(state);
         broadcastLiveState(saved);
@@ -3953,7 +3953,7 @@ app.post('/api/live/next-player', async (req, res) => {
     state.game.activePlayer = nextIndex;
     state.game.currentThrow = 0;
     advanceLiveTurn(state);
-    state.game.throwRound = (state.game.throwRound || 1) + 1;
+    if (nextIndex === 0) state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
     // Neuen aktiven Spieler's currentRoundPoints leeren
     state.players[nextIndex].currentRoundPoints = [];
     state.players[nextIndex].turnScoreRecorded = false;
