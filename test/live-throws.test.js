@@ -102,6 +102,35 @@ test('correctLatestThrow ersetzt den zuletzt erzeugten Fehlwurf statt den vorher
   assert.deepEqual(state.players[0].currentRoundPoints, [20, 60, 20]);
 });
 
+test('correctLatestThrow verwendet bei einem Bust den Reststand vor dem Dart', () => {
+  const state = {
+    players: [{
+      slot: 1,
+      name: 'Alice',
+      remaining: 100,
+      totalScored: 40,
+      turns: 3,
+      currentRoundPoints: [],
+      throws: [
+        { points: 20, remaining: 480, bust: false, ts: 100, turnId: 1 },
+        { points: 20, remaining: 460, bust: false, ts: 200, turnId: 1 },
+        { points: 70, remaining: 60, bust: true, ts: 300, turnId: 1 }
+      ]
+    }]
+  };
+
+  const result = correctLatestThrow(state, -10, {
+    checkoutRule: 'double',
+    isValidCheckout: (_remaining, points) => points < 60,
+    pointsToSegment: points => 'S' + points
+  });
+
+  assert.equal(result.newPoints, 60);
+  assert.equal(state.players[0].throws[2].bust, true);
+  assert.equal(state.players[0].remaining, 60);
+  assert.equal(state.players[0].totalScored, 40);
+});
+
 test('removeLatestThrow stellt Aufnahme und Spielstand wieder her', () => {
   const state = createState();
   const result = removeLatestThrow(state, {
