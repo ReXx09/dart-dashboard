@@ -389,7 +389,7 @@
     .focus-summary span { display: block; color: #666; font-size: .5rem; text-transform: uppercase; letter-spacing: 1px; }
     .focus-summary strong { display: block; color: #f1f1f1; font-size: .78rem; margin-top: 1px; }
 
-    /* Leg-Liste – feste Höhe (25% reduziert) */
+    /* Leg-Liste – eigener Scrollbereich ohne zusammengedrückte Aufnahmen */
     .focus-leg-card {
       background: #141414;
       border-radius: 14px;
@@ -786,13 +786,14 @@
     .leg-start-cancel { border: 1px solid #6c757d; border-radius: 7px; padding: 9px 18px; background: transparent; color: #fff; cursor: pointer; }
     .leg-list {
       width: 100%;
-      display: grid;
-      grid-template-rows: repeat(10, minmax(0, 1fr));
+      display: flex;
+      flex-direction: column;
       gap: 3px;
-      overflow: auto;
-      flex: 1 1 auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex: 1 1 0;
       min-height: 0;
-      max-height: none;
+      scrollbar-gutter: stable;
     }
     .leg-item { 
       display: grid;
@@ -804,6 +805,8 @@
       padding: 4px 8px;
       font-size: .65rem;
       gap: 8px;
+      min-height: 34px;
+      flex: 0 0 auto;
     }
     .leg-item > * {
       display: flex;
@@ -817,10 +820,12 @@
       border-right: 1px solid #333;
     }
     .leg-item .throws {
+      min-width: 0;
       justify-content: center;
       gap: 6px;
       color: #ddd;
       font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
     }
     .leg-item .throws .sep {
       color: #555;
