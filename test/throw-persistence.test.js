@@ -131,6 +131,46 @@ test('Live-State und Korrektur werden atomar gespeichert', async () => {
   }
 });
 
+test('Korrektur gleicht die Segment-Zeile des Darts für die Heatmap ab', async () => {
+  const sqliteFile = path.join(os.tmpdir(), `dart-dashboard-segment-sync-${process.pid}-${Date.now()}.db`);
+  const previousClient = process.env.DB_CLIENT;
+  const previousFile = process.env.DB_SQLITE_FILE;
+  process.env.DB_CLIENT = 'sqlite';
+  process.env.DB_SQLITE_FILE = sqliteFile;
+  const store = new DataStore();
+
+  try {
+    await store.init({});
+    await store.recordThrowSegments([{ playerSlot: 1, segment: 'T20', points: 60, mode: '501', thrownAt: 1234, duelId: 7, turnId: 4, remaining: 441, source: 'manual' }]);
+    const row = (segment, points, thrownAt) => ({ playerSlot: 1, segment, points, mode: '501', bust: false, thrownAt, duelId: 7, turnId: 4, remaining: 501 - points, source: 'manual-correction' });
+    const state = { game: { mode: '501' }, players: [], lastAction: { type: 'throw' } };
+
+    // Bestehender Dart: T20 wird zu S20, es bleibt genau eine Zeile.
+    await store.saveLiveStateWithCorrection(state, {
+      playerSlot: 1, originalPoints: 60, correctedPoints: 20, delta: -40, correctedAt: 6789,
+      segmentSync: { playerSlot: 1, thrownAt: 1234, duelId: 7, row: row('S20', 20, 1234) }
+    });
+    // Fehlwurf-Eintrag hatte keine Zeile: Die Korrektur legt sie neu an.
+    await store.saveLiveStateWithCorrection(state, {
+      playerSlot: 1, originalPoints: 0, correctedPoints: 60, delta: 60, correctedAt: 6790,
+      segmentSync: { playerSlot: 1, thrownAt: 2000, duelId: 7, row: row('T20', 60, 2000) }
+    });
+    // Wert ohne Dartfeld (z. B. eine Summe): vorhandene Zeile entfällt, es wird keine neue erfunden.
+    await store.saveLiveStateWithCorrection(state, {
+      playerSlot: 1, originalPoints: 20, correctedPoints: 85, delta: 65, correctedAt: 6791,
+      segmentSync: { playerSlot: 1, thrownAt: 1234, duelId: 7, row: null }
+    });
+
+    const rows = await store.sqlite.all('SELECT segment, points, thrown_at, source FROM player_throw_segments ORDER BY thrown_at');
+    assert.deepEqual(rows, [{ segment: 'T20', points: 60, thrown_at: 2000, source: 'manual-correction' }]);
+  } finally {
+    if (store.sqlite) await store.sqlite.close();
+    if (previousClient === undefined) delete process.env.DB_CLIENT; else process.env.DB_CLIENT = previousClient;
+    if (previousFile === undefined) delete process.env.DB_SQLITE_FILE; else process.env.DB_SQLITE_FILE = previousFile;
+    for (const suffix of ['', '-wal', '-shm']) fs.rmSync(sqliteFile + suffix, { force: true });
+  }
+});
+
 test('Undo entfernt Wurfprojektion und schreibt Undo-Audit atomar', async () => {
   const sqliteFile = path.join(os.tmpdir(), `dart-dashboard-undo-${process.pid}-${Date.now()}.db`);
   const previousClient = process.env.DB_CLIENT;

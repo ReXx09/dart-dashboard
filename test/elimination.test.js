@@ -49,3 +49,40 @@ test('Elimination rekonstruiert Punkte und Eliminierungen nach einer Wurfkorrekt
   assert.equal(state.players[0].eliminatedCount, 1);
   assert.equal(state.eliminationEvents.length, 1);
 });
+
+test('Elimination: Neuberechnung verwirft bei einem Bust die gesamte Aufnahme', () => {
+  const dart = (points, ts, turnId) => ({ points, ts, turnId, bust: false });
+  const state = {
+    game: { mode: 'elimination' },
+    players: [
+      { slot: 1, throws: [dart(100, 1, 1), dart(100, 2, 1), dart(60, 3, 3), dart(60, 4, 3)], currentRoundPoints: [] },
+      { slot: 2, throws: [], currentRoundPoints: [] }
+    ]
+  };
+
+  rebuildEliminationState(state);
+
+  assert.equal(state.players[0].totalScored, 200);
+  assert.equal(state.players[0].throws[2].bust, false);
+  assert.equal(state.players[0].throws[3].bust, true);
+});
+
+test('Elimination: Neuberechnung lässt lastAction und aktuelle Aufnahme unverändert', () => {
+  const lastAction = { type: 'next-player', autoAdvancePending: true, ts: 9 };
+  const state = {
+    game: { mode: 'elimination' },
+    players: [
+      { slot: 1, throws: [{ points: 20, ts: 1, turnId: 1 }], currentRoundPoints: [20] },
+      { slot: 2, throws: [{ points: 20, ts: 2, turnId: 2 }], currentRoundPoints: [20] }
+    ],
+    lastAction
+  };
+
+  rebuildEliminationState(state);
+
+  assert.equal(state.lastAction, lastAction);
+  assert.deepEqual(lastAction, { type: 'next-player', autoAdvancePending: true, ts: 9 });
+  assert.deepEqual(state.players[0].currentRoundPoints, [20]);
+  assert.deepEqual(state.players[1].currentRoundPoints, [20]);
+  assert.equal(state.eliminationEvents[0].createdAt, 2);
+});

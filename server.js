@@ -43,8 +43,7 @@ const {
   checkEliminationWin,
   getEliminationWinner,
   applyEliminationThrow,
-  applyEliminationHit,
-  rebuildEliminationState
+  applyEliminationHit
 } = require('./modes/elimination');
 
 let SerialPortCtor = null;
@@ -2085,6 +2084,7 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout', generation = liveL
     remaining: player.remaining,
     bust: false,
     ts: thrownAt,
+    turnId: state.game.turnId || 1,
     source: 'arduino-miss',
     reason,
     channel: evt.channel ? formatChannel(evt.channel) : null,
@@ -4088,27 +4088,39 @@ app.post('/api/live/next-player', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Next-Player fehlgeschlagen: ' + err.message }); }
 });
 
+// Cache vor dem DB-Schreiben aktualisieren, damit ein gleichzeitig ablaufender Spielerwechsel den neuen Stand sieht.
+async function commitLiveStateChange(state, persist) {
+  const previousCache = liveStateCache;
+  liveStateCache = cloneLiveState(state);
+  try {
+    await persist();
+  } catch (error) {
+    liveStateCache = previousCache;
+    throw error;
+  }
+  const latest = cloneLiveState(liveStateCache) || state;
+  broadcastLiveState(latest);
+  return latest;
+}
+
 app.post('/api/live/undo', async (req, res) => {
   try {
-    cancelScheduledAutoAdvance();
+    const generation = liveLifecycleGeneration;
     const state = await getLiveState();
+    if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
-    const mode = state.game.mode || DEFAULT_MODE;
-    const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
-    const isCricket = modeDef.type === 'cricket';
-    const isElimination = modeDef.type === 'elimination';
-    const result = removeLatestThrow(state, { isCricket, calculateAverage: calculateCurrentRoundAverage });
-    if (!result) return res.status(400).json({ error: 'Kein Wurf zum Rückgängigmachen vorhanden.' });
+    const modeDef = GAME_MODES[state.game.mode || DEFAULT_MODE] || GAME_MODES[DEFAULT_MODE];
+    const result = removeLatestThrow(state, {
+      modeType: modeDef.type,
+      checkoutRule: state.game.checkoutRule || DEFAULT_CHECKOUT_RULE,
+      isCheckoutAttempt,
+      calculateAverage: calculateCurrentRoundAverage
+    });
+    if (result.error) return res.status(400).json({ error: result.error });
 
-    state.game.currentThrow = result.player.currentRoundPoints.length;
-    state.game.activePlayer = result.playerIndex;
-    if (isElimination) {
-      rebuildEliminationState(state);
-      const removedTurnId = Number(result.throwData.turnId || state.game.turnId || 1);
-      state.game.turnId = Math.max(1, removedTurnId);
-      state.game.throwRound = Math.max(1, Math.floor((state.game.turnId - 1) / state.players.length) + 1);
-    }
-    state.lastAction = { type: 'undo', player: result.player.name, points: result.throwData.points, ts: Date.now() };
+    // Die Aufnahme ist wieder offen; ein laufender Spielerwechsel gehört nicht mehr dazu.
+    cancelScheduledAutoAdvance();
+    state.lastAction = { type: 'undo', player: result.player.name, playerSlot: result.player.slot, points: result.throwData.points, ts: Date.now() };
 
     const undoRecord = {
       playerSlot: result.player.slot,
@@ -4126,18 +4138,46 @@ app.post('/api/live/undo', async (req, res) => {
       correctedSegment: null,
       correctedAt: state.lastAction.ts
     };
-    const saved = typeof dataStore.saveLiveStateWithUndo === 'function'
-      ? await dataStore.saveLiveStateWithUndo(state, undoRecord).then(() => state)
-      : await saveLiveState(state);
-    if (typeof dataStore.saveLiveStateWithUndo !== 'function') {
-      queueLiveDetailWrite(() => dataStore.recordThrowCorrection(undoRecord), 'Wurf-Undo');
-    }
-    liveStateCache = cloneLiveState(saved);
-    broadcastLiveState(saved);
+    const hasAtomicSave = typeof dataStore.saveLiveStateWithUndo === 'function';
+    const saved = await commitLiveStateChange(state, () => hasAtomicSave
+      ? dataStore.saveLiveStateWithUndo(state, undoRecord)
+      : saveLiveState(state));
+    if (!hasAtomicSave) queueLiveDetailWrite(() => dataStore.recordThrowCorrection(undoRecord), 'Wurf-Undo');
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Undo fehlgeschlagen: ' + err.message }); }
 });
 
+// Beendet das Leg, wenn der korrigierte Wert die Spielregeln dafür erfüllt (Checkout bzw. Elimination-Ziel).
+function finishLegAfterCorrection(state, correction, modeDef, generation) {
+  const { player } = correction;
+  const mode = state.game.mode || DEFAULT_MODE;
+  state.lastAction = { type: 'correction', player: player.name, playerSlot: player.slot, points: correction.newPoints, ts: Date.now(), mode, segment: correction.correctedSegment };
+
+  if (modeDef.type === 'elimination') {
+    finishEliminationIfComplete(state);
+    return;
+  }
+
+  const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
+  player.lastCheckoutValue = getCheckoutValue(player, correction.remainingBeforeThrow);
+  player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
+  const ruleStats = getCheckoutRuleStats(player, checkoutRule);
+  ruleStats.success += 1;
+  ruleStats.highest = Math.max(ruleStats.highest, Math.min(170, player.lastCheckoutValue));
+  player.legs = Math.max(0, Number(player.legs || 0)) + 1;
+  state.game.status = 'leg-finished';
+  state.lastAction.legWin = true;
+  state.lastAction.winner = player.name;
+  state.lastAction.winnerSlot = player.slot;
+  queueLiveDetailWrite(
+    () => addHighscore(player.name, player.lastCheckoutValue, { kind: 'checkout', legWin: true, source: 'correction', gameMode: mode, checkoutRule, duelId: state.game.duelId, playerSlot: player.slot }),
+    'Leg-Highscore'
+  );
+  queueCompletedLegStats(state, player, generation);
+}
+
+// Die Korrektur ändert nur den Wert des letzten Darts. Spieler, Dart-Zähler, Aufnahme, Runde und ein
+// laufender Spielerwechsel bleiben unberührt; nur ein regelkonformes Leg-Ende wird übernommen.
 app.post('/api/live/correct-last', async (req, res) => {
   const delta = Number(req.body && req.body.delta);
   if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 180) {
@@ -4145,29 +4185,30 @@ app.post('/api/live/correct-last', async (req, res) => {
   }
 
   try {
-    cancelScheduledAutoAdvance();
+    const generation = liveLifecycleGeneration;
     const state = await getLiveState();
+    if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
 
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     const correction = correctLatestThrow(state, delta, {
+      modeType: modeDef.type,
       checkoutRule: state.game.checkoutRule || DEFAULT_CHECKOUT_RULE,
       isValidCheckout,
+      isCheckoutAttempt,
       pointsToSegment,
       calculateAverage: calculateCurrentRoundAverage
     });
     if (correction.error) return res.status(400).json({ error: correction.error });
 
-    if (modeDef.type === 'elimination') rebuildEliminationState(state);
+    if (correction.legFinished) finishLegAfterCorrection(state, correction, modeDef, generation);
 
-    state.game.currentThrow = correction.player.currentRoundPoints.length;
-    state.game.activePlayer = correction.playerIndex;
-    state.lastAction = { type: 'correction', player: correction.player.name, playerSlot: correction.player.slot, points: correction.newPoints, delta, ts: Date.now(), mode, segment: correction.correctedSegment };
-
+    const throwData = correction.throwData;
+    const correctedAt = Date.now();
     const correctionRecord = {
       playerSlot: correction.player.slot,
-      turnId: correction.throwData.turnId,
+      turnId: throwData.turnId,
       duelId: state.game.duelId,
       originalPoints: correction.oldPoints,
       correctedPoints: correction.newPoints,
@@ -4178,17 +4219,34 @@ app.post('/api/live/correct-last', async (req, res) => {
       correctedBust: correction.correctedBust,
       originalSegment: correction.oldSegment,
       correctedSegment: correction.correctedSegment,
-      correctedAt: state.lastAction.ts,
-      season: seasonFromTimestamp(state.lastAction.ts)
+      correctedAt,
+      season: seasonFromTimestamp(correctedAt),
+      // Heatmap und Segmentstatistik lesen player_throw_segments und müssen den korrigierten Dart widerspiegeln.
+      segmentSync: {
+        playerSlot: correction.player.slot,
+        thrownAt: throwData.ts,
+        duelId: state.game.duelId,
+        row: correction.correctedSegment ? {
+          playerSlot: correction.player.slot,
+          segment: correction.correctedSegment,
+          points: correction.newPoints,
+          mode,
+          bust: false,
+          thrownAt: throwData.ts,
+          duelId: state.game.duelId,
+          duelLegId: state.game.duelLegId,
+          turnId: throwData.turnId,
+          remaining: correction.correctedRemaining,
+          source: throwData.source,
+          season: seasonFromTimestamp(throwData.ts)
+        } : null
+      }
     };
-    const saved = typeof dataStore.saveLiveStateWithCorrection === 'function'
-      ? await dataStore.saveLiveStateWithCorrection(state, correctionRecord).then(() => state)
-      : await saveLiveState(state);
-    if (typeof dataStore.saveLiveStateWithCorrection !== 'function') {
-      queueLiveDetailWrite(() => dataStore.recordThrowCorrection(correctionRecord), 'Wurfkorrektur');
-    }
-    liveStateCache = cloneLiveState(saved);
-    broadcastLiveState(saved);
+    const hasAtomicSave = typeof dataStore.saveLiveStateWithCorrection === 'function';
+    const saved = await commitLiveStateChange(state, () => hasAtomicSave
+      ? dataStore.saveLiveStateWithCorrection(state, correctionRecord)
+      : saveLiveState(state));
+    if (!hasAtomicSave) queueLiveDetailWrite(() => dataStore.recordThrowCorrection(correctionRecord), 'Wurfkorrektur');
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Wurfkorrektur fehlgeschlagen: ' + err.message }); }
 });
@@ -4957,6 +5015,7 @@ if (require.main === module) {
 
 module.exports = {
   app,
+  dataStore,
   startServer,
   createFireTvServer,
   startFireTvServer,

@@ -71,6 +71,47 @@ function getThrowCorrectionValues(correction) {
 
 const THROW_CORRECTION_COLUMNS = 'player_slot, turn_id, duel_id, original_points, corrected_points, delta, original_remaining, corrected_remaining, original_bust, corrected_bust, original_segment, corrected_segment, action, source, corrected_at, season';
 
+function getThrowSegmentValues(row) {
+  const thrownAt = Number(row.thrownAt) || Date.now();
+  return [
+    Number(row.playerSlot),
+    String(row.segment || 'MISS').toUpperCase(),
+    Number(row.points || 0),
+    row.mode ? String(row.mode) : null,
+    row.bust ? 1 : 0,
+    thrownAt,
+    Number(row.duelId) > 0 ? Number(row.duelId) : null,
+    Number(row.duelLegId) > 0 ? Number(row.duelLegId) : null,
+    Number(row.turnId) > 0 ? Number(row.turnId) : null,
+    Number.isFinite(Number(row.remaining)) ? Number(row.remaining) : null,
+    row.source ? String(row.source) : null,
+    row.season || seasonFromTimestamp(thrownAt)
+  ];
+}
+
+// Ersetzt die Segment-Zeile eines korrigierten Darts; Fehlwurf-Einträge hatten bisher keine Zeile.
+function getSegmentSyncStatements(sync) {
+  if (!sync || !(Number(sync.playerSlot) > 0) || !(Number(sync.thrownAt) > 0)) return [];
+  const duelId = Number(sync.duelId) > 0 ? Number(sync.duelId) : null;
+  const columns = 'player_slot, segment, points, mode, bust, thrown_at, duel_id, duel_leg_id, turn_id, remaining, source, season';
+  const statements = [{
+    sql: 'DELETE FROM player_throw_segments WHERE player_slot = ? AND thrown_at = ? AND (? IS NULL OR duel_id = ?)',
+    postgresSql: 'DELETE FROM player_throw_segments WHERE player_slot = $1 AND thrown_at = $2 AND ($3 IS NULL OR duel_id = $3)',
+    params: [Number(sync.playerSlot), Number(sync.thrownAt), duelId, duelId],
+    postgresParams: [Number(sync.playerSlot), Number(sync.thrownAt), duelId]
+  }];
+  if (sync.row) {
+    const params = getThrowSegmentValues(sync.row);
+    statements.push({
+      sql: `INSERT INTO player_throw_segments (${columns}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      postgresSql: `INSERT INTO player_throw_segments (${columns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      params,
+      postgresParams: params
+    });
+  }
+  return statements;
+}
+
 class DataStore {
   constructor() {
     this.client = String(process.env.DB_CLIENT || 'sqlite').toLowerCase();
@@ -2043,6 +2084,7 @@ class DataStore {
     const payload = JSON.stringify(state);
     const updatedAt = Date.now();
     const correctionValues = getThrowCorrectionValues(correction);
+    const segmentStatements = getSegmentSyncStatements(correction.segmentSync);
     const sqliteCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const postgresCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`;
 
@@ -2054,6 +2096,7 @@ class DataStore {
           [payload, updatedAt]
         );
         await this.sqlite.run(sqliteCorrection, correctionValues);
+        for (const statement of segmentStatements) await this.sqlite.run(statement.sql, statement.params);
         await this.sqlite.exec('COMMIT');
       } catch (error) {
         await this.sqlite.exec('ROLLBACK');
@@ -2071,6 +2114,7 @@ class DataStore {
           [payload, updatedAt]
         );
         await client.query(postgresCorrection, correctionValues);
+        for (const statement of segmentStatements) await client.query(statement.postgresSql, statement.postgresParams);
         await client.query('COMMIT');
       } catch (error) {
         await client.query('ROLLBACK');
@@ -2089,6 +2133,7 @@ class DataStore {
         [payload, updatedAt]
       );
       await connection.query(sqliteCorrection, correctionValues);
+      for (const statement of segmentStatements) await connection.query(statement.sql, statement.params);
       await connection.commit();
     } catch (error) {
       await connection.rollback();

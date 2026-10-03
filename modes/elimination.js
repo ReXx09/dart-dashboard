@@ -87,25 +87,47 @@ function applyEliminationThrow(state, player, value) {
 }
 
 function rebuildEliminationState(state) {
-  const throws = [];
-  for (const player of state.players || []) {
+  const players = Array.isArray(state.players) ? state.players : [];
+  const savedLastAction = state.lastAction;
+  const savedRounds = players.map(player => player.currentRoundPoints);
+  const entries = [];
+
+  players.forEach((player, playerIndex) => {
     player.totalScored = 0;
     player.eliminatedCount = 0;
-    for (const throwData of Array.isArray(player.throws) ? player.throws : []) {
-      throws.push({ player, throwData });
-    }
-  }
+    (Array.isArray(player.throws) ? player.throws : []).forEach((throwData, throwIndex) => {
+      if (throwData) entries.push({ player, playerIndex, throwData, throwIndex });
+    });
+  });
+  entries.sort((left, right) =>
+    (Number(left.throwData.ts) || 0) - (Number(right.throwData.ts) || 0)
+    || left.playerIndex - right.playerIndex
+    || left.throwIndex - right.throwIndex);
 
   state.eliminationEvents = [];
-  throws.sort((left, right) => Number(left.throwData.ts || 0) - Number(right.throwData.ts || 0));
-  for (const { player, throwData } of throws) {
-    if (throwData.bust) {
-      throwData.elimination = false;
-      continue;
-    }
-    const result = applyEliminationThrow(state, player, Number(throwData.points) || 0);
+  const visits = new Map();
+  for (const { player, throwData } of entries) {
+    const turnId = Number(throwData.turnId);
+    const visitKey = player.slot + ':' + (Number.isFinite(turnId) ? turnId : 'ohne');
+    const visitPoints = visits.get(visitKey) || [];
+    const value = Number(throwData.points) || 0;
+
+    // Ein Bust verwirft über currentRoundPoints die bisherigen Darts derselben Aufnahme.
+    player.currentRoundPoints = visitPoints.slice();
+    const result = applyEliminationThrow(state, player, value);
+    throwData.bust = result.bust;
     throwData.elimination = Boolean(result.eliminationAction);
+    if (result.eliminationAction) {
+      const event = state.eliminationEvents[state.eliminationEvents.length - 1];
+      if (event && Number(throwData.ts) > 0) event.createdAt = Number(throwData.ts);
+    }
+    visitPoints.push(value);
+    visits.set(visitKey, visitPoints);
   }
+
+  players.forEach((player, index) => { player.currentRoundPoints = savedRounds[index]; });
+  if (savedLastAction === undefined) delete state.lastAction;
+  else state.lastAction = savedLastAction;
   return state;
 }
 
