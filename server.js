@@ -3020,6 +3020,7 @@ function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
     legs: Number(legsBySlot.get(Number(p.slot || 0)) || 0),
     turns: 0,
     totalScored: 0,
+    eliminatedCount: 0,
     bestTurn: 0,
     average: 0,
     checkoutAttempts: 0,
@@ -3053,6 +3054,7 @@ function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
     },
     players,
     lastAction: null,
+    eliminationEvents: [],
     arduino: { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
   };
 }

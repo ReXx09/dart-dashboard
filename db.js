@@ -1522,6 +1522,31 @@ class DataStore {
       if (!legPlayersById.has(key)) legPlayersById.set(key, []);
       legPlayersById.get(key).push(player);
     }
+    let eliminationEvents = [];
+    if (this.isSQLite()) eliminationEvents = await this.sqlite.all('SELECT duel_leg_id, eliminator_slot, eliminated_slot FROM duel_eliminations WHERE duel_id = ?', [safeId]);
+    else if (this.isPostgres()) eliminationEvents = (await this.pg.query('SELECT duel_leg_id, eliminator_slot, eliminated_slot FROM duel_eliminations WHERE duel_id = $1', [safeId])).rows;
+    else eliminationEvents = (await this.my.query('SELECT duel_leg_id, eliminator_slot, eliminated_slot FROM duel_eliminations WHERE duel_id = ?', [safeId]))[0];
+    const eliminationCountsByLeg = new Map();
+    for (const event of eliminationEvents) {
+      const key = String(event.duel_leg_id);
+      const counts = eliminationCountsByLeg.get(key) || new Map();
+      const eliminatorSlot = Number(event.eliminator_slot);
+      const eliminatedSlot = Number(event.eliminated_slot);
+      const eliminator = counts.get(eliminatorSlot) || { eliminations: 0, eliminated: 0 };
+      eliminator.eliminations += 1;
+      counts.set(eliminatorSlot, eliminator);
+      const eliminated = counts.get(eliminatedSlot) || { eliminations: 0, eliminated: 0 };
+      eliminated.eliminated += 1;
+      counts.set(eliminatedSlot, eliminated);
+      eliminationCountsByLeg.set(key, counts);
+    }
+    for (const [legId, counts] of eliminationCountsByLeg) {
+      for (const player of legPlayersById.get(legId) || []) {
+        const values = counts.get(Number(player.player_slot)) || { eliminations: 0, eliminated: 0 };
+        player.eliminations = values.eliminations;
+        player.eliminated = values.eliminated;
+      }
+    }
     const categoryInfo = getMatchCategory(duel.match_type, duel.participant_count || players.length);
     return { ...duel, id: Number(duel.id), ...categoryInfo, players, legs: legs.map(leg => ({ ...leg, players: legPlayersById.get(String(leg.id)) || [] })) };
   }
