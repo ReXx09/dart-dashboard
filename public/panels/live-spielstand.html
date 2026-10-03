@@ -685,7 +685,8 @@
     }
     .throw-correction-keypad button:hover,
     .throw-correction-keypad button:active { border-color: #f4a261; background: #343d42; color: #f4a261; }
-    .throw-correction-keypad button.selected { border-color: #2a9d8f; background: #2a9d8f; color: #fff; box-shadow: 0 0 0 2px rgba(42,157,143,.28); }
+    .throw-correction-keypad button.selected,
+    .throw-correction-actions button.selected { border-color: #2a9d8f; background: #2a9d8f; color: #fff; box-shadow: 0 0 0 2px rgba(42,157,143,.28); }
     .throw-correction-keypad .clear { color: #e98b91; }
     .throw-correction-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
     .throw-correction-actions button { min-height: 48px; padding: 9px 10px; border: 1px solid #536068; border-radius: 8px; background: #22292d; color: #f1f1f1; font: inherit; font-weight: 700; cursor: pointer; }
@@ -3340,6 +3341,7 @@
 
     function selectCricketCorrectionNumber(number) {
       cricketCorrectionNumber = number;
+      if (!cricketCorrectionMultiplier) cricketCorrectionMultiplier = 1;
       updateThrowCorrectionDisplay();
     }
 
@@ -3353,7 +3355,10 @@
       const isCricket = !!(liveState && /cricket/i.test(String(liveState.game && liveState.game.mode || '')));
       const hint = document.getElementById('throwCorrectionHint');
       if ((!isCricket && !amount) || (isCricket && (!cricketCorrectionNumber || !cricketCorrectionMultiplier))) {
-        if (hint) { hint.textContent = 'Bitte zuerst einen Korrekturwert eingeben.'; hint.classList.add('error'); }
+        if (hint) {
+          hint.textContent = isCricket ? 'Bitte Zahl und Trefferart auswählen.' : 'Bitte zuerst einen Korrekturwert eingeben.';
+          hint.classList.add('error');
+        }
         return;
       }
       const button = document.querySelector('.throw-correction-actions .apply');
