@@ -633,12 +633,15 @@
       align-items: center;
       justify-content: center;
       padding: 14px;
+      overflow-y: auto;
       background: rgba(4, 7, 9, .86);
       backdrop-filter: blur(5px);
     }
     .throw-correction-overlay.show { display: flex; }
     .throw-correction-card {
       width: min(430px, 100%);
+      max-height: calc(100dvh - 28px);
+      overflow-y: auto;
       padding: 18px;
       background: #171b1e;
       border: 1px solid #49545b;
@@ -692,6 +695,19 @@
       .action-confirm-card { padding: 20px; }
       .action-confirm-actions { flex-direction: column-reverse; }
       .action-confirm-actions button { width: 100%; }
+    }
+    @media (max-height: 760px) {
+      .throw-correction-card { padding: 12px; }
+      .throw-correction-card p { margin-bottom: 8px; }
+      .throw-correction-target { margin-bottom: 7px; padding: 6px 8px; }
+      .throw-correction-preview { min-height: 18px; margin-bottom: 5px; }
+      .throw-correction-display { margin-bottom: 7px; }
+      .throw-correction-display button,
+      .throw-correction-display input { min-height: 46px; font-size: 1.35rem; }
+      .throw-correction-keypad { gap: 5px; }
+      .throw-correction-keypad button { min-height: 46px; font-size: 1.2rem; }
+      .throw-correction-actions { gap: 5px; margin-top: 7px; }
+      .throw-correction-actions button { min-height: 40px; padding: 6px 8px; }
     }
     .modal-options {
       display: grid;
