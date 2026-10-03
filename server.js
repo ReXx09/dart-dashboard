@@ -4031,6 +4031,7 @@ app.post('/api/live/throw', async (req, res) => {
     if (typeof dataStore.saveLiveStateWithThrow !== 'function') {
       queueLiveDetailWrite(() => dataStore.recordThrowSegments([throwRecord]), 'Wurfdetail');
     }
+    liveStateCache = cloneLiveState(saved);
     broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Wurf konnte nicht gespeichert werden: ' + err.message }); }
@@ -4113,6 +4114,7 @@ app.post('/api/live/undo', async (req, res) => {
     if (typeof dataStore.saveLiveStateWithUndo !== 'function') {
       queueLiveDetailWrite(() => dataStore.recordThrowCorrection(undoRecord), 'Wurf-Undo');
     }
+    liveStateCache = cloneLiveState(saved);
     broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Undo fehlgeschlagen: ' + err.message }); }
@@ -4169,6 +4171,7 @@ app.post('/api/live/correct-last', async (req, res) => {
     if (typeof dataStore.saveLiveStateWithCorrection !== 'function') {
       queueLiveDetailWrite(() => dataStore.recordThrowCorrection(correctionRecord), 'Wurfkorrektur');
     }
+    liveStateCache = cloneLiveState(saved);
     broadcastLiveState(saved);
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Wurfkorrektur fehlgeschlagen: ' + err.message }); }
