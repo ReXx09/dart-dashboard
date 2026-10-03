@@ -685,6 +685,7 @@
     }
     .throw-correction-keypad button:hover,
     .throw-correction-keypad button:active { border-color: #f4a261; background: #343d42; color: #f4a261; }
+    .throw-correction-keypad button.selected { border-color: #2a9d8f; background: #2a9d8f; color: #fff; box-shadow: 0 0 0 2px rgba(42,157,143,.28); }
     .throw-correction-keypad .clear { color: #e98b91; }
     .throw-correction-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
     .throw-correction-actions button { min-height: 48px; padding: 9px 10px; border: 1px solid #536068; border-radius: 8px; background: #22292d; color: #f1f1f1; font: inherit; font-weight: 700; cursor: pointer; }
@@ -1338,7 +1339,7 @@
       <h2 id="throwCorrectionTitle">Letzten Wurf korrigieren</h2>
       <p id="throwCorrectionHint">Korrektur für den letzten Wurf eingeben.</p>
       <div class="throw-correction-target" id="throwCorrectionTarget"></div>
-      <div class="throw-correction-display">
+      <div class="throw-correction-display" id="throwCorrectionNumericDisplay">
         <button type="button" id="throwCorrectionSign" onclick="toggleCorrectionSign()">−</button>
         <input id="throwCorrectionValue" type="text" value="0" readonly aria-label="Korrekturwert">
       </div>
@@ -1359,7 +1360,7 @@
           <button type="button" onclick="selectCricketCorrectionMultiplier(3)">Triple</button>
         </div>
       </div>
-      <div class="throw-correction-keypad" aria-label="Korrektur-Tastenfeld">
+      <div class="throw-correction-keypad" id="throwCorrectionNumericKeypad" aria-label="Korrektur-Tastenfeld">
         <button type="button" onclick="appendCorrectionDigit('1')">1</button>
         <button type="button" onclick="appendCorrectionDigit('2')">2</button>
         <button type="button" onclick="appendCorrectionDigit('3')">3</button>
@@ -3252,12 +3253,25 @@
       const cricketControls = document.getElementById('cricketCorrectionControls');
       const isCricket = !!(liveState && /cricket/i.test(String(liveState.game && liveState.game.mode || '')));
       if (cricketControls) cricketControls.hidden = !isCricket;
+      const numericDisplay = document.getElementById('throwCorrectionNumericDisplay');
+      const numericKeypad = document.getElementById('throwCorrectionNumericKeypad');
+      if (numericDisplay) numericDisplay.hidden = isCricket;
+      if (numericKeypad) numericKeypad.hidden = isCricket;
       if (sign) sign.textContent = throwCorrectionSign < 0 ? '−' : '+';
       if (value) value.value = throwCorrectionDigits || '0';
       if (targetElement) {
         targetElement.innerHTML = throwCorrectionTarget
           ? '<strong style="color:' + escapeAttr(throwCorrectionTarget.player.color || '#f4a261') + '">' + escapeHtml(throwCorrectionTarget.player.name) + '</strong> · Dart ' + throwCorrectionTarget.dartNumber + ' · ' + escapeHtml(describeThrowValue(throwCorrectionTarget.throwData))
           : 'Noch kein Wurf vorhanden';
+      }
+      document.querySelectorAll('#cricketCorrectionControls button').forEach(button => button.classList.remove('selected'));
+      if (isCricket && cricketCorrectionNumber) {
+        const numberButton = document.querySelector('#cricketCorrectionControls button[onclick="selectCricketCorrectionNumber(' + cricketCorrectionNumber + ')"]');
+        if (numberButton) numberButton.classList.add('selected');
+      }
+      if (isCricket && cricketCorrectionMultiplier) {
+        const multiplierButton = document.querySelector('#cricketCorrectionControls button[onclick="selectCricketCorrectionMultiplier(' + cricketCorrectionMultiplier + ')"]');
+        if (multiplierButton) multiplierButton.classList.add('selected');
       }
       if (preview) {
         const amount = Number(throwCorrectionDigits || 0) * throwCorrectionSign;
@@ -3288,7 +3302,9 @@
       updateThrowCorrectionDisplay();
       if (hint) {
         hint.textContent = throwCorrectionTarget
-          ? '− zieht Punkte ab, + addiert Punkte. Spieler, Aufnahme und Leg bleiben unverändert.'
+          ? (/cricket/i.test(String(liveState && liveState.game && liveState.game.mode || ''))
+            ? 'Zahl und Trefferart auswählen. Spieler und Aufnahme bleiben unverändert.'
+            : '− zieht Punkte ab, + addiert Punkte. Spieler, Aufnahme und Leg bleiben unverändert.')
           : 'Es gibt noch keinen Wurf zum Korrigieren.';
         hint.classList.remove('error');
       }
