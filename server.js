@@ -29,6 +29,11 @@ const {
 } = require('./modes/cricket');
 
 const DEFAULT_STATS_SEASON = String(process.env.DART_SEASON || '2026');
+const PLAYER_COLORS = [
+  '#e63946', '#f4a261', '#2a9d8f', '#457b9d', '#9b5de5', '#2ec4b6', '#f0b429', '#52b788',
+  '#ff6b6b', '#ff9f1c', '#06d6a0', '#118ab2', '#c77dff', '#00b4d8', '#ffd166', '#80ed99',
+  '#ef476f', '#8338ec', '#3a86ff', '#fb5607'
+];
 function seasonFromTimestamp(timestamp = Date.now()) {
   const date = new Date(Number(timestamp));
   return Number.isNaN(date.getTime()) ? DEFAULT_STATS_SEASON : String(date.getFullYear());
@@ -2790,7 +2795,7 @@ async function getActivePlayersForLive() {
   const players = (await getPlayers()).filter(p => p.active && String(p.name || '').trim());
   return players.map((p, index) => ({
     slot: p.slot, name: String(p.name).trim(), profileId: p.profileId || null,
-    color: p.color || ['#e63946','#f4a261','#2a9d8f','#457b9d','#9b5de5','#f77f00'][index % 6]
+    color: p.color || PLAYER_COLORS[index % PLAYER_COLORS.length]
   }));
 }
 
@@ -2930,7 +2935,7 @@ function normalizeLiveStateSnapshot(state) {
     ? source.players.map((player, index) => sanitizePlayerState(player, {
         slot: index + 1,
         name: `Spieler ${index + 1}`,
-        color: ['#e63946', '#f4a261', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'][index % 6],
+        color: PLAYER_COLORS[index % PLAYER_COLORS.length],
         remaining: getStartScoreForMode(safeMode),
         legs: 0,
         turns: 0,

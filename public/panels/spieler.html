@@ -59,6 +59,8 @@
     .color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .15s, border-color .15s; flex-shrink: 0; }
     .color-dot:hover { transform: scale(1.2); }
     .color-dot.selected { border-color: #fff; transform: scale(1.15); }
+    .custom-color { width: 24px; height: 22px; padding: 1px; border: 1px solid #444; border-radius: 6px; background: #111; cursor: pointer; }
+    .custom-color:focus { outline: 2px solid #fff; outline-offset: 1px; }
 
     /* Info row */
     .slot-info { font-size: 0.72rem; color: #333; min-height: 16px; }
@@ -125,9 +127,18 @@
     /* Profile Manager */
     .profile-manager { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 14px; }
     .profile-manager h3 { font-size: .78rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
-    .profile-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-    .profile-chip { display: flex; align-items: center; gap: 6px; background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 20px; padding: 4px 10px 4px 6px; font-size: .82rem; }
+    .profile-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .profile-chip { display: flex; align-items: center; gap: 8px; background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 10px; padding: 6px 10px 6px 8px; font-size: .82rem; }
     .profile-chip .p-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .profile-chip .p-name { min-width: 110px; }
+    .profile-color-options { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+    .profile-color-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; flex-shrink: 0; transition: transform .15s, border-color .15s; }
+    .profile-color-dot:hover { transform: scale(1.18); }
+    .profile-color-dot.selected { border-color: #fff; transform: scale(1.12); }
+    .profile-custom-color { width: 24px; height: 22px; padding: 1px; border: 1px solid #444; border-radius: 6px; background: #111; cursor: pointer; }
+    .profile-custom-color:focus { outline: 2px solid #fff; outline-offset: 1px; }
+    .profile-gradient { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+    .profile-gradient input { width: 22px; height: 20px; padding: 1px; border: 1px solid #444; border-radius: 5px; background: #111; cursor: pointer; }
     .profile-chip .p-del { cursor: pointer; color: #555; font-size: .7rem; margin-left: 4px; }
     .profile-chip .p-del:hover { color: #e63946; }
     .profile-add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -202,7 +213,9 @@
   <script>
     const COLORS = [
       '#e63946','#f4a261','#2a9d8f','#457b9d',
-      '#9b5de5','#2ec4b6','#f0b429','#52b788'
+      '#9b5de5','#2ec4b6','#f0b429','#52b788',
+      '#ff6b6b','#ff9f1c','#06d6a0','#118ab2',
+      '#c77dff','#00b4d8','#ffd166','#80ed99'
     ];
 
     let players = [];
@@ -270,6 +283,7 @@
           <div class="slot-colors">
             <span>Farbe</span>
             ${colorDots}
+            <input class="custom-color" type="color" value="${escAttr(normalizeColor(color, '#e63946'))}" aria-label="Eigene Farbe für Spieler ${p.slot}" title="Eigene Farbe" onchange="pickCustomColor(${idx},this.value,event)" />
           </div>
           <div class="slot-info" id="info-${idx}">${p.name ? `Slot ${p.slot}: ${escHtml(p.name)}` : 'Kein Name'}</div>
         `;
@@ -326,6 +340,16 @@
       markDirty();
     }
 
+    function pickCustomColor(playerIdx, color, e) {
+      const normalized = normalizeColor(color, '#e63946');
+      const card = e.target.closest('.slot-card');
+      card.querySelectorAll('.color-dot').forEach(dot => dot.classList.remove('selected'));
+      card.style.setProperty('--sc', normalized);
+      if (players[playerIdx].active) card.querySelector('.slot-num').style.background = normalized;
+      players[playerIdx].color = normalized;
+      markDirty();
+    }
+
     function markDirty() {
       dirty = true;
       document.getElementById('saveBtn').disabled = false;
@@ -378,11 +402,76 @@
       }
       list.innerHTML = profiles.map((pr, i) =>
         '<div class="profile-chip">' +
-          '<span class="p-dot" style="background:' + escAttr(pr.color || '#555') + '"></span>' +
-          '<span>' + escHtml(pr.name) + '</span>' +
+          '<span class="p-dot" style="background:' + escAttr(pr.gradient || pr.color || '#555') + '"></span>' +
+          '<span class="p-name">' + escHtml(pr.name) + '</span>' +
+          '<div class="profile-color-options" aria-label="Farbe für ' + escAttr(pr.name) + '">' +
+            COLORS.map((color, colorIdx) => '<span class="profile-color-dot' + (color === pr.color ? ' selected' : '') + '" style="background:' + color + '" title="' + color + '" onclick="pickProfileColor(' + i + ',' + colorIdx + ',event)"></span>').join('') +
+            '<input class="profile-custom-color" type="color" value="' + escAttr(normalizeColor(pr.color, '#e63946')) + '" aria-label="Eigene Farbe für ' + escAttr(pr.name) + '" title="Eigene Farbe" onchange="pickCustomProfileColor(' + i + ',this.value,event)" />' +
+          '</div>' +
+          '<div class="profile-gradient" title="Mehrfarbiger Verlauf für das Profil">' +
+            '<input type="color" value="' + escAttr(getGradientColor(pr, 0)) + '" aria-label="Verlaufsfarbe 1" onchange="pickProfileGradient(' + i + ',0,this.value,event)" />' +
+            '<input type="color" value="' + escAttr(getGradientColor(pr, 1)) + '" aria-label="Verlaufsfarbe 2" onchange="pickProfileGradient(' + i + ',1,this.value,event)" />' +
+          '</div>' +
           '<span class="p-del" onclick="removeProfile(' + i + ')">✕</span>' +
         '</div>'
       ).join('');
+    }
+
+    function pickProfileColor(profileIdx, colorIdx, event) {
+      const profile = profiles[profileIdx];
+      const color = COLORS[colorIdx];
+      if (!profile || !color) return;
+      profile.color = color;
+      players.forEach(player => {
+        if (Number(player.profileId) === Number(profile.id)) player.color = color;
+      });
+      profilesDirty = true;
+      dirty = true;
+      document.getElementById('saveBtn').disabled = false;
+      renderProfiles();
+      renderSlots();
+      renderSummary();
+      event.stopPropagation();
+    }
+
+    function pickCustomProfileColor(profileIdx, color, event) {
+      const profile = profiles[profileIdx];
+      const normalized = normalizeColor(color, '#e63946');
+      if (!profile) return;
+      profile.color = normalized;
+      players.forEach(player => {
+        if (Number(player.profileId) === Number(profile.id)) player.color = normalized;
+      });
+      profilesDirty = true;
+      dirty = true;
+      document.getElementById('saveBtn').disabled = false;
+      renderProfiles();
+      renderSlots();
+      renderSummary();
+      event.stopPropagation();
+    }
+
+    function pickProfileGradient(profileIdx, colorIdx, color, event) {
+      const profile = profiles[profileIdx];
+      if (!profile) return;
+      const normalized = normalizeColor(color, colorIdx === 0 ? (profile.color || '#e63946') : '#2ec4b6');
+      profile.gradientStart = colorIdx === 0 ? normalized : normalizeColor(profile.gradientStart, profile.color || '#e63946');
+      profile.gradientEnd = colorIdx === 1 ? normalized : normalizeColor(profile.gradientEnd, '#2ec4b6');
+      profile.gradient = 'linear-gradient(135deg,' + profile.gradientStart + ',' + profile.gradientEnd + ')';
+      profilesDirty = true;
+      renderProfiles();
+      event.stopPropagation();
+    }
+
+    function normalizeColor(value, fallback) {
+      const color = String(value || '').trim();
+      return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : fallback;
+    }
+
+    function getGradientColor(profile, index) {
+      const fallback = index === 0 ? (profile.color || '#e63946') : '#2ec4b6';
+      const matches = String(profile.gradient || '').match(/#[0-9a-f]{6}/gi);
+      return normalizeColor(matches && matches[index], fallback);
     }
 
     function addProfile() {
@@ -431,6 +520,7 @@
           throw new Error(result.error || 'HTTP ' + response.status);
         }
         profilesDirty = false;
+        if (dirty) await saveAll();
         showToast('Profile gespeichert ✓');
       } catch (error) {
         showToast('Profile nicht gespeichert: ' + error.message);

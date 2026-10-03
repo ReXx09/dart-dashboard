@@ -165,6 +165,7 @@ class DataStore {
     await this.ensureDuelSchema();
     await this.ensureEliminationSchema();
     await this.ensurePlayerProfileSchema();
+    await this.ensureProfileGradientSchema();
     await this.ensureHighscoreProfileSchema();
     await this.ensureHighscoreModeColumn();
     await this.ensureCheckoutRuleColumns();
@@ -222,6 +223,19 @@ class DataStore {
     if (this.isSQLite()) await this.sqlite.run(backfill);
     else if (this.isPostgres()) await this.pg.query(backfill);
     else await this.my.query(backfill);
+  }
+
+  async ensureProfileGradientSchema() {
+    const query = this.isSQLite() || this.isPostgres()
+      ? 'ALTER TABLE profiles ADD COLUMN gradient TEXT'
+      : 'ALTER TABLE profiles ADD COLUMN gradient VARCHAR(255) NULL';
+    try {
+      if (this.isSQLite()) await this.sqlite.run(query);
+      else if (this.isPostgres()) await this.pg.query(query);
+      else await this.my.query(query);
+    } catch (error) {
+      if (!/duplicate|already exists/i.test(String(error.message || ''))) throw error;
+    }
   }
 
   async ensureHighscoreProfileSchema() {
@@ -926,7 +940,8 @@ class DataStore {
       CREATE TABLE IF NOT EXISTS profiles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        color TEXT
+        color TEXT,
+        gradient TEXT
       );
 
       CREATE TABLE IF NOT EXISTS player_stats (
@@ -1013,7 +1028,8 @@ class DataStore {
       CREATE TABLE IF NOT EXISTS profiles (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        color TEXT
+        color TEXT,
+        gradient TEXT
       );
 
       CREATE TABLE IF NOT EXISTS player_stats (
@@ -1106,7 +1122,8 @@ class DataStore {
       CREATE TABLE IF NOT EXISTS profiles (
         id INT PRIMARY KEY AUTO_INCREMENT,
         name VARCHAR(255) NOT NULL,
-        color VARCHAR(32) NULL
+        color VARCHAR(32) NULL,
+        gradient VARCHAR(255) NULL
       );
     `);
 
@@ -1216,13 +1233,13 @@ class DataStore {
 
   async getProfiles() {
     if (this.isSQLite()) {
-      return this.sqlite.all('SELECT id, name, color FROM profiles ORDER BY name ASC');
+      return this.sqlite.all('SELECT id, name, color, gradient FROM profiles ORDER BY name ASC');
     }
     if (this.isPostgres()) {
-      const result = await this.pg.query('SELECT id, name, color FROM profiles ORDER BY name ASC');
+      const result = await this.pg.query('SELECT id, name, color, gradient FROM profiles ORDER BY name ASC');
       return result.rows;
     }
-    const [rows] = await this.my.query('SELECT id, name, color FROM profiles ORDER BY name ASC');
+    const [rows] = await this.my.query('SELECT id, name, color, gradient FROM profiles ORDER BY name ASC');
     return rows;
   }
 
@@ -1233,8 +1250,8 @@ class DataStore {
       try {
         for (const p of safeList) {
           const id = Number(p.id || 0);
-          if (id > 0) await this.sqlite.run('UPDATE profiles SET name = ?, color = ? WHERE id = ?', [String(p.name || '').trim(), p.color || null, id]);
-          else await this.sqlite.run('INSERT INTO profiles (name, color) VALUES (?, ?)', [String(p.name || '').trim(), p.color || null]);
+          if (id > 0) await this.sqlite.run('UPDATE profiles SET name = ?, color = ?, gradient = ? WHERE id = ?', [String(p.name || '').trim(), p.color || null, p.gradient || null, id]);
+          else await this.sqlite.run('INSERT INTO profiles (name, color, gradient) VALUES (?, ?, ?)', [String(p.name || '').trim(), p.color || null, p.gradient || null]);
         }
         await this.sqlite.exec('COMMIT');
       } catch (err) {
@@ -1249,8 +1266,8 @@ class DataStore {
         await client.query('BEGIN');
         for (const p of safeList) {
           const id = Number(p.id || 0);
-          if (id > 0) await client.query('UPDATE profiles SET name = $1, color = $2 WHERE id = $3', [String(p.name || '').trim(), p.color || null, id]);
-          else await client.query('INSERT INTO profiles (name, color) VALUES ($1, $2)', [String(p.name || '').trim(), p.color || null]);
+          if (id > 0) await client.query('UPDATE profiles SET name = $1, color = $2, gradient = $3 WHERE id = $4', [String(p.name || '').trim(), p.color || null, p.gradient || null, id]);
+          else await client.query('INSERT INTO profiles (name, color, gradient) VALUES ($1, $2, $3)', [String(p.name || '').trim(), p.color || null, p.gradient || null]);
         }
         await client.query('COMMIT');
       } catch (err) {
@@ -1265,8 +1282,8 @@ class DataStore {
     try {
       for (const p of safeList) {
         const id = Number(p.id || 0);
-        if (id > 0) await connection.query('UPDATE profiles SET name = ?, color = ? WHERE id = ?', [String(p.name || '').trim(), p.color || null, id]);
-        else await connection.query('INSERT INTO profiles (name, color) VALUES (?, ?)', [String(p.name || '').trim(), p.color || null]);
+        if (id > 0) await connection.query('UPDATE profiles SET name = ?, color = ?, gradient = ? WHERE id = ?', [String(p.name || '').trim(), p.color || null, p.gradient || null, id]);
+        else await connection.query('INSERT INTO profiles (name, color, gradient) VALUES (?, ?, ?)', [String(p.name || '').trim(), p.color || null, p.gradient || null]);
       }
     } finally {
       connection.release();
