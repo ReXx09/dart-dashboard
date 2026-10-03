@@ -1444,6 +1444,12 @@ function advanceLiveTurn(state) {
   return state.game.turnId;
 }
 
+function isRoundBoundary(state, nextPlayerIndex) {
+  const startingPlayerSlot = Number(state.game.startingPlayerSlot || 0);
+  if (startingPlayerSlot > 0) return Number(state.players[nextPlayerIndex]?.slot) === startingPlayerSlot;
+  return nextPlayerIndex === 0;
+}
+
 async function recordPlayerLegStats(player, state, options = {}) {
   try {
     if (!options.skipDuel) await recordDuelLegIfActive(state, player);
@@ -1805,7 +1811,7 @@ function completeAutoAdvance(state, source) {
   advanceLiveTurn(state);
   state.players[state.game.activePlayer].currentRoundPoints = [];
   state.players[state.game.activePlayer].turnScoreRecorded = false;
-  if (state.game.activePlayer === 0) {
+  if (isRoundBoundary(state, state.game.activePlayer)) {
     state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
   }
   finishEliminationIfComplete(state);
@@ -2496,7 +2502,7 @@ function parseArduinoLine(line) {
         state.game.activePlayer = nextIdx;
         state.game.currentThrow = 0;
         advanceLiveTurn(state);
-        if (nextIdx === 0) state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
+        if (isRoundBoundary(state, nextIdx)) state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
         state.lastAction = { type: 'player-switch-btn', player: state.players[nextIdx].name, playerSlot: state.players[nextIdx].slot, ts: Date.now() };
         const saved = await saveLiveState(state);
         broadcastLiveState(saved);
@@ -3111,6 +3117,7 @@ async function getLiveState() {
       startedAt: Number(saved.game?.startedAt || fallback.game.startedAt),
       updatedAt: Number(saved.game?.updatedAt || Date.now()),
       activePlayer: Math.min(Number(saved.game?.activePlayer || 0), mergedPlayers.length - 1),
+      startingPlayerSlot: Number(saved.game?.startingPlayerSlot || fallback.game.startingPlayerSlot || mergedPlayers[0]?.slot || 0),
       throwRound: Number(saved.game?.throwRound || 1),
       currentThrow: Number(saved.game?.currentThrow || 0),
       turnId: Math.max(1, Number(saved.game?.turnId || 1)),
@@ -4069,7 +4076,7 @@ app.post('/api/live/next-player', async (req, res) => {
     state.game.activePlayer = nextIndex;
     state.game.currentThrow = 0;
     advanceLiveTurn(state);
-    if (nextIndex === 0) state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
+    if (isRoundBoundary(state, nextIndex)) state.game.throwRound = (Number(state.game.throwRound || 1) || 1) + 1;
     // Neuen aktiven Spieler's currentRoundPoints leeren
     state.players[nextIndex].currentRoundPoints = [];
     state.players[nextIndex].turnScoreRecorded = false;
