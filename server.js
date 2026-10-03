@@ -1934,13 +1934,15 @@ async function applyArduinoThrowFromChannel(channel, evt = {}, generation = live
   let bust = false;
   let eliminationAction = null;
   let cricketPointsAwarded = 0;
+  let cricketNum = null;
+  let hitCount = 0;
   if (isCricket) {
     const rawCode = Number(evt.code);
     const hasCode = Number.isFinite(rawCode) && rawCode >= 0 && rawCode <= 999;
-    const cricketNum = hasCode ? codeToCricketNumber(rawCode) : pointsToCricketNumber(value);
+    cricketNum = hasCode ? codeToCricketNumber(rawCode) : pointsToCricketNumber(value);
     const nums = getCricketNumbersForMode(mode);
     if (nums && cricketNum !== null && nums.includes(cricketNum)) {
-      const hitCount = hasCode ? codeToCricketHitCount(rawCode) : getThrowHitCount(value);
+      hitCount = hasCode ? codeToCricketHitCount(rawCode) : getThrowHitCount(value);
       cricketPointsAwarded = applyCricketHit(player, state.players, cricketNum, hitCount);
     }
   } else {
@@ -1977,6 +1979,9 @@ async function applyArduinoThrowFromChannel(channel, evt = {}, generation = live
     source: 'arduino',
     turnId: state.game.turnId || 1,
     segment: throwSegment,
+    ...(isCricket && Number.isInteger(cricketNum) && [15, 16, 17, 18, 19, 20, 25].includes(cricketNum)
+      ? { number: cricketNum, multiplier: hitCount, hitCount }
+      : {}),
     channel: formatChannel(channel),
     raw: evt.line || null
   });
@@ -3958,7 +3963,14 @@ app.post('/api/live/throw', async (req, res) => {
     const throwSource = typeof req.body?.source === 'string' && req.body.source.trim()
       ? req.body.source.trim()
       : 'manual';
-    player.throws.push({ points, remaining: player.remaining, bust, elimination: Boolean(eliminationAction), ts: thrownAt, mode, segment: throwSegment, turnId: state.game.turnId || 1, source: throwSource });
+    const cricketNumber = isCricket ? Number(req.body?.number || pointsToCricketNumber(points)) : null;
+    const inferredMultiplier = incomingSegment && incomingSegment[0] === 'T' ? 3
+      : incomingSegment && incomingSegment[0] === 'D' ? 2
+        : incomingSegment === 'DBULL' ? 2 : 1;
+    const cricketMultiplier = isCricket ? Number(req.body?.multiplier || inferredMultiplier) : null;
+    player.throws.push({ points, remaining: player.remaining, bust, elimination: Boolean(eliminationAction), ts: thrownAt, mode, segment: throwSegment, turnId: state.game.turnId || 1, source: throwSource,
+      ...(isCricket && [15, 16, 17, 18, 19, 20, 25].includes(cricketNumber) ? { number: cricketNumber, multiplier: cricketMultiplier, hitCount: cricketMultiplier } : {})
+    });
     player.average = calculateCurrentRoundAverage(player);
     state.game.currentThrow = (state.game.currentThrow || 0) + 1;
 
@@ -4158,6 +4170,20 @@ function finishLegAfterCorrection(state, correction, modeDef, generation) {
     return;
   }
 
+  if (modeDef.type === 'cricket') {
+    player.legs = Math.max(0, Number(player.legs || 0)) + 1;
+    state.game.status = 'leg-finished';
+    state.lastAction.cricketWin = true;
+    state.lastAction.winner = player.name;
+    state.lastAction.winnerSlot = player.slot;
+    queueLiveDetailWrite(
+      () => addHighscore(player.name, player.cricketPoints || 0, { kind: 'cricket', legWin: true, source: 'correction', gameMode: mode, duelId: state.game.duelId, playerSlot: player.slot }),
+      'Leg-Highscore'
+    );
+    queueCompletedLegStats(state, player, generation);
+    return;
+  }
+
   const checkoutRule = state.game.checkoutRule || DEFAULT_CHECKOUT_RULE;
   player.lastCheckoutValue = getCheckoutValue(player, correction.remainingBeforeThrow);
   player.checkoutSuccess = Number(player.checkoutSuccess || 0) + 1;
@@ -4180,7 +4206,8 @@ function finishLegAfterCorrection(state, correction, modeDef, generation) {
 // laufender Spielerwechsel bleiben unberührt; nur ein regelkonformes Leg-Ende wird übernommen.
 app.post('/api/live/correct-last', async (req, res) => {
   const delta = Number(req.body && req.body.delta);
-  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 180) {
+  const hasCricketSelection = Number.isInteger(Number(req.body?.cricketNumber)) && Number.isInteger(Number(req.body?.cricketMultiplier));
+  if ((!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 180) && !hasCricketSelection) {
     return res.status(400).json({ error: 'delta muss eine ganze Zahl zwischen -180 und 180 sein.' });
   }
 
@@ -4198,7 +4225,9 @@ app.post('/api/live/correct-last', async (req, res) => {
       isValidCheckout,
       isCheckoutAttempt,
       pointsToSegment,
-      calculateAverage: calculateCurrentRoundAverage
+      calculateAverage: calculateCurrentRoundAverage,
+      cricketNumber: Number(req.body?.cricketNumber),
+      cricketMultiplier: Number(req.body?.cricketMultiplier)
     });
     if (correction.error) return res.status(400).json({ error: correction.error });
 

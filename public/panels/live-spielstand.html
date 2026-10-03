@@ -1327,6 +1327,22 @@
         <input id="throwCorrectionValue" type="text" value="0" readonly aria-label="Korrekturwert">
       </div>
       <div class="throw-correction-preview" id="throwCorrectionPreview"></div>
+      <div id="cricketCorrectionControls" hidden>
+        <div class="throw-correction-keypad" aria-label="Cricket-Zahl">
+          <button type="button" onclick="selectCricketCorrectionNumber(20)">20</button>
+          <button type="button" onclick="selectCricketCorrectionNumber(19)">19</button>
+          <button type="button" onclick="selectCricketCorrectionNumber(18)">18</button>
+          <button type="button" onclick="selectCricketCorrectionNumber(17)">17</button>
+          <button type="button" onclick="selectCricketCorrectionNumber(16)">16</button>
+          <button type="button" onclick="selectCricketCorrectionNumber(15)">15</button>
+          <button type="button" onclick="selectCricketCorrectionNumber(25)">BULL</button>
+        </div>
+        <div class="throw-correction-actions">
+          <button type="button" onclick="selectCricketCorrectionMultiplier(1)">Single</button>
+          <button type="button" onclick="selectCricketCorrectionMultiplier(2)">Double</button>
+          <button type="button" onclick="selectCricketCorrectionMultiplier(3)">Triple</button>
+        </div>
+      </div>
       <div class="throw-correction-keypad" aria-label="Korrektur-Tastenfeld">
         <button type="button" onclick="appendCorrectionDigit('1')">1</button>
         <button type="button" onclick="appendCorrectionDigit('2')">2</button>
@@ -3185,6 +3201,8 @@
     let throwCorrectionSign = -1;
     let throwCorrectionDigits = '';
     let throwCorrectionTarget = null;
+    let cricketCorrectionNumber = null;
+    let cricketCorrectionMultiplier = null;
 
     // Gleiche Regel wie auf dem Server: Der zeitlich letzte Dart aller Spieler ist betroffen.
     function findThrowCorrectionTarget(state) {
@@ -3215,6 +3233,9 @@
       const value = document.getElementById('throwCorrectionValue');
       const targetElement = document.getElementById('throwCorrectionTarget');
       const preview = document.getElementById('throwCorrectionPreview');
+      const cricketControls = document.getElementById('cricketCorrectionControls');
+      const isCricket = !!(liveState && /cricket/i.test(String(liveState.game && liveState.game.mode || '')));
+      if (cricketControls) cricketControls.hidden = !isCricket;
       if (sign) sign.textContent = throwCorrectionSign < 0 ? '−' : '+';
       if (value) value.value = throwCorrectionDigits || '0';
       if (targetElement) {
@@ -3224,6 +3245,13 @@
       }
       if (preview) {
         const amount = Number(throwCorrectionDigits || 0) * throwCorrectionSign;
+        if (isCricket) {
+          preview.classList.remove('invalid');
+          preview.textContent = cricketCorrectionNumber && cricketCorrectionMultiplier
+            ? 'Neuer Dart: ' + (cricketCorrectionMultiplier === 1 ? 'S' : cricketCorrectionMultiplier === 2 ? 'D' : 'T') + cricketCorrectionNumber
+            : 'Zahl und Trefferart auswählen';
+          return;
+        }
         const next = throwCorrectionTarget ? (Number(throwCorrectionTarget.throwData.points) || 0) + amount : 0;
         const invalid = !!amount && (next < 0 || next > 180);
         preview.classList.toggle('invalid', invalid);
@@ -3239,6 +3267,8 @@
       // Ein Wurf mit 0 Punkten kann nur nach oben korrigiert werden.
       throwCorrectionSign = throwCorrectionTarget && (Number(throwCorrectionTarget.throwData.points) || 0) === 0 ? 1 : -1;
       throwCorrectionDigits = '';
+      cricketCorrectionNumber = null;
+      cricketCorrectionMultiplier = null;
       updateThrowCorrectionDisplay();
       if (hint) {
         hint.textContent = throwCorrectionTarget
@@ -3276,10 +3306,21 @@
       updateThrowCorrectionDisplay();
     }
 
+    function selectCricketCorrectionNumber(number) {
+      cricketCorrectionNumber = number;
+      updateThrowCorrectionDisplay();
+    }
+
+    function selectCricketCorrectionMultiplier(multiplier) {
+      cricketCorrectionMultiplier = multiplier;
+      updateThrowCorrectionDisplay();
+    }
+
     async function applyLastThrowCorrection() {
       const amount = Number(throwCorrectionDigits || 0) * throwCorrectionSign;
+      const isCricket = !!(liveState && /cricket/i.test(String(liveState.game && liveState.game.mode || '')));
       const hint = document.getElementById('throwCorrectionHint');
-      if (!amount) {
+      if ((!isCricket && !amount) || (isCricket && (!cricketCorrectionNumber || !cricketCorrectionMultiplier))) {
         if (hint) { hint.textContent = 'Bitte zuerst einen Korrekturwert eingeben.'; hint.classList.add('error'); }
         return;
       }
@@ -3289,7 +3330,9 @@
         const r = await fetch('/api/live/correct-last', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ delta: amount })
+          body: JSON.stringify(isCricket
+            ? { cricketNumber: cricketCorrectionNumber, cricketMultiplier: cricketCorrectionMultiplier }
+            : { delta: amount })
         });
         const payload = await r.json().catch(() => ({}));
         if (!r.ok) {
@@ -3300,7 +3343,7 @@
         const correctedName = throwCorrectionTarget ? throwCorrectionTarget.player.name : 'letztem Wurf';
         closeThrowCorrection();
         renderState(liveState);
-        showToast((amount > 0 ? '+' : '−') + Math.abs(amount) + ' Punkte bei ' + correctedName + ' korrigiert');
+        showToast(isCricket ? 'Cricket-Dart bei ' + correctedName + ' korrigiert' : (amount > 0 ? '+' : '−') + Math.abs(amount) + ' Punkte bei ' + correctedName + ' korrigiert');
       } catch (error) { showToast('Netzwerkfehler', true); }
       finally { if (button) button.disabled = false; }
     }

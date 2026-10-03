@@ -9,6 +9,7 @@ const {
 } = require('../lib/live-throws');
 const { isValidCheckout, isCheckoutAttempt } = require('../modes/x01');
 const { applyEliminationThrow } = require('../modes/elimination');
+const { applyCricketHit } = require('../modes/cricket');
 
 const SEGMENTS = { 20: 'S20', 40: 'D20', 50: 'DBULL', 60: 'T20' };
 const segmentOf = points => points === 0 ? 'MISS' : SEGMENTS[points] || (points <= 20 ? 'S' + points : null);
@@ -373,14 +374,55 @@ test('Wurf entfernen nimmt den Checkout-Versuch eines echten Darts zurück', () 
   assert.equal(player.checkoutByRule.double.attempts, 0);
 });
 
-test('Wurf entfernen und Korrigieren melden fehlende Würfe und Cricket als Fehler', () => {
+test('Wurf entfernen meldet fehlende Würfe', () => {
   const empty = createFinishable(40);
   empty.players[0].throws = [];
 
   assert.match(removeLatestThrow(empty, x01Context()).error, /Kein Wurf/);
   assert.match(correctLatestThrow(empty, 5, x01Context()).error, /Kein Wurf/);
-  assert.match(removeLatestThrow(createAfterMissClick(), x01Context({ modeType: 'cricket' })).error, /Cricket/);
-  assert.match(correctLatestThrow(createAfterMissClick(), 5, x01Context({ modeType: 'cricket' })).error, /Cricket/);
+});
+
+test('Cricket-Korrektur ersetzt einen fehlenden Dart regelkonform', () => {
+  const state = {
+    game: { mode: 'cricket', turnId: 1, activePlayer: 0, currentThrow: 1, throwRound: 1 },
+    players: [
+      { slot: 1, name: 'Alice', cricketHits: {}, cricketClosed: {}, cricketPoints: 0, totalScored: 0, turns: 1, currentRoundPoints: [0], throws: [
+        { points: 0, segment: 'MISS', source: 'manual-miss', ts: 100, turnId: 1 }
+      ] },
+      { slot: 2, name: 'Bob', cricketHits: {}, cricketClosed: {}, cricketPoints: 0, totalScored: 0, turns: 0, currentRoundPoints: [], throws: [] }
+    ]
+  };
+
+  const result = correctLatestThrow(state, 0, x01Context({ modeType: 'cricket', cricketNumber: 20, cricketMultiplier: 3 }));
+
+  assert.equal(result.error, undefined);
+  assert.equal(state.players[0].throws[0].points, 60);
+  assert.equal(state.players[0].throws[0].segment, 'T20');
+  assert.equal(state.players[0].throws[0].number, 20);
+  assert.equal(state.players[0].cricketHits[20], 3);
+  assert.equal(state.players[0].cricketClosed[20], true);
+  assert.equal(state.players[0].cricketPoints, 0);
+});
+
+test('Cricket-Undo baut Treffer und Punkte aus den verbleibenden Darts neu auf', () => {
+  const state = {
+    game: { mode: 'cricket', turnId: 1, activePlayer: 0, currentThrow: 2, throwRound: 1, startingPlayerSlot: 1 },
+    players: [
+      { slot: 1, name: 'Alice', cricketHits: {}, cricketClosed: {}, cricketPoints: 20, totalScored: 20, turns: 2, currentRoundPoints: [20, 20], throws: [
+        { points: 20, segment: 'S20', number: 20, multiplier: 1, ts: 100, turnId: 1 },
+        { points: 20, segment: 'S20', number: 20, multiplier: 1, ts: 200, turnId: 1 }
+      ] },
+      { slot: 2, name: 'Bob', cricketHits: {}, cricketClosed: {}, cricketPoints: 0, totalScored: 0, turns: 0, currentRoundPoints: [], throws: [] }
+    ]
+  };
+
+  const result = removeLatestThrow(state, { modeType: 'cricket', calculateAverage: averageOf });
+
+  assert.equal(result.error, undefined);
+  assert.equal(state.players[0].throws.length, 1);
+  assert.equal(state.players[0].cricketHits[20], 1);
+  assert.equal(state.players[0].cricketClosed[20], undefined);
+  assert.equal(state.players[0].cricketPoints, 0);
 });
 
 // Elimination: Darts werden wie in der Live-Route gespielt, damit die Zustände realistisch sind.
