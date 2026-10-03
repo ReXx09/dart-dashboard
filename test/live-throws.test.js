@@ -67,6 +67,8 @@ test('summarizePlayerThrows leitet Aufnahme- und Leg-Werte aus Würfen ab', () =
 
 test('correctLatestThrow aktualisiert Wurf, Aufnahme und Restscore', () => {
   const state = createState();
+  state.players[0].throws.pop();
+  state.players[0].currentRoundPoints = [20, 60];
   const result = correctLatestThrow(state, -5, {
     checkoutRule: 'single',
     isValidCheckout: (_remaining, points) => points <= 180,
@@ -81,6 +83,23 @@ test('correctLatestThrow aktualisiert Wurf, Aufnahme und Restscore', () => {
   assert.equal(state.players[0].totalScored, 75);
   assert.deepEqual(state.players[0].currentRoundPoints, [20, 55]);
   assert.equal(state.players[0].turnScoreRecorded, false);
+});
+
+test('correctLatestThrow ersetzt den zuletzt erzeugten Fehlwurf statt den vorherigen Dart', () => {
+  const state = createState();
+  state.players[0].currentRoundPoints = [20, 60, 0];
+  const result = correctLatestThrow(state, 20, {
+    checkoutRule: 'single',
+    isValidCheckout: (_remaining, points) => points <= 180,
+    pointsToSegment: points => points === 0 ? 'MISS' : 'S' + points
+  });
+
+  assert.equal(result.newPoints, 20);
+  assert.equal(state.players[0].throws[2].points, 20);
+  assert.equal(state.players[0].throws[2].source, 'manual-correction');
+  assert.equal(state.players[0].remaining, 401);
+  assert.equal(state.players[0].totalScored, 100);
+  assert.deepEqual(state.players[0].currentRoundPoints, [20, 60, 20]);
 });
 
 test('removeLatestThrow stellt Aufnahme und Spielstand wieder her', () => {
