@@ -164,8 +164,8 @@ class DataStore {
 
     await this.ensureDuelSchema();
     await this.ensureEliminationSchema();
-    await this.ensurePlayerProfileSchema();
     await this.ensureProfileGradientSchema();
+    await this.ensurePlayerProfileSchema();
     await this.ensureHighscoreProfileSchema();
     await this.ensureHighscoreModeColumn();
     await this.ensureCheckoutRuleColumns();
