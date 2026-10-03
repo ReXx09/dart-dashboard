@@ -42,7 +42,9 @@ const {
   calculateEliminationPoints,
   checkEliminationWin,
   getEliminationWinner,
-  applyEliminationThrow
+  applyEliminationThrow,
+  applyEliminationHit,
+  rebuildEliminationState
 } = require('./modes/elimination');
 
 let SerialPortCtor = null;
@@ -4087,11 +4089,18 @@ app.post('/api/live/undo', async (req, res) => {
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
     const isCricket = modeDef.type === 'cricket';
+    const isElimination = modeDef.type === 'elimination';
     const result = removeLatestThrow(state, { isCricket, calculateAverage: calculateCurrentRoundAverage });
     if (!result) return res.status(400).json({ error: 'Kein Wurf zum Rückgängigmachen vorhanden.' });
 
     state.game.currentThrow = result.player.currentRoundPoints.length;
     state.game.activePlayer = result.playerIndex;
+    if (isElimination) {
+      rebuildEliminationState(state);
+      const removedTurnId = Number(result.throwData.turnId || state.game.turnId || 1);
+      state.game.turnId = Math.max(1, removedTurnId);
+      state.game.throwRound = Math.max(1, Math.floor((state.game.turnId - 1) / state.players.length) + 1);
+    }
     state.lastAction = { type: 'undo', player: result.player.name, points: result.throwData.points, ts: Date.now() };
 
     const undoRecord = {
@@ -4135,10 +4144,6 @@ app.post('/api/live/correct-last', async (req, res) => {
 
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
-    if (modeDef.type === 'cricket' || modeDef.type === 'elimination') {
-      return res.status(400).json({ error: 'Diese Korrektur ist für diesen Spielmodus noch nicht verfügbar.' });
-    }
-
     const correction = correctLatestThrow(state, delta, {
       checkoutRule: state.game.checkoutRule || DEFAULT_CHECKOUT_RULE,
       isValidCheckout,
@@ -4146,6 +4151,8 @@ app.post('/api/live/correct-last', async (req, res) => {
       calculateAverage: calculateCurrentRoundAverage
     });
     if (correction.error) return res.status(400).json({ error: correction.error });
+
+    if (modeDef.type === 'elimination') rebuildEliminationState(state);
 
     state.game.currentThrow = correction.player.currentRoundPoints.length;
     state.game.activePlayer = correction.playerIndex;

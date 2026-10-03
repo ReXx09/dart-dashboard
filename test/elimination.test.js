@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { checkEliminationWin } = require('../modes/elimination');
+const { checkEliminationWin, rebuildEliminationState } = require('../modes/elimination');
 
 function createState(throwRound, currentThrow, activePlayer, scores = [200, 180, 120]) {
   return {
@@ -30,4 +30,22 @@ test('Elimination beendet das Leg nach dem letzten Dart der zehnten Aufnahme', (
 
 test('Elimination beendet das Leg sofort bei Erreichen von 301 Punkten', () => {
   assert.equal(checkEliminationWin(createState(4, 1, 1, [301, 97, 120])), true);
+});
+
+test('Elimination rekonstruiert Punkte und Eliminierungen nach einer Wurfkorrektur', () => {
+  const state = {
+    game: { mode: 'elimination' },
+    players: [
+      { slot: 1, totalScored: 99, eliminatedCount: 0, throws: [{ points: 20, bust: false, ts: 1 }] },
+      { slot: 2, totalScored: 0, eliminatedCount: 1, throws: [{ points: 20, bust: false, ts: 2 }] }
+    ],
+    eliminationEvents: []
+  };
+
+  rebuildEliminationState(state);
+
+  assert.equal(state.players[0].totalScored, 0);
+  assert.equal(state.players[1].totalScored, 20);
+  assert.equal(state.players[0].eliminatedCount, 1);
+  assert.equal(state.eliminationEvents.length, 1);
 });

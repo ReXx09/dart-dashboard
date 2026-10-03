@@ -86,10 +86,34 @@ function applyEliminationThrow(state, player, value) {
   };
 }
 
+function rebuildEliminationState(state) {
+  const throws = [];
+  for (const player of state.players || []) {
+    player.totalScored = 0;
+    player.eliminatedCount = 0;
+    for (const throwData of Array.isArray(player.throws) ? player.throws : []) {
+      throws.push({ player, throwData });
+    }
+  }
+
+  state.eliminationEvents = [];
+  throws.sort((left, right) => Number(left.throwData.ts || 0) - Number(right.throwData.ts || 0));
+  for (const { player, throwData } of throws) {
+    if (throwData.bust) {
+      throwData.elimination = false;
+      continue;
+    }
+    const result = applyEliminationThrow(state, player, Number(throwData.points) || 0);
+    throwData.elimination = Boolean(result.eliminationAction);
+  }
+  return state;
+}
+
 module.exports = {
   calculateEliminationPoints,
   checkEliminationWin,
   getEliminationWinner,
   applyEliminationThrow,
-  applyEliminationHit
+  applyEliminationHit,
+  rebuildEliminationState
 };
