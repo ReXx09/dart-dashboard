@@ -74,7 +74,7 @@ Das Dashboard funktioniert auch ohne angeschlossenen Arduino. In diesem Fall wir
 | Statistiken | <http://localhost:3100/panels/statistics.html> |
 | Fire-TV-Dashboard | <http://localhost:3200/panels/firetv-dashboard.html> |
 
-Für andere Geräte im Heimnetz wird `localhost` durch die IP-Adresse des Dashboard-Servers ersetzt, zum Beispiel `http://192.168.8.111:3100`.
+Für andere Geräte im Heimnetz wird `localhost` durch die IP-Adresse des Dashboard-Servers ersetzt, zum Beispiel `http://DEINE-SERVER-IP:3100`.
 
 ## Konfiguration
 
