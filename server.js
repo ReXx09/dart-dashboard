@@ -2775,6 +2775,7 @@ async function startArduinoMonitor() {
     arduinoParser = parser;
 
     port.on('open', () => {
+      clearArduinoReconnectTimer();
       if (typeof resetChannelAutoDetect === 'function') resetChannelAutoDetect();
       normalizeArduinoStatePatch({ connected: true, port: serialPath, error: null });
     });
@@ -2783,6 +2784,7 @@ async function startArduinoMonitor() {
     port.on('close', () => {
       if (arduinoPort === port) arduinoPort = null;
       normalizeArduinoStatePatch({ connected: false, error: 'Arduino-Port getrennt.' });
+      scheduleArduinoReconnect();
     });
   } catch (err) {
     normalizeArduinoStatePatch({ connected: false, error: `Arduino-Verbindung fehlgeschlagen: ${err.message}` });
