@@ -2,11 +2,11 @@
 
 Live-Dart-Dashboard für elektronische Löwen-Dartboards. Das System liest Würfe über einen Arduino ein, verwaltet Spiele und Statistiken und stellt optimierte Ansichten für Browser, Controller und Fire TV bereit.
 
-## Live-Ansicht
+## Screenshots
 
-[![Live-Spielstand des Löwen Dart Dashboards](docs/dashboard-preview.png)](http://localhost:3100/panels/live-spielstand.html)
+[![Neutrale Vollbildansicht des Löwen Dart Dashboards](docs/dashboard-preview.png)](docs/dashboard-preview.png)
 
-> Ein Klick auf das Bild öffnet die lokale Live-Ansicht, sobald das Dashboard läuft.
+Die Vorschau ist ein statischer Screenshot. Sie benötigt keinen laufenden Server und enthält ausschließlich neutrale Beispieldaten.
 
 ## Funktionen
 
