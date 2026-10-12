@@ -4,9 +4,11 @@ Live-Dart-Dashboard für elektronische Löwen-Dartboards. Das System liest Würf
 
 ## Screenshots
 
-[![Neutrale Vollbildansicht des Löwen Dart Dashboards](docs/dashboard-preview.png)](docs/dashboard-preview.png)
+Die folgenden Ansichten sind statische Screenshots und benötigen keinen laufenden Server:
 
-Die Vorschau ist ein statischer Screenshot. Sie benötigt keinen laufenden Server und enthält ausschließlich neutrale Beispieldaten.
+![Live-Spielstand](docs/screenshot-live-spielstand.png)
+
+![Dialog zum Starten einer Begegnung](docs/screenshot-begegnung-starten.png)
 
 ## Funktionen
 
