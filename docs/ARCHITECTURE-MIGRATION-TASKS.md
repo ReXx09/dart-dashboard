@@ -1,6 +1,7 @@
 # Aufgabenliste: Zentrale Spiel-, Statistik- und Highscore-Daten
 
 **Sicherungsstand:** `save-before-live-structure-refactor-2026-09-13`
+**Letzte Prüfung:** `2026-10-12` – `npm test`: 66 Tests erfolgreich.
 
 Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnungen verwenden. `live-state.json` bleibt ein aktueller Live-/Cache-Zustand und wird nicht zur unabhängigen Statistikquelle.
 
@@ -19,7 +20,7 @@ Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnun
 - [ ] Jede Lesestelle in `live-spielstand.html`, `statistics.html`, `highscores.html` und TV-Ansichten dokumentieren.
 - [ ] Festlegen, welche Daten künftig verbindlich aus der Datenbank kommen.
 - [ ] Bestehende Datenbanktabellen und ihre Beziehungen dokumentieren.
-
+  
 ## Phase 2: Einheitliches Datenmodell definieren
 
 - [ ] Entitäten festlegen: Spieler, Begegnung, Leg, Aufnahme und Wurf.
@@ -85,24 +86,24 @@ Ziel: Alle Anzeigen sollen dieselbe zentrale Datenquelle und dieselben Berechnun
 ## Phase 8: Tests und Freigabe
 
 - [x] Unit-Tests für Wurfkorrektur und Undo ergänzen.
-- [ ] Tests für Aufnahme- und Leg-Summen ergänzen.
-- [ ] Tests für Bust- und Checkout-Neuberechnung ergänzen.
+- [x] Tests für Aufnahme- und Leg-Summen ergänzen.
+- [x] Tests für Bust- und Checkout-Neuberechnung ergänzen.
 - [ ] Tests für Highscore-Neuberechnung ergänzen.
 - [ ] Tests für Statistik-Neuberechnung ergänzen.
-- [ ] Integrationstest: Wurf erfassen, korrigieren, Anzeige vergleichen.
-- [ ] Integrationstest: Wurf entfernen, Anzeige vergleichen.
+- [x] Integrationstest: Wurf erfassen, korrigieren, Anzeige vergleichen.
+- [x] Integrationstest: Wurf entfernen, Anzeige vergleichen.
 - [ ] Integrationstest: Leg abschließen und Statistiken prüfen.
-- [ ] `npm test` ausführen.
+- [x] `npm test` ausführen.
 - [ ] Dashboard manuell auf Browser, Tablet und TV prüfen.
 - [ ] Stabilen Stand nach erfolgreicher Prüfung committen und pushen.
 
-## Empfohlene erste Umsetzung
+## Nächste Umsetzung
 
 1. Phase 1 abschließen und die aktuellen Datenflüsse dokumentieren.
-2. Datenmodell für Wurf, Aufnahme und Korrektur festlegen.
-3. `lib/live-throws.js` mit Tests anlegen.
-4. Undo und Wurfkorrektur auf diese gemeinsame Logik umstellen.
-5. Erst danach Statistik- und Highscore-Datenbankmigration beginnen.
+2. Pflichtfelder und Berechnungsdefinitionen für Wurf, Aufnahme, Leg und Highscore verbindlich dokumentieren.
+3. `/api/live/throw` ebenfalls an die gemeinsame Wurf-Berechnung anbinden.
+4. Statistik- und Highscore-Neuberechnung nach Korrekturen testen.
+5. Erst danach die Datenbankmigration und den Abgleich historischer Daten beginnen.
 
 ## Abbruch- und Rücksetzpunkt
 
