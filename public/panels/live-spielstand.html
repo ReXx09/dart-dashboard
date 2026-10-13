@@ -1213,6 +1213,10 @@
     .match-menu-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
     .match-menu-actions button { border: 1px solid #4d555a; border-radius: 7px; padding: 9px 15px; color: #f1f1f1; background: #25292c; font: inherit; cursor: pointer; }
     .match-menu-actions .primary { background: #f4a261; border-color: #f4a261; color: #171717; font-weight: 800; }
+    .match-presets { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 9px 10px; background: #111315; border: 1px solid #2d3337; border-radius: 7px; }
+    .match-presets strong { margin-right: 3px; color: #cfd6da; font-size: .75rem; }
+    .match-presets button, .match-presets select { border: 1px solid #4d555a; border-radius: 6px; padding: 6px 9px; color: #f1f1f1; background: #25292c; font: inherit; cursor: pointer; }
+    .match-presets select { background: #101112; }
     @media (max-width: 600px) {
       .heatmap-toolbar { align-items: flex-start; flex-direction: column; }
       .heatmap-boards { grid-template-columns: 1fr; }
@@ -1405,6 +1409,16 @@
         <label class="match-menu-field encounter-only" id="tournamentNameField" hidden>Turniername
           <input id="matchTournamentName" type="text" maxlength="80" placeholder="z. B. Freitagsturnier" />
         </label>
+        <div class="match-menu-field full">
+          <div class="match-presets" aria-label="Spiel-Presets">
+            <strong>Presets</strong>
+            <button type="button" onclick="loadMatchPreset(0)">1 laden</button>
+            <button type="button" onclick="loadMatchPreset(1)">2 laden</button>
+            <button type="button" onclick="loadMatchPreset(2)">3 laden</button>
+            <select id="matchPresetSaveSlot" aria-label="Preset-Speicherplatz"><option value="0">Preset 1</option><option value="1">Preset 2</option><option value="2">Preset 3</option></select>
+            <button type="button" onclick="saveMatchPreset()">Auswahl speichern</button>
+          </div>
+        </div>
         <div class="match-menu-field full">Teilnehmer
           <div class="match-player-list" id="matchPlayerList"></div>
         </div>
@@ -1745,6 +1759,7 @@
       if (modeSelect && liveState && liveState.game) modeSelect.value = liveState.game.mode || '501';
       if (checkoutSelect && liveState && liveState.game) checkoutSelect.value = liveState.game.checkoutRule || 'double';
       document.getElementById('matchStartKind').value = 'encounter';
+      document.getElementById('matchTypeSelect').value = 'direct';
       updateMatchStartKind();
       document.getElementById('matchMenuOverlay').classList.add('open');
       loadMatchPlayers();
@@ -1797,9 +1812,13 @@
         const response = await fetch('/api/players', { cache: 'no-store' });
         if (!response.ok) throw new Error('Spieler konnten nicht geladen werden');
         const players = (await response.json()).filter(player => player && player.active !== false && String(player.name || '').trim());
-        const selectedSlots = Array.isArray(liveState && liveState.game && liveState.game.selectedPlayerSlots)
+        const hasRunningGame = String(liveState && liveState.game && liveState.game.status || '') === 'running';
+        const stateSlots = Array.isArray(liveState && liveState.game && liveState.game.selectedPlayerSlots)
           ? liveState.game.selectedPlayerSlots.map(Number)
           : (Array.isArray(liveState && liveState.players) ? liveState.players.map(player => Number(player.slot)) : []);
+        const selectedSlots = hasRunningGame
+          ? stateSlots
+          : players.slice(0, 2).map(player => Number(player.slot));
         list.innerHTML = players.map(player => '<label class="match-player-option"><input type="checkbox" value="' + Number(player.slot) + '"' + (selectedSlots.includes(Number(player.slot)) ? ' checked' : '') + ' /><span>' + escapeHtml(player.name) + '</span></label>').join('');
         document.getElementById('matchTypeSelect').value = selectedSlots.length === 2 ? 'direct' : 'group';
         updateMatchMenuType();
@@ -1810,6 +1829,44 @@
     }
 
     function closeMatchMenu() { document.getElementById('matchMenuOverlay').classList.remove('open'); }
+
+    function getMatchPresetKey(index) { return 'dartMatchPreset' + Number(index); }
+
+    function readMatchPreset(index) {
+      try {
+        const value = JSON.parse(localStorage.getItem(getMatchPresetKey(index)) || 'null');
+        return value && typeof value === 'object' ? value : null;
+      } catch (_) { return null; }
+    }
+
+    function loadMatchPreset(index) {
+      const preset = readMatchPreset(index);
+      if (!preset) { showToast('Preset ' + (Number(index) + 1) + ' ist noch leer.', true); return; }
+      document.getElementById('matchStartKind').value = preset.matchType === 'single' ? 'single' : 'encounter';
+      document.getElementById('matchTypeSelect').value = preset.matchType || 'direct';
+      document.getElementById('matchMode').value = preset.mode || '501';
+      document.getElementById('matchCheckoutRule').value = preset.checkoutRule || 'double';
+      document.getElementById('matchBestOf').value = String(preset.bestOf || 1);
+      document.getElementById('matchTournamentName').value = preset.tournamentName || '';
+      document.querySelectorAll('#matchPlayerList input').forEach(input => { input.checked = (preset.playerSlots || []).includes(Number(input.value)); });
+      updateMatchMenuType();
+      showToast('Preset ' + (Number(index) + 1) + ' geladen');
+    }
+
+    function saveMatchPreset() {
+      const index = Number(document.getElementById('matchPresetSaveSlot').value || 0);
+      const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
+      const preset = {
+        matchType: document.getElementById('matchTypeSelect').value,
+        mode: document.getElementById('matchMode').value,
+        checkoutRule: document.getElementById('matchCheckoutRule').value,
+        bestOf: Number(document.getElementById('matchBestOf').value),
+        tournamentName: document.getElementById('matchTournamentName').value.trim(),
+        playerSlots
+      };
+      localStorage.setItem(getMatchPresetKey(index), JSON.stringify(preset));
+      showToast('Auswahl als Preset ' + (index + 1) + ' gespeichert');
+    }
 
     async function abortActiveMatch() {
       const button = document.getElementById('duelStatsToggle');

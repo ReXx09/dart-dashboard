@@ -2835,7 +2835,7 @@ async function defaultLiveState(mode, selectedPlayerSlots = null) {
   const startingPlayer = chooseStartingPlayer(fallbackPlayers);
 
   return {
-    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'running', startedAt: Date.now(), updatedAt: Date.now(), activePlayer: startingPlayer.index, startingPlayerSlot: startingPlayer.slot, throwRound: 1, currentThrow: 0, duelId: null, selectedPlayerSlots: fallbackPlayers.map(player => Number(player.slot)) },
+    game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'idle', startedAt: null, updatedAt: Date.now(), activePlayer: startingPlayer.index, startingPlayerSlot: startingPlayer.slot, throwRound: 1, currentThrow: 0, duelId: null, selectedPlayerSlots: fallbackPlayers.map(player => Number(player.slot)) },
     players: fallbackPlayers.map(p => ({ ...p, remaining: startScore, legs: 0, turns: 0, totalScored: 0, bestTurn: 0, average: 0, throws: [], currentRoundPoints: [], ...defaultPlayerCricketState(m) })),
     lastAction: null,
     arduino: { connected: false, lastEvent: null, activeCount: 0, heartbeatMs: null }
@@ -2973,7 +2973,7 @@ function normalizeLiveStateSnapshot(state) {
   const normalizedGame = {
     ...(game || {}),
     mode: safeMode,
-    status: String(game.status || 'running'),
+    status: String(game.status || 'idle'),
     activePlayer: Number.isFinite(Number(game.activePlayer)) ? Math.max(0, Number(game.activePlayer)) : 0,
     currentThrow: Math.max(0, Number(game.currentThrow || 0)),
     throwRound: Math.max(1, Number(game.throwRound || 1)),
@@ -3088,6 +3088,16 @@ async function getLiveState() {
   const mode = savedLiveMode || DEFAULT_MODE;
   const fallback = await defaultLiveState(mode);
   const saved = await dataStore.getLiveState(fallback);
+  const staleStatePlayers = Array.isArray(saved.players) ? saved.players : [];
+  const isStaleEmptyRunningState = String(saved.game?.status || '') === 'running'
+    && Number(saved.game?.duelId || 0) <= 0
+    && !saved.lastAction
+    && staleStatePlayers.length > 0
+    && staleStatePlayers.every(player => Number(player.turns || 0) === 0 && (!Array.isArray(player.throws) || player.throws.length === 0));
+  if (isStaleEmptyRunningState) {
+    saved.game = { ...(saved.game || {}), status: 'idle', startedAt: null, updatedAt: Date.now() };
+    await dataStore.saveLiveState(saved);
+  }
   const arduinoView = buildArduinoStateView();
   const activePlayers = fallback.players;
   let selectedPlayerSlots = Array.isArray(saved.game?.selectedPlayerSlots)
@@ -3121,7 +3131,7 @@ async function getLiveState() {
       mode: String(saved.game?.mode || fallback.game.mode),
       checkoutRule: savedCheckoutRule || DEFAULT_CHECKOUT_RULE,
       status: String(saved.game?.status || fallback.game.status),
-      startedAt: Number(saved.game?.startedAt || fallback.game.startedAt),
+      startedAt: Number(saved.game?.startedAt || fallback.game.startedAt) || null,
       updatedAt: Number(saved.game?.updatedAt || Date.now()),
       activePlayer: Math.min(Number(saved.game?.activePlayer || 0), mergedPlayers.length - 1),
       startingPlayerSlot: Number(saved.game?.startingPlayerSlot || fallback.game.startingPlayerSlot || mergedPlayers[0]?.slot || 0),
@@ -3373,6 +3383,7 @@ app.post('/api/live/start', async (req, res) => {
     if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
     invalidateLiveLifecycle();
     const fresh = await defaultLiveState(mode, slots);
+    fresh.game.status = 'running';
     fresh.game.checkoutRule = checkoutRule;
     savedLiveMode = mode;
     savedCheckoutRule = checkoutRule;
@@ -3720,6 +3731,7 @@ app.post('/api/duels/start', async (req, res) => {
     const duel = tournament ? tournament.duel : await dataStore.createDuel({ mode, matchType, tournamentName, checkoutRule, players: tournamentPlayers });
     const activeSlots = tournament ? duel.players.map(player => Number(player.player_slot)) : slots;
     const fresh = await defaultLiveState(mode, activeSlots);
+    fresh.game.status = 'running';
     fresh.game.duelId = duel.id;
     fresh.game.checkoutRule = checkoutRule;
     fresh.game.selectedPlayerSlots = activeSlots;
@@ -3837,6 +3849,8 @@ app.post('/api/duels/:id/finish', requireAdmin, async (req, res) => {
       });
     }
     state.game.duelId = null;
+    state.game.status = 'idle';
+    state.game.startedAt = null;
     await saveLiveState(state, { immediate: true });
     broadcastReload();
     res.json(duel);
