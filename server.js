@@ -908,6 +908,8 @@ let matrixStickySignalCount = 0;
 let matrixStickySignalBlockedKey = '';
 let lastAppliedThrowAt = 0;
 const arduinoRawEventHistory = [];
+const ARDUINO_DIAGNOSTIC_LOG_DIR = path.join(DATA_DIR, 'arduino-logs');
+let arduinoDiagnosticLogQueue = Promise.resolve();
 const matrixSniffer = {
   activeRows: {},
   activeColumns: {},
@@ -998,6 +1000,11 @@ function scheduleArduinoStateBroadcast() {
 function normalizeArduinoStatePatch(patch) {
   Object.assign(arduinoState, patch, { lastUpdateMs: Date.now() });
   scheduleArduinoStateBroadcast();
+}
+
+function getArduinoLogDay(timestamp = Date.now()) {
+  const date = new Date(timestamp);
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
 }
 
 function isAutoAdvancePending() {
@@ -1236,6 +1243,12 @@ function buildArduinoStateView() {
     lastUpdateMs: Number(arduinoState.lastUpdateMs || 0) || null
   };
 
+  const diagnosticLog = {
+    day: getArduinoLogDay(),
+    endpoint: '/api/arduino/diagnostic-log',
+    daysEndpoint: '/api/arduino/diagnostic-log/days'
+  };
+
   const lookups = {
     dartValueByChannel: DART_VALUE_BY_CHANNEL,
     matrixCodeByRowColumn: MATRIX_CODE_BY_ROW_COLUMN
@@ -1248,6 +1261,7 @@ function buildArduinoStateView() {
     matrix,
     automation,
     telemetry,
+    diagnosticLog,
     lookups
   };
 
@@ -1255,9 +1269,30 @@ function buildArduinoStateView() {
 }
 
 function rememberArduinoLine(line) {
-  const entry = { line: String(line || '').trim(), ts: Date.now() };
+  const cleanLine = String(line || '').trim();
+  const receivedAt = Date.now();
+  const entry = { line: cleanLine, ts: receivedAt };
   arduinoRawEventHistory.unshift(entry);
   while (arduinoRawEventHistory.length > 20) arduinoRawEventHistory.pop();
+
+  const day = getArduinoLogDay(receivedAt);
+  const arduinoMsMatch = cleanLine.match(/^(?:HIT|MATRIX|HB|DIAG|TEL),?(\d+)/i);
+  const typeMatch = cleanLine.match(/^([A-Z]+)/i);
+  const record = JSON.stringify({
+    receivedAt: new Date(receivedAt).toISOString(),
+    receivedAtMs: receivedAt,
+    day,
+    type: typeMatch ? typeMatch[1].toUpperCase() : 'RAW',
+    arduinoMs: arduinoMsMatch ? Number(arduinoMsMatch[1]) : null,
+    line: cleanLine
+  }) + '\n';
+  const logFile = path.join(ARDUINO_DIAGNOSTIC_LOG_DIR, `arduino-${day}.jsonl`);
+  arduinoDiagnosticLogQueue = arduinoDiagnosticLogQueue
+    .then(async () => {
+      await fs.promises.mkdir(ARDUINO_DIAGNOSTIC_LOG_DIR, { recursive: true });
+      await fs.promises.appendFile(logFile, record, 'utf8');
+    })
+    .catch((error) => console.error('[Arduino-Log] Schreiben fehlgeschlagen:', error.message));
 }
 
 function formatChannel(channel) {
@@ -3598,6 +3633,41 @@ app.post('/api/arduino/command', (req, res) => {
 
 app.get('/api/arduino/raw', (_req, res) => {
   res.json({ connected: !!arduinoState.connected, port: arduinoState.port, history: arduinoRawEventHistory.slice(0, 50) });
+});
+
+app.get('/api/arduino/diagnostic-log', async (_req, res) => {
+  const requestedDay = String(_req.query.day || '').trim();
+  const day = requestedDay || getArduinoLogDay();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    return res.status(400).json({ error: 'Ungültiger Tag. Erwartet wird YYYY-MM-DD.' });
+  }
+  const file = path.join(ARDUINO_DIAGNOSTIC_LOG_DIR, `arduino-${day}.jsonl`);
+  try {
+    const content = await fs.promises.readFile(file, 'utf8');
+    const entries = content.split('\n').filter(Boolean).map((line) => {
+      try { return JSON.parse(line); } catch { return { line, type: 'INVALID' }; }
+    });
+    res.json({ day, file, entries });
+  } catch (error) {
+    if (error.code === 'ENOENT') return res.json({ day, file, entries: [] });
+    res.status(500).json({ error: 'Arduino-Diagnoselog konnte nicht gelesen werden.' });
+  }
+});
+
+app.get('/api/arduino/diagnostic-log/days', async (_req, res) => {
+  try {
+    const entries = await fs.promises.readdir(ARDUINO_DIAGNOSTIC_LOG_DIR);
+    const days = entries
+      .map((entry) => entry.match(/^arduino-(\d{4}-\d{2}-\d{2})\.jsonl$/i))
+      .filter(Boolean)
+      .map((match) => match[1])
+      .sort()
+      .reverse();
+    res.json({ days });
+  } catch (error) {
+    if (error.code === 'ENOENT') return res.json({ days: [] });
+    res.status(500).json({ error: 'Arduino-Logtage konnten nicht gelesen werden.' });
+  }
 });
 
 // ── Live-State ──
