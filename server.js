@@ -936,6 +936,7 @@ const arduinoState = {
   port: null,
   baudRate: 115200,
   lastLine: '',
+  firmware: null,
   lastEvent: null,
   lastHeartbeat: null,
   lastTelemetry: null,
@@ -1208,6 +1209,7 @@ function buildArduinoStateView() {
     heartbeat: arduinoState.lastHeartbeat ? { ...arduinoState.lastHeartbeat } : null,
     trigger: arduinoState.lastTrigger ? { ...arduinoState.lastTrigger } : null,
     line: arduinoState.lastLine || '',
+    firmware: arduinoState.firmware ? { ...arduinoState.firmware } : null,
     hit: normalizedHit,
     rawHit
   };
@@ -2518,6 +2520,18 @@ function parseArduinoLine(line) {
 
   rememberArduinoLine(clean);
   normalizeArduinoStatePatch({ lastLine: clean, error: null });
+
+  const firmwareMatch = clean.match(/^===\s*(HB8 SNIFFER.*)\s*===$/i);
+  if (firmwareMatch) {
+    normalizeArduinoStatePatch({
+      firmware: {
+        name: firmwareMatch[1].trim(),
+        diagSketch: /\bDIAG\b/i.test(firmwareMatch[1]),
+        detectedAt: Date.now(),
+        line: clean
+      }
+    });
+  }
 
   // DIAG-Parsing
   const diagMatch = clean.match(/^DIAG,(\d+),ch=(CH\d+),edges=(\d+)$/i);

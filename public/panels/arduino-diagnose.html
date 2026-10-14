@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arduino-Diagnose - Löwen Dart</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #0a0a0a; color: #eee; font-family: "Segoe UI", system-ui, sans-serif; }
+    main { width: min(1180px, 100%); margin: 0 auto; padding: 22px 28px 36px; }
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    h1 { margin: 0; font-size: 1.45rem; }
+    .back { color: #aaa; text-decoration: none; border: 1px solid #292929; border-radius: 6px; padding: 7px 10px; background: #151515; }
+    .back:hover { color: #fff; border-color: #457b9d; }
+    .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; background: #111; border: 1px solid #252525; border-radius: 10px; }
+    .firmware-status { margin-top: 12px; padding: 10px 14px; border: 1px solid #333; border-left: 3px solid #777; border-radius: 8px; background: #111; color: #aaa; font-size: .82rem; }
+    .firmware-status.ok { border-left-color: #2a9d8f; color: #2a9d8f; }
+    .firmware-status.warn { border-left-color: #f4a261; color: #f4a261; }
+    .firmware-status.bad { border-left-color: #e63946; color: #e63946; }
+    label { color: #999; font-size: .78rem; }
+    select, button { font: inherit; color: #eee; background: #191919; border: 1px solid #333; border-radius: 6px; padding: 7px 10px; }
+    button { cursor: pointer; }
+    button:hover { border-color: #2a9d8f; }
+    .summary { margin-left: auto; color: #777; font-size: .78rem; }
+    .log { margin-top: 14px; border: 1px solid #252525; border-radius: 10px; overflow: hidden; background: #0f0f0f; }
+    .log-row { display: grid; grid-template-columns: 92px 62px 112px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid #1d1d1d; font-family: Consolas, "Courier New", monospace; font-size: .76rem; }
+    .log-row:last-child { border-bottom: 0; }
+    .log-row:hover { background: #171717; }
+    .time, .arduino-time { color: #777; white-space: nowrap; }
+    .type { color: #bbb; font-weight: 700; }
+    .message { min-width: 0; color: #ddd; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .row-hit { border-left: 3px solid #2a9d8f; }
+    .row-tel { border-left: 3px solid #f4a261; }
+    .row-hb { border-left: 3px solid #457b9d; }
+    .row-diag, .row-invalid { border-left: 3px solid #e63946; }
+    .row-raw { border-left: 3px solid #777; }
+    .type-hit { color: #2a9d8f; }
+    .type-tel { color: #f4a261; }
+    .type-hb { color: #69a8d1; }
+    .type-diag, .type-invalid { color: #e63946; }
+    .empty { padding: 30px; text-align: center; color: #777; }
+    @media (max-width: 700px) {
+      main { padding: 16px 12px 28px; }
+      .summary { width: 100%; margin-left: 0; }
+      .log-row { grid-template-columns: 78px 52px minmax(0, 1fr); gap: 7px; }
+      .arduino-time { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <a class="back" href="/">← Zurück</a>
+      <h1>Arduino-Diagnose</h1>
+    </header>
+    <div class="toolbar">
+      <label for="day">Logtag</label>
+      <select id="day" aria-label="Logtag auswählen"></select>
+      <button id="reload" type="button">Aktualisieren</button>
+      <span class="summary" id="summary">Lade Log...</span>
+    </div>
+    <div class="firmware-status" id="firmwareStatus">Prüfe, welcher Sketch auf dem Arduino läuft...</div>
+    <section class="log" id="log" aria-live="polite"></section>
+  </main>
+  <script>
+    const daySelect = document.getElementById('day');
+    const logElement = document.getElementById('log');
+    const summaryElement = document.getElementById('summary');
+    const firmwareStatusElement = document.getElementById('firmwareStatus');
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, function(character) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character];
+      });
+    }
+
+    function rowClass(type) {
+      const normalized = String(type || 'RAW').toLowerCase();
+      return ['hit', 'tel', 'hb', 'diag', 'invalid'].includes(normalized) ? normalized : 'raw';
+    }
+
+    function formatTime(value) {
+      if (!value) return '--:--:--';
+      return new Date(value).toLocaleTimeString('de-DE');
+    }
+
+    function renderLog(data) {
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      summaryElement.textContent = data.day + ' · ' + entries.length + ' Zeilen';
+      if (!entries.length) {
+        logElement.innerHTML = '<div class="empty">Für diesen Tag sind keine Arduino-Zeilen gespeichert.</div>';
+        return;
+      }
+      logElement.innerHTML = entries.map(function(entry) {
+        const type = String(entry.type || 'RAW').toUpperCase();
+        const kind = rowClass(type);
+        const arduinoTime = entry.arduinoMs === null || entry.arduinoMs === undefined ? '-' : entry.arduinoMs + ' ms';
+        return '<div class="log-row row-' + kind + '">' +
+          '<span class="time">' + escapeHtml(formatTime(entry.receivedAt)) + '</span>' +
+          '<span class="type type-' + kind + '">' + escapeHtml(type) + '</span>' +
+          '<span class="arduino-time">' + escapeHtml(arduinoTime) + '</span>' +
+          '<span class="message">' + escapeHtml(entry.line) + '</span>' +
+          '</div>';
+      }).join('');
+    }
+
+    async function loadLog() {
+      const day = daySelect.value;
+      summaryElement.textContent = 'Lade Log...';
+      const endpoint = '/api/arduino/diagnostic-log' + (day ? '?day=' + encodeURIComponent(day) : '');
+      try {
+        const response = await fetch(endpoint, { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        renderLog(await response.json());
+      } catch (error) {
+        summaryElement.textContent = 'Fehler beim Laden';
+        logElement.innerHTML = '<div class="empty">Diagnoselog konnte nicht geladen werden: ' + escapeHtml(error.message) + '</div>';
+      }
+    }
+
+    async function checkFirmware() {
+      try {
+        const response = await fetch('/api/arduino/state', { cache: 'no-store' });
+        const state = await response.json();
+        const firmware = state.latest && state.latest.firmware;
+        if (firmware && firmware.diagSketch) {
+          firmwareStatusElement.className = 'firmware-status ok';
+          firmwareStatusElement.textContent = '✓ DIAG-Sketch erkannt: ' + firmware.name;
+        } else if (firmware) {
+          firmwareStatusElement.className = 'firmware-status bad';
+          firmwareStatusElement.textContent = '✗ DIAG-Sketch nicht erkannt. Gefunden: ' + firmware.name;
+        } else {
+          firmwareStatusElement.className = 'firmware-status warn';
+          firmwareStatusElement.textContent = '⌛ Firmware noch nicht erkannt. Arduino resetten oder neu verbinden.';
+        }
+      } catch (error) {
+        firmwareStatusElement.className = 'firmware-status bad';
+        firmwareStatusElement.textContent = '✗ Arduino-Status konnte nicht geprüft werden.';
+      }
+    }
+
+    async function loadDays() {
+      try {
+        const response = await fetch('/api/arduino/diagnostic-log/days', { cache: 'no-store' });
+        const data = await response.json();
+        const days = Array.isArray(data.days) ? data.days : [];
+        daySelect.innerHTML = days.map(function(day) { return '<option value="' + escapeHtml(day) + '">' + escapeHtml(day) + '</option>'; }).join('');
+      } catch (error) {
+        daySelect.innerHTML = '';
+      }
+      await loadLog();
+    }
+
+    daySelect.addEventListener('change', loadLog);
+    document.getElementById('reload').addEventListener('click', loadDays);
+    checkFirmware();
+    loadDays();
+  </script>
+</body>
+</html>
