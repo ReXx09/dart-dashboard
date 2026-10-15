@@ -4915,6 +4915,21 @@ app.get('/api/players/:id/segment-analysis', async (req, res) => {
   }
 });
 
+app.get('/api/players/:id/performance-trend', async (req, res) => {
+  try {
+    const playerId = Number(req.params.id);
+    const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
+    const mode = String(req.query.mode || '').trim();
+    const month = String(req.query.month || 'all').trim();
+    if (!Number.isInteger(playerId) || playerId < 1) return res.status(400).json({ error: 'Invalid player ID' });
+    if (!/^\d{4}$/.test(season)) return res.status(400).json({ error: 'Invalid season' });
+    if (month !== 'all' && !/^(?:[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ error: 'Invalid month' });
+    res.json(await dataStore.getPerformanceTrend(playerId, season, mode, month));
+  } catch (err) {
+    res.status(500).json({ error: 'Performance-Verlauf konnte nicht geladen werden: ' + err.message });
+  }
+});
+
 app.get('/api/duels/:id/segment-analysis', async (req, res) => {
   try {
     const duelId = Number(req.params.id);

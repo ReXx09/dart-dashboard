@@ -474,6 +474,16 @@
         <div class="stats-grid" id="distributionStats"></div>
       </div>
       <div class="section">
+        <h2 class="section-title">Performance-Verlauf</h2>
+        <p class="stat-sub">Aufnahmen pro Monat. Die Auswahl oben filtert Saison, Monat und Spielmodus.</p>
+        <div style="overflow-x:auto;margin-top:12px">
+          <table class="segment-table" id="performanceTrendTable">
+            <thead><tr><th>Monat</th><th>Aufnahmen</th><th>3-Dart-Ø</th><th>80+</th><th>100+</th><th>120+</th><th>140+</th><th>160+</th><th>180</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="section">
         <h2 class="section-title">Segmentanalyse</h2>
         <div class="segment-controls">
           <div class="segment-toolbar">
@@ -846,17 +856,19 @@
         if (assignedPlayer) {
           currentPlayerId = Number(assignedPlayer.slot);
           try {
-            const [statsRes, historyRes, segmentRes, highscoresRes] = await Promise.all([
+            const [statsRes, historyRes, segmentRes, highscoresRes, trendRes] = await Promise.all([
               fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' }),
               fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=10&season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' }),
               fetch(`${API_BASE}/players/${currentPlayerId}/segment-analysis?mode=${encodeURIComponent(currentStatsMode)}&season=${encodeURIComponent(currentSeason)}&profileId=${currentProfileId}`, { cache: 'no-store' }),
-              fetch('/api/highscores', { cache: 'no-store' })
+              fetch('/api/highscores', { cache: 'no-store' }),
+              fetch(`${API_BASE}/players/${currentPlayerId}/performance-trend?season=${encodeURIComponent(currentSeason)}&mode=${encodeURIComponent(currentStatsMode)}&month=${encodeURIComponent(currentMonth)}`, { cache: 'no-store' })
             ]);
             const stats = await statsRes.json();
             const history = await historyRes.json();
             currentStats = stats;
             segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
             const highscores = highscoresRes.ok ? await highscoresRes.json() : [];
+            const trend = trendRes.ok ? await trendRes.json() : [];
             const maxHighscore = highscores
               .filter(entry => Number(entry.profileId || 0) === currentProfileId || Number(entry.playerSlot || 0) === currentPlayerId)
               .filter(entry => entry.kind !== 'checkout' && entry.kind !== 'cricket' && entry.kind !== 'elimination')
@@ -866,6 +878,7 @@
             renderOverview(stats);
             renderAvg(stats);
             renderScoring(stats);
+            renderPerformanceTrend(trend);
             renderSegmentAnalysis();
             renderCheckout(stats);
             renderHistory(history);
@@ -890,11 +903,12 @@
         return;
       }
       try {
-        const [statsRes, historyRes, segmentRes, highscoresRes] = await Promise.all([
+        const [statsRes, historyRes, segmentRes, highscoresRes, trendRes] = await Promise.all([
           fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${currentSeason}`, { cache: 'no-store' }),
           fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=10&season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' }),
           fetch(`${API_BASE}/players/${currentPlayerId}/segment-analysis?mode=${encodeURIComponent(currentStatsMode)}&season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' }),
-          fetch('/api/highscores', { cache: 'no-store' })
+          fetch('/api/highscores', { cache: 'no-store' }),
+          fetch(`${API_BASE}/players/${currentPlayerId}/performance-trend?season=${encodeURIComponent(currentSeason)}&mode=${encodeURIComponent(currentStatsMode)}&month=${encodeURIComponent(currentMonth)}`, { cache: 'no-store' })
         ]);
         const stats = await statsRes.json();
         const history = await historyRes.json();
@@ -902,6 +916,7 @@
         segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
         if (segmentComparison) await loadSegmentComparison();
         const highscores = highscoresRes.ok ? await highscoresRes.json() : [];
+        const trend = trendRes.ok ? await trendRes.json() : [];
         const selectedPlayerLabel = (playerSelect.options[playerSelect.selectedIndex] || {}).textContent || '';
         const playerName = selectedPlayerLabel.split(' · ').pop().trim();
         const maxHighscore = highscores
@@ -912,6 +927,7 @@
         renderOverview(stats);
         renderAvg(stats);
         renderScoring(stats);
+        renderPerformanceTrend(trend);
         renderSegmentAnalysis();
         renderCheckout(stats);
         renderHistory(history);
@@ -1324,6 +1340,25 @@
       ].join('');
     }
 
+    function renderPerformanceTrend(rows) {
+      const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+      const tbody = document.querySelector('#performanceTrendTable tbody');
+      const values = Array.isArray(rows) ? rows.filter(row => Number(row.turns || 0) > 0) : [];
+      tbody.innerHTML = values.length ? values.map(row => `
+        <tr>
+          <td>${monthNames[Number(row.month) - 1] || row.month}</td>
+          <td>${Number(row.turns || 0)}</td>
+          <td class="avg">${Number(row.average || 0).toFixed(2)}</td>
+          <td>${Number(row.plus80 || 0)}</td>
+          <td>${Number(row.plus100 || 0)}</td>
+          <td>${Number(row.plus120 || 0)}</td>
+          <td>${Number(row.plus140 || 0)}</td>
+          <td>${Number(row.plus160 || 0)}</td>
+          <td class="checkout">${Number(row.one80 || 0)}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="9" class="muted">Keine Aufnahmen für diese Filter vorhanden.</td></tr>';
+    }
+
     function renderCheckout(stats) {
       const s = stats || {};
       const rules = [['single', 'Single-Out'], ['double', 'Double-Out'], ['master', 'Master-Out']];
@@ -1499,6 +1534,7 @@
 
     monthSelect.addEventListener('change', () => {
       currentMonth = monthSelect.value;
+      loadStats();
       loadEncounters();
       loadEncounterStats();
     });

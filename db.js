@@ -1749,6 +1749,47 @@ class DataStore {
     return { playerSlot: slot, mode: String(mode || ''), duelId: encounterId, duelLegId: legId, totalThrows: rows.length, segments, categories: Object.values(categories) };
   }
 
+  async getPerformanceTrend(playerSlot, season = DEFAULT_STATS_SEASON, mode = '', month = 'all') {
+    const slot = Number(playerSlot);
+    const selectedMode = String(mode || '');
+    const selectedMonth = String(month || 'all');
+    const query = 'SELECT thrown_at, duel_id, turn_id, points, bust, mode FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) ORDER BY thrown_at ASC';
+    let rows;
+    if (this.isSQLite()) rows = await this.sqlite.all(query, [slot, season, selectedMode, selectedMode]);
+    else if (this.isPostgres()) rows = (await this.pg.query(
+      'SELECT thrown_at, duel_id, turn_id, points, bust, mode FROM player_throw_segments WHERE player_slot = $1 AND season = $2 AND ($3 = \'\' OR mode = $3) ORDER BY thrown_at ASC',
+      [slot, season, selectedMode]
+    )).rows;
+    else rows = (await this.my.query(query, [slot, season, selectedMode, selectedMode]))[0];
+
+    const months = Array.from({ length: 12 }, (_value, index) => ({
+      month: index + 1, turns: 0, points: 0, average: 0, plus80: 0, plus100: 0, plus120: 0, plus140: 0, plus160: 0, one80: 0
+    }));
+    const turns = new Map();
+    for (const row of rows) {
+      const timestamp = Number(row.thrown_at);
+      const date = new Date(timestamp);
+      const rowMonth = date.getMonth() + 1;
+      if (!Number.isFinite(timestamp) || (selectedMonth !== 'all' && String(rowMonth) !== selectedMonth)) continue;
+      const key = `${row.duel_id || 'solo'}:${row.turn_id || timestamp}`;
+      const turn = turns.get(key) || { month: rowMonth, points: 0 };
+      if (!row.bust) turn.points += Number(row.points || 0);
+      turns.set(key, turn);
+    }
+    for (const turn of turns.values()) {
+      const item = months[turn.month - 1];
+      item.turns += 1;
+      item.points += turn.points;
+      if (turn.points >= 80) item.plus80 += 1;
+      if (turn.points >= 100) item.plus100 += 1;
+      if (turn.points >= 120) item.plus120 += 1;
+      if (turn.points >= 140) item.plus140 += 1;
+      if (turn.points >= 160) item.plus160 += 1;
+      if (turn.points === 180) item.one80 += 1;
+    }
+    return months.map(item => ({ ...item, average: item.turns ? Number((item.points / item.turns).toFixed(2)) : 0 }));
+  }
+
   async finishDuel(id, winnerSlot = null, endedAt = Date.now()) {
     const values = [endedAt, winnerSlot, endedAt, Number(id)];
     if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET status = \'finished\', ended_at = ?, winner_slot = ?, updated_at = ? WHERE id = ?', values);
