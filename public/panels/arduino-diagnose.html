@@ -22,6 +22,9 @@
     button { cursor: pointer; }
     button:hover { border-color: #2a9d8f; }
     .summary { margin-left: auto; color: #777; font-size: .78rem; }
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 0 0; }
+    .pagination button:disabled { cursor: default; opacity: .35; }
+    .page-info { color: #777; font-size: .78rem; min-width: 90px; text-align: center; }
     .log { margin-top: 14px; border: 1px solid #252525; border-radius: 10px; overflow: hidden; background: #0f0f0f; }
     .log-row { display: grid; grid-template-columns: 92px 62px 112px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid #1d1d1d; font-family: Consolas, "Courier New", monospace; font-size: .76rem; }
     .log-row:last-child { border-bottom: 0; }
@@ -56,17 +59,44 @@
     <div class="toolbar">
       <label for="day">Logtag</label>
       <select id="day" aria-label="Logtag auswählen"></select>
+      <label for="type">Typ</label>
+      <select id="type" aria-label="Logtyp filtern">
+        <option value="ALL">Alle</option>
+        <option value="HIT">HIT</option>
+        <option value="TEL">TEL</option>
+        <option value="HB">HB</option>
+        <option value="RAW">RAW</option>
+        <option value="DIAG">DIAG</option>
+      </select>
+      <label for="order">Sortierung</label>
+      <select id="order" aria-label="Log sortieren">
+        <option value="newest">Neueste zuerst</option>
+        <option value="oldest">Älteste zuerst</option>
+      </select>
       <button id="reload" type="button">Aktualisieren</button>
       <span class="summary" id="summary">Lade Log...</span>
     </div>
     <div class="firmware-status" id="firmwareStatus">Prüfe, welcher Sketch auf dem Arduino läuft...</div>
     <section class="log" id="log" aria-live="polite"></section>
+    <div class="pagination">
+      <button id="newer" type="button">← Neuere</button>
+      <span class="page-info" id="pageInfo">Seite 1/1</span>
+      <button id="older" type="button">Ältere →</button>
+    </div>
   </main>
   <script>
     const daySelect = document.getElementById('day');
+    const typeSelect = document.getElementById('type');
+    const orderSelect = document.getElementById('order');
     const logElement = document.getElementById('log');
     const summaryElement = document.getElementById('summary');
     const firmwareStatusElement = document.getElementById('firmwareStatus');
+    const pageInfoElement = document.getElementById('pageInfo');
+    const newerButton = document.getElementById('newer');
+    const olderButton = document.getElementById('older');
+    const pageSize = 150;
+    let allEntries = [];
+    let currentPage = 0;
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, function(character) {
@@ -84,14 +114,36 @@
       return new Date(value).toLocaleTimeString('de-DE');
     }
 
+    function entryTimestamp(entry) {
+      return Number(entry.receivedAtMs) || Date.parse(entry.receivedAt) || 0;
+    }
+
     function renderLog(data) {
-      const entries = Array.isArray(data.entries) ? data.entries : [];
-      summaryElement.textContent = data.day + ' · ' + entries.length + ' Zeilen';
-      if (!entries.length) {
+      allEntries = Array.isArray(data.entries) ? data.entries : [];
+      currentPage = 0;
+      renderPage(data.day);
+    }
+
+    function renderPage(day) {
+      const selectedType = typeSelect.value;
+      const entries = allEntries
+        .filter(function(entry) { return selectedType === 'ALL' || String(entry.type || 'RAW').toUpperCase() === selectedType; })
+        .sort(function(left, right) {
+          const difference = entryTimestamp(left) - entryTimestamp(right);
+          return orderSelect.value === 'newest' ? -difference : difference;
+        });
+      const pageCount = Math.max(1, Math.ceil(entries.length / pageSize));
+      currentPage = Math.min(currentPage, pageCount - 1);
+      const visibleEntries = entries.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+      summaryElement.textContent = day + ' · ' + entries.length + ' von ' + allEntries.length + ' Zeilen';
+      pageInfoElement.textContent = 'Seite ' + (currentPage + 1) + '/' + pageCount;
+      newerButton.disabled = currentPage === 0;
+      olderButton.disabled = currentPage >= pageCount - 1;
+      if (!visibleEntries.length) {
         logElement.innerHTML = '<div class="empty">Für diesen Tag sind keine Arduino-Zeilen gespeichert.</div>';
         return;
       }
-      logElement.innerHTML = entries.map(function(entry) {
+      logElement.innerHTML = visibleEntries.map(function(entry) {
         const type = String(entry.type || 'RAW').toUpperCase();
         const kind = rowClass(type);
         const arduinoTime = entry.arduinoMs === null || entry.arduinoMs === undefined ? '-' : entry.arduinoMs + ' ms';
@@ -152,6 +204,10 @@
     }
 
     daySelect.addEventListener('change', loadLog);
+    typeSelect.addEventListener('change', function() { currentPage = 0; renderPage(daySelect.value); });
+    orderSelect.addEventListener('change', function() { currentPage = 0; renderPage(daySelect.value); });
+    newerButton.addEventListener('click', function() { if (currentPage > 0) { currentPage--; renderPage(daySelect.value); } });
+    olderButton.addEventListener('click', function() { currentPage++; renderPage(daySelect.value); });
     document.getElementById('reload').addEventListener('click', loadDays);
     checkFirmware();
     loadDays();

@@ -330,17 +330,20 @@ class DataStore {
       ? [
         'ALTER TABLE highscores ADD COLUMN event_key TEXT',
         'ALTER TABLE leg_history ADD COLUMN duel_id INTEGER',
+        "ALTER TABLE leg_history ADD COLUMN mode TEXT NOT NULL DEFAULT 'x01'",
         'ALTER TABLE player_throw_segments ADD COLUMN duel_leg_id INTEGER'
       ]
       : this.isPostgres()
         ? [
           'ALTER TABLE highscores ADD COLUMN IF NOT EXISTS event_key TEXT',
           'ALTER TABLE leg_history ADD COLUMN IF NOT EXISTS duel_id BIGINT',
+          "ALTER TABLE leg_history ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'x01'",
           'ALTER TABLE player_throw_segments ADD COLUMN IF NOT EXISTS duel_leg_id BIGINT'
         ]
         : [
           'ALTER TABLE highscores ADD COLUMN event_key VARCHAR(255) NULL',
           'ALTER TABLE leg_history ADD COLUMN duel_id BIGINT NULL',
+          "ALTER TABLE leg_history ADD COLUMN mode VARCHAR(32) NOT NULL DEFAULT 'x01'",
           'ALTER TABLE player_throw_segments ADD COLUMN duel_leg_id BIGINT NULL'
         ];
     for (const query of queries) {
@@ -1029,6 +1032,7 @@ class DataStore {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL,
         season TEXT NOT NULL DEFAULT '2026',
+        mode TEXT NOT NULL DEFAULT 'x01',
         leg_avg REAL DEFAULT 0,
         checkout INTEGER DEFAULT 0,
         won INTEGER DEFAULT 0,
@@ -1117,6 +1121,7 @@ class DataStore {
         id BIGSERIAL PRIMARY KEY,
         player_id INTEGER NOT NULL,
         season TEXT NOT NULL DEFAULT '2026',
+        mode TEXT NOT NULL DEFAULT 'x01',
         leg_avg NUMERIC DEFAULT 0,
         checkout INTEGER DEFAULT 0,
         won BOOLEAN DEFAULT FALSE,
@@ -1215,6 +1220,7 @@ class DataStore {
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
         player_id INT NOT NULL,
         season VARCHAR(32) NOT NULL DEFAULT '2026',
+        mode VARCHAR(32) NOT NULL DEFAULT 'x01',
         leg_avg DECIMAL(6,2) DEFAULT 0,
         checkout INT DEFAULT 0,
         won TINYINT(1) DEFAULT 0,
@@ -2517,13 +2523,13 @@ class DataStore {
     return Number((await this.my.query(sql, [slot]))[0]?.[0]?.count || 0);
   }
 
-  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn, season = seasonFromTimestamp(), duelId = null) {
+  async recordLegHistory(playerId, legAvg, checkout, won, dartsThrawn, season = seasonFromTimestamp(), duelId = null, mode = 'x01') {
     const ts = Date.now();
 
     if (this.isSQLite()) {
       await this.sqlite.run(
-        `INSERT INTO leg_history (player_id, season, duel_id, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
+        `INSERT INTO leg_history (player_id, season, duel_id, mode, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, mode || 'x01', legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
       );
       // Keep rolling 50 legs
       await this.sqlite.run(
@@ -2537,8 +2543,8 @@ class DataStore {
 
     if (this.isPostgres()) {
       await this.pg.query(
-        `INSERT INTO leg_history (player_id, season, duel_id, leg_avg, checkout, won, darts_thrown, ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, legAvg, checkout, won, dartsThrawn, ts]
+        `INSERT INTO leg_history (player_id, season, duel_id, mode, leg_avg, checkout, won, darts_thrown, ts) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, mode || 'x01', legAvg, checkout, won, dartsThrawn, ts]
       );
       // Keep rolling 50 legs
       await this.pg.query(
@@ -2551,8 +2557,8 @@ class DataStore {
     }
 
     await this.my.query(
-      `INSERT INTO leg_history (player_id, season, duel_id, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
+      `INSERT INTO leg_history (player_id, season, duel_id, mode, leg_avg, checkout, won, darts_thrown, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [playerId, season, Number(duelId) > 0 ? Number(duelId) : null, mode || 'x01', legAvg, checkout, won ? 1 : 0, dartsThrawn, ts]
     );
     // Keep rolling 50 legs
     await this.my.query(

@@ -522,6 +522,7 @@
             <thead>
               <tr>
                 <th>Datum</th>
+                <th>Modus</th>
                 <th>Leg Avg</th>
                 <th>Checkout</th>
                 <th>Darts</th>
@@ -1454,6 +1455,10 @@
       return ({ all: 'Alle', single: 'Singles', double: 'Doubles', triple: 'Triples', bull: 'Bulls' })[type] || 'Alle';
     }
 
+    function gameModeLabel(mode) {
+      return ({ x01: 'X01', cricket: 'Cricket', elimination: 'Elimination' })[String(mode || '').toLowerCase()] || 'Unbekannt';
+    }
+
     function renderHistory(history) {
       const tbody = document.querySelector('#historyTable tbody');
       const emptyState = document.getElementById('emptyHistory');
@@ -1466,6 +1471,7 @@
       tbody.innerHTML = history.map(h => `
         <tr>
           <td>${new Date(h.ts).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'2-digit'})} ${new Date(h.ts).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'})}</td>
+          <td>${gameModeLabel(h.mode)}</td>
           <td class="avg">${Number(h.leg_avg || 0).toFixed(2)}</td>
           <td class="checkout">${Number(h.checkout || 0) > 0 ? Number(h.checkout) : '—'}</td>
           <td class="darts">${Number(h.darts_thrown || 0)}</td>

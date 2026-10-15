@@ -909,7 +909,10 @@ let matrixStickySignalBlockedKey = '';
 let lastAppliedThrowAt = 0;
 const arduinoRawEventHistory = [];
 const ARDUINO_DIAGNOSTIC_LOG_DIR = path.join(DATA_DIR, 'arduino-logs');
+const ARDUINO_LOG_RETENTION_DAYS = Math.max(1, Number(process.env.ARDUINO_LOG_RETENTION_DAYS || 14));
+const ARDUINO_LOG_MAX_BYTES = Math.max(1024 * 1024, Number(process.env.ARDUINO_LOG_MAX_BYTES || 25 * 1024 * 1024));
 let arduinoDiagnosticLogQueue = Promise.resolve();
+let arduinoDiagnosticMaintenanceDay = '';
 const matrixSniffer = {
   activeRows: {},
   activeColumns: {},
@@ -1293,8 +1296,38 @@ function rememberArduinoLine(line) {
     .then(async () => {
       await fs.promises.mkdir(ARDUINO_DIAGNOSTIC_LOG_DIR, { recursive: true });
       await fs.promises.appendFile(logFile, record, 'utf8');
+      await trimArduinoDiagnosticLog(logFile);
+      if (arduinoDiagnosticMaintenanceDay !== day) {
+        await pruneArduinoDiagnosticLogs(day);
+        arduinoDiagnosticMaintenanceDay = day;
+      }
     })
     .catch((error) => console.error('[Arduino-Log] Schreiben fehlgeschlagen:', error.message));
+}
+
+async function trimArduinoDiagnosticLog(logFile) {
+  const stats = await fs.promises.stat(logFile);
+  if (stats.size <= ARDUINO_LOG_MAX_BYTES) return;
+  const lines = (await fs.promises.readFile(logFile, 'utf8')).split('\n').filter(Boolean);
+  let totalBytes = lines.reduce((total, line) => total + Buffer.byteLength(line, 'utf8') + 1, 0);
+  while (lines.length > 1 && totalBytes > ARDUINO_LOG_MAX_BYTES) {
+    totalBytes -= Buffer.byteLength(lines.shift(), 'utf8') + 1;
+  }
+  await fs.promises.writeFile(logFile, lines.join('\n') + '\n', 'utf8');
+}
+
+async function pruneArduinoDiagnosticLogs(currentDay) {
+  const currentDate = new Date(`${currentDay}T00:00:00`);
+  const entries = await fs.promises.readdir(ARDUINO_DIAGNOSTIC_LOG_DIR);
+  await Promise.all(entries.map(async (entry) => {
+    const match = entry.match(/^arduino-(\d{4}-\d{2}-\d{2})\.jsonl$/i);
+    if (!match) return;
+    const logDate = new Date(`${match[1]}T00:00:00`);
+    const ageDays = Math.floor((currentDate - logDate) / 86400000);
+    if (Number.isFinite(ageDays) && ageDays >= ARDUINO_LOG_RETENTION_DAYS) {
+      await fs.promises.unlink(path.join(ARDUINO_DIAGNOSTIC_LOG_DIR, entry));
+    }
+  }));
 }
 
 function formatChannel(channel) {
@@ -1526,7 +1559,7 @@ async function recordPlayerLegStats(player, state, options = {}) {
     
     // Record leg in history
     const won = player.remaining === 0 ? 1 : 0;
-    await dataStore.recordLegHistory(player.slot, legAvg, checkout, won, dartsThrawn, statsSeason, state.game?.duelId || null);
+    await dataStore.recordLegHistory(player.slot, legAvg, checkout, won, dartsThrawn, statsSeason, state.game?.duelId || null, mode);
 
     // Update player stats
     const currentStats = await dataStore.getPlayerStats(player.slot, statsSeason) || {};
@@ -1755,7 +1788,7 @@ async function recordCompletedDuelPlayerStats(duel) {
     await dataStore.updatePlayerStats(row.playerId, updates, duelSeason);
     for (const leg of duel.legs || []) {
       const legPlayer = (leg.players || []).find(player => Number(player.player_slot) === row.playerId);
-      if (legPlayer) await dataStore.recordLegHistory(row.playerId, Number(legPlayer.average || 0), Number(legPlayer.checkout_highest || 0), Number(legPlayer.won || 0), Number(legPlayer.darts || 0), duelSeason, duel.id);
+      if (legPlayer) await dataStore.recordLegHistory(row.playerId, Number(legPlayer.average || 0), Number(legPlayer.checkout_highest || 0), Number(legPlayer.won || 0), Number(legPlayer.darts || 0), duelSeason, duel.id, duel.mode || 'x01');
     }
   }
 }
