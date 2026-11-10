@@ -2732,7 +2732,19 @@ function parseArduinoLine(line) {
       if (!key || value == null || !/^[-+]?\d+(?:\.\d+)?$/.test(value)) return;
       values[key.trim()] = Number(value);
     });
-    normalizeArduinoStatePatch({ lastTelemetry: values });
+    const hasDiagnosticCounters = ['diagSnapshots', 'stateChanges', 'unique', 'rowOnly', 'colOnly', 'ambiguous']
+      .some(key => Object.prototype.hasOwnProperty.call(values, key));
+    normalizeArduinoStatePatch({
+      lastTelemetry: values,
+      ...(hasDiagnosticCounters && !arduinoState.firmware ? {
+        firmware: {
+          name: 'HB8 SNIFFER DIAG (TEL erkannt)',
+          diagSketch: true,
+          detectedAt: Date.now(),
+          line: clean
+        }
+      } : {})
+    });
     return;
   }
 
