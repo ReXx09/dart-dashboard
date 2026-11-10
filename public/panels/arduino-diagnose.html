@@ -23,6 +23,15 @@
     button:hover { border-color: #2a9d8f; }
     #resetLogs { border-color: #5a2929; color: #e88; }
     #resetLogs:hover { border-color: #e63946; color: #fff; background: #2a1111; }
+    .pin-dialog { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; padding: 18px; background: rgba(0,0,0,.78); }
+    .pin-dialog.is-open { display: grid; }
+    .pin-card { width: min(360px, 100%); background: #141414; border: 1px solid #333; border-top: 3px solid #e63946; border-radius: 10px; padding: 18px; }
+    .pin-card h2 { margin: 0 0 8px; font-size: 1rem; }
+    .pin-card p { margin: 0 0 14px; color: #888; font-size: .78rem; }
+    .pin-card label { display: block; margin-bottom: 5px; }
+    .pin-card input { width: 100%; }
+    .pin-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+    .pin-error { min-height: 18px; margin-top: 8px; color: #e63946; font-size: .72rem; }
     .summary { margin-left: auto; color: #777; font-size: .78rem; }
     .pagination { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 0 0; }
     .pagination button:disabled { cursor: default; opacity: .35; }
@@ -87,6 +96,19 @@
       <button id="older" type="button">Ältere →</button>
     </div>
   </main>
+  <div class="pin-dialog" id="pinDialog" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
+    <form class="pin-card" id="pinForm">
+      <h2 id="pinTitle">Admin-PIN erforderlich</h2>
+      <p>Für das Zurücksetzen der Arduino-Diagnoselogs ist eine Admin-Anmeldung erforderlich.</p>
+      <label for="adminPin">Admin-PIN</label>
+      <input id="adminPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" required />
+      <div class="pin-error" id="pinError"></div>
+      <div class="pin-actions">
+        <button id="cancelPin" type="button">Abbrechen</button>
+        <button type="submit">Anmelden</button>
+      </div>
+    </form>
+  </div>
   <script>
     const daySelect = document.getElementById('day');
     const typeSelect = document.getElementById('type');
@@ -97,9 +119,33 @@
     const pageInfoElement = document.getElementById('pageInfo');
     const newerButton = document.getElementById('newer');
     const olderButton = document.getElementById('older');
+    const pinDialog = document.getElementById('pinDialog');
+    const pinForm = document.getElementById('pinForm');
+    const adminPin = document.getElementById('adminPin');
+    const pinError = document.getElementById('pinError');
     const pageSize = 150;
     let allEntries = [];
     let currentPage = 0;
+    let resetAfterLogin = false;
+
+    function openPinDialog() {
+      pinError.textContent = '';
+      adminPin.value = '';
+      pinDialog.classList.add('is-open');
+      setTimeout(function() { adminPin.focus(); }, 0);
+    }
+
+    function closePinDialog() {
+      pinDialog.classList.remove('is-open');
+    }
+
+    async function loginAdmin(pin) {
+      const response = await fetch('/api/admin/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin })
+      });
+      const result = await response.json().catch(function() { return {}; });
+      if (!response.ok) throw new Error(result.error || 'Anmeldung fehlgeschlagen.');
+    }
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, function(character) {
@@ -217,10 +263,29 @@
       try {
         const response = await fetch('/api/arduino/diagnostic-log/reset', { method: 'POST' });
         const result = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+          resetAfterLogin = true;
+          openPinDialog();
+          return;
+        }
         if (!response.ok) throw new Error(result.error || 'Zurücksetzen nicht erlaubt.');
         await loadDays();
       } catch (error) {
         summaryElement.textContent = error.message;
+      }
+    });
+    document.getElementById('cancelPin').addEventListener('click', closePinDialog);
+    pinForm.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      try {
+        await loginAdmin(adminPin.value);
+        closePinDialog();
+        if (resetAfterLogin) {
+          resetAfterLogin = false;
+          document.getElementById('resetLogs').click();
+        }
+      } catch (error) {
+        pinError.textContent = error.message;
       }
     });
     checkFirmware();

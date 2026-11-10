@@ -777,7 +777,10 @@
         const result = await response.json();
         message = result && result.error ? String(result.error) : '';
       } catch (_) {}
-      if (response.status === 401) return 'Bitte zuerst Admin-Anmeldung öffnen und anmelden.';
+      if (response.status === 401) {
+        window.location.href = '/admin.html';
+        return 'Admin-Anmeldung wird geöffnet.';
+      }
       return message || fallback;
     }
 
