@@ -909,8 +909,8 @@ let matrixStickySignalBlockedKey = '';
 let lastAppliedThrowAt = 0;
 const arduinoRawEventHistory = [];
 const ARDUINO_DIAGNOSTIC_LOG_DIR = path.join(DATA_DIR, 'arduino-logs');
-const ARDUINO_LOG_RETENTION_DAYS = Math.max(1, Number(process.env.ARDUINO_LOG_RETENTION_DAYS || 14));
-const ARDUINO_LOG_MAX_BYTES = Math.max(1024 * 1024, Number(process.env.ARDUINO_LOG_MAX_BYTES || 25 * 1024 * 1024));
+const ARDUINO_LOG_RETENTION_DAYS = Math.max(1, Number(process.env.ARDUINO_LOG_RETENTION_DAYS || 10));
+const ARDUINO_LOG_MAX_BYTES = Math.max(1024 * 1024, Number(process.env.ARDUINO_LOG_MAX_BYTES || 10 * 1024 * 1024));
 let arduinoDiagnosticLogQueue = Promise.resolve();
 let arduinoDiagnosticMaintenanceDay = '';
 const matrixSniffer = {
@@ -1328,6 +1328,23 @@ async function pruneArduinoDiagnosticLogs(currentDay) {
       await fs.promises.unlink(path.join(ARDUINO_DIAGNOSTIC_LOG_DIR, entry));
     }
   }));
+}
+
+async function clearArduinoDiagnosticLogs() {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(ARDUINO_DIAGNOSTIC_LOG_DIR);
+  } catch (error) {
+    if (error.code === 'ENOENT') return 0;
+    throw error;
+  }
+  let removed = 0;
+  for (const entry of entries) {
+    if (!/^arduino-\d{4}-\d{2}-\d{2}\.jsonl$/i.test(entry)) continue;
+    await fs.promises.unlink(path.join(ARDUINO_DIAGNOSTIC_LOG_DIR, entry));
+    removed += 1;
+  }
+  return removed;
 }
 
 function formatChannel(channel) {
@@ -3717,6 +3734,16 @@ app.get('/api/arduino/diagnostic-log/days', async (_req, res) => {
   }
 });
 
+app.post('/api/arduino/diagnostic-log/reset', requireAdmin, async (_req, res) => {
+  try {
+    const removed = await clearArduinoDiagnosticLogs();
+    arduinoDiagnosticMaintenanceDay = '';
+    res.json({ ok: true, removed });
+  } catch (error) {
+    res.status(500).json({ error: 'Arduino-Diagnoselog konnte nicht zurückgesetzt werden.' });
+  }
+});
+
 // ── Live-State ──
 app.get('/api/live/state', async (_req, res) => {
   try {
@@ -5087,6 +5114,12 @@ async function startServer() {
     liveStateFile: LIVE_STATE_FILE,
     highscoresFile: HIGHSCORES_FILE
   });
+  try {
+    await pruneArduinoDiagnosticLogs(getArduinoLogDay());
+    arduinoDiagnosticMaintenanceDay = getArduinoLogDay();
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.error('[Arduino-Log] Bereinigung fehlgeschlagen:', error.message);
+  }
 
   const storedSettings = readJson(SETTINGS_FILE, {});
   if (typeof storedSettings.adminAuthEnabled === 'boolean') adminAuthEnabled = storedSettings.adminAuthEnabled;

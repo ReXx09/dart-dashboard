@@ -21,6 +21,8 @@
     select, button { font: inherit; color: #eee; background: #191919; border: 1px solid #333; border-radius: 6px; padding: 7px 10px; }
     button { cursor: pointer; }
     button:hover { border-color: #2a9d8f; }
+    #resetLogs { border-color: #5a2929; color: #e88; }
+    #resetLogs:hover { border-color: #e63946; color: #fff; background: #2a1111; }
     .summary { margin-left: auto; color: #777; font-size: .78rem; }
     .pagination { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 0 0; }
     .pagination button:disabled { cursor: default; opacity: .35; }
@@ -74,6 +76,7 @@
         <option value="oldest">Älteste zuerst</option>
       </select>
       <button id="reload" type="button">Aktualisieren</button>
+      <button id="resetLogs" type="button">Logs zurücksetzen</button>
       <span class="summary" id="summary">Lade Log...</span>
     </div>
     <div class="firmware-status" id="firmwareStatus">Prüfe, welcher Sketch auf dem Arduino läuft...</div>
@@ -209,6 +212,17 @@
     newerButton.addEventListener('click', function() { if (currentPage > 0) { currentPage--; renderPage(daySelect.value); } });
     olderButton.addEventListener('click', function() { currentPage++; renderPage(daySelect.value); });
     document.getElementById('reload').addEventListener('click', loadDays);
+    document.getElementById('resetLogs').addEventListener('click', async function() {
+      if (!confirm('Alle Arduino-Diagnoselogs endgültig löschen?')) return;
+      try {
+        const response = await fetch('/api/arduino/diagnostic-log/reset', { method: 'POST' });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Zurücksetzen nicht erlaubt.');
+        await loadDays();
+      } catch (error) {
+        summaryElement.textContent = error.message;
+      }
+    });
     checkFirmware();
     loadDays();
   </script>
