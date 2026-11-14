@@ -520,10 +520,7 @@
       }
     }
     .fireworks-container { position: fixed; inset: 0; z-index: 10002; pointer-events: none; overflow: hidden; }
-    .fireworks-burst { position: absolute; width: var(--burst-size, 8px); height: var(--burst-size, 8px); border-radius: 50%; background: radial-gradient(circle, #fff 0 18%, currentColor 30% 58%, transparent 72%); box-shadow: 0 0 var(--core-glow, 14px) var(--core-spread, 5px) currentColor; animation: fireworks-burst var(--burst-duration, 1.5s) ease-out forwards; }
-    .fireworks-burst::before, .fireworks-burst::after { content: ''; position: absolute; border-radius: 50%; background: repeating-conic-gradient(from var(--burst-rotation, 0deg), currentColor 0deg var(--ray-width, 3deg), transparent var(--ray-width, 3deg) var(--ray-step, 18deg)); -webkit-mask: radial-gradient(circle, transparent 0 var(--core-hole, 6px), #000 var(--core-hole, 6px) var(--ray-mask, 10px), transparent var(--ray-mask, 10px)); mask: radial-gradient(circle, transparent 0 var(--core-hole, 6px), #000 var(--core-hole, 6px) var(--ray-mask, 10px), transparent var(--ray-mask, 10px)); filter: drop-shadow(0 0 var(--ray-glow, 5px) currentColor); }
-    .fireworks-burst::before { inset: calc(var(--burst-radius, 38px) * -1); opacity: .95; }
-    .fireworks-burst::after { inset: calc(var(--burst-radius, 38px) * -.68); opacity: .78; transform: rotate(9deg); background: repeating-conic-gradient(from var(--burst-rotation, 0deg), #fff 0deg var(--inner-ray-width, 2deg), transparent var(--inner-ray-width, 2deg) var(--inner-ray-step, 13deg)); }
+    .fireworks-burst { position: absolute; width: var(--burst-size, 8px); height: var(--burst-size, 8px); border-radius: 50%; background: radial-gradient(circle, #fff 0 18%, currentColor 32% 62%, transparent 78%); animation: fireworks-burst var(--burst-duration, 1.5s) ease-out forwards; }
     @keyframes fireworks-burst { 0% { transform: translateY(48vh) scale(.08); opacity: 0; } 24% { opacity: 1; } 48% { transform: translateY(0) scale(1.08); opacity: 1; } 100% { transform: translateY(0) scale(1.22); opacity: 0; } }
     @keyframes bounce {
       0%, 100% { transform: translateY(0); }
@@ -694,6 +691,9 @@
   <script>
     let liveState = null;
     let countdownTimer = null;
+    let countdownTimerKey = null;
+    let renderedFocusMarkup = null;
+    let renderedCompactPlayersMarkup = null;
     let isFirstLoad = true;
     let lastCricketAnimationKey = '';
     const playedEventSoundKeys = new Set();
@@ -930,15 +930,21 @@
     updateAudioButton();
 
     function startCountdown(state) {
-      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
       const action = state && state.lastAction;
       if (!action || !action.autoAdvancePending || !action.autoAdvanceDelayMs) {
+        if (countdownTimer) clearInterval(countdownTimer);
+        countdownTimer = null;
+        countdownTimerKey = null;
         const el = document.querySelector('.focus-switch-timer') || document.getElementById('countdownDisplay');
         if (el) { el.classList.remove('visible'); el.style.display = 'none'; el.textContent = ''; }
         return;
       }
-      const startedAt = action.autoAdvanceStartedAt || Date.now();
-      const delayMs = action.autoAdvanceDelayMs;
+      const startedAt = Number(action.autoAdvanceStartedAt) || Date.now();
+      const delayMs = Number(action.autoAdvanceDelayMs);
+      const timerKey = startedAt + ':' + delayMs;
+      if (countdownTimer && countdownTimerKey === timerKey) return;
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimerKey = timerKey;
       countdownTimer = setInterval(() => {
         const elapsed = Date.now() - startedAt;
         const remaining = Math.max(0, delayMs - elapsed);
@@ -946,6 +952,7 @@
         if (remaining <= 0) {
           if (el) { el.classList.remove('visible'); el.style.display = 'none'; el.textContent = ''; }
           if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+          countdownTimerKey = null;
           return;
         }
         if (el) {
@@ -1311,20 +1318,31 @@
 
       if (isCricket) {
         focusPlayer.classList.remove('single');
-        focusPlayer.innerHTML = renderCricketView(active, state) + renderFocusLegCard(active);
+        const markup = renderCricketView(active, state) + renderFocusLegCard(active);
+        if (markup !== renderedFocusMarkup) {
+          focusPlayer.innerHTML = markup;
+          renderedFocusMarkup = markup;
+        }
       } else {
         focusPlayer.classList.remove('single');
-        focusPlayer.innerHTML = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
+        const markup = renderFocusPlayer(active, activePlayer, state) + renderFocusLegCard(active);
+        if (markup !== renderedFocusMarkup) {
+          focusPlayer.innerHTML = markup;
+          renderedFocusMarkup = markup;
+        }
       }
 
+      let compactMarkup = '';
       if (hasOthers) {
         const compactOrder = [...state.players]
           .filter((_p, idx) => idx !== activePlayer)
           .sort((a, b) => (Number(a.legs || 0) - Number(b.legs || 0)) || (Number(a.remaining || 0) - Number(b.remaining || 0)) || (Number(a.slot || 0) - Number(b.slot || 0)));
-        compactPlayers.innerHTML = compactOrder
+        compactMarkup = compactOrder
           .map((p) => renderCompactPlayer(p, mode, state.players.length >= 5)).join('');
-      } else {
-        compactPlayers.innerHTML = '';
+      }
+      if (compactMarkup !== renderedCompactPlayersMarkup) {
+        compactPlayers.innerHTML = compactMarkup;
+        renderedCompactPlayersMarkup = compactMarkup;
       }
 
       // Winner overlay
@@ -1395,7 +1413,7 @@
       if (!container) return;
       container.innerHTML = '';
       const colors = ['#f4a261', '#e63946', '#2a9d8f', '#457b9d', '#9b5de5', '#f77f00'];
-      for (let i = 0; i < 80; i++) {
+      for (let i = 0; i < 32; i++) {
         const confetti = document.createElement('div');
         confetti.className = 'confetti';
         confetti.style.left = Math.random() * 100 + '%';
@@ -1410,32 +1428,18 @@
       const container = document.createElement('div');
       container.className = 'fireworks-container';
       const colors = ['#fff7c2', '#f4c542', '#e63946', '#2a9d8f', '#72b7ff', '#f4a261', '#ff8bd1'];
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 6; i++) {
         const burst = document.createElement('div');
         const color = colors[i % colors.length];
-        const size = 5 + Math.random() * 9;
-        const radius = 28 + Math.random() * 70;
-        const rayStep = 10 + Math.floor(Math.random() * 13) * 2;
+        const size = 6 + Math.random() * 6;
         burst.className = 'fireworks-burst';
         burst.style.left = (5 + Math.random() * 88) + '%';
         burst.style.top = (10 + Math.random() * 72) + 'vh';
         burst.style.color = color;
-        burst.style.background = color;
-        burst.style.boxShadow = '0 0 ' + Math.round(radius * .3) + 'px ' + Math.round(size * .8) + 'px ' + color;
         burst.style.setProperty('--burst-size', size + 'px');
-        burst.style.setProperty('--burst-radius', radius + 'px');
-        burst.style.setProperty('--ray-step', rayStep + 'deg');
-        burst.style.setProperty('--ray-width', Math.max(2, Math.round(rayStep / 6)) + 'deg');
-        burst.style.setProperty('--inner-ray-step', (rayStep * .72).toFixed(1) + 'deg');
-        burst.style.setProperty('--inner-ray-width', Math.max(1, Math.round(rayStep / 9)) + 'deg');
-        burst.style.setProperty('--core-hole', Math.max(4, Math.round(size * .7)) + 'px');
-        burst.style.setProperty('--ray-mask', Math.max(8, Math.round(size * 1.35)) + 'px');
-        burst.style.setProperty('--ray-glow', Math.round(4 + size * .55) + 'px');
-        burst.style.setProperty('--core-glow', Math.round(10 + size * 1.2) + 'px');
-        burst.style.setProperty('--core-spread', Math.round(3 + size * .45) + 'px');
-        burst.style.setProperty('--burst-rotation', Math.round(Math.random() * 30) + 'deg');
+        burst.style.boxShadow = '0 0 ' + Math.round(size * 2) + 'px ' + Math.round(size * .6) + 'px ' + color;
         burst.style.setProperty('--burst-duration', (1.25 + Math.random() * .8).toFixed(2) + 's');
-        burst.style.animationDelay = (i * .16 + Math.random() * .18).toFixed(2) + 's';
+        burst.style.animationDelay = (i * .12 + Math.random() * .12).toFixed(2) + 's';
         container.appendChild(burst);
       }
       document.body.appendChild(container);
@@ -1627,6 +1631,9 @@
         gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
         osc.connect(gain);
         gain.connect(ctx.destination);
+        osc.addEventListener('ended', () => {
+          ctx.close().catch(error => console.warn('[TV-Audio] AudioContext konnte nicht geschlossen werden:', error));
+        }, { once: true });
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.4);
       } catch {}
@@ -1645,6 +1652,9 @@
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.2);
         osc.connect(gain);
         gain.connect(ctx.destination);
+        osc.addEventListener('ended', () => {
+          ctx.close().catch(error => console.warn('[TV-Audio] AudioContext konnte nicht geschlossen werden:', error));
+        }, { once: true });
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 1.2);
       } catch {}
@@ -1672,10 +1682,12 @@
       } catch(e) {
         console.error('[Live-State] Laden fehlgeschlagen', e);
         if (retryAttempt < 3) {
+          renderedFocusMarkup = null;
           document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#f4a261">Verbinde mit Live-State … (' + (retryAttempt + 1) + '/3)</div>';
           setTimeout(() => loadAll(retryAttempt + 1), 1000);
           return;
         }
+        renderedFocusMarkup = null;
         document.getElementById('focusPlayer').innerHTML = '<div style="text-align:center;padding:40px;color:#e63946">⚠️ Live-State API nicht erreichbar<br><small>Bitte Verbindung oder Dashboard-Server prüfen.</small></div>';
       }
       loadDailyHighscore();
