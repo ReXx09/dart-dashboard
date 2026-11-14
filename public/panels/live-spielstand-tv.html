@@ -29,30 +29,45 @@
       align-items: center;
       gap: 10px;
     }
-    .topbar a { color: #888; text-decoration: none; font-size: .85rem; }
-    .topbar a:hover { color: #fff; }
-    .topbar-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: clamp(20px, 4vw, 56px); }
-    .topbar h2 { font-size: 1rem; font-weight: 700; text-align: center; min-width: 0; white-space: nowrap; }
-    .topbar-info { min-width: auto; font-size: 1.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
-    .topbar-mode, .topbar-checkout { text-align: center; }
+    .topbar a { color: #888; text-decoration: none; font-size: .85rem; background: #1a1a1a; border: 1px solid #444; border-radius: 8px; padding: 5px 10px; display: inline-flex; align-items: center; transition: all .15s; }
+    .topbar a:hover { color: #f4a261; border-color: #f4a261; background: #252525; }
+    .topbar-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: clamp(8px, 2.5vw, 32px); }
+    .topbar h2 { font-size: clamp(.78rem, 1.2vw, 1rem); font-weight: 700; text-align: center; min-width: 0; white-space: nowrap; }
+    .topbar-info { min-width: 0; max-width: 34%; overflow: hidden; text-overflow: ellipsis; padding: 2px 9px; border: 1px solid transparent; border-radius: 8px; font-size: clamp(.85rem, 1.8vw, 1.5rem); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; line-height: 1.05; white-space: nowrap; }
+    .topbar-mode { color: #f4c542; background: rgba(244,197,66,.1); border-color: rgba(244,197,66,.45); text-align: center; }
+    .topbar-checkout { color: #ff9aa0; background: rgba(230,57,70,.12); border-color: rgba(230,57,70,.5); text-align: center; }
     .topbar-separator { color: #d7e0e5; font-size: 1.55rem; font-weight: 400; line-height: .7; }
     .topbar .fs-btn, .topbar .audio-btn { background: #1a1a1a; border: 1px solid #444; color: #f1f1f1; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: .78rem; font-family: inherit; transition: all .15s; }
+    .topbar .fs-btn, .topbar .audio-btn { width: 34px; height: 30px; padding: 5px; display: inline-flex; align-items: center; justify-content: center; }
     .topbar .fs-btn:hover, .topbar .audio-btn:hover { background: #252525; border-color: #f4a261; color: #f4a261; }
     .topbar .audio-btn.active { border-color: #2a9d8f; color: #7ac29a; }
+    .topbar .audio-btn:not(.active) { border-color: #7a3035; color: #ff9aa0; }
     .daily-hs {
-      font-size: .72rem;
+      min-height: 28px;
+      width: clamp(180px, 18vw, 210px);
+      flex: 0 0 clamp(180px, 18vw, 210px);
+      font-size: .78rem;
       color: #f4a261;
       background: #1a1a1a;
       border: 1px solid #333;
       border-radius: 8px;
-      padding: 3px 10px;
+      padding: 5px 10px;
       white-space: nowrap;
-      display: flex;
+      display: grid;
+      grid-template-columns: 78px minmax(0, 1fr);
       align-items: center;
       gap: 6px;
+      border-color: var(--hs-color, #333);
+      box-shadow: inset 0 0 12px var(--hs-glow, transparent);
     }
-    .daily-hs .hs-label { color: #777; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; }
-    .daily-hs .hs-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .daily-hs .hs-label,
+    .daily-hs .hs-val {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .daily-hs .hs-label { color: var(--hs-color, #777); font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; text-align: left; }
+    .daily-hs .hs-val { color: var(--hs-color, #f4a261); font-weight: 800; font-variant-numeric: tabular-nums; text-align: left; }
     main {
       padding: 6px;
       max-width: none;
@@ -153,6 +168,10 @@
     .focus-checkout-label { justify-self: end; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #2a9d8f; font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; }
     .focus-player-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 2px; min-width: 0; }
     .focus-player-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 2rem; font-weight: 800; white-space: nowrap; }
+    .focus-match-details { min-width: 0; max-width: 100%; margin-left: auto; display: inline-flex; align-items: center; gap: 7px; overflow: hidden; padding: 4px 10px; color: #f4a261; background: linear-gradient(135deg, rgba(244,162,97,.14), rgba(42,157,143,.08)); border: 1px solid rgba(244,162,97,.4); border-radius: 999px; box-shadow: inset 0 0 14px rgba(244,162,97,.06); font-size: 1rem; font-weight: 900; letter-spacing: 1px; line-height: 1.1; text-align: center; text-transform: uppercase; white-space: nowrap; }
+    .focus-match-details > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .focus-match-details .match-format { color: #9de0d1; }
+    .focus-match-details .match-format::before { content: '·'; color: #77888a; margin-right: 7px; }
     .focus-switch-timer { display: inline-flex; visibility: hidden; justify-self: end; align-items: center; flex: 0 0 auto; color: #f4a261; background: rgba(244,162,97,.1); border: 1px solid rgba(244,162,97,.45); border-radius: 8px; padding: 6px 12px; font-size: .72rem; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
     .focus-switch-timer.visible { visibility: visible; }
     .focus-meta { color: #777; font-size: .68rem; margin-bottom: 4px; }
@@ -638,6 +657,8 @@
     }
 
     @media (min-width: 768px) and (max-width: 1366px) and (min-height: 768px) and (max-height: 1024px) {
+      .topbar-info { font-size: clamp(.85rem, 1.55vw, 1.15rem); letter-spacing: .7px; }
+      .topbar-center { gap: clamp(6px, 1.5vw, 18px); }
       .focus-player.single { grid-template-rows: minmax(0, 1fr); }
       .focus-card { min-height: 0; padding: 6px; }
       .focus-name { font-size: 1.5rem; }
@@ -657,13 +678,13 @@
     <div class="topbar-center">
       <span class="topbar-info topbar-mode" id="topbarModeInfo">501</span>
       <span class="topbar-separator" aria-hidden="true">·</span>
-      <h2>🎯 Live-Spielstand</h2>
+      <h2>Bockis🎯Dashboard</h2>
       <span class="topbar-separator" aria-hidden="true">·</span>
       <span class="topbar-info topbar-checkout" id="topbarCheckoutInfo">Double-Out</span>
     </div>
-    <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
-    <button class="audio-btn" id="audioUnlockBtn" onclick="toggleMobileAudio()" title="Ton einschalten">🔇 Ton aus</button>
+    <button class="audio-btn" id="audioUnlockBtn" onclick="toggleMobileAudio()" title="Ton einschalten" aria-label="Ton einschalten">🔇</button>
     <div class="daily-hs" id="dailyHsDisplay" title="Heutiger Höchstwert"><span class="hs-label">Heute</span><span class="hs-val">–</span></div>
+    <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Vollbild aktivieren">⛶</button>
   </div>
   <main>
     <section class="focus-player" id="focusPlayer"><div style="text-align:center;padding:40px;color:#555">Lade Spieler...</div></section>
@@ -861,8 +882,9 @@
     function updateAudioButton() {
       const button = document.getElementById('audioUnlockBtn');
       if (!button) return;
-      button.textContent = mobileAudioUnlocked ? '🔊 Ton an' : '🔇 Ton aus';
+      button.textContent = mobileAudioUnlocked ? '🔊' : '🔇';
       button.title = mobileAudioUnlocked ? 'Ton ausschalten' : 'Ton einschalten';
+      button.setAttribute('aria-label', button.title);
       button.classList.toggle('active', mobileAudioUnlocked);
     }
     function toggleMobileAudio() {
@@ -970,15 +992,13 @@
     }
 
     function getFocusModeLabel(state) {
-      const baseLabel = getGameModeLabel(state && state.game && state.game.mode);
       const game = state && state.game ? state.game : {};
-      const typeLabels = { direct: 'Duell', group: 'Mehrspieler', tournament: 'Turnier' };
-      const typeLabel = typeLabels[String(game.matchType || '')];
-      if (!typeLabel) return baseLabel;
+      const typeLabels = { direct: 'Direktes Duell', group: 'Mehrspieler', tournament: 'Turnier' };
+      const typeLabel = typeLabels[String(game.matchType || '')] || 'Solospiel';
       const bestOf = Number(game.bestOf || 1);
-      const details = [typeLabel, bestOf > 1 ? 'BO' + bestOf : 'Einzelleg'];
+      const details = [typeLabel, bestOf > 1 ? 'Best-of-' + bestOf : 'Einzelleg'];
       if (typeLabel === 'Turnier' && String(game.tournamentName || '').trim()) details.push(String(game.tournamentName).trim());
-      return baseLabel + ' · ' + details.join(' · ');
+      return details.join(' · ');
     }
 
     function getFocusCheckoutLabel(state) {
@@ -1018,7 +1038,7 @@
       const bigScoreValue = isElimination ? totalScored : p.remaining;
 
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#f4a261') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-switch-timer"></span></div>' +
+        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-match-details"><span class="match-type">' + escapeHtml(getFocusModeLabel(state).split(' · ')[0]) + '</span><span class="match-format">' + escapeHtml(getFocusModeLabel(state).split(' · ')[1] || '') + '</span></span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel">' +
             '<h4>Aktuelle Würfe</h4>' +
@@ -1132,7 +1152,7 @@
       }).join('');
       const legStats = getLiveLegStats(p);
       return '<div class="focus-card" style="--pc:' + escapeAttr(p.color || '#e63946') + ';--pc-glow:' + colorToRgba(p.color || '#e63946', .18) + '">' +
-        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-switch-timer"></span></div>' +
+        '<div class="focus-player-line"><span class="focus-player-name">🎯 ' + escapeHtml(p.name) + '</span><span class="focus-match-details"><span class="match-type">' + escapeHtml(getFocusModeLabel(state).split(' · ')[0]) + '</span><span class="match-format">' + escapeHtml(getFocusModeLabel(state).split(' · ')[1] || '') + '</span></span><span class="focus-switch-timer"></span></div>' +
         '<div class="focus-kacheln">' +
           '<div class="focus-kachel"><h4>Letzte Würfe</h4><div class="throw-segments">' + throwsHtml + '</div></div>' +
           '<div class="focus-kachel"><div><h4>Cricket Punkte</h4><div class="focus-big-score">' + cricketPoints + '</div></div><div><h4>Zahlen</h4><div class="cricket-grid horizontal">' + gridHtml + '</div></div></div>' +
@@ -1507,6 +1527,14 @@
       const showCheckout = mode === 'checkout' || (mode === 'alternate' && Math.floor(Date.now() / dailyDisplaySettings.intervalMs) % 2 === 0);
       const best = showCheckout ? data && data.bestCheckout : data && data.best;
       const label = showCheckout ? 'Höchster Checkout' : 'Tages-Highscore';
+      const playerName = String(best && best.player || '').trim().toLowerCase();
+      const player = liveState && Array.isArray(liveState.players)
+        ? liveState.players.find(item => Number(item.slot) === Number(best && best.playerSlot))
+          || liveState.players.find(item => String(item.name || '').trim().toLowerCase() === playerName)
+        : null;
+      const playerColor = player && player.color ? player.color : '#333';
+      el.style.setProperty('--hs-color', playerColor);
+      el.style.setProperty('--hs-glow', player && player.color ? colorToRgba(player.color, .14) : 'transparent');
       const labelEl = el.querySelector('.hs-label');
       if (labelEl) labelEl.textContent = showCheckout ? 'Checkout' : 'Tages-HS';
       if (best) {

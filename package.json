@@ -1,6 +1,6 @@
 {
   "name": "loewen-dart-dashboard",
-  "version": "1.0.0",
+  "version": "1.2.4",
   "description": "Live Dart Dashboard – Arduino-gesteuerter Spielstand & Highscores",
   "main": "server.js",
   "scripts": {

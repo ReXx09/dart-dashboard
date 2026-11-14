@@ -75,9 +75,24 @@ generate_admin_pin_hash() {
   bash "$SCRIPT_DIR/scripts/generate-pin-hash.sh"
 }
 
+run_system_update() {
+  if ! command_exists apt-get; then
+    msg_fail 'apt-get wurde auf diesem System nicht gefunden.'
+    return 1
+  fi
+  msg_warn 'Systempakete werden aktualisiert. Ein Neustart kann erforderlich sein.'
+  if ! ask_yes_no 'Systempakete jetzt aktualisieren?' 'n'; then
+    msg_info 'System-Update abgebrochen.'
+    return 0
+  fi
+  ensure_sudo
+  sudo apt-get update
+  sudo apt-get upgrade -y
+}
+
 run_raspi_update() {
-  if ! command_exists raspi-update; then
-    msg_fail 'raspi-update wurde auf diesem System nicht gefunden.'
+  if ! command_exists rpi-update; then
+    msg_fail 'rpi-update wurde auf diesem System nicht gefunden.'
     local os_release=''
     local device_model=''
     if [[ -r /etc/os-release ]]; then
@@ -92,7 +107,7 @@ run_raspi_update() {
         ensure_sudo
         sudo apt-get update
         sudo apt-get install -y rpi-update
-        if ! command_exists raspi-update; then
+        if ! command_exists rpi-update; then
           msg_fail 'rpi-update konnte nicht installiert werden.'
           return 1
         fi
@@ -112,11 +127,11 @@ run_raspi_update() {
     msg_info 'Pruefe das Betriebssystem mit: cat /etc/os-release'
     return 1
   fi
-  msg_warn 'raspi-update aktualisiert die Raspberry-Pi-Firmware und kann einen Neustart erfordern.'
+  msg_warn 'rpi-update aktualisiert die Raspberry-Pi-Firmware und kann einen Neustart erfordern.'
   if ! ask_yes_no 'Raspi-Update jetzt starten?' 'n'; then
     msg_info 'Raspi-Update abgebrochen.'
     return 0
   fi
   ensure_sudo
-  sudo raspi-update
+  sudo rpi-update
 }
