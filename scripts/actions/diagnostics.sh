@@ -128,6 +128,7 @@ show_setup_overview() {
   auth_enabled="$(json_path_field "$auth_info" enabled 2>/dev/null || true)"
 
   report+="=== EINRICHTUNGS-STATUS ===\n\n"
+  report+="HINWEIS: Weitere Zeilen folgen unten. Scrollen: Pfeil abwaerts / Bild abwaerts. Enter schliesst.\n\n"
   report+="VERSION & GIT\n"
   report+="Branch: ${branch}  |  Commit: ${commit}\n"
   report+="Arbeitskopie: $([[ "${dirty_count:-0}" =~ ^[0-9]+$ ]] && (( dirty_count > 0 )) && printf '%s lokale Aenderung(en)' "$dirty_count" || printf 'sauber')\n"
