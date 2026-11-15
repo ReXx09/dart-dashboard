@@ -2243,6 +2243,13 @@ class DataStore {
   async saveLiveStateWithUndo(state, undo) {
     const payload = JSON.stringify(state);
     const updatedAt = Date.now();
+    const undoDuelId = Number(undo.duelId) > 0 ? Number(undo.duelId) : null;
+    const undoTurnId = Number(undo.turnId) > 0 ? Number(undo.turnId) : null;
+    const undoLegNumber = Number(undo.legNumber) > 0 ? Number(undo.legNumber) : null;
+    const undoPlayerSlot = Number(undo.playerSlot) > 0 ? Number(undo.playerSlot) : null;
+    const highscoreEventPattern = undoDuelId && undoTurnId && undoLegNumber && undoPlayerSlot
+      ? `duel:${undoDuelId}:${undoLegNumber}:${undoPlayerSlot}:%:%:${undoTurnId}`
+      : null;
     const correctionValues = getThrowCorrectionValues({
       ...undo,
       action: 'undo',
@@ -2255,6 +2262,9 @@ class DataStore {
       await this.sqlite.exec('BEGIN IMMEDIATE');
       try {
         await this.sqlite.run('DELETE FROM player_throw_segments WHERE player_slot = ? AND thrown_at = ? AND (? IS NULL OR duel_id = ?)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null, Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
+        if (highscoreEventPattern) {
+          await this.sqlite.run('DELETE FROM highscores WHERE duel_id = ? AND player_slot = ? AND event_key LIKE ?', [undoDuelId, undoPlayerSlot, highscoreEventPattern]);
+        }
         await this.sqlite.run('INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at', [payload, updatedAt]);
         await this.sqlite.run(sqliteCorrection, correctionValues);
         await this.sqlite.exec('COMMIT');
@@ -2270,6 +2280,9 @@ class DataStore {
       try {
         await client.query('BEGIN');
         await client.query('DELETE FROM player_throw_segments WHERE player_slot = $1 AND thrown_at = $2 AND ($3 IS NULL OR duel_id = $3)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
+        if (highscoreEventPattern) {
+          await client.query('DELETE FROM highscores WHERE duel_id = $1 AND player_slot = $2 AND event_key LIKE $3', [undoDuelId, undoPlayerSlot, highscoreEventPattern]);
+        }
         await client.query('INSERT INTO live_state (id, payload, updated_at) VALUES (1, $1, $2) ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at', [payload, updatedAt]);
         await client.query(postgresCorrection, correctionValues);
         await client.query('COMMIT');
@@ -2286,6 +2299,9 @@ class DataStore {
     try {
       await connection.beginTransaction();
       await connection.query('DELETE FROM player_throw_segments WHERE player_slot = ? AND thrown_at = ? AND (? IS NULL OR duel_id = ?)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null, Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
+      if (highscoreEventPattern) {
+        await connection.query('DELETE FROM highscores WHERE duel_id = ? AND player_slot = ? AND event_key LIKE ?', [undoDuelId, undoPlayerSlot, highscoreEventPattern]);
+      }
       await connection.query('INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)', [payload, updatedAt]);
       await connection.query(sqliteCorrection, correctionValues);
       await connection.commit();
@@ -2298,7 +2314,10 @@ class DataStore {
   }
 
   async getHighscores(limit = 100, gameMode = '', includeActive = false) {
-    const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+    const requestedLimit = Number(limit || 100);
+    const safeLimit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(5000, requestedLimit))
+      : 100;
     const safeMode = String(gameMode || '').trim();
     const validEncounter = (includeActive ? '1 = 1' : "(duel_id IS NULL OR EXISTS (SELECT 1 FROM duels d WHERE d.id = highscores.duel_id AND d.status = 'finished'))") + " AND NOT (kind = 'elimination' AND leg_win = 1)";
     let rows = [];
@@ -2422,18 +2441,27 @@ class DataStore {
     return (await this.my.query('SELECT * FROM highscores WHERE id = ?', [safeId]))[0][0] || null;
   }
 
-  async updateHighscore(id, player, score, playerSlot = null) {
+  async updateHighscore(id, player, score, playerSlot = null, kind = null, profileId) {
     const safeId = Number(id);
     if (!Number.isFinite(safeId) || safeId <= 0) return;
+    const updateProfile = arguments.length >= 6;
     if (this.isSQLite()) {
-      await this.sqlite.run('UPDATE highscores SET player = ?, player_slot = ?, score = ? WHERE id = ?', [player, playerSlot, score, safeId]);
+      const profileClause = updateProfile ? 'profile_id = ?, ' : '';
+      const values = [player, playerSlot, ...(updateProfile ? [profileId] : []), score, kind, safeId];
+      await this.sqlite.run(`UPDATE highscores SET player = ?, player_slot = ?, ${profileClause}score = ?, kind = COALESCE(?, kind) WHERE id = ?`, values);
       return;
     }
     if (this.isPostgres()) {
-      await this.pg.query('UPDATE highscores SET player = $1, player_slot = $2, score = $3 WHERE id = $4', [player, playerSlot, score, safeId]);
+      if (updateProfile) {
+        await this.pg.query('UPDATE highscores SET player = $1, player_slot = $2, profile_id = $3, score = $4, kind = COALESCE($5, kind) WHERE id = $6', [player, playerSlot, profileId, score, kind, safeId]);
+      } else {
+        await this.pg.query('UPDATE highscores SET player = $1, player_slot = $2, score = $3, kind = COALESCE($4, kind) WHERE id = $5', [player, playerSlot, score, kind, safeId]);
+      }
       return;
     }
-    await this.my.query('UPDATE highscores SET player = ?, player_slot = ?, score = ? WHERE id = ?', [player, playerSlot, score, safeId]);
+    const profileClause = updateProfile ? 'profile_id = ?, ' : '';
+    const values = [player, playerSlot, ...(updateProfile ? [profileId] : []), score, kind, safeId];
+    await this.my.query(`UPDATE highscores SET player = ?, player_slot = ?, ${profileClause}score = ?, kind = COALESCE(?, kind) WHERE id = ?`, values);
   }
 
   async clearManualHighscores() {

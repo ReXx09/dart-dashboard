@@ -181,3 +181,31 @@ test('Elimination: Korrektur und Rücknahme folgen den Regeln, ohne den Spielflu
     assert.equal(undone.body.eliminationEvents.length, 0);
   });
 });
+
+test('Undo entfernt auch den bereits gespeicherten Turn-Highscore der korrigierten Aufnahme', async () => {
+  await withApp(async call => {
+    const started = await call('POST', '/api/duels/start', {
+      mode: '501',
+      matchType: 'direct',
+      checkoutRule: 'double',
+      bestOf: 1,
+      playerSlots: [1, 2]
+    });
+    assert.equal(started.status, 200);
+    const duelId = started.body.game.duelId;
+
+    const throwDart = points => call('POST', '/api/live/throw', { playerIndex: 0, points });
+    await throwDart(60);
+    await throwDart(60);
+    await throwDart(60);
+    await wait(50);
+
+    const beforeUndo = await dataStore.sqlite.all('SELECT id FROM highscores WHERE duel_id = ? AND player_slot = 1', [duelId]);
+    assert.equal(beforeUndo.length, 1);
+
+    const undone = await call('POST', '/api/live/undo');
+    assert.equal(undone.status, 200);
+    const afterUndo = await dataStore.sqlite.all('SELECT id FROM highscores WHERE duel_id = ? AND player_slot = 1', [duelId]);
+    assert.equal(afterUndo.length, 0);
+  });
+});

@@ -3284,7 +3284,7 @@ async function saveLiveState(state, options = {}) {
 }
 
 async function getHighscores(gameMode = '', options = {}) {
-  return dataStore.getHighscores(500, gameMode, options.includeActive === true);
+  return dataStore.getHighscores(options.limit || 500, gameMode, options.includeActive === true);
 }
 
 async function addHighscore(playerName, score, meta = {}) {
@@ -4309,6 +4309,8 @@ async function commitLiveStateChange(state, persist) {
 app.post('/api/live/undo', async (req, res) => {
   try {
     const generation = liveLifecycleGeneration;
+    await liveCompletionQueue;
+    await flushLiveDetailWrites();
     const state = await getLiveState();
     if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
@@ -4321,6 +4323,7 @@ app.post('/api/live/undo', async (req, res) => {
       calculateAverage: calculateCurrentRoundAverage
     });
     if (result.error) return res.status(400).json({ error: result.error });
+    const duel = Number(state.game.duelId || 0) > 0 ? await dataStore.getDuel(state.game.duelId) : null;
 
     // Die Aufnahme ist wieder offen; ein laufender Spielerwechsel gehört nicht mehr dazu.
     cancelScheduledAutoAdvance();
@@ -4330,6 +4333,7 @@ app.post('/api/live/undo', async (req, res) => {
       playerSlot: result.player.slot,
       turnId: result.throwData.turnId,
       duelId: state.game.duelId,
+      legNumber: Number(duel?.total_legs || 0) + 1,
       thrownAt: result.throwData.ts,
       originalPoints: result.throwData.points,
       correctedPoints: 0,
@@ -4475,7 +4479,7 @@ app.post('/api/live/correct-last', async (req, res) => {
 
 // ── Highscores ──
 app.get('/api/highscores', async (_req, res) => {
-  try { res.json(await getHighscores(_req.query.gameMode)); }
+  try { res.json(await getHighscores(_req.query.gameMode, { limit: _req.query.limit })); }
   catch (err) { res.status(500).json({ error: 'Highscores konnten nicht geladen werden: ' + err.message }); }
 });
 
@@ -4503,7 +4507,7 @@ app.delete('/api/highscores/selected', requireAdmin, async (req, res) => {
     for (const id of ids) {
       const existing = await dataStore.getHighscore(id);
       if (!existing) return res.status(404).json({ error: `Highscore #${id} wurde nicht gefunden. Bitte die Liste aktualisieren.` });
-      if (String(existing.kind || '') !== 'manual' && Number(existing.duel_id || 0) > 0) {
+      if (Number(existing.duel_id || 0) > 0) {
         return res.status(409).json({ error: `Highscore #${id} gehört zu Begegnung #${existing.duel_id}. Bitte die gesamte Begegnung in der Begegnungsverwaltung löschen.` });
       }
       entries.push(existing);
@@ -4519,8 +4523,8 @@ app.delete('/api/highscores/:id', requireAdmin, async (req, res) => {
   try {
     const existing = await dataStore.getHighscore(id);
     if (!existing) return res.status(404).json({ error: 'Highscore nicht gefunden.' });
-    if (String(existing.kind || '') !== 'manual' && Number(existing.duel_id || 0) > 0) {
-      return res.status(409).json({ error: `Automatischer Highscore gehört zu Begegnung #${existing.duel_id}. Bitte dort die Quelldaten korrigieren oder löschen.` });
+    if (Number(existing.duel_id || 0) > 0) {
+      return res.status(409).json({ error: `Highscore gehört zu Begegnung #${existing.duel_id}. Bitte dort die Quelldaten korrigieren oder löschen.` });
     }
     await dataStore.deleteHighscore(id);
     res.json({ ok: true, highscores: await getHighscores() });
@@ -4537,12 +4541,19 @@ app.put('/api/highscores/:id', requireAdmin, async (req, res) => {
   try {
     const existing = await dataStore.getHighscore(id);
     if (!existing) return res.status(404).json({ error: 'Highscore nicht gefunden.' });
-    if (String(existing.kind || '') !== 'manual') {
-      return res.status(409).json({ error: existing.duel_id ? `Automatischer Highscore gehört zu Begegnung #${existing.duel_id}. Bitte dort die Quelldaten korrigieren.` : 'Automatische Highscores können nur über ihre Spieldaten korrigiert werden.' });
+    if (Number(existing.duel_id || 0) > 0) {
+      return res.status(409).json({ error: `Highscore gehört zu Begegnung #${existing.duel_id}. Bitte dort die Quelldaten korrigieren.` });
     }
     const matchingPlayers = (await dataStore.getPlayers()).filter(item => String(item.name || '').trim().toLowerCase() === player.toLowerCase());
+    const matchingProfiles = (await dataStore.getProfiles()).filter(item => String(item.name || '').trim().toLowerCase() === player.toLowerCase());
     const playerSlot = matchingPlayers.length === 1 ? Number(matchingPlayers[0].slot) : null;
-    await dataStore.updateHighscore(id, player, score, playerSlot);
+    const profileId = matchingProfiles.length === 1 ? Number(matchingProfiles[0].id) : null;
+    const isManual = String(existing.kind || '') === 'manual';
+    const kind = isManual ? 'manual' : getTurnScoreHighscoreKind(score);
+    if (!kind) {
+      return res.status(400).json({ error: 'Automatische Highscores müssen mindestens 60 Punkte haben. Kleinere Fehlwerte bitte löschen.' });
+    }
+    await dataStore.updateHighscore(id, player, score, playerSlot, kind, profileId);
     res.json({ ok: true, highscores: await getHighscores() });
   } catch (err) { res.status(500).json({ error: 'Highscore konnte nicht bearbeitet werden: ' + err.message }); }
 });

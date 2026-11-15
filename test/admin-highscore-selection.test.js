@@ -18,7 +18,7 @@ test('Bulk-Löschen akzeptiert nicht zugeordnete automatische Highscores, aber k
     matchType: 'direct',
     players: [{ slot: 1, name: 'Alice' }, { slot: 2, name: 'Bob' }]
   });
-  await dataStore.addHighscore({ player: 'Alice', score: 180, kind: 'turn' });
+  await dataStore.addHighscore({ player: 'Alice', score: 180, kind: '180er' });
   await dataStore.addHighscore({ player: 'Alice', score: 140, kind: 'turn', duelId: duel.id, playerSlot: 1 });
   const orphaned = await dataStore.sqlite.get('SELECT id FROM highscores WHERE duel_id IS NULL AND player = ?', ['Alice']);
   const linked = await dataStore.sqlite.get('SELECT id FROM highscores WHERE duel_id = ?', [duel.id]);
@@ -36,6 +36,16 @@ test('Bulk-Löschen akzeptiert nicht zugeordnete automatische Highscores, aber k
     assert.equal(blockedResponse.status, 409);
     assert.ok(await dataStore.getHighscore(orphaned.id));
     assert.ok(await dataStore.getHighscore(linked.id));
+
+    const editResponse = await fetch(base + '/api/highscores/' + orphaned.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player: 'Alice', score: 140 })
+    });
+    assert.equal(editResponse.status, 200);
+    const edited = await dataStore.getHighscore(orphaned.id);
+    assert.equal(edited.score, 140);
+    assert.equal(edited.kind, '140+');
 
     const deletedResponse = await fetch(base + '/api/highscores/selected', {
       method: 'DELETE',

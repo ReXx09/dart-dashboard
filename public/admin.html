@@ -124,8 +124,15 @@
     <div class="sec-hd"><span class="sec-title">Erweiterte Spielfunktionen</span><div class="sec-line"></div></div>
     <fieldset>
       <legend>Begegnungen verwalten</legend>
-      <div class="field-hint" style="margin:0 0 8px">Auch abgeschlossene Begegnungen können vollständig aus Duellstatistik, Legs, Würfen und Highscores entfernt werden.</div>
+      <div class="field-hint" style="margin:0 0 8px">Begegnungen lassen sich nach Zeitraum, Spieler, Modus und Status filtern. Das Löschen entfernt die Begegnung samt Legs, Würfen und zugehörigen Highscores; danach betroffene Spielerstatistiken bei Bedarf im Statistikeditor anpassen.</div>
       <input id="adminDuelSearch" type="search" placeholder="Spieler, ID, Modus oder Status suchen" aria-label="Begegnungen durchsuchen" style="margin:0 8px 8px 0" />
+      <select id="adminDuelStatusFilter" aria-label="Begegnungsstatus filtern"><option value="">Alle Status</option><option value="active">Offen</option><option value="finished">Beendet</option><option value="canceled">Abgebrochen</option></select>
+      <select id="adminDuelModeFilter" aria-label="Spielmodus filtern"><option value="">Alle Modi</option></select>
+      <select id="adminDuelTypeFilter" aria-label="Begegnungsart filtern"><option value="">Alle Arten</option></select>
+      <select id="adminDuelPlayerFilter" aria-label="Begegnungsspieler filtern"><option value="">Alle Spieler</option></select>
+      <label class="field-hint">Von <input id="adminDuelDateFrom" type="date" aria-label="Begegnungen ab Datum" /></label>
+      <label class="field-hint">Bis <input id="adminDuelDateTo" type="date" aria-label="Begegnungen bis Datum" /></label>
+      <span id="adminDuelCount" class="field-hint"></span>
       <button class="btn-save" id="refreshDuelsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Begegnungen laden</button>
       <div class="duel-list" id="adminDuelList"><div class="duel-row">Begegnungen werden geladen...</div></div>
     </fieldset>
@@ -252,6 +259,7 @@
   <div class="section" data-admin-panel="data">
     <div class="sec-hd"><span class="sec-title">Highscore-Verwaltung</span><div class="sec-line"></div></div>
     <fieldset>
+      <div class="field-hint" style="margin:0 0 10px">Unverbundene automatische Highscores können bearbeitet oder gelöscht werden. Begegnungsgebundene Einträge bleiben an ihre Quelldaten gebunden.</div>
       <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <span style="font-size:.82rem;color:#888">Einträge: <strong id="hsCount" style="color:#f4a261">0</strong></span>
         <button class="btn-save" id="refreshHsBtn" style="background:#1e1e1e;border:1px solid #2a2a2a;padding:6px 14px;font-size:.78rem">🔄 Aktualisieren</button>
@@ -268,6 +276,20 @@
           <option value="score">Höchster Score zuerst</option>
         </select>
       </div>
+      <details style="margin:0 0 10px">
+        <summary style="cursor:pointer;color:#bbb;font-size:.8rem">Weitere Filter (Typ, Quelle, Zeitraum, Score, Begegnung)</summary>
+        <div class="hs-filters" style="margin-top:8px">
+          <select id="hsTypeFilter" aria-label="Highscore-Typ filtern"><option value="">Alle Typen</option></select>
+          <select id="hsModeFilter" aria-label="Spielmodus filtern"><option value="">Alle Modi</option></select>
+          <select id="hsCategoryFilter" aria-label="Begegnungsart filtern"><option value="">Alle Begegnungsarten</option></select>
+          <select id="hsSourceFilter" aria-label="Erfassungsart filtern"><option value="">Alle Erfassungsarten</option><option value="manual">Manuell</option><option value="automatic">Automatisch ohne Begegnung</option><option value="duel">Begegnungsgebunden</option></select>
+          <label class="field-hint">Von <input id="hsDateFrom" type="date" aria-label="Highscores ab Datum" /></label>
+          <label class="field-hint">Bis <input id="hsDateTo" type="date" aria-label="Highscores bis Datum" /></label>
+          <input id="hsScoreMin" type="number" min="0" placeholder="Score ab" aria-label="Mindestscore" />
+          <input id="hsScoreMax" type="number" min="0" placeholder="Score bis" aria-label="Höchstscore" />
+          <input id="hsDuelIdFilter" type="number" min="1" placeholder="Begegnungs-ID" aria-label="Begegnungs-ID filtern" />
+        </div>
+      </details>
       <div class="field-inline" style="margin:12px 0">
         <input id="hsNewPlayer" type="text" placeholder="Spieler für neuen Highscore" aria-label="Spieler für neuen Highscore" style="flex:1;min-width:180px;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit" />
         <input id="hsNewScore" type="number" min="1" placeholder="Score" aria-label="Score für neuen Highscore" style="width:110px;background:#0d0d0d;border:1px solid #2a2a2a;color:#f1f1f1;padding:8px 10px;border-radius:8px;font:inherit" />
@@ -311,6 +333,9 @@
         <input id="adminPlayerSearch" type="search" placeholder="Spieler oder Profil suchen" aria-label="Spieler oder Profil suchen" />
         <select id="adminPlayerSelect" aria-label="Spieler oder Profil auswählen"><option value="">Spieler auswählen</option></select>
       </div>
+      <label class="field-row" style="max-width:220px">Statistik-Saison
+        <select id="adminStatsSeason" aria-label="Statistik-Saison auswählen"></select>
+      </label>
       <div class="field-hint" style="margin:8px 0 0">Spielerstatistiken können pro Slot bearbeitet oder zurückgesetzt werden. Der Reset löscht die Statistikwerte und Leg-History des gewählten Spielers.</div>
       <div class="stats-editor" id="statsEditor" hidden>
         <label>Spiele<input data-stat="games_played" type="number" min="0"></label>
@@ -322,9 +347,28 @@
         <label>Highest Leg Avg<input data-stat="highest_leg_avg" type="number" min="0" step="0.01"></label>
         <label>First 9 Avg<input data-stat="avg_first9" type="number" min="0" step="0.01"></label>
         <label>180er<input data-stat="count_180" type="number" min="0"></label>
+        <label>171+ Aufnahmen<input data-stat="count_171plus" type="number" min="0"></label>
+        <label>140+ Aufnahmen<input data-stat="count_140plus" type="number" min="0"></label>
+        <label>100+ Aufnahmen<input data-stat="count_100plus" type="number" min="0"></label>
         <label>Max Score<input data-stat="max_score" type="number" min="0"></label>
         <label>Checkout Versuche<input data-stat="checkout_attempts" type="number" min="0"></label>
         <label>Checkout Erfolge<input data-stat="checkout_success" type="number" min="0"></label>
+        <label>Höchstes Checkout<input data-stat="highest_checkout" type="number" min="0"></label>
+        <label>Single-Out Versuche<input data-stat="checkout_single_attempts" type="number" min="0"></label>
+        <label>Single-Out Erfolge<input data-stat="checkout_single_success" type="number" min="0"></label>
+        <label>Höchstes Single-Out<input data-stat="checkout_single_highest" type="number" min="0"></label>
+        <label>Double-Out Versuche<input data-stat="checkout_double_attempts" type="number" min="0"></label>
+        <label>Double-Out Erfolge<input data-stat="checkout_double_success" type="number" min="0"></label>
+        <label>Höchstes Double-Out<input data-stat="checkout_double_highest" type="number" min="0"></label>
+        <label>Master-Out Versuche<input data-stat="checkout_master_attempts" type="number" min="0"></label>
+        <label>Master-Out Erfolge<input data-stat="checkout_master_success" type="number" min="0"></label>
+        <label>Höchstes Master-Out<input data-stat="checkout_master_highest" type="number" min="0"></label>
+        <label>100+ Checkout<input data-stat="checkout_100plus" type="number" min="0"></label>
+        <label>120+ Checkout<input data-stat="checkout_120plus" type="number" min="0"></label>
+        <label>160+ Checkout<input data-stat="checkout_160plus" type="number" min="0"></label>
+        <label>Cricket-Legs<input data-stat="cricket_legs" type="number" min="0"></label>
+        <label>Cricket-Siege<input data-stat="cricket_won" type="number" min="0"></label>
+        <label>Cricket-MPR<input data-stat="cricket_mpr" type="number" min="0" step="0.01"></label>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
         <button class="btn-save" id="saveStatsBtn" disabled>Statistik speichern</button>
@@ -791,10 +835,11 @@
 
   async function loadHighscores() {
     try {
-      const r = await fetch('/api/highscores?limit=500', { cache: 'no-store' });
+      const r = await fetch('/api/highscores?limit=5000', { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       hsData = await r.json();
       renderMonthFilter();
+      renderHighscoreFilterOptions();
       renderHighscores();
     } catch(e) {
       document.getElementById('hsTableBody').innerHTML = '<tr><td colspan="7" style="padding:30px;text-align:center;color:#e63946">Fehler beim Laden: ' + e.message + '</td></tr>';
@@ -851,15 +896,55 @@
     if (months.includes(oldValue)) select.value = oldValue;
   }
 
+  function renderHighscoreFilterOptions() {
+    const filterValues = [
+      ['hsTypeFilter', 'Alle Typen', hsData.map(entry => String(entry.kind || 'score'))],
+      ['hsModeFilter', 'Alle Modi', hsData.map(entry => String(entry.gameMode || ''))],
+      ['hsCategoryFilter', 'Alle Begegnungsarten', hsData.map(entry => String(entry.category || ''))]
+    ];
+    for (const [id, label, values] of filterValues) {
+      const select = document.getElementById(id);
+      const oldValue = select.value;
+      const options = Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
+      select.innerHTML = '<option value="">' + label + '</option>' + options.map(value =>
+        '<option value="' + escapeAttr(value) + '">' + escapeHtml(value) + '</option>'
+      ).join('');
+      if (options.includes(oldValue)) select.value = oldValue;
+    }
+  }
+
   function getFilteredHighscores() {
     const search = document.getElementById('hsPlayerSearch').value.trim().toLocaleLowerCase('de-DE');
     const selectedPlayer = document.getElementById('hsPlayerSelect').value;
     const month = document.getElementById('hsMonthFilter').value;
+    const type = document.getElementById('hsTypeFilter').value;
+    const mode = document.getElementById('hsModeFilter').value;
+    const category = document.getElementById('hsCategoryFilter').value;
+    const source = document.getElementById('hsSourceFilter').value;
+    const from = document.getElementById('hsDateFrom').value;
+    const to = document.getElementById('hsDateTo').value;
+    const minScore = document.getElementById('hsScoreMin').value;
+    const maxScore = document.getElementById('hsScoreMax').value;
+    const duelId = document.getElementById('hsDuelIdFilter').value;
     const sort = document.getElementById('hsSort').value;
+    const fromTime = from ? new Date(from + 'T00:00:00').getTime() : null;
+    const toTime = to ? new Date(to + 'T23:59:59.999').getTime() : null;
     hsFilteredData = hsData
       .filter(entry => !search || String(entry.player || '').toLocaleLowerCase('de-DE').includes(search))
       .filter(entry => !selectedPlayer || String(entry.player || '') === selectedPlayer)
       .filter(entry => !month || monthKey(entry.ts) === month)
+      .filter(entry => !type || String(entry.kind || 'score') === type)
+      .filter(entry => !mode || String(entry.gameMode || '') === mode)
+      .filter(entry => !category || String(entry.category || '') === category)
+      .filter(entry => !source
+        || (source === 'manual' && String(entry.kind || '') === 'manual')
+        || (source === 'automatic' && String(entry.kind || '') !== 'manual' && Number(entry.duelId || 0) <= 0)
+        || (source === 'duel' && Number(entry.duelId || 0) > 0))
+      .filter(entry => fromTime === null || Number(entry.ts || 0) >= fromTime)
+      .filter(entry => toTime === null || Number(entry.ts || 0) <= toTime)
+      .filter(entry => minScore === '' || Number(entry.score || 0) >= Number(minScore))
+      .filter(entry => maxScore === '' || Number(entry.score || 0) <= Number(maxScore))
+      .filter(entry => !duelId || Number(entry.duelId || 0) === Number(duelId))
       .sort((a, b) => {
         if (sort === 'oldest') return Number(a.ts || 0) - Number(b.ts || 0);
         if (sort === 'score') return Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0);
@@ -870,7 +955,7 @@
 
   function renderHighscores() {
     const list = getFilteredHighscores();
-    document.getElementById('hsCount').textContent = list.length + ' / ' + hsData.length;
+    document.getElementById('hsCount').textContent = list.length + ' / ' + hsData.length + (hsData.length === 5000 ? ' (max. 5.000 geladen)' : '');
     const body = document.getElementById('hsTableBody');
     if (!list.length) {
       body.innerHTML = '<tr><td colspan="7" style="padding:30px;text-align:center;color:#555">Keine Highscore-Einträge vorhanden.</td></tr>';
@@ -881,19 +966,18 @@
       const kind = entry.kind || 'score';
       const isEditing = Number(editingHighscoreId) === Number(entry.id);
       const isManual = kind === 'manual';
-      const canDelete = isManual || Number(entry.duelId || 0) <= 0;
-      const action = isEditing && isManual
+      const canDelete = Number(entry.duelId || 0) <= 0;
+      const canEdit = isManual || Number(entry.duelId || 0) <= 0;
+      const action = isEditing && canEdit
         ? '<input type="text" value="' + escapeAttr(entry.player) + '" data-hs-edit-player style="width:105px;padding:5px;background:#111;color:#f1f1f1;border:1px solid #555;border-radius:4px;margin-right:4px" aria-label="Spielername" />' +
           '<input type="number" min="1" value="' + Number(entry.score || 0) + '" data-hs-edit-score style="width:72px;padding:5px;background:#111;color:#f1f1f1;border:1px solid #555;border-radius:4px;margin-right:4px" aria-label="Score" />' +
           '<button class="btn-save" style="background:#2a9d8f;border:none;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-save-id="' + Number(entry.id) + '">Speichern</button>' +
           '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem" data-hs-cancel-edit>Abbrechen</button>'
-        : isManual
-          ? '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-edit-id="' + entry.id + '">Bearbeiten</button>' +
-            '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>'
-          : canDelete
-            ? '<span style="color:#777;font-size:.68rem;margin-right:6px">' + (isManual ? 'Manuell' : 'Ohne Begegnung') + '</span>' +
+        : canEdit
+          ? '<span style="color:#777;font-size:.68rem;margin-right:6px">' + (isManual ? 'Manuell' : 'Ohne Begegnung') + '</span>' +
+              '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-edit-id="' + entry.id + '">Bearbeiten</button>' +
               '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>'
-            : '<span style="color:#777;font-size:.68rem">Quelle: Begegnung #' + Number(entry.duelId) + '</span>';
+          : '<span style="color:#777;font-size:.68rem">Quelle: Begegnung #' + Number(entry.duelId) + '</span>';
       return '<tr>' +
         '<td style="padding:8px 10px;text-align:center">' + (canDelete ? '<input type="checkbox" class="hs-select" value="' + Number(entry.id) + '" aria-label="Highscore von ' + escapeAttr(entry.player) + ' auswählen" />' : '<span style="color:#555" title="Highscores aus einer Begegnung werden zusammen mit der Begegnung gelöscht">-</span>') + '</td>' +
         '<td style="padding:8px 10px;color:#666;font-weight:700">' + (idx + 1) + '</td>' +
@@ -1058,6 +1142,8 @@
   document.getElementById('hsPlayerSelect').addEventListener('change', renderHighscores);
   document.getElementById('hsMonthFilter').addEventListener('change', renderHighscores);
   document.getElementById('hsSort').addEventListener('change', renderHighscores);
+  ['hsTypeFilter', 'hsModeFilter', 'hsCategoryFilter', 'hsSourceFilter', 'hsDateFrom', 'hsDateTo', 'hsScoreMin', 'hsScoreMax', 'hsDuelIdFilter']
+    .forEach(id => document.getElementById(id).addEventListener('input', renderHighscores));
   // Highscores automatisch laden
   loadHighscores();
   loadHighscorePlayers();
@@ -1133,6 +1219,7 @@
 
   async function loadAdminStats(playerId) {
     selectedAdminPlayer = Number(playerId) || null;
+    const season = document.getElementById('adminStatsSeason').value;
     const editor = document.getElementById('statsEditor');
     const saveButton = document.getElementById('saveStatsBtn');
     const resetButton = document.getElementById('resetStatsBtn');
@@ -1143,7 +1230,7 @@
       return;
     }
     try {
-      const response = await fetch('/api/players/' + selectedAdminPlayer + '/stats', { cache: 'no-store' });
+      const response = await fetch('/api/players/' + selectedAdminPlayer + '/stats?season=' + encodeURIComponent(season), { cache: 'no-store' });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const stats = await response.json();
       editor.querySelectorAll('[data-stat]').forEach(input => { input.value = Number(stats[input.dataset.stat] || 0); });
@@ -1159,6 +1246,7 @@
     if (!selectedAdminPlayer) return;
     const payload = {};
     document.querySelectorAll('#statsEditor [data-stat]').forEach(input => { payload[input.dataset.stat] = Number(input.value || 0); });
+    payload.season = document.getElementById('adminStatsSeason').value;
     try {
       const response = await fetch('/api/players/' + selectedAdminPlayer + '/stats', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -1172,7 +1260,10 @@
   async function resetAdminStats() {
     if (!selectedAdminPlayer || !confirm('Statistik und Leg-History dieses Spielers wirklich zurücksetzen?')) return;
     try {
-      const response = await fetch('/api/players/' + selectedAdminPlayer + '/stats/reset', { method: 'POST' });
+      const response = await fetch('/api/players/' + selectedAdminPlayer + '/stats/reset', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ season: document.getElementById('adminStatsSeason').value })
+      });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       await loadAdminStats(selectedAdminPlayer);
       showToast('Statistik zurückgesetzt ✓');
@@ -1181,58 +1272,162 @@
 
   document.getElementById('adminPlayerSearch').addEventListener('input', renderAdminPlayerOptions);
   document.getElementById('adminPlayerSelect').addEventListener('change', event => loadAdminStats(event.target.value));
+  document.getElementById('adminStatsSeason').addEventListener('change', () => loadAdminStats(selectedAdminPlayer));
   document.getElementById('saveStatsBtn').addEventListener('click', saveAdminStats);
   document.getElementById('resetStatsBtn').addEventListener('click', resetAdminStats);
+
+  async function loadAdminSeasons() {
+    try {
+      const response = await fetch('/api/seasons', { cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const seasons = await response.json();
+      const options = Array.from(new Set([...seasons.map(String), String(new Date().getFullYear())]))
+        .filter(value => /^\d{4}$/.test(value))
+        .sort((a, b) => Number(b) - Number(a));
+      const select = document.getElementById('adminStatsSeason');
+      select.innerHTML = options.map(season => '<option value="' + season + '">' + season + '</option>').join('');
+      if (options.includes(String(new Date().getFullYear()))) select.value = String(new Date().getFullYear());
+    } catch (err) {
+      showToast('Statistik-Saisons konnten nicht geladen werden: ' + err.message, true);
+    }
+  }
+
+  loadAdminSeasons();
   loadAdminPlayers();
 
   function formatAdminDuelStatus(duel) {
     return duel.status === 'finished' ? 'beendet' : duel.status === 'canceled' ? 'abgebrochen' : 'offen';
   }
 
+  let adminDuels = [];
+
   async function loadAdminDuels() {
     const list = document.getElementById('adminDuelList');
     try {
       const response = await fetch('/api/duels?limit=1000&status=all', { cache: 'no-store' });
       if (!response.ok) throw new Error('HTTP ' + response.status);
-      const duels = await response.json();
-      if (!duels.length) {
-        list.innerHTML = '<div class="duel-row">Keine Begegnungen vorhanden.</div>';
-        return;
-      }
-      list.innerHTML = duels.map(duel => {
-        const players = (duel.players || []).map(player => escapeHtml(player.player_name)).join(' · ');
-        const deleteButton = '<button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '" data-duel-status="' + escapeHtml(duel.status || '') + '">🗑 Löschen</button>';
-        const searchValue = [duel.id, duel.mode, duel.status, formatAdminDuelStatus(duel), ...(duel.players || []).map(player => player.player_name)].join(' ').toLocaleLowerCase('de-DE');
-        return '<div class="duel-row" data-duel-search-value="' + escapeHtml(searchValue) + '"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div>' + deleteButton + '</div>';
-      }).join('');
-      list.querySelectorAll('[data-duel-delete]').forEach(button => button.addEventListener('click', () => deleteAdminDuel(Number(button.dataset.duelDelete), button.dataset.duelStatus)));
+      adminDuels = await response.json();
+      renderAdminDuelFilters();
       filterAdminDuels();
     } catch (err) {
       list.innerHTML = '<div class="duel-row" style="color:#e63946">Fehler beim Laden: ' + escapeHtml(err.message) + '</div>';
     }
   }
 
+  function renderAdminDuelFilters() {
+    const filterDefinitions = [
+      ['adminDuelModeFilter', 'Alle Modi', adminDuels.map(duel => String(duel.mode || ''))],
+      ['adminDuelTypeFilter', 'Alle Arten', adminDuels.map(duel => String(duel.match_type || duel.category || 'direct'))]
+    ];
+    for (const [id, label, values] of filterDefinitions) {
+      const select = document.getElementById(id);
+      const previous = select.value;
+      const unique = Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
+      select.innerHTML = '<option value="">' + label + '</option>' + unique.map(value =>
+        '<option value="' + escapeAttr(value) + '">' + escapeHtml(value) + '</option>'
+      ).join('');
+      if (unique.includes(previous)) select.value = previous;
+    }
+
+    const playerSelect = document.getElementById('adminDuelPlayerFilter');
+    const previousPlayer = playerSelect.value;
+    const players = new Map();
+    adminDuels.forEach(duel => (duel.players || []).forEach(player => {
+      players.set(String(player.player_slot), String(player.player_name || 'Spieler'));
+    }));
+    playerSelect.innerHTML = '<option value="">Alle Spieler</option>' + Array.from(players.entries())
+      .sort((a, b) => a[1].localeCompare(b[1], 'de'))
+      .map(([slot, name]) => '<option value="' + escapeAttr(slot) + '">' + escapeHtml(name) + ' · Slot ' + escapeHtml(slot) + '</option>')
+      .join('');
+    if (players.has(previousPlayer)) playerSelect.value = previousPlayer;
+  }
+
   function filterAdminDuels() {
     const search = document.getElementById('adminDuelSearch').value.trim().toLocaleLowerCase('de-DE');
-    document.querySelectorAll('#adminDuelList [data-duel-search-value]').forEach(row => {
-      row.hidden = search && !row.dataset.duelSearchValue.includes(search);
+    const status = document.getElementById('adminDuelStatusFilter').value;
+    const mode = document.getElementById('adminDuelModeFilter').value;
+    const type = document.getElementById('adminDuelTypeFilter').value;
+    const playerSlot = document.getElementById('adminDuelPlayerFilter').value;
+    const from = document.getElementById('adminDuelDateFrom').value;
+    const to = document.getElementById('adminDuelDateTo').value;
+    const fromTime = from ? new Date(from + 'T00:00:00').getTime() : null;
+    const toTime = to ? new Date(to + 'T23:59:59.999').getTime() : null;
+    const filtered = adminDuels.filter(duel => {
+      const players = Array.isArray(duel.players) ? duel.players : [];
+      const haystack = [duel.id, duel.mode, duel.status, formatAdminDuelStatus(duel), duel.match_type, duel.category, ...players.map(player => player.player_name)].join(' ').toLocaleLowerCase('de-DE');
+      const startedAt = Number(duel.started_at || 0);
+      return (!search || haystack.includes(search))
+        && (!status || String(duel.status || '') === status)
+        && (!mode || String(duel.mode || '') === mode)
+        && (!type || String(duel.match_type || duel.category || 'direct') === type)
+        && (!playerSlot || players.some(player => Number(player.player_slot) === Number(playerSlot)))
+        && (fromTime === null || startedAt >= fromTime)
+        && (toTime === null || startedAt <= toTime);
     });
+    document.getElementById('adminDuelCount').textContent = filtered.length + ' / ' + adminDuels.length + ' Begegnungen' + (adminDuels.length === 1000 ? ' (max. 1.000 geladen)' : '');
+    const list = document.getElementById('adminDuelList');
+    if (!filtered.length) {
+      list.innerHTML = '<div class="duel-row">Keine passenden Begegnungen gefunden.</div>';
+      return;
+    }
+    list.innerHTML = filtered.map(duel => {
+      const players = (duel.players || []).map(player => escapeHtml(player.player_name)).join(' · ');
+      const date = duel.started_at ? new Date(Number(duel.started_at)).toLocaleDateString('de-DE') : 'Datum unbekannt';
+      const deleteButton = '<button class="duel-delete" type="button" data-duel-delete="' + Number(duel.id) + '" data-duel-status="' + escapeHtml(duel.status || '') + '">🗑 Löschen</button>';
+      const detailsButton = '<button class="duel-delete" type="button" data-duel-details="' + Number(duel.id) + '">Details</button>';
+      return '<div class="duel-row"><div class="duel-meta"><strong>#' + Number(duel.id) + ' · ' + escapeHtml(duel.mode) + ' · ' + players + '</strong><span class="duel-status">' + escapeHtml(String(duel.match_type || duel.category || 'direct')) + ' · ' + date + ' · ' + formatAdminDuelStatus(duel) + ' · ' + Number(duel.total_legs || 0) + ' Leg(s)' + (duel.winner_slot ? ' · Sieger Slot ' + Number(duel.winner_slot) : '') + '</span></div>' + detailsButton + deleteButton + '</div>';
+    }).join('');
+    list.querySelectorAll('[data-duel-delete]').forEach(button => button.addEventListener('click', () => deleteAdminDuel(Number(button.dataset.duelDelete), button.dataset.duelStatus)));
+    list.querySelectorAll('[data-duel-details]').forEach(button => button.addEventListener('click', () => showAdminDuelDetails(Number(button.dataset.duelDetails))));
+  }
+
+  async function showAdminDuelDetails(id) {
+    const row = [...document.querySelectorAll('#adminDuelList .duel-row')]
+      .find(element => element.querySelector('[data-duel-details="' + id + '"]'));
+    if (!row) return;
+    const existing = row.nextElementSibling;
+    if (existing && existing.dataset.duelDetailsPanel === String(id)) {
+      existing.remove();
+      return;
+    }
+    try {
+      const response = await fetch('/api/duels/' + id, { cache: 'no-store' });
+      if (!response.ok) throw new Error(await getApiError(response));
+      const duel = await response.json();
+      const details = (duel.legs || []).map(leg => {
+        const players = (leg.players || []).map(player =>
+          escapeHtml(player.player_name || 'Spieler') + ': ' + Number(player.leg_avg || 0).toFixed(2) + ' Ø, ' + Number(player.darts_thrown || 0) + ' Darts, ' + (Number(player.won) ? 'gewonnen' : 'verloren')
+        ).join('<br>');
+        return '<div style="padding:8px 0;border-bottom:1px solid #222"><strong>Leg ' + Number(leg.leg_number) + '</strong><br>' + players + '</div>';
+      }).join('') || '<span style="color:#777">Keine Leg-Snapshots gespeichert.</span>';
+      const panel = document.createElement('div');
+      panel.dataset.duelDetailsPanel = String(id);
+      panel.className = 'duel-row';
+      panel.innerHTML = '<div style="color:#bbb;font-size:.78rem"><strong>Leg-Details · Begegnung #' + Number(id) + '</strong><div style="margin-top:6px">' + details + '</div><div style="margin-top:8px;color:#d9a441">Einzelne historische Würfe lassen sich nicht sicher isoliert ändern. Für eine vollständige Quellenkorrektur die Begegnung löschen und danach die Saisonwerte im Statistikeditor anpassen.</div></div>';
+      row.after(panel);
+    } catch (err) {
+      showToast('Begegnungsdetails konnten nicht geladen werden: ' + err.message, true);
+    }
   }
 
   async function deleteAdminDuel(id, status) {
-    const warning = status === 'finished' ? 'ACHTUNG: Die abgeschlossene Begegnung #' + id + ' wird aus den Duellstatistiken entfernt. Legs, Würfe und Highscores werden ebenfalls gelöscht.' : 'Begegnung #' + id + ' vollständig löschen? Die gespeicherten Legs und Wurfdaten werden ebenfalls entfernt.';
+    const warning = status === 'finished'
+      ? 'ACHTUNG: Die abgeschlossene Begegnung #' + id + ' wird mit Legs, Würfen und Highscores gelöscht. Bereits gespeicherte Spieler-Aggregate werden nicht automatisch neu berechnet; passe sie anschließend unter Statistik-Verwaltung für die passende Saison an.'
+      : 'Begegnung #' + id + ' vollständig löschen? Gespeicherte Legs, Würfe und Highscores werden ebenfalls entfernt.';
     if (!confirm(warning)) return;
     try {
       const response = await fetch('/api/duels/' + id, { method: 'DELETE' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
       showToast('Begegnung #' + id + ' gelöscht.');
-      await loadAdminDuels();
+      await Promise.all([loadAdminDuels(), loadHighscores()]);
     } catch (err) { showToast('Fehler beim Löschen: ' + err.message, true); }
   }
 
   document.getElementById('refreshDuelsBtn').addEventListener('click', loadAdminDuels);
   document.getElementById('adminDuelSearch').addEventListener('input', filterAdminDuels);
+  ['adminDuelStatusFilter', 'adminDuelModeFilter', 'adminDuelTypeFilter', 'adminDuelPlayerFilter', 'adminDuelDateFrom', 'adminDuelDateTo']
+    .forEach(id => document.getElementById(id).addEventListener('change', filterAdminDuels));
   loadAdminDuels();
 </script>
 </body>
