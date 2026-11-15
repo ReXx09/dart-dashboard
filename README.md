@@ -23,7 +23,7 @@ Die folgenden Ansichten sind statische Screenshots und benötigen keinen laufend
 
 ## Schnellstart mit Docker
 
-Voraussetzungen: Docker mit Compose-Unterstützung und unter Linux Zugriff auf den Arduino unter `/dev/serial/by-id/`.
+Der Assistent installiert fehlende Docker-/Compose-Komponenten, fragt die Dashboard-Ports ab, erkennt ein angeschlossenes Arduino-USB-Gerät und richtet eine Admin-PIN ein. Den Arduino nach Möglichkeit vor dem Start per USB anschließen. Ohne Arduino kann das Dashboard trotzdem gestartet und der Assistent nach dem Anschließen erneut ausgeführt werden.
 
 ```bash
 git clone https://github.com/ReXx09/dart-dashboard.git
@@ -41,11 +41,13 @@ chmod +x install.sh menu.sh
 ./install.sh quickstart
 ```
 
-Der im Repository eingetragene Gerätepfad in `docker-compose.yml` muss zum eigenen Arduino passen. Den verfügbaren Pfad zeigt beispielsweise dieser Befehl:
+Der Assistent speichert die Einrichtung lokal in `.env` und bindet bei erkanntem Arduino automatisch `docker-compose.arduino.yml` ein. Die Standardports sind 3100 (Browser/Admin) und 3200 (Fire TV). Für eine manuelle Docker-Installation ohne Arduino genügt:
 
 ```bash
-ls -l /dev/serial/by-id/
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
+
+Für manuelle Installationen mit Arduino muss zusätzlich `docker-compose.arduino.yml` eingebunden und `ARDUINO_DEVICE` in `.env` auf ein vorhandenes Host-Gerät unter `/dev` gesetzt werden. Der Installationsassistent übernimmt diese Schritte automatisch.
 
 ## Lokale Entwicklung
 
@@ -87,7 +89,10 @@ Wichtige Einstellungen:
 | Variable | Bedeutung | Standard |
 | --- | --- | --- |
 | `SERVER_IP` | LAN-Adresse des Servers | automatische Erkennung |
+| `PUBLIC_PORT` | Browser-/Admin-Port des Hosts | `3100` |
+| `FIRETV_PORT` | Fire-TV-Port des Hosts | `3200` |
 | `DATA_PATH` | Verzeichnis für persistente Daten | `./data` |
+| `ARDUINO_DEVICE` | Arduino-USB-Gerät auf dem Host | automatische Erkennung |
 | `ADMIN_PIN_HASH` | Scrypt-Hash der Admin-PIN | nicht gesetzt |
 | `ADMIN_SESSION_TTL_MS` | Gültigkeit einer Admin-Sitzung | `900000` |
 | `BACKUP_USB_PATH` | optionales USB-Backupziel | nicht gesetzt |

@@ -522,8 +522,8 @@ function getAdminSession(req) {
 
 function requireAdmin(req, res, next) {
   if (!isLocalOrPrivateAddress(req.socket.remoteAddress)) return res.status(403).json({ error: 'Admin-Zugriff nur aus dem lokalen Netz.' });
-  if (!getAdminPinHash()) return next();
   if (!adminAuthEnabled) return next();
+  if (!getAdminPinHash()) return res.status(503).json({ error: 'Admin-PIN ist nicht konfiguriert. Bitte den Installationsassistenten ausfuehren.' });
   if (!getAdminSession(req)) return res.status(401).json({ error: 'Admin-Anmeldung erforderlich.' });
   next();
 }

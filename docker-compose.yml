@@ -4,25 +4,21 @@ services:
     container_name: dart-dashboard
     restart: unless-stopped
     ports:
-      - "3100:3100"
-      - "3200:3200"
+      - "${PUBLIC_PORT:-3100}:${PUBLIC_PORT:-3100}"
+      - "${FIRETV_PORT:-3200}:${FIRETV_PORT:-3200}"
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3100/api/server-info', response => process.exit(response.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:${PUBLIC_PORT:-3100}/api/server-info', response => process.exit(response.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 10
       start_period: 20s
-    group_add:
-      - dialout
-    devices:
-      - /dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_1453230323235141E0C2-if00:/dev/ttyACM0
     volumes:
       - ${DATA_PATH:-./data}:/app/data
     environment:
       - NODE_ENV=production
-      - BROWSER_PORT=3100
-      - FIRETV_PORT=3200
-      - PORT=3100
+      - BROWSER_PORT=${PUBLIC_PORT:-3100}
+      - FIRETV_PORT=${FIRETV_PORT:-3200}
+      - PORT=${PUBLIC_PORT:-3100}
       - SERVER_IP=${SERVER_IP:-}
       - ADMIN_PIN_HASH=${ADMIN_PIN_HASH:-}
       - ADMIN_SESSION_TTL_MS=${ADMIN_SESSION_TTL_MS:-900000}

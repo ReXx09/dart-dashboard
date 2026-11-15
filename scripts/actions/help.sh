@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 
 run_quickstart_wizard() {
-  local summary
+  local summary=""
   summary+="Schnellstart-Assistent\n\n"
   summary+="Es werden nacheinander ausgefuehrt:\n"
   summary+="1) Systemcheck + Auto-Installation\n"
-  summary+="2) Build + Start des Docker-Containers\n"
-  summary+="3) Health-Checks\n"
-  summary+="4) Gefuehrte Funktionstests\n\n"
+  summary+="2) Ports und Arduino-Verbindung konfigurieren\n"
+  summary+="3) Admin-PIN sicher einrichten\n"
+  summary+="4) Build + Start des Docker-Containers\n"
+  summary+="5) Health-Checks und Funktionstests\n\n"
   summary+="Dauer: je nach Internet/Hardware mehrere Minuten."
 
   show_textbox "Schnellstart" "$(printf '%b' "$summary")"
@@ -17,8 +18,15 @@ run_quickstart_wizard() {
     msg_warn 'Schnellstart nach fehlgeschlagenem oder abgebrochenem Systemcheck beendet.'
     return 1
   fi
-  build_and_start
-  run_health_checks
+  configure_dashboard_installation || {
+    msg_warn 'Schnellstart bei der Konfiguration beendet. Starte ./install.sh quickstart erneut, um fortzufahren.'
+    return 1
+  }
+  build_and_start || return 1
+  if ! run_health_checks; then
+    msg_fail 'Ein oder mehrere Health-Checks sind fehlgeschlagen. Details stehen in der Anzeige oben.'
+    return 1
+  fi
 
   if ask_yes_no 'Zum Abschluss die gefuehrten Funktionstests anzeigen?' 'y'; then
     run_guided_tests
@@ -46,7 +54,7 @@ clone_repo_elsewhere() {
   fi
 
   git clone "$REPO_URL" "$target_dir"
-  msg_ok "Repo geklont nach: ${target_dir}/dart-dashboard"
+  msg_ok "Repo geklont nach: ${target_dir}"
 }
 
 show_beginner_help() {
@@ -56,7 +64,7 @@ show_beginner_help() {
   text+="   - Menuepunkt 'Schnellstart-Assistent'\n"
   text+="   - Fuehrt Systemcheck, Installation und Start zusammen\n\n"
   text+="2) Health-Checks ausfuehren\n"
-  text+="   - Prueft Docker, Container und APIs\n\n"
+  text+="   - Prueft Dashboard, Fire TV, Storage und APIs\n\n"
   text+="3) Gefuehrte Funktionstests starten\n"
   text+="   - Testet die wichtigsten Endpunkte Schritt fuer Schritt\n\n"
   text+="4) Docker-Untermenue nutzen\n"

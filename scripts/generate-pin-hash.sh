@@ -57,10 +57,12 @@ while true; do
   fi
 done
 
-print_step 'Schritt 1/3: Prüfe Node.js auf dem Host oder im Dashboard-Container.'
+print_step 'Schritt 1/3: Erzeuge den PIN-Hash mit Node.js oder Python 3.'
 hash_script='const c=require("crypto"); const p=require("fs").readFileSync(0,"utf8"); const s=c.randomBytes(16).toString("hex"); process.stdout.write(s+":"+c.scryptSync(p,s,32).toString("hex"));'
 if command_exists node; then
   hash="$(printf '%s' "$pin" | node -e "$hash_script")"
+elif command_exists python3; then
+  hash="$(printf '%s' "$pin" | python3 -c 'import hashlib, secrets, sys; pin=sys.stdin.buffer.read(); salt=secrets.token_bytes(16); print(salt.hex()+":"+hashlib.scrypt(pin, salt=salt, n=16384, r=8, p=1, dklen=32).hex())')"
 elif command_exists docker && [[ "$(docker inspect -f '{{.State.Running}}' dart-dashboard 2>/dev/null || true)" == 'true' ]]; then
   hash="$(printf '%s' "$pin" | docker exec -i dart-dashboard node -e "$hash_script")"
 else

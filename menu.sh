@@ -42,12 +42,21 @@ status_badge() {
 
 docker_menu_status() {
   if ! command_exists docker; then printf '%s Docker fehlt' "$(status_badge off)"; return 0; fi
-  local state; state="$(docker inspect -f '{{.State.Status}}' dart-dashboard 2>/dev/null || printf 'nicht gefunden')"
+  local docker_cmd="docker" state
+  if ! docker info >/dev/null 2>&1; then
+    if command_exists sudo && sudo -n docker info >/dev/null 2>&1; then
+      docker_cmd="sudo docker"
+    else
+      printf '%s Docker nicht erreichbar (Berechtigung oder Dienst)' "$(status_badge off)"
+      return 0
+    fi
+  fi
+  state="$($docker_cmd inspect -f '{{.State.Status}}' dart-dashboard 2>/dev/null || printf 'nicht gefunden')"
   case "$state" in
-    running)   printf '%s Container running'   "$(status_badge ok)" ;;
-    exited)    printf '%s Container exited'    "$(status_badge warn)" ;;
-    restarting) printf '%s Container restarting' "$(status_badge warn)" ;;
-    *)         printf '%s Container %s'         "$(status_badge off)" "$state" ;;
+    running)   printf '%s Container laeuft' "$(status_badge ok)" ;;
+    exited)    printf '%s Container gestoppt' "$(status_badge warn)" ;;
+    restarting) printf '%s Container startet neu' "$(status_badge warn)" ;;
+    *)         printf '%s Container %s' "$(status_badge off)" "$state" ;;
   esac
 }
 
@@ -63,7 +72,7 @@ api_menu_status() {
 
 storage_menu_status() {
   if ! command_exists curl; then printf '%s DB unbekannt' "$(status_badge off)"; return 0; fi
-  local port api_base payload client mode
+  local port api_base payload client
   port="$(get_env_value_local PUBLIC_PORT 3100)"; api_base="http://localhost:${port}"
   payload="$(curl -fsS --max-time 2 "${api_base}/api/storage/info" 2>/dev/null || true)"
   if [[ -z "$payload" ]]; then printf '%s DB offline' "$(status_badge off)"; return 0; fi
@@ -78,9 +87,27 @@ arduino_menu_status() {
   port="$(get_env_value_local PUBLIC_PORT 3100)"; api_base="http://localhost:${port}"
   payload="$(curl -fsS --max-time 2 "${api_base}/api/arduino/state" 2>/dev/null || true)"
   if [[ -z "$payload" ]]; then printf '%s Arduino offline' "$(status_badge off)"; return 0; fi
-  connected="$(node -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); process.stdout.write(String(!!(data.connection ? data.connection.connected : data.connected)));' <<<"$payload" 2>/dev/null)"
-  if [[ "$connected" == "true" ]]; then printf '%s Arduino connected' "$(status_badge ok)"
-  else printf '%s Arduino disconnected' "$(status_badge warn)"; fi
+  if printf '%s' "$payload" | grep -Eq '"connected"[[:space:]]*:[[:space:]]*true'; then
+    printf '%s Arduino verbunden' "$(status_badge ok)"
+  else
+    printf '%s Arduino nicht verbunden' "$(status_badge warn)"
+  fi
+}
+
+branch_menu_status() {
+  local branch commit dirty_count
+  if ! command_exists git || ! git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf 'Branch unbekannt'
+    return 0
+  fi
+  branch="$(git -C "$SCRIPT_DIR" branch --show-current 2>/dev/null || true)"
+  [[ -z "$branch" ]] && branch='detached'
+  commit="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || printf '?')"
+  dirty_count="$(git -C "$SCRIPT_DIR" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+  printf '%s @ %s' "$branch" "$commit"
+  if [[ "${dirty_count:-0}" =~ ^[0-9]+$ ]] && (( dirty_count > 0 )); then
+    printf ' (+%s lokale Aenderung(en))' "$dirty_count"
+  fi
 }
 
 menu_status_line()   { printf '%s | %s | %s | %s' "$(docker_menu_status)" "$(api_menu_status)" "$(storage_menu_status)" "$(arduino_menu_status)"; }
@@ -92,6 +119,7 @@ print_line() { printf '%s\n' "--------------------------------------------------
 print_header() {
   clear || true; print_line
   printf ' Loewen Dart Dashboard - Menue\n'; print_line
+  printf ' Branch: %s\n' "$(branch_menu_status)"
   printf ' Live-Spielstand, Spieler, Highscores & Arduino\n\n'
 }
 
@@ -103,7 +131,7 @@ action_label() {
     check)              printf 'Systemcheck + Auto-Installation' ;;
     pin-hash)           printf 'Admin-PIN-Assistent' ;;
     system-update)      printf 'Systempakete aktualisieren' ;;
-    raspi-update)       printf 'Raspberry-Pi-Firmware aktualisieren' ;;
+    raspi-update)       printf 'Raspberry-Pi-Firmware (erweitert) aktualisieren' ;;
     build-start)        printf 'Install/Update + Build + Start' ;;
     dev-build-start)    printf 'Dev-Pull + Build + Start' ;;
     start)              printf 'Container Start' ;;
@@ -120,6 +148,7 @@ action_label() {
     arduino-status)     printf 'Arduino-Status' ;;
     arduino-connect)    printf 'Arduino verbinden' ;;
     arduino-disconnect) printf 'Arduino trennen' ;;
+    overview)           printf 'Einrichtungsstatus & Versionen' ;;
     clone)              printf 'Repo klonen' ;;
     help-guide)         printf 'Einsteiger-Hilfe' ;;
     *)                  printf '%s' "$1" ;;
@@ -162,50 +191,24 @@ show_action_error() {
 }
 
 execute_action() {
-  local action="$1" pause_after="${2:-1}" capture_output="${3:-2}" label
+  local action="$1" pause_after="${2:-1}" label
   label="$(action_label "$action")"; msg_run "$label"
 
-  if [[ "$capture_output" -eq 0 ]]; then
-    local tmp action_status
-    tmp="$(mktemp)"
-    set +e
-    run_action "$action" 2>&1 | tee "$tmp"
-    action_status="${PIPESTATUS[0]}"
-    set -e
-    if [[ "$action_status" -ne 0 ]]; then
-      show_action_error "$action" "$tmp" "$action_status"
-      rm -f "$tmp"
-      return "$action_status"
-    fi
+  local tmp action_status
+  tmp="$(mktemp)"
+  set +e
+  run_action "$action" 2>&1 | tee "$tmp"
+  action_status="${PIPESTATUS[0]}"
+  set -e
+
+  if [[ "$action_status" -ne 0 ]]; then
+    show_action_error "$action" "$tmp" "$action_status" || true
     rm -f "$tmp"
-  elif [[ "$capture_output" -eq 2 ]]; then
-    local tmp action_status
-    tmp="$(mktemp)"
-    set +e
-    run_action "$action" 2>&1 | tee "$tmp"
-    action_status="${PIPESTATUS[0]}"
-    set -e
-    if [[ "$action_status" -ne 0 ]]; then
-      show_action_error "$action" "$tmp" "$action_status"
-      rm -f "$tmp"
-      return "$action_status"
-    fi
-    rm -f "$tmp"
-  else
-    local tmp action_status
-    tmp="$(mktemp)"
-    set +e
-    run_action "$action" >"$tmp" 2>&1
-    action_status="$?"
-    set -e
-    if [[ "$action_status" -ne 0 ]]; then
-      show_action_error "$action" "$tmp" "$action_status"
-      rm -f "$tmp"
-      return "$action_status"
-    fi
-    rm -f "$tmp"
+    msg_warn 'Das Menue bleibt geoeffnet. Details stehen in der Fehleranzeige.'
+    return 0
   fi
-  [[ "$pause_after" -eq 1 ]] && show_action_success "$action"
+  rm -f "$tmp"
+  if [[ "$pause_after" -eq 1 ]]; then show_action_success "$action" || true; fi
 }
 
 ui_pause() {
@@ -219,14 +222,14 @@ ui_pause() {
 submenu_einrichtung_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(printf 'System vorbereiten oder komplett einrichten.\n\nENTER = ausfuehren   ESC = zurueck')" 18 84 5 \
-      "1" "Schnellstart-Assistent (komplette Einrichtung)" \
-      "2" "Systemcheck + Auto-Installation" \
+    choice="$(whiptail --title "Loewen Dart | Einrichtung" --menu "$(printf 'Empfohlen: komplette Einrichtung. Alternativ nur Voraussetzungen installieren.\n\nENTER = ausfuehren   ESC = zurueck')" 18 84 5 \
+      "1" "Komplette Einrichtung (empfohlen)" \
+      "2" "Nur Systemvoraussetzungen pruefen/installieren" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
     case "$choice" in
-      1) execute_action quickstart 1 0 ;;
-      2) execute_action check 1 0 ;;
+      1) execute_action quickstart ;;
+      2) execute_action check ;;
       0|"") return 0 ;;
     esac
   done
@@ -235,18 +238,16 @@ submenu_einrichtung_whiptail() {
 submenu_updates_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart | Updates" --menu "System, Raspberry-Pi-Firmware oder Dashboard aktualisieren.\n\nENTER = ausfuehren   ESC = zurueck" 18 84 6 \
-      "1" "Systempakete: apt update + apt upgrade" \
-      "2" "Raspberry-Pi-Firmware: rpi-update" \
-      "3" "Dashboard: Install/Update + Build + Start" \
-      "4" "Dashboard Dev: Pull + Build + Start" \
+    choice="$(whiptail --title "Loewen Dart | Updates" --menu "Raspberry Pi OS oder Dashboard aktualisieren.\nDie Testversion ist nur fuer Tests gedacht.\n\nENTER = ausfuehren   ESC = zurueck" 18 84 5 \
+      "1" "Raspberry Pi OS: normale Paketupdates" \
+      "2" "Dashboard: stabile Version installieren/aktualisieren" \
+      "3" "Dashboard: Testversion (Dev-Branch, erweitert)" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
     case "$choice" in
-      1) execute_action system-update 0 0 ;;
-      2) execute_action raspi-update 0 0 ;;
-      3) execute_action build-start 1 0 ;;
-      4) execute_action dev-build-start 1 0 ;;
+      1) execute_action system-update 0 ;;
+      2) execute_action build-start ;;
+      3) execute_action dev-build-start 1 0 ;;
       0|"") return 0 ;;
     esac
   done
@@ -255,37 +256,45 @@ submenu_updates_whiptail() {
 submenu_docker_whiptail() {
   while true; do
     local choice status_line; status_line="$(docker_status_line)"
-    choice="$(whiptail --title "Loewen Dart | Docker" --menu "${status_line}\n\n$(printf 'Container steuern, Logs ansehen oder neu aufsetzen.\n\nENTER = ausfuehren   ESC = zurueck')" 20 80 8 \
-      "1" "Start" \
-      "2" "Stop" \
-      "3" "Restart" \
-      "4" "ps  (Status anzeigen)" \
-      "5" "Logs anzeigen (Snapshot)" \
-      "6" "Logs verfolgen (Live, Ctrl+C)" \
-      "7" "Uninstall (Container + Image entfernen)" \
-      "8" "Reinstall (Uninstall + Neustart)" \
+    choice="$(whiptail --title "Loewen Dart | Container verwalten" --menu "${status_line}\n\nContainer starten, stoppen oder Logs pruefen.\nNeuinstallation entfernt den Container und das Image, Daten bleiben erhalten.\n\nENTER = ausfuehren   ESC = zurueck" 20 88 7 \
+      "1" "Container starten" \
+      "2" "Container stoppen" \
+      "3" "Container neu starten" \
+      "4" "Letzte Container-Logs anzeigen" \
+      "5" "Container-Logs live verfolgen (Ctrl+C)" \
+      "6" "Container + Image entfernen (Daten bleiben)" \
+      "7" "Neu installieren (Entfernen + Neuaufbau)" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
-    case "$choice" in 1) execute_action start ;; 2) execute_action stop ;; 3) execute_action restart ;; 4) execute_action ps ;; 5) execute_action logs 0 0 ;; 6) execute_action logs-follow 0 0 ;; 7) execute_action uninstall ;; 8) execute_action reinstall ;; 0|"") return 0 ;; esac
+    case "$choice" in
+      1) execute_action start ;;
+      2) execute_action stop ;;
+      3) execute_action restart ;;
+      4) execute_action logs 0 ;;
+      5) execute_action logs-follow 0 ;;
+      6) execute_action uninstall ;;
+      7) execute_action reinstall ;;
+      0|"") return 0 ;;
+    esac
   done
 }
 
 submenu_monitoring_whiptail() {
   while true; do
     local choice status_line; status_line="$(diag_status_line)"
-    choice="$(whiptail --title "Loewen Dart | Status & Monitoring" --menu "${status_line}\n\n$(printf 'Status pruefen, Diagnose oder Arduino verbinden.\n\nENTER = ausfuehren   ESC = zurueck')" 20 80 7 \
-      "1" "Schnell-Diagnose (Health-Checks)" \
-      "2" "Gesamtstatus" \
-      "3" "Arduino-Status" \
+    choice="$(whiptail --title "Loewen Dart | Status & Arduino" --menu "${status_line}\n\nSystem pruefen und Arduino-Verbindung verwalten.\n\nENTER = ausfuehren   ESC = zurueck" 20 84 7 \
+      "1" "Systemdiagnose (Schnellcheck)" \
+      "2" "Detaillierten Gesamtstatus anzeigen" \
+      "3" "Arduino-Verbindung pruefen" \
       "4" "Arduino verbinden / neu verbinden" \
       "5" "Arduino trennen" \
       "6" "Gefuehrte Funktionstests" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
     case "$choice" in
-      1) execute_action health 0 0 ;; 2) execute_action status 0 0 ;;
-      3) execute_action arduino-status 0 0 ;; 4) execute_action arduino-connect ;;
-      5) execute_action arduino-disconnect ;; 6) execute_action test 0 0 ;;
+      1) execute_action health 0 ;; 2) execute_action status 0 ;;
+      3) execute_action arduino-status 0 ;; 4) execute_action arduino-connect ;;
+      5) execute_action arduino-disconnect ;; 6) execute_action test 0 ;;
       0|"") return 0 ;; esac
   done
 }
@@ -300,8 +309,8 @@ submenu_einrichtung_text() {
     printf '0) Zurueck\n\n'
     read -r -p 'Option [0-2]: ' c
     case "$c" in
-      1) execute_action quickstart 1 0 ;;
-      2) execute_action check 1 0 ;;
+      1) execute_action quickstart ;;
+      2) execute_action check ;;
       0|'') return 0 ;;
     esac
   done
@@ -310,17 +319,15 @@ submenu_einrichtung_text() {
 submenu_updates_text() {
   while true; do
     printf '\n-- Updates ------------------------------------\n'
-    printf '1) Systempakete: apt update + apt upgrade\n'
-    printf '2) Raspberry-Pi-Firmware: rpi-update\n'
-    printf '3) Dashboard: Install/Update + Build + Start\n'
-    printf '4) Dashboard Dev: Pull + Build + Start (%s)\n' "${DART_DEV_BRANCH:-refactor-central-data}"
+    printf '1) Raspberry Pi OS: normale Paketupdates\n'
+    printf '2) Dashboard: stabile Version installieren/aktualisieren\n'
+    printf '3) Dashboard: Testversion (Dev-Branch, erweitert) (%s)\n' "${DART_DEV_BRANCH:-refactor-central-data}"
     printf '0) Zurueck\n\n'
-    read -r -p 'Option [0-4]: ' c
+    read -r -p 'Option [0-3]: ' c
     case "$c" in
-      1) execute_action system-update 0 0 ;;
-      2) execute_action raspi-update 0 0 ;;
-      3) execute_action build-start 1 0 ;;
-      4) execute_action dev-build-start 1 0 ;;
+      1) execute_action system-update 0 ;;
+      2) execute_action build-start ;;
+      3) execute_action dev-build-start 1 0 ;;
       0|'') return 0 ;;
     esac
   done
@@ -328,33 +335,47 @@ submenu_updates_text() {
 
 submenu_docker_text() {
   while true; do
-    printf '\n-- Docker -------------------------------------\n'
+    printf '\n-- Container verwalten ------------------------\n'
     printf '%s\n' "$(docker_status_line)"
-    printf '1) Start\n2) Stop\n3) Restart\n4) ps\n5) Logs (Snapshot)\n6) Logs (Live)\n7) Uninstall\n8) Reinstall\n0) Zurueck\n\n'
-    read -r -p 'Option [0-8]: ' c
-    case "$c" in 1) execute_action start ;; 2) execute_action stop ;; 3) execute_action restart ;; 4) execute_action ps ;; 5) execute_action logs 0 0 ;; 6) execute_action logs-follow 0 0 ;; 7) execute_action uninstall ;; 8) execute_action reinstall ;; 0|'') return 0 ;; esac
+    printf 'Container starten, stoppen oder Logs pruefen.\nNeuinstallation entfernt Container und Image, Daten bleiben erhalten.\n\n'
+    printf '1) Container starten\n2) Container stoppen\n3) Container neu starten\n4) Letzte Container-Logs anzeigen\n5) Container-Logs live verfolgen (Ctrl+C)\n6) Container + Image entfernen (Daten bleiben)\n7) Neu installieren (Entfernen + Neuaufbau)\n0) Zurueck\n\n'
+    read -r -p 'Option [0-7]: ' c
+    case "$c" in
+      1) execute_action start ;;
+      2) execute_action stop ;;
+      3) execute_action restart ;;
+      4) execute_action logs 0 ;;
+      5) execute_action logs-follow 0 ;;
+      6) execute_action uninstall ;;
+      7) execute_action reinstall ;;
+      0|'') return 0 ;;
+    esac
   done
 }
 
 submenu_monitoring_text() {
   while true; do
-    printf '\n-- Status & Monitoring ------------------------\n'
+    printf '\n-- Status & Arduino ---------------------------\n'
     printf '%s\n' "$(diag_status_line)"
-    printf '1) Health-Checks\n2) Gesamtstatus\n3) Arduino-Status\n4) Arduino verbinden\n5) Arduino trennen\n6) Funktionstests\n0) Zurueck\n\n'
+    printf '1) Systemdiagnose (Schnellcheck)\n2) Detaillierten Gesamtstatus anzeigen\n3) Arduino-Verbindung pruefen\n4) Arduino verbinden / neu verbinden\n5) Arduino trennen\n6) Detaillierte Funktionstests\n0) Zurueck\n\n'
     read -r -p 'Option [0-6]: ' c
-    case "$c" in 1) execute_action health 0 0 ;; 2) execute_action status 0 0 ;; 3) execute_action arduino-status 0 0 ;; 4) execute_action arduino-connect ;; 5) execute_action arduino-disconnect ;; 6) execute_action test 0 0 ;; 0|'') return 0 ;; esac
+    case "$c" in 1) execute_action health 0 ;; 2) execute_action status 0 ;; 3) execute_action arduino-status 0 ;; 4) execute_action arduino-connect ;; 5) execute_action arduino-disconnect ;; 6) execute_action test 0 ;; 0|'') return 0 ;; esac
   done
 }
 
 submenu_system_whiptail() {
   while true; do
     local choice
-    choice="$(whiptail --title "Loewen Dart | Systempflege" --menu "PIN-Schutz und administrative Systemfunktionen.\n\nPIN-Hash wird nur als Hash in .env gespeichert.\n\nENTER = ausfuehren   ESC = zurueck" 16 84 4 \
-      "1" "Admin-PIN-Assistent starten" \
+    choice="$(whiptail --title "Loewen Dart | Sicherheit & Systempflege" --menu "PIN einrichten oder erweiterte Wartung starten.\nFirmware-Updates sind optional und koennen einen Neustart erfordern.\n\nENTER = ausfuehren   ESC = zurueck" 18 88 5 \
+      "1" "Admin-PIN einrichten/aendern" \
+      "2" "Raspberry-Pi-Firmware aktualisieren (erweitert)" \
+      "3" "Repo in einen anderen Ordner klonen" \
       "0" "Zurueck" \
       3>&1 1>&2 2>&3)" || return 0
     case "$choice" in
       1) execute_action pin-hash ;;
+      2) execute_action raspi-update 0 ;;
+      3) execute_action clone ;;
       0|"") return 0 ;;
     esac
   done
@@ -362,12 +383,18 @@ submenu_system_whiptail() {
 
 submenu_system_text() {
   while true; do
-    printf '\n-- Systempflege -------------------------------\n'
-    printf '1) Admin-PIN-Assistent starten\n'
+    printf '\n-- Sicherheit & Systempflege ------------------\n'
+    printf 'PIN einrichten oder erweiterte Wartung starten.\n'
+    printf 'Firmware-Updates sind optional und koennen einen Neustart erfordern.\n\n'
+    printf '1) Admin-PIN einrichten/aendern\n'
+    printf '2) Raspberry-Pi-Firmware aktualisieren (erweitert)\n'
+    printf '3) Repo in einen anderen Ordner klonen\n'
     printf '0) Zurueck\n\n'
-    read -r -p 'Option [0-1]: ' c
+    read -r -p 'Option [0-3]: ' c
     case "$c" in
       1) execute_action pin-hash ;;
+      2) execute_action raspi-update 0 ;;
+      3) execute_action clone ;;
       0|"") return 0 ;;
     esac
   done
@@ -378,13 +405,13 @@ submenu_system_text() {
 main_menu_whiptail() {
   while true; do
     local choice status_line; status_line="$(menu_status_line)"
-    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 22 84 9 \
+    choice="$(whiptail --title "Loewen Dart Dashboard | $(hostname)" --menu "${status_line}\nBranch: $(branch_menu_status)\n\nWaehle einen Bereich:\nENTER = oeffnen   ESC = beenden" 22 88 9 \
       "1" "Einrichtung >" \
       "2" "Updates >" \
       "3" "Status & Monitoring >" \
-      "4" "Docker >" \
-      "5" "Systempflege >" \
-      "6" "Repo in anderen Ordner klonen" \
+      "4" "Einrichtungsstatus & Versionen" \
+      "5" "Container verwalten >" \
+      "6" "Sicherheit & Systempflege >" \
       "7" "Hilfe fuer Einsteiger" \
       "8" "Beenden" \
       3>&1 1>&2 2>&3)" || exit 0
@@ -392,9 +419,9 @@ main_menu_whiptail() {
       1) submenu_einrichtung_whiptail ;;
       2) submenu_updates_whiptail ;;
       3) submenu_monitoring_whiptail ;;
-      4) submenu_docker_whiptail ;;
-      5) submenu_system_whiptail ;;
-      6) execute_action clone 1 0 ;;
+      4) execute_action overview 0 ;;
+      5) submenu_docker_whiptail ;;
+      6) submenu_system_whiptail ;;
       7) execute_action help-guide ;;
       8) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n' ;;
@@ -409,9 +436,9 @@ main_menu_text() {
     printf ' 1) Einrichtung >\n'
     printf ' 2) Updates >\n'
     printf ' 3) Status & Monitoring >\n'
-    printf ' 4) Docker >\n'
-    printf ' 5) Systempflege >\n'
-    printf ' 6) Repo klonen\n'
+    printf ' 4) Einrichtungsstatus & Versionen\n'
+    printf ' 5) Container verwalten >\n'
+    printf ' 6) Sicherheit & Systempflege >\n'
     printf ' 7) Hilfe fuer Einsteiger\n'
     printf ' 8) Beenden\n\n'
     read -r -p 'Option [1-8]: ' c
@@ -419,9 +446,9 @@ main_menu_text() {
       1) submenu_einrichtung_text ;;
       2) submenu_updates_text ;;
       3) submenu_monitoring_text ;;
-      4) submenu_docker_text ;;
-      5) submenu_system_text ;;
-      6) execute_action clone 1 0 ;;
+      4) execute_action overview 0 ;;
+      5) submenu_docker_text ;;
+      6) submenu_system_text ;;
       7) execute_action help-guide ;;
       8) printf 'Beendet.\n'; exit 0 ;;
       *) printf 'Ungueltige Auswahl.\n'; sleep 1 ;;

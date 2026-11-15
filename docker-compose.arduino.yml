@@ -1,0 +1,6 @@
+services:
+  dart-dashboard:
+    group_add:
+      - "${DIALOUT_GID:-20}"
+    devices:
+      - "${ARDUINO_DEVICE:?Set ARDUINO_DEVICE in .env to the host Arduino serial device}:/dev/ttyACM0"

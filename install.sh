@@ -34,6 +34,7 @@ run_action() {
     arduino-status) show_arduino_status ;;
     arduino-connect) connect_arduino_monitor ;;
     arduino-disconnect) disconnect_arduino_monitor ;;
+    overview)       show_setup_overview ;;
     clone)          clone_repo_elsewhere ;;
     help-guide)     show_beginner_help ;;
     *)
@@ -72,6 +73,7 @@ Actions:
   arduino-status  Arduino-Status anzeigen
   arduino-connect Arduino verbinden / neu verbinden
   arduino-disconnect Arduino-Monitor trennen
+  overview        Einrichtungsstatus, Dienste, Branch und Versionen anzeigen
   clone           Repo in anderen Ordner klonen
   help-guide      Einsteiger-Hilfe anzeigen
 
@@ -96,7 +98,7 @@ if [[ $# -eq 0 || "${1:-}" == "menu" ]]; then
 fi
 
 case "${1:-}" in
-  quickstart|check|pin-hash|system-update|raspi-update|build-start|dev-build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|arduino-status|arduino-connect|arduino-disconnect|help-guide)
+  quickstart|check|pin-hash|system-update|raspi-update|build-start|dev-build-start|start|stop|restart|ps|logs|logs-follow|status|uninstall|reinstall|clone|health|test|arduino-status|arduino-connect|arduino-disconnect|overview|help-guide)
     run_action "$1"
     ;;
   -h|--help|help)

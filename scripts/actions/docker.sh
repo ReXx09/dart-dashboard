@@ -29,19 +29,11 @@ build_and_start() {
 
   switch_to_remote_branch master
 
-  init_compose_build_args
-
   msg_run 'Baue Container mit aktuellem Code...'
-  if [[ ${#COMPOSE_BUILD_ARGS[@]} -gt 0 ]]; then
-    $COMPOSE_CMD "${COMPOSE_BUILD_ARGS[@]}" up -d --build
-  else
-    $COMPOSE_CMD build --no-cache
-    msg_run 'Starte Container...'
-    $COMPOSE_CMD up -d
-  fi
+  compose up -d --build
 
   msg_info 'Container Status:'
-  $COMPOSE_CMD ps
+  compose ps
   show_network_hint
 }
 
@@ -52,18 +44,11 @@ dev_build_and_start() {
   local dev_branch="${DART_DEV_BRANCH:-refactor-central-data}"
   switch_to_remote_branch "$dev_branch"
 
-  init_compose_build_args
   msg_run 'Baue Dev-Container mit aktuellem Code...'
-  if [[ ${#COMPOSE_BUILD_ARGS[@]} -gt 0 ]]; then
-    $COMPOSE_CMD "${COMPOSE_BUILD_ARGS[@]}" up -d --build
-  else
-    $COMPOSE_CMD build --no-cache
-    msg_run 'Starte Dev-Container...'
-    $COMPOSE_CMD up -d
-  fi
+  compose up -d --build
 
   msg_info 'Container Status:'
-  $COMPOSE_CMD ps
+  compose ps
   show_network_hint
 }
 
@@ -72,49 +57,49 @@ start_existing() {
   ensure_env_file
 
   msg_run 'Starte vorhandenen lokalen Container...'
-  $COMPOSE_CMD up -d
-  $COMPOSE_CMD ps
+  compose up -d
+  compose ps
   show_network_hint
 }
 
 stop_stack() {
   ensure_docker_ready
   msg_run 'Stoppe Container...'
-  $COMPOSE_CMD down
+  compose down
 }
 
 restart_stack() {
   ensure_docker_ready
   ensure_env_file
   msg_run 'Starte Docker-Container neu...'
-  $COMPOSE_CMD down
-  $COMPOSE_CMD up -d
-  $COMPOSE_CMD ps
+  compose down
+  compose up -d
+  compose ps
   show_network_hint
 }
 
 show_compose_ps() {
   ensure_docker_ready
-  $COMPOSE_CMD ps
+  compose ps
 }
 
 show_logs() {
   ensure_docker_ready
-  $COMPOSE_CMD logs --tail=100
+  compose logs --tail=100
 }
 
 show_logs_follow() {
   ensure_docker_ready
-  $COMPOSE_CMD logs --tail=50 -f
+  compose logs --tail=50 -f
 }
 
 show_status() {
   ensure_docker_ready
   msg_run 'Container Status:'
-  $COMPOSE_CMD ps
+  compose ps
 
   msg_run 'Letzte Log-Auszuege:'
-  $COMPOSE_CMD logs --tail=20
+  compose logs --tail=20
 
   msg_run 'Port und Netzwerk:'
   show_network_hint
@@ -132,7 +117,7 @@ uninstall_stack() {
     msg_warn 'Abgebrochen.'; return 2
   fi
 
-  $COMPOSE_CMD down --remove-orphans || true
+  compose down --remove-orphans || true
   docker rmi ghcr.io/rexx09/loewen-dart-dashboard:latest 2>/dev/null \
     && msg_ok 'Image entfernt.' || msg_warn 'Image nicht gefunden.'
 

@@ -661,6 +661,14 @@
           'triple-hit': [[440, 660, .42, 'triangle']]
         };
         const pattern = patterns[sound] || patterns['positive-chime'];
+        let remainingSources = pattern.length;
+        const closeContextWhenDone = () => {
+          remainingSources -= 1;
+          if (remainingSources === 0) {
+            ctx.close().catch(error => console.warn('[Controller-Audio] AudioContext konnte nicht geschlossen werden:', error));
+          }
+        };
+        oscillator.addEventListener('ended', closeContextWhenDone, { once: true });
         oscillator.type = pattern[0][3];
         oscillator.frequency.setValueAtTime(pattern[0][0], now);
         oscillator.frequency.linearRampToValueAtTime(pattern[0][1], now + pattern[0][2]);
@@ -672,6 +680,7 @@
         oscillator.stop(now + pattern[0][2]);
         if (pattern[1]) {
           const second = ctx.createOscillator();
+          second.addEventListener('ended', closeContextWhenDone, { once: true });
           const secondGain = ctx.createGain();
           second.type = pattern[1][3];
           second.frequency.setValueAtTime(pattern[1][0], now + .18);
@@ -683,8 +692,8 @@
           second.start(now + .18);
           second.stop(now + .18 + pattern[1][2]);
         }
-        setTimeout(() => ctx.close().catch(() => {}), 1800);
-      } catch (_) {
+      } catch (error) {
+        console.warn('[Controller-Audio] Audio-Vorschau konnte nicht abgespielt werden:', error);
         showToast('Audio-Vorschau wurde vom Browser blockiert');
       }
     }

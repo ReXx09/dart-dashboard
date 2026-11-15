@@ -3,10 +3,11 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$SCRIPT_DIR"
 
-REPO_URL="https://github.com/ReXx09/loewen-dart-dashboard.git"
+REPO_URL="https://github.com/ReXx09/dart-dashboard.git"
 USE_WHIPTAIL=0
 COMPOSE_BUILD_ARGS=()
 COMPOSE_CMD=""
+DOCKER_CMD=""
 
 get_env_value() {
   local key="$1"
@@ -73,6 +74,17 @@ ask_yes_no() {
   [[ "$answer" =~ ^[Yy]$ ]]
 }
 
+ask_input() {
+  local title="$1" prompt="$2" default_value="${3:-}" value
+  if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
+    value="$(whiptail --title "$title" --inputbox "$prompt" 11 78 "$default_value" 3>&1 1>&2 2>&3)" || return 1
+  else
+    read -r -p "$prompt [$default_value]: " value
+    value="${value:-$default_value}"
+  fi
+  printf '%s' "$value"
+}
+
 ui_pause() {
   stty sane 2>/dev/null || true
   if [[ "$USE_WHIPTAIL" -eq 1 ]]; then
@@ -95,22 +107,42 @@ show_textbox() {
 }
 
 detect_compose_cmd() {
-  if command_exists docker && docker compose version >/dev/null 2>&1; then
-    COMPOSE_CMD="docker compose"
-    return 0
+  DOCKER_CMD=""
+  if command_exists docker; then
+    if docker info >/dev/null 2>&1; then
+      DOCKER_CMD="docker"
+    elif command_exists sudo && sudo docker info >/dev/null 2>&1; then
+      DOCKER_CMD="sudo docker"
+    fi
+    if [[ -n "$DOCKER_CMD" ]] && $DOCKER_CMD compose version >/dev/null 2>&1; then
+      COMPOSE_CMD="$DOCKER_CMD compose"
+      return 0
+    fi
+    if [[ -n "$DOCKER_CMD" ]] && command_exists docker-compose && docker-compose version >/dev/null 2>&1; then
+      if [[ "$DOCKER_CMD" == "sudo docker" ]]; then COMPOSE_CMD="sudo docker-compose"
+      else COMPOSE_CMD="docker-compose"; fi
+      return 0
+    fi
   fi
-  if command_exists docker-compose; then
+  if command_exists docker-compose && docker-compose version >/dev/null 2>&1; then
     COMPOSE_CMD="docker-compose"
+    DOCKER_CMD="docker"
     return 0
   fi
   return 1
 }
 
 init_compose_build_args() {
-  COMPOSE_BUILD_ARGS=()
-  if [[ -f docker-compose.yml && -f docker-compose.build.yml ]]; then
-    COMPOSE_BUILD_ARGS=(-f docker-compose.yml -f docker-compose.build.yml)
+  COMPOSE_BUILD_ARGS=(-f docker-compose.yml)
+  if [[ -n "$(get_env_value ARDUINO_DEVICE)" ]]; then
+    COMPOSE_BUILD_ARGS+=(-f docker-compose.arduino.yml)
   fi
+  if [[ -f docker-compose.build.yml ]]; then COMPOSE_BUILD_ARGS+=(-f docker-compose.build.yml); fi
+}
+
+compose() {
+  init_compose_build_args
+  $COMPOSE_CMD "${COMPOSE_BUILD_ARGS[@]}" "$@"
 }
 
 ensure_sudo() {
@@ -137,29 +169,53 @@ ensure_env_file() {
     if [[ -f .env.example ]]; then
       cp .env.example .env
       msg_ok '.env aus .env.example erstellt.'
+    else
+      msg_fail '.env und .env.example fehlen; Konfiguration kann nicht angelegt werden.'
+      return 1
     fi
   fi
+  chmod 600 .env
 }
 
 ensure_docker_ready() {
   if ! command_exists docker; then
     msg_fail 'Docker ist nicht installiert.'
     if ask_yes_no 'Soll Docker jetzt installiert werden?' 'y'; then
-      curl -fsSL https://get.docker.com | sh
+      install_docker_stack_debian
     else
       exit 1
     fi
   fi
 
+  if command_exists systemctl && command_exists sudo && ! docker info >/dev/null 2>&1; then
+    sudo systemctl enable --now docker || {
+      msg_fail 'Der Docker-Dienst konnte nicht gestartet werden.'
+      return 1
+    }
+  fi
+
   if ! detect_compose_cmd; then
     msg_fail 'Docker Compose ist nicht verfuegbar.'
-    exit 1
+    if command_exists apt-get && command_exists sudo && ask_yes_no 'Docker Compose jetzt installieren?' 'y'; then
+      sudo apt-get update
+      sudo apt-get install -y docker-compose-plugin
+    fi
+    if ! detect_compose_cmd; then
+      msg_fail 'Docker Compose konnte nicht bereitgestellt werden. Bitte Installationsausgabe pruefen.'
+      return 1
+    fi
+  fi
+  if [[ -z "$DOCKER_CMD" ]] || ! $DOCKER_CMD info >/dev/null 2>&1; then
+    msg_fail 'Docker ist installiert, aber der Dienst ist nicht erreichbar.'
+    msg_info 'Pruefe den Docker-Dienst und die Benutzerberechtigungen.'
+    return 1
   fi
 }
 
 show_network_hint() {
-  local port ip_address count=0 attempt
+  local port firetv_port ip_address count=0 attempt
   port="$(get_env_value PUBLIC_PORT 3100)"
+  firetv_port="$(get_env_value FIRETV_PORT 3200)"
 
   if command_exists curl; then
     for attempt in {1..15}; do
@@ -173,12 +229,14 @@ show_network_hint() {
   if command_exists curl && curl -fsS --max-time 2 "http://localhost:${port}/api/server-info" >/dev/null 2>&1; then
     msg_info ''
     msg_info '=== Dashboard ist bereit ==='
-    msg_info "Lokaler Zugriff: http://localhost:${port}"
+    msg_info "Spiel-/Admin-Ansicht: http://localhost:${port}"
+    msg_info "Fire-TV-Ansicht:      http://localhost:${firetv_port}/panels/firetv-dashboard.html"
 
     if command_exists ip; then
       while IFS= read -r ip_address; do
         [[ -z "$ip_address" || "$ip_address" == 127.* ]] && continue
-        msg_info "Netzwerk:       http://${ip_address}:${port}"
+        msg_info "Im Heimnetz:    http://${ip_address}:${port}"
+        msg_info "Fire TV:        http://${ip_address}:${firetv_port}/panels/firetv-dashboard.html"
         count=$((count + 1))
         [[ "$count" -ge 3 ]] && break
       done < <(ip -4 -o addr show 2>/dev/null | awk '{split($4, address, "/"); print address[1]}')
