@@ -4499,10 +4499,16 @@ app.delete('/api/highscores/selected', requireAdmin, async (req, res) => {
   const ids = [...new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter(id => Number.isInteger(id) && id > 0))];
   if (!ids.length) return res.status(400).json({ error: 'Keine Highscores ausgewählt.' });
   try {
+    const entries = [];
     for (const id of ids) {
       const existing = await dataStore.getHighscore(id);
-      if (existing && String(existing.kind || '') === 'manual') await dataStore.deleteHighscore(id);
+      if (!existing) return res.status(404).json({ error: `Highscore #${id} wurde nicht gefunden. Bitte die Liste aktualisieren.` });
+      if (String(existing.kind || '') !== 'manual' && Number(existing.duel_id || 0) > 0) {
+        return res.status(409).json({ error: `Highscore #${id} gehört zu Begegnung #${existing.duel_id}. Bitte die gesamte Begegnung in der Begegnungsverwaltung löschen.` });
+      }
+      entries.push(existing);
     }
+    for (const entry of entries) await dataStore.deleteHighscore(entry.id);
     res.json({ ok: true, highscores: await getHighscores() });
   } catch (err) { res.status(500).json({ error: 'Ausgewählte Highscores konnten nicht gelöscht werden: ' + err.message }); }
 });

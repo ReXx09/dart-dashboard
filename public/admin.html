@@ -275,7 +275,7 @@
         <button class="btn-save" id="resetHsBtn" style="background:#8b0000;padding:7px 14px;font-size:.78rem">Alle manuellen zurücksetzen</button>
       </div>
       <div class="field-inline" style="margin:0 0 10px">
-        <label style="font-size:.78rem;color:#888"><input type="checkbox" id="hsSelectVisible" /> Alle sichtbaren manuellen auswählen</label>
+        <label style="font-size:.78rem;color:#888"><input type="checkbox" id="hsSelectVisible" /> Alle sichtbaren löschbaren auswählen</label>
         <button class="btn-save" id="resetSelectedHsBtn" style="background:#8b0000;padding:6px 12px;font-size:.76rem">Auswahl zurücksetzen</button>
       </div>
       <div style="max-height:400px;overflow-y:auto;border:1px solid #1e1e1e;border-radius:8px">
@@ -311,6 +311,7 @@
         <input id="adminPlayerSearch" type="search" placeholder="Spieler oder Profil suchen" aria-label="Spieler oder Profil suchen" />
         <select id="adminPlayerSelect" aria-label="Spieler oder Profil auswählen"><option value="">Spieler auswählen</option></select>
       </div>
+      <div class="field-hint" style="margin:8px 0 0">Spielerstatistiken können pro Slot bearbeitet oder zurückgesetzt werden. Der Reset löscht die Statistikwerte und Leg-History des gewählten Spielers.</div>
       <div class="stats-editor" id="statsEditor" hidden>
         <label>Spiele<input data-stat="games_played" type="number" min="0"></label>
         <label>Gewonnen<input data-stat="games_won" type="number" min="0"></label>
@@ -873,6 +874,7 @@
     const body = document.getElementById('hsTableBody');
     if (!list.length) {
       body.innerHTML = '<tr><td colspan="7" style="padding:30px;text-align:center;color:#555">Keine Highscore-Einträge vorhanden.</td></tr>';
+      updateSelectedHighscoreState();
       return;
     }
     body.innerHTML = list.map((entry, idx) => {
@@ -893,7 +895,7 @@
               '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>'
             : '<span style="color:#777;font-size:.68rem">Quelle: Begegnung #' + Number(entry.duelId) + '</span>';
       return '<tr>' +
-        '<td style="padding:8px 10px;text-align:center">' + (isManual ? '<input type="checkbox" class="hs-select" value="' + Number(entry.id) + '" aria-label="Highscore von ' + escapeAttr(entry.player) + ' auswählen" />' : '<span style="color:#555">-</span>') + '</td>' +
+        '<td style="padding:8px 10px;text-align:center">' + (canDelete ? '<input type="checkbox" class="hs-select" value="' + Number(entry.id) + '" aria-label="Highscore von ' + escapeAttr(entry.player) + ' auswählen" />' : '<span style="color:#555" title="Highscores aus einer Begegnung werden zusammen mit der Begegnung gelöscht">-</span>') + '</td>' +
         '<td style="padding:8px 10px;color:#666;font-weight:700">' + (idx + 1) + '</td>' +
         '<td style="padding:8px 10px;color:#f1f1f1">' + escapeHtml(entry.player) + '</td>' +
         '<td style="padding:8px 10px;text-align:right;color:#f4a261;font-weight:700">' + entry.score + '</td>' +
@@ -915,6 +917,7 @@
       });
     });
     body.querySelectorAll('.hs-select').forEach(input => input.addEventListener('change', updateSelectedHighscoreState));
+    updateSelectedHighscoreState();
     body.querySelectorAll('[data-hs-edit-id]').forEach(btn => {
       btn.addEventListener('click', function() {
         editingHighscoreId = Number(this.dataset.hsEditId);
@@ -938,7 +941,11 @@
   }
 
   function updateSelectedHighscoreState() {
-    const selected = document.querySelectorAll('#hsTableBody .hs-select:checked').length;
+    const selectable = [...document.querySelectorAll('#hsTableBody .hs-select')];
+    const selected = selectable.filter(input => input.checked).length;
+    const selectVisible = document.getElementById('hsSelectVisible');
+    selectVisible.disabled = selectable.length === 0;
+    selectVisible.checked = selectable.length > 0 && selected === selectable.length;
     document.getElementById('resetSelectedHsBtn').disabled = selected === 0;
   }
 
@@ -1058,7 +1065,6 @@
   let adminPlayers = [];
   let adminProfiles = [];
   let selectedAdminPlayer = null;
-  let selectedAdminProfile = null;
 
   async function loadAdminPlayers() {
     try {
@@ -1078,15 +1084,20 @@
   function renderAdminPlayerOptions() {
     const select = document.getElementById('adminPlayerSelect');
     const search = document.getElementById('adminPlayerSearch').value.trim().toLocaleLowerCase('de-DE');
-    const profileOptions = adminProfiles
-      .filter(profile => profile.name && String(profile.name).toLocaleLowerCase('de-DE').includes(search))
-      .map(profile => {
-        const assignedPlayer = adminPlayers.find(player => Number(player.profileId || 0) === Number(profile.id));
-        return { profile, assignedPlayer };
-      });
+    const playerOptions = adminPlayers
+      .filter(player => Number(player.slot) > 0 && String(player.name || '').trim())
+      .map(player => ({
+        player,
+        profile: adminProfiles.find(item => Number(item.id) === Number(player.profileId || 0))
+      }))
+      .filter(({ player, profile }) => !search
+        || String(player.name || '').toLocaleLowerCase('de-DE').includes(search)
+        || String(profile && profile.name || '').toLocaleLowerCase('de-DE').includes(search));
     select.innerHTML = '<option value="">Spieler auswählen</option>' +
-      profileOptions.map(({ profile, assignedPlayer }) => '<option value="' + Number(profile.id) + '"' + (assignedPlayer ? '' : ' disabled') + '>' + escapeHtml(profile.name) + (assignedPlayer ? '' : ' · kein Slot') + '</option>').join('');
-    if (selectedAdminProfile && profileOptions.some(({ profile, assignedPlayer }) => Number(profile.id) === selectedAdminProfile && assignedPlayer)) select.value = String(selectedAdminProfile);
+      playerOptions.map(({ player, profile }) => '<option value="' + Number(player.slot) + '">' + escapeHtml(player.name) + ' · Slot ' + Number(player.slot) + (profile ? ' · ' + escapeHtml(profile.name) : '') + '</option>').join('');
+    const selectionIsVisible = playerOptions.some(({ player }) => Number(player.slot) === Number(selectedAdminPlayer));
+    select.value = selectionIsVisible ? String(selectedAdminPlayer) : '';
+    if (selectedAdminPlayer && !selectionIsVisible) loadAdminStats(null);
   }
 
   function renderAdminProfileAssignments() {
@@ -1118,14 +1129,6 @@
       showToast('Profilzuordnung nicht gespeichert: ' + error.message, true);
       select.disabled = false;
     }
-  }
-
-  function loadAdminStatsByProfile(profileId) {
-    selectedAdminProfile = Number(profileId) || null;
-    const profile = adminProfiles.find(item => Number(item.id) === selectedAdminProfile);
-    const assignedPlayer = profile && adminPlayers.find(player => Number(player.profileId || 0) === selectedAdminProfile);
-    selectedAdminPlayer = assignedPlayer ? Number(assignedPlayer.slot) : null;
-    return loadAdminStats(selectedAdminPlayer);
   }
 
   async function loadAdminStats(playerId) {
@@ -1177,7 +1180,7 @@
   }
 
   document.getElementById('adminPlayerSearch').addEventListener('input', renderAdminPlayerOptions);
-  document.getElementById('adminPlayerSelect').addEventListener('change', event => loadAdminStatsByProfile(event.target.value));
+  document.getElementById('adminPlayerSelect').addEventListener('change', event => loadAdminStats(event.target.value));
   document.getElementById('saveStatsBtn').addEventListener('click', saveAdminStats);
   document.getElementById('resetStatsBtn').addEventListener('click', resetAdminStats);
   loadAdminPlayers();
