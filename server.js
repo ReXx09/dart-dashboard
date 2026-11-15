@@ -258,6 +258,10 @@ function isLiveLifecycleCurrent(generation) {
   return Number(generation) === liveLifecycleGeneration;
 }
 
+function isLiveGameRunning(state) {
+  return String(state?.game?.status || '') === 'running';
+}
+
 function broadcastReload() {
   sseClients.forEach(res => { try { res.write('event: reload\ndata: 1\n\n'); } catch { sseClients.delete(res); } });
 }
@@ -1998,7 +2002,7 @@ async function applyArduinoThrowFromChannel(channel, evt = {}, generation = live
   const state = await getLiveState();
   if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
-  if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
+  if (!isLiveGameRunning(state)) return { ok: false, reason: state.game.status === 'leg-finished' ? 'leg-finished' : 'game-not-running' };
   if (state.lastAction && state.lastAction.autoAdvancePending) return { ok: false, reason: 'auto-advance-pending' };
 
   const targetIndex = Number.isInteger(state.game.activePlayer) ? state.game.activePlayer : 0;
@@ -2157,7 +2161,7 @@ async function applyArduinoMiss(evt = {}, reason = 'timeout', generation = liveL
   const state = await getLiveState();
   if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
-  if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
+  if (!isLiveGameRunning(state)) return { ok: false, reason: state.game.status === 'leg-finished' ? 'leg-finished' : 'game-not-running' };
   if (state.lastAction && state.lastAction.autoAdvancePending) return { ok: false, reason: 'auto-advance-pending' };
 
   const targetIndex = Number.isInteger(state.game.activePlayer) ? state.game.activePlayer : 0;
@@ -2361,7 +2365,7 @@ async function applyArduinoThrowFromMatrix(hit, generation = liveLifecycleGenera
   const state = await getLiveState();
   if (!isLiveLifecycleCurrent(generation)) return { ok: false, reason: 'stale-lifecycle' };
   if (!Array.isArray(state.players) || state.players.length === 0) return { ok: false, reason: 'no-players' };
-  if (state.game.status === 'leg-finished') return { ok: false, reason: 'leg-finished' };
+  if (!isLiveGameRunning(state)) return { ok: false, reason: state.game.status === 'leg-finished' ? 'leg-finished' : 'game-not-running' };
   if (state.lastAction && state.lastAction.autoAdvancePending) return { ok: false, reason: 'auto-advance-pending' };
 
   const targetIndex = Number.isInteger(state.game.activePlayer) ? state.game.activePlayer : 0;
@@ -2602,6 +2606,7 @@ function parseArduinoLine(line) {
         const state = await getLiveState();
         if (!isLiveLifecycleCurrent(taskGeneration)) return null;
         if (!Array.isArray(state.players) || state.players.length === 0) return;
+      if (!isLiveGameRunning(state)) return;
         const nextIdx = (state.game.activePlayer + 1) % state.players.length;
         state.game.activePlayer = nextIdx;
         state.game.currentThrow = 0;
@@ -3485,14 +3490,16 @@ app.post('/api/live/start', async (req, res) => {
   if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
   if (slots.length < 1 || slots.length > 8) return res.status(400).json({ error: 'Bitte 1 bis 8 Spieler auswählen.' });
   try {
+    const availableSlots = new Set((await getActivePlayersForLive()).map(player => Number(player.slot)));
+    if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
     const currentState = await getLiveState();
+    invalidateLiveLifecycle();
+    await liveCompletionQueue;
+    await flushLiveDetailWrites();
     if (Number(currentState.game?.duelId || 0) > 0) {
       const currentDuel = await dataStore.getDuel(currentState.game.duelId);
       if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
     }
-    const availableSlots = new Set((await getActivePlayersForLive()).map(player => Number(player.slot)));
-    if (slots.some(slot => !availableSlots.has(slot))) return res.status(400).json({ error: 'Auswahl enthält keinen aktiven Spieler.' });
-    invalidateLiveLifecycle();
     const fresh = await defaultLiveState(mode, slots);
     fresh.game.status = 'running';
     fresh.game.checkoutRule = checkoutRule;
@@ -3860,11 +3867,6 @@ app.delete('/api/duels/:id', requireAdmin, async (req, res) => {
 
 app.post('/api/duels/start', async (req, res) => {
   try {
-    const currentState = await getLiveState();
-    if (Number(currentState.game?.duelId || 0) > 0) {
-      const currentDuel = await dataStore.getDuel(currentState.game.duelId);
-      if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
-    }
     const matchType = ['single', 'direct', 'group', 'tournament'].includes(String(req.body?.matchType)) ? String(req.body.matchType) : 'direct';
     const mode = String(req.body?.mode || '501');
     const checkoutRule = String(req.body?.checkoutRule || 'double');
@@ -3878,7 +3880,14 @@ app.post('/api/duels/start', async (req, res) => {
     const configuredPlayers = await getPlayers();
     const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());
     if (selectedPlayers.length !== slots.length) return res.status(400).json({ error: 'Alle ausgewählten Slots müssen einen Spielernamen haben.' });
+    const currentState = await getLiveState();
     invalidateLiveLifecycle();
+    await liveCompletionQueue;
+    await flushLiveDetailWrites();
+    if (Number(currentState.game?.duelId || 0) > 0) {
+      const currentDuel = await dataStore.getDuel(currentState.game.duelId);
+      if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
+    }
     const tournamentName = String(req.body?.tournamentName || '').trim();
     const tournamentPlayers = selectedPlayers.map(player => ({ slot: player.slot, name: player.name, profileId: Number(player.profileId || 0) || null }));
     const tournament = matchType === 'tournament'
@@ -4018,7 +4027,11 @@ app.post('/api/duels/:id/cancel', async (req, res) => {
     const state = await getLiveState();
     const duelId = Number(req.params.id);
     if (Number(state.game?.duelId) !== duelId) return res.status(409).json({ error: 'Diese Begegnung ist nicht aktiv.' });
+    const activeDuel = await dataStore.getDuel(duelId);
+    if (!activeDuel || activeDuel.status !== 'active') return res.status(409).json({ error: 'Diese Begegnung kann nicht mehr abgebrochen werden.' });
     invalidateLiveLifecycle();
+    await liveCompletionQueue;
+    await flushLiveDetailWrites();
     const duel = await dataStore.cancelDuel(duelId);
     const fresh = await defaultLiveState(String(state.game.mode || DEFAULT_MODE), state.game.selectedPlayerSlots);
     savedLiveMode = String(state.game.mode || DEFAULT_MODE);
@@ -4036,7 +4049,11 @@ app.post('/api/live/reset', async (req, res) => {
     const current = await getLiveState();
     if (!carryLegs && Number(current.game?.duelId || 0) > 0) {
       const currentDuel = await dataStore.getDuel(current.game.duelId);
-      if (currentDuel && currentDuel.status === 'active') await dataStore.cancelDuel(currentDuel.id);
+      if (currentDuel && currentDuel.status === 'active') {
+        await liveCompletionQueue;
+        await flushLiveDetailWrites();
+        await dataStore.cancelDuel(currentDuel.id);
+      }
     }
     const fresh = resetLiveState(carryLegs, mode, current);
     if (carryLegs && Number(current.game?.duelId || 0) > 0) {
@@ -4086,6 +4103,7 @@ app.post('/api/live/throw', async (req, res) => {
       targetIndex = state.players.findIndex(player => Number(player.slot) === playerSlot);
     }
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
+    if (!isLiveGameRunning(state)) return res.status(409).json({ error: 'Es läuft kein Spiel. Bitte zuerst eine Begegnung starten.' });
     if (targetIndex < 0 || targetIndex >= state.players.length) return res.status(400).json({ error: 'Spieler nicht gefunden.' });
 
     const player = state.players[targetIndex];
@@ -4238,6 +4256,7 @@ app.post('/api/live/next-player', async (req, res) => {
     clearPendingArduinoThrow();
     const state = await getLiveState();
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
+    if (!isLiveGameRunning(state)) return res.status(409).json({ error: 'Es läuft kein Spiel. Bitte zuerst eine Begegnung starten.' });
     const currentPlayer = state.players[state.game.activePlayer];
     if (currentPlayer && Array.isArray(currentPlayer.currentRoundPoints)) {
       while (currentPlayer.currentRoundPoints.length < 3) {
@@ -4293,6 +4312,7 @@ app.post('/api/live/undo', async (req, res) => {
     const state = await getLiveState();
     if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
+    if (!isLiveGameRunning(state)) return res.status(409).json({ error: 'Es läuft kein Spiel. Bitte zuerst eine Begegnung starten.' });
     const modeDef = GAME_MODES[state.game.mode || DEFAULT_MODE] || GAME_MODES[DEFAULT_MODE];
     const result = removeLatestThrow(state, {
       modeType: modeDef.type,
@@ -4388,6 +4408,7 @@ app.post('/api/live/correct-last', async (req, res) => {
     const state = await getLiveState();
     if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
+    if (!isLiveGameRunning(state)) return res.status(409).json({ error: 'Es läuft kein Spiel. Bitte zuerst eine Begegnung starten.' });
 
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
@@ -4492,8 +4513,8 @@ app.delete('/api/highscores/:id', requireAdmin, async (req, res) => {
   try {
     const existing = await dataStore.getHighscore(id);
     if (!existing) return res.status(404).json({ error: 'Highscore nicht gefunden.' });
-    if (String(existing.kind || '') !== 'manual') {
-      return res.status(409).json({ error: existing.duel_id ? `Automatischer Highscore gehört zu Begegnung #${existing.duel_id}. Bitte dort die Quelldaten korrigieren oder löschen.` : 'Automatische Highscores können nur über ihre Spieldaten korrigiert werden.' });
+    if (String(existing.kind || '') !== 'manual' && Number(existing.duel_id || 0) > 0) {
+      return res.status(409).json({ error: `Automatischer Highscore gehört zu Begegnung #${existing.duel_id}. Bitte dort die Quelldaten korrigieren oder löschen.` });
     }
     await dataStore.deleteHighscore(id);
     res.json({ ok: true, highscores: await getHighscores() });
@@ -5251,6 +5272,9 @@ module.exports = {
   isValidCheckout,
   isValidEventEffectSound,
   scanSoundDirectory,
+  applyArduinoThrowFromChannel,
+  applyArduinoThrowFromMatrix,
+  applyArduinoMiss,
   normalizeLiveStateSnapshot,
   getLiveDisplayState,
   validatePlayerStatUpdates

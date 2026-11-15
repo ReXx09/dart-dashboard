@@ -1799,16 +1799,63 @@ class DataStore {
   }
 
   async cancelDuel(id, endedAt = Date.now()) {
-    const values = [endedAt, endedAt, Number(id)];
-    if (this.isSQLite()) await this.sqlite.run('UPDATE duels SET status = \'canceled\', ended_at = ?, updated_at = ? WHERE id = ?', values);
-    else if (this.isPostgres()) await this.pg.query('UPDATE duels SET status = \'canceled\', ended_at = $1, updated_at = $2 WHERE id = $3', values);
-    else await this.my.query('UPDATE duels SET status = \'canceled\', ended_at = ?, updated_at = ? WHERE id = ?', values);
-    await this.deleteDuelHighscores(id);
-    await this.deleteDuelEliminations(id);
     const safeId = Number(id);
-    if (this.isSQLite()) await this.sqlite.run('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
-    else if (this.isPostgres()) await this.pg.query('DELETE FROM leg_history WHERE duel_id = $1', [safeId]);
-    else await this.my.query('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
+    if (!Number.isFinite(safeId) || safeId <= 0) throw new Error('Ungültige Begegnungs-ID.');
+    if (this.isSQLite()) {
+      await this.sqlite.exec('BEGIN TRANSACTION');
+      try {
+        await this.sqlite.run('UPDATE duels SET status = \'canceled\', ended_at = ?, winner_slot = NULL, total_legs = 0, updated_at = ? WHERE id = ?', [endedAt, endedAt, safeId]);
+        await this.sqlite.run('DELETE FROM duel_leg_players WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM duel_legs WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM throw_corrections WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM duel_eliminations WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
+        await this.sqlite.exec('COMMIT');
+      } catch (err) {
+        await this.sqlite.exec('ROLLBACK');
+        throw err;
+      }
+    } else if (this.isPostgres()) {
+      const client = await this.pg.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('UPDATE duels SET status = \'canceled\', ended_at = $1, winner_slot = NULL, total_legs = 0, updated_at = $2 WHERE id = $3', [endedAt, endedAt, safeId]);
+        await client.query('DELETE FROM duel_leg_players WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM duel_legs WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM player_throw_segments WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM throw_corrections WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM highscores WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM duel_eliminations WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM leg_history WHERE duel_id = $1', [safeId]);
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    } else {
+      const connection = await this.my.getConnection();
+      try {
+        await connection.beginTransaction();
+        await connection.query('UPDATE duels SET status = \'canceled\', ended_at = ?, winner_slot = NULL, total_legs = 0, updated_at = ? WHERE id = ?', [endedAt, endedAt, safeId]);
+        await connection.query('DELETE FROM duel_leg_players WHERE duel_id = ?', [safeId]);
+        await connection.query('DELETE FROM duel_legs WHERE duel_id = ?', [safeId]);
+        await connection.query('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
+        await connection.query('DELETE FROM throw_corrections WHERE duel_id = ?', [safeId]);
+        await connection.query('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
+        await connection.query('DELETE FROM duel_eliminations WHERE duel_id = ?', [safeId]);
+        await connection.query('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
+        await connection.commit();
+      } catch (err) {
+        await connection.rollback();
+        throw err;
+      } finally {
+        connection.release();
+      }
+    }
     return this.getDuel(id);
   }
 
@@ -1838,6 +1885,7 @@ class DataStore {
         await this.sqlite.run('DELETE FROM duel_legs WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM duel_players WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
+        await this.sqlite.run('DELETE FROM throw_corrections WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM duel_eliminations WHERE duel_id = ?', [safeId]);
         await this.sqlite.run('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);
@@ -1857,6 +1905,7 @@ class DataStore {
         await client.query('DELETE FROM duel_legs WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM duel_players WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM player_throw_segments WHERE duel_id = $1', [safeId]);
+        await client.query('DELETE FROM throw_corrections WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM highscores WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM duel_eliminations WHERE duel_id = $1', [safeId]);
         await client.query('DELETE FROM leg_history WHERE duel_id = $1', [safeId]);
@@ -1877,6 +1926,7 @@ class DataStore {
       await connection.query('DELETE FROM duel_legs WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM duel_players WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM player_throw_segments WHERE duel_id = ?', [safeId]);
+      await connection.query('DELETE FROM throw_corrections WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM highscores WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM duel_eliminations WHERE duel_id = ?', [safeId]);
       await connection.query('DELETE FROM leg_history WHERE duel_id = ?', [safeId]);

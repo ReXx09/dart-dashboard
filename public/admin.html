@@ -879,6 +879,7 @@
       const kind = entry.kind || 'score';
       const isEditing = Number(editingHighscoreId) === Number(entry.id);
       const isManual = kind === 'manual';
+      const canDelete = isManual || Number(entry.duelId || 0) <= 0;
       const action = isEditing && isManual
         ? '<input type="text" value="' + escapeAttr(entry.player) + '" data-hs-edit-player style="width:105px;padding:5px;background:#111;color:#f1f1f1;border:1px solid #555;border-radius:4px;margin-right:4px" aria-label="Spielername" />' +
           '<input type="number" min="1" value="' + Number(entry.score || 0) + '" data-hs-edit-score style="width:72px;padding:5px;background:#111;color:#f1f1f1;border:1px solid #555;border-radius:4px;margin-right:4px" aria-label="Score" />' +
@@ -887,7 +888,10 @@
         : isManual
           ? '<button class="btn-save" style="background:#1e1e1e;border:1px solid #444;padding:4px 10px;font-size:.7rem;margin-right:4px" data-hs-edit-id="' + entry.id + '">Bearbeiten</button>' +
             '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>'
-          : '<span style="color:#777;font-size:.68rem">' + (entry.duelId ? 'Quelle: Begegnung #' + Number(entry.duelId) : 'Automatisch erfasst') + '</span>';
+          : canDelete
+            ? '<span style="color:#777;font-size:.68rem;margin-right:6px">' + (isManual ? 'Manuell' : 'Ohne Begegnung') + '</span>' +
+              '<button class="btn-save" style="background:#8b0000;border:none;padding:4px 10px;font-size:.7rem" data-hs-id="' + entry.id + '" data-hs-name="' + escapeAttr(entry.player) + '" data-hs-score="' + entry.score + '">✕ Löschen</button>'
+            : '<span style="color:#777;font-size:.68rem">Quelle: Begegnung #' + Number(entry.duelId) + '</span>';
       return '<tr>' +
         '<td style="padding:8px 10px;text-align:center">' + (isManual ? '<input type="checkbox" class="hs-select" value="' + Number(entry.id) + '" aria-label="Highscore von ' + escapeAttr(entry.player) + ' auswählen" />' : '<span style="color:#555">-</span>') + '</td>' +
         '<td style="padding:8px 10px;color:#666;font-weight:700">' + (idx + 1) + '</td>' +

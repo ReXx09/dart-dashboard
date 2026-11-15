@@ -1749,9 +1749,15 @@
       if (hasActiveMatch(liveState)) {
         confirmAction({
           title: 'Begegnung abbrechen?',
-          message: 'Die laufende Begegnung wird beendet. Die bisherige Begegnung bleibt in der Statistik erhalten.',
+          message: 'Die laufende Begegnung wird abgebrochen. Bisherige Würfe und Highscores dieser Begegnung werden verworfen.',
           acceptLabel: 'Begegnung abbrechen'
         }).then(accepted => { if (accepted) abortActiveMatch(); });
+        return;
+      }
+      const soloGameHasThrows = Array.isArray(liveState && liveState.players)
+        && liveState.players.some(player => Number(player.turns || 0) > 0 || (Array.isArray(player.throws) && player.throws.length > 0));
+      if (liveState && liveState.game && liveState.game.status === 'running' && Number(liveState.game.duelId || 0) <= 0 && soloGameHasThrows) {
+        showToast('Es läuft bereits ein Einzelspiel. Bitte erst beenden oder zurücksetzen.', true);
         return;
       }
       const modeSelect = document.getElementById('matchMode');

@@ -97,6 +97,51 @@ test('Abgeschlossene Begegnung wird mit Leg-History vollständig gelöscht', asy
   });
 });
 
+test('Abgebrochene Begegnung entfernt Wurf-, Leg-, Highscore- und Statistikdetails', async () => {
+  await withStore(async store => {
+    const duel = await store.createDuel({
+      mode: '501',
+      matchType: 'direct',
+      players: [{ slot: 1, name: 'Claudia' }, { slot: 2, name: 'Andy' }]
+    });
+    await store.recordDuelLeg({
+      duelId: duel.id,
+      mode: '501',
+      winnerSlot: 1,
+      startedAt: Date.now() - 1000,
+      players: [{ slot: 1, name: 'Claudia' }, { slot: 2, name: 'Andy' }],
+      matchComplete: false
+    });
+    await store.recordThrowSegments([{
+      playerSlot: 1,
+      segment: 'T20',
+      points: 60,
+      mode: '501',
+      thrownAt: Date.now(),
+      duelId: duel.id,
+      source: 'arduino'
+    }]);
+    await store.addHighscore({ player: 'Claudia', score: 60, kind: 'turn', duelId: duel.id, playerSlot: 1 });
+    await store.recordThrowCorrection({
+      playerSlot: 1,
+      turnId: 1,
+      duelId: duel.id,
+      originalPoints: 60,
+      correctedPoints: 20,
+      delta: -40,
+      correctedAt: Date.now()
+    });
+    await store.recordLegHistory(1, 50.1, 40, 1, 30, '2026', duel.id);
+
+    const canceled = await store.cancelDuel(duel.id);
+    assert.equal(canceled.status, 'canceled');
+    assert.equal(Number(canceled.total_legs), 0);
+    for (const table of ['duel_leg_players', 'duel_legs', 'player_throw_segments', 'throw_corrections', 'highscores', 'duel_eliminations', 'leg_history']) {
+      assert.equal(Number((await store.sqlite.get(`SELECT COUNT(*) AS count FROM ${table} WHERE duel_id = ?`, [duel.id])).count), 0, table);
+    }
+  });
+});
+
 test('Statistik-Reset löscht First-9-Basis und Leg-History atomisch', async () => {
   await withStore(async store => {
     await store.initPlayerStats(1);
