@@ -195,6 +195,18 @@ execute_action() {
   label="$(action_label "$action")"; msg_run "$label"
 
   local tmp action_status
+  if [[ "$USE_WHIPTAIL" -eq 1 && "$action" == "overview" ]]; then
+    set +e
+    run_action "$action"
+    action_status=$?
+    set -e
+    if [[ "$action_status" -ne 0 ]]; then
+      show_action_error "$action" "" "$action_status" || true
+      msg_warn 'Das Menue bleibt geoeffnet. Details stehen in der Fehleranzeige.'
+    fi
+    return 0
+  fi
+
   tmp="$(mktemp)"
   set +e
   run_action "$action" 2>&1 | tee "$tmp"
