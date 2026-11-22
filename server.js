@@ -2989,15 +2989,30 @@ function getTurnScoreHighscoreKind(score) {
   return null;
 }
 
-async function addTurnScoreHighscoreIfNeeded(player, state, source = 'live') {
-  if (!Array.isArray(player.currentRoundPoints) || player.currentRoundPoints.length !== 3 || player.turnScoreRecorded) return;
+function getTurnScoreHighscore(player) {
+  if (!Array.isArray(player?.currentRoundPoints) || player.currentRoundPoints.length !== 3) return null;
   const turnScore = player.currentRoundPoints.reduce((sum, points) => sum + (Number(points) || 0), 0);
   const kind = getTurnScoreHighscoreKind(turnScore);
-  if (!kind) return;
+  return kind ? { turnScore, kind } : null;
+}
+
+function buildDuelHighscoreEventKey(duelId, legNumber, playerSlot, kind, score, turnId) {
+  return ['duel', duelId, legNumber, playerSlot, kind || 'score', score, turnId || ''].join(':');
+}
+
+async function addTurnScoreHighscoreIfNeeded(player, state, source = 'live') {
+  if (player.turnScoreRecorded) return;
+  const turnHighscore = getTurnScoreHighscore(player);
+  if (!turnHighscore) return;
+  const { turnScore, kind } = turnHighscore;
 
   player.turnScoreRecorded = true;
+  // Werte jetzt festhalten: Der Schreibauftrag läuft verzögert, ein sofortiger Spielerwechsel würde turnId sonst erhöhen
+  // und Undo/Korrektur fänden den Eintrag nicht mehr.
+  const meta = { kind, source, gameMode: state.game.mode, duelId: state.game.duelId, playerSlot: player.slot, turnId: state.game.turnId };
+  const playerName = player.name;
   queueLiveDetailWrite(
-    () => addHighscore(player.name, turnScore, { kind, source, gameMode: state.game.mode, duelId: state.game.duelId, playerSlot: player.slot, turnId: state.game.turnId }),
+    () => addHighscore(playerName, turnScore, meta),
     'Turn-Highscore'
   );
 }
@@ -3301,7 +3316,7 @@ async function addHighscore(playerName, score, meta = {}) {
   if (!eventKey && duelId && playerSlot) {
     const duel = await dataStore.getDuel(duelId);
     const legNumber = Number(duel?.total_legs || 0) + 1;
-    eventKey = ['duel', duelId, legNumber, playerSlot, meta.kind || 'score', safeScore, meta.turnId || ''].join(':');
+    eventKey = buildDuelHighscoreEventKey(duelId, legNumber, playerSlot, meta.kind, safeScore, meta.turnId);
   }
   await dataStore.addHighscore({ player: safeName, score: safeScore, ts: Date.now(), legWin: !!meta.legWin, gameMode: meta.gameMode || meta.mode || DEFAULT_MODE, ...meta, playerSlot, eventKey });
 }
@@ -3670,7 +3685,8 @@ app.get('/api/events', (req, res) => {
   res.flushHeaders();
   res.write('data: connected\n\n');
   sseClients.add(res);
-  const ka = setInterval(() => { try { res.write(':ka\n\n'); } catch { clearInterval(ka); sseClients.delete(res); } }, 25000);
+  // Benannter Ping statt Kommentar: Clients (Fire-TV-Kiosk) erkennen daran tote Verbindungen.
+  const ka = setInterval(() => { try { res.write('event: ping\ndata: ' + Date.now() + '\n\n'); } catch { clearInterval(ka); sseClients.delete(res); } }, 20000);
   req.on('close', () => { clearInterval(ka); sseClients.delete(res); });
 });
 
@@ -4409,6 +4425,9 @@ app.post('/api/live/correct-last', async (req, res) => {
 
   try {
     const generation = liveLifecycleGeneration;
+    // Ein noch wartender Turn-Highscore muss gespeichert sein, damit die Korrektur ihn ersetzen kann.
+    await liveCompletionQueue;
+    await flushLiveDetailWrites();
     const state = await getLiveState();
     if (!isLiveLifecycleCurrent(generation)) return res.status(409).json({ error: 'Das Spiel wurde inzwischen neu gestartet.' });
     if (state.game.status === 'leg-finished') return res.status(400).json({ error: 'Spiel ist bereits beendet.' });
@@ -4416,6 +4435,9 @@ app.post('/api/live/correct-last', async (req, res) => {
 
     const mode = state.game.mode || DEFAULT_MODE;
     const modeDef = GAME_MODES[mode] || GAME_MODES[DEFAULT_MODE];
+    const duelId = Number(state.game.duelId || 0) > 0 ? Number(state.game.duelId) : null;
+    const duel = duelId ? await dataStore.getDuel(duelId) : null;
+    const legNumber = Number(duel?.total_legs || 0) + 1;
     const correction = correctLatestThrow(state, delta, {
       modeType: modeDef.type,
       checkoutRule: state.game.checkoutRule || DEFAULT_CHECKOUT_RULE,
@@ -4431,6 +4453,10 @@ app.post('/api/live/correct-last', async (req, res) => {
     if (correction.legFinished) finishLegAfterCorrection(state, correction, modeDef, generation);
 
     const throwData = correction.throwData;
+    const correctedPlayer = correction.player;
+    // Nur Begegnungs-Highscores haben einen event_key mit Aufnahme und lassen sich daher gezielt ersetzen.
+    const turnHighscore = duelId && Number(throwData.turnId) > 0 ? getTurnScoreHighscore(correctedPlayer) : null;
+    if (turnHighscore) correctedPlayer.turnScoreRecorded = true;
     const correctedAt = Date.now();
     const correctionRecord = {
       playerSlot: correction.player.slot,
@@ -4466,13 +4492,25 @@ app.post('/api/live/correct-last', async (req, res) => {
           source: throwData.source,
           season: seasonFromTimestamp(throwData.ts)
         } : null
-      }
+      },
+      // Der alte Turn-Highscore (z. B. 180 statt 160) wird in derselben Transaktion entfernt.
+      highscoreSync: { duelId, legNumber, playerSlot: correctedPlayer.slot, turnId: throwData.turnId }
     };
     const hasAtomicSave = typeof dataStore.saveLiveStateWithCorrection === 'function';
     const saved = await commitLiveStateChange(state, () => hasAtomicSave
       ? dataStore.saveLiveStateWithCorrection(state, correctionRecord)
       : saveLiveState(state));
     if (!hasAtomicSave) queueLiveDetailWrite(() => dataStore.recordThrowCorrection(correctionRecord), 'Wurfkorrektur');
+    if (turnHighscore) {
+      const { turnScore, kind } = turnHighscore;
+      const playerName = correctedPlayer.name;
+      const playerSlot = correctedPlayer.slot;
+      const eventKey = buildDuelHighscoreEventKey(duelId, legNumber, playerSlot, kind, turnScore, throwData.turnId);
+      queueLiveDetailWrite(
+        () => addHighscore(playerName, turnScore, { kind, source: 'correction', gameMode: mode, duelId, playerSlot, turnId: throwData.turnId, eventKey }),
+        'Turn-Highscore'
+      );
+    }
     res.json(saved);
   } catch (err) { res.status(500).json({ error: 'Wurfkorrektur fehlgeschlagen: ' + err.message }); }
 });

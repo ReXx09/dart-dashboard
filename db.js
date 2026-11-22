@@ -69,6 +69,22 @@ function getThrowCorrectionValues(correction) {
   ];
 }
 
+// Turn-Highscores tragen die Aufnahme im event_key (duel:<id>:<leg>:<slot>:<kind>:<score>:<turnId>).
+// Wird ein Dart der Aufnahme entfernt oder korrigiert, muss der gespeicherte Eintrag mit weg.
+function getTurnHighscoreDeletion(sync) {
+  const duelId = Number(sync && sync.duelId) > 0 ? Number(sync.duelId) : null;
+  const turnId = Number(sync && sync.turnId) > 0 ? Number(sync.turnId) : null;
+  const legNumber = Number(sync && sync.legNumber) > 0 ? Number(sync.legNumber) : null;
+  const playerSlot = Number(sync && sync.playerSlot) > 0 ? Number(sync.playerSlot) : null;
+  if (!duelId || !turnId || !legNumber || !playerSlot) return null;
+  const params = [duelId, playerSlot, `duel:${duelId}:${legNumber}:${playerSlot}:%:%:${turnId}`];
+  return {
+    sql: 'DELETE FROM highscores WHERE duel_id = ? AND player_slot = ? AND event_key LIKE ?',
+    postgresSql: 'DELETE FROM highscores WHERE duel_id = $1 AND player_slot = $2 AND event_key LIKE $3',
+    params
+  };
+}
+
 const THROW_CORRECTION_COLUMNS = 'player_slot, turn_id, duel_id, original_points, corrected_points, delta, original_remaining, corrected_remaining, original_bust, corrected_bust, original_segment, corrected_segment, action, source, corrected_at, season';
 
 function getThrowSegmentValues(row) {
@@ -2182,6 +2198,7 @@ class DataStore {
     const updatedAt = Date.now();
     const correctionValues = getThrowCorrectionValues(correction);
     const segmentStatements = getSegmentSyncStatements(correction.segmentSync);
+    const highscoreDeletion = getTurnHighscoreDeletion(correction.highscoreSync);
     const sqliteCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const postgresCorrection = `INSERT INTO throw_corrections (${THROW_CORRECTION_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`;
 
@@ -2194,6 +2211,7 @@ class DataStore {
         );
         await this.sqlite.run(sqliteCorrection, correctionValues);
         for (const statement of segmentStatements) await this.sqlite.run(statement.sql, statement.params);
+        if (highscoreDeletion) await this.sqlite.run(highscoreDeletion.sql, highscoreDeletion.params);
         await this.sqlite.exec('COMMIT');
       } catch (error) {
         await this.sqlite.exec('ROLLBACK');
@@ -2212,6 +2230,7 @@ class DataStore {
         );
         await client.query(postgresCorrection, correctionValues);
         for (const statement of segmentStatements) await client.query(statement.postgresSql, statement.postgresParams);
+        if (highscoreDeletion) await client.query(highscoreDeletion.postgresSql, highscoreDeletion.params);
         await client.query('COMMIT');
       } catch (error) {
         await client.query('ROLLBACK');
@@ -2231,6 +2250,7 @@ class DataStore {
       );
       await connection.query(sqliteCorrection, correctionValues);
       for (const statement of segmentStatements) await connection.query(statement.sql, statement.params);
+      if (highscoreDeletion) await connection.query(highscoreDeletion.sql, highscoreDeletion.params);
       await connection.commit();
     } catch (error) {
       await connection.rollback();
@@ -2243,13 +2263,7 @@ class DataStore {
   async saveLiveStateWithUndo(state, undo) {
     const payload = JSON.stringify(state);
     const updatedAt = Date.now();
-    const undoDuelId = Number(undo.duelId) > 0 ? Number(undo.duelId) : null;
-    const undoTurnId = Number(undo.turnId) > 0 ? Number(undo.turnId) : null;
-    const undoLegNumber = Number(undo.legNumber) > 0 ? Number(undo.legNumber) : null;
-    const undoPlayerSlot = Number(undo.playerSlot) > 0 ? Number(undo.playerSlot) : null;
-    const highscoreEventPattern = undoDuelId && undoTurnId && undoLegNumber && undoPlayerSlot
-      ? `duel:${undoDuelId}:${undoLegNumber}:${undoPlayerSlot}:%:%:${undoTurnId}`
-      : null;
+    const highscoreDeletion = getTurnHighscoreDeletion(undo);
     const correctionValues = getThrowCorrectionValues({
       ...undo,
       action: 'undo',
@@ -2262,9 +2276,7 @@ class DataStore {
       await this.sqlite.exec('BEGIN IMMEDIATE');
       try {
         await this.sqlite.run('DELETE FROM player_throw_segments WHERE player_slot = ? AND thrown_at = ? AND (? IS NULL OR duel_id = ?)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null, Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
-        if (highscoreEventPattern) {
-          await this.sqlite.run('DELETE FROM highscores WHERE duel_id = ? AND player_slot = ? AND event_key LIKE ?', [undoDuelId, undoPlayerSlot, highscoreEventPattern]);
-        }
+        if (highscoreDeletion) await this.sqlite.run(highscoreDeletion.sql, highscoreDeletion.params);
         await this.sqlite.run('INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at', [payload, updatedAt]);
         await this.sqlite.run(sqliteCorrection, correctionValues);
         await this.sqlite.exec('COMMIT');
@@ -2280,9 +2292,7 @@ class DataStore {
       try {
         await client.query('BEGIN');
         await client.query('DELETE FROM player_throw_segments WHERE player_slot = $1 AND thrown_at = $2 AND ($3 IS NULL OR duel_id = $3)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
-        if (highscoreEventPattern) {
-          await client.query('DELETE FROM highscores WHERE duel_id = $1 AND player_slot = $2 AND event_key LIKE $3', [undoDuelId, undoPlayerSlot, highscoreEventPattern]);
-        }
+        if (highscoreDeletion) await client.query(highscoreDeletion.postgresSql, highscoreDeletion.params);
         await client.query('INSERT INTO live_state (id, payload, updated_at) VALUES (1, $1, $2) ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at', [payload, updatedAt]);
         await client.query(postgresCorrection, correctionValues);
         await client.query('COMMIT');
@@ -2299,9 +2309,7 @@ class DataStore {
     try {
       await connection.beginTransaction();
       await connection.query('DELETE FROM player_throw_segments WHERE player_slot = ? AND thrown_at = ? AND (? IS NULL OR duel_id = ?)', [Number(undo.playerSlot), Number(undo.thrownAt), Number(undo.duelId) > 0 ? Number(undo.duelId) : null, Number(undo.duelId) > 0 ? Number(undo.duelId) : null]);
-      if (highscoreEventPattern) {
-        await connection.query('DELETE FROM highscores WHERE duel_id = ? AND player_slot = ? AND event_key LIKE ?', [undoDuelId, undoPlayerSlot, highscoreEventPattern]);
-      }
+      if (highscoreDeletion) await connection.query(highscoreDeletion.sql, highscoreDeletion.params);
       await connection.query('INSERT INTO live_state (id, payload, updated_at) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)', [payload, updatedAt]);
       await connection.query(sqliteCorrection, correctionValues);
       await connection.commit();

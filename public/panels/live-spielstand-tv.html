@@ -1696,24 +1696,83 @@
     }
 
     (function() {
-      const sse = new EventSource('/api/events');
-      let reloadQueued = false;
-      sse.addEventListener('live-state', event => {
-        try {
-          const state = JSON.parse(event.data);
-          if (!state || !Array.isArray(state.players)) return;
-          liveState = state;
-          renderState(state);
-        } catch (error) { console.error('[SSE] Live-State konnte nicht verarbeitet werden:', error); }
-      });
-      sse.addEventListener('reload', () => {
-        if (reloadQueued) return;
-        reloadQueued = true;
-        setTimeout(() => {
-          reloadQueued = false;
-          loadAll().catch(() => {});
+      // Der Server pingt alle 20 s. Bleibt alles länger still, gilt die Verbindung als tot
+      // (z. B. halb-offene WLAN-Verbindung auf dem Fire TV) und wird neu aufgebaut.
+      const STALE_AFTER_MS = 50000;
+      let sse = null;
+      let lastActivity = Date.now();
+      let hasConnectedOnce = false;
+      let reconnectTimer = null;
+      let reconnectAttempts = 0;
+      let reloadTimer = null;
+      let reloadInFlight = false;
+      let reloadRequested = false;
+
+      function requestReload() {
+        reloadRequested = true;
+        if (reloadTimer || reloadInFlight) return;
+        reloadTimer = setTimeout(async () => {
+          reloadTimer = null;
+          if (!reloadRequested) return;
+          reloadRequested = false;
+          reloadInFlight = true;
+          try { await loadAll(); }
+          catch (_) { }
+          finally {
+            reloadInFlight = false;
+            if (reloadRequested) requestReload();
+          }
         }, 120);
+      }
+
+      function markActivity() { lastActivity = Date.now(); }
+
+      function scheduleReconnect() {
+        if (reconnectTimer) return;
+        reconnectAttempts++;
+        const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts - 1));
+        reconnectTimer = setTimeout(() => { reconnectTimer = null; connectSSE(); }, delay);
+      }
+
+      function connectSSE() {
+        if (sse) sse.close();
+        markActivity();
+        sse = new EventSource('/api/events');
+        sse.onopen = () => {
+          markActivity();
+          reconnectAttempts = 0;
+          // Während der Unterbrechung verpasste Live-State-Updates nachladen.
+          if (hasConnectedOnce) requestReload();
+          hasConnectedOnce = true;
+        };
+        sse.onmessage = markActivity;
+        sse.addEventListener('ping', markActivity);
+        sse.addEventListener('live-state', event => {
+          markActivity();
+          try {
+            const state = JSON.parse(event.data);
+            if (!state || !Array.isArray(state.players)) return;
+            liveState = state;
+            renderState(state);
+          } catch (error) { console.error('[SSE] Live-State konnte nicht verarbeitet werden:', error); }
+        });
+        sse.addEventListener('reload', () => { markActivity(); requestReload(); });
+        sse.onerror = () => {
+          if (sse.readyState === EventSource.CLOSED) scheduleReconnect();
+        };
+      }
+
+      setInterval(() => {
+        if (Date.now() - lastActivity < STALE_AFTER_MS || reconnectTimer) return;
+        console.warn('[SSE] Keine Daten seit ' + Math.round((Date.now() - lastActivity) / 1000) + ' s – baue Verbindung neu auf');
+        connectSSE();
+      }, 10000);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') requestReload();
       });
+
+      connectSSE();
     })();
 
     loadAll();

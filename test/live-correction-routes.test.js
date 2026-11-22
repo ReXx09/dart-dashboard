@@ -209,3 +209,37 @@ test('Undo entfernt auch den bereits gespeicherten Turn-Highscore der korrigiert
     assert.equal(afterUndo.length, 0);
   });
 });
+
+test('Korrektur des letzten Darts ersetzt den gespeicherten Turn-Highscore (180 -> 160)', async () => {
+  await withApp(async call => {
+    const started = await call('POST', '/api/duels/start', {
+      mode: '501',
+      matchType: 'direct',
+      checkoutRule: 'double',
+      bestOf: 1,
+      playerSlots: [1, 2]
+    });
+    assert.equal(started.status, 200);
+    const duelId = started.body.game.duelId;
+
+    const throwDart = points => call('POST', '/api/live/throw', { playerIndex: 0, points });
+    await throwDart(60);
+    await throwDart(60);
+    await throwDart(60);
+
+    const corrected = await call('POST', '/api/live/correct-last', { delta: -20 });
+    assert.equal(corrected.status, 200);
+    assert.equal(corrected.body.players[0].remaining, 341);
+    await wait(100);
+
+    const rows = await dataStore.sqlite.all('SELECT score, kind FROM highscores WHERE duel_id = ? AND player_slot = 1', [duelId]);
+    assert.deepEqual(rows.map(row => ({ score: row.score, kind: row.kind })), [{ score: 160, kind: '160er' }]);
+
+    // Erneute Korrektur derselben Aufnahme ersetzt den Eintrag wieder, statt einen zweiten anzulegen.
+    const lowered = await call('POST', '/api/live/correct-last', { delta: -40 });
+    assert.equal(lowered.status, 200);
+    await wait(100);
+    const loweredRows = await dataStore.sqlite.all('SELECT score, kind FROM highscores WHERE duel_id = ? AND player_slot = 1', [duelId]);
+    assert.deepEqual(loweredRows.map(row => ({ score: row.score, kind: row.kind })), [{ score: 120, kind: '100+' }]);
+  });
+});
