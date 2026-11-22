@@ -3299,7 +3299,7 @@ async function saveLiveState(state, options = {}) {
 }
 
 async function getHighscores(gameMode = '', options = {}) {
-  return dataStore.getHighscores(options.limit || 500, gameMode, options.includeActive === true);
+  return dataStore.getHighscores(options.limit || 500, gameMode, options.includeActive === true, options.fromTs ?? null);
 }
 
 async function addHighscore(playerName, score, meta = {}) {
@@ -3594,10 +3594,21 @@ app.get('/api/profiles', async (_req, res) => {
 app.put('/api/profiles', requireLocalNetwork, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
   try {
-    await dataStore.saveProfiles(req.body);
-    res.json({ ok: true });
+    const savedIds = await dataStore.saveProfiles(req.body);
+    res.json({ ok: true, savedIds, profiles: await dataStore.getProfiles() });
   } catch (err) {
     res.status(500).json({ error: 'Profile konnten nicht gespeichert werden: ' + err.message });
+  }
+});
+
+app.delete('/api/profiles/:id', requireLocalNetwork, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Ungültige Profil-ID.' });
+  try {
+    if (!await dataStore.deleteProfile(id)) return res.status(404).json({ error: 'Profil nicht gefunden.' });
+    res.json({ ok: true, profiles: await dataStore.getProfiles() });
+  } catch (err) {
+    res.status(500).json({ error: 'Profil konnte nicht gelöscht werden: ' + err.message });
   }
 });
 
@@ -4609,7 +4620,8 @@ app.get('/api/highscores/daily', async (_req, res) => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const fromTs = todayStart.getTime();
-    const all = await getHighscores('', { includeActive: true });
+    // Erst auf heute filtern, dann begrenzen – sonst fallen niedrige Checkouts aus dem Top-500-Fenster aller Tage.
+    const all = await getHighscores('', { includeActive: true, fromTs, limit: 5000 });
     const today = all.filter(e => Number(e.ts) >= fromTs).sort((a, b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.ts || 0) - Number(a.ts || 0));
     const best = today.length > 0 ? today[0] : null;
     const checkouts = today.filter(entry => entry.kind === 'checkout');

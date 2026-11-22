@@ -53,18 +53,15 @@
     .slot-name-input:focus { border-color: #e63946; }
     .slot-name-input::placeholder { color: #333; }
 
-    /* Color row */
-    .slot-colors { display: flex; gap: 6px; align-items: center; }
-    .slot-colors span { font-size: 0.65rem; color: #444; text-transform: uppercase; letter-spacing: 1px; }
-    .color-dot { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .15s, border-color .15s; flex-shrink: 0; }
-    .color-dot:hover { transform: scale(1.2); }
-    .color-dot.selected { border-color: #fff; transform: scale(1.15); }
-    .custom-color { width: 24px; height: 22px; padding: 1px; border: 1px solid #444; border-radius: 6px; background: #111; cursor: pointer; }
-    .custom-color:focus { outline: 2px solid #fff; outline-offset: 1px; }
-
-    /* Info row */
-    .slot-info { font-size: 0.72rem; color: #333; min-height: 16px; }
-    .slot-card.active .slot-info { color: #555; }
+    /* Farbfeld (Slot) */
+    .swatch { width: 32px; height: 32px; border-radius: 8px; border: 2px solid #333; flex-shrink: 0; cursor: pointer; padding: 0; background: none; }
+    .swatch:hover { border-color: #777; }
+    input[type="color"].swatch::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"].swatch::-webkit-color-swatch { border: none; border-radius: 6px; }
+    input[type="color"].swatch::-moz-color-swatch { border: none; border-radius: 6px; }
+    .slot-card:not(.has-profile) .slot-name-row select { flex: 0 1 130px; min-width: 0; }
+    .slot-card:not(.has-profile) .slot-name-input { flex: 1; min-width: 0; }
+    .slot-card.has-profile .slot-name-input { display: none; }
 
     /* ACTIVE PLAYERS SUMMARY */
     .summary-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -86,13 +83,15 @@
     body.tv-mode main { max-width: none; padding: 14px 18px 16px; }
     body.tv-mode .page-header { justify-content: flex-start; }
     body.tv-mode .page-header-left p,
-    body.tv-mode .slot-colors,
+    body.tv-mode .profile-manager,
+    body.tv-mode .swatch,
+    body.tv-mode .slot-name-row select,
     body.tv-mode .toggle,
-    body.tv-mode .slot-info,
     body.tv-mode #clock-mini,
     body.tv-mode .section-header {
       display: none !important;
     }
+    body.tv-mode .slot-card.has-profile .slot-name-input { display: block; }
     body.tv-mode .summary-row { gap: 8px; }
     body.tv-mode .player-chip {
       background: #111;
@@ -126,26 +125,57 @@
 
     /* Profile Manager */
     .profile-manager { background: #141414; border-radius: 12px; border: 1px solid #1e1e1e; padding: 14px; }
-    .profile-manager h3 { font-size: .78rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
-    .profile-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-    .profile-chip { display: flex; align-items: center; gap: 8px; background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 10px; padding: 6px 10px 6px 8px; font-size: .82rem; }
-    .profile-chip .p-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .profile-chip .p-name { min-width: 110px; }
-    .profile-color-options { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-    .profile-color-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; flex-shrink: 0; transition: transform .15s, border-color .15s; }
-    .profile-color-dot:hover { transform: scale(1.18); }
-    .profile-color-dot.selected { border-color: #fff; transform: scale(1.12); }
-    .profile-custom-color { width: 24px; height: 22px; padding: 1px; border: 1px solid #444; border-radius: 6px; background: #111; cursor: pointer; }
-    .profile-custom-color:focus { outline: 2px solid #fff; outline-offset: 1px; }
-    .profile-gradient { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-    .profile-gradient input { width: 22px; height: 20px; padding: 1px; border: 1px solid #444; border-radius: 5px; background: #111; cursor: pointer; }
-    .profile-chip .p-del { cursor: pointer; color: #555; font-size: .7rem; margin-left: 4px; }
-    .profile-chip .p-del:hover { color: #e63946; }
-    .profile-add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .profile-add-row input { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 6px 10px; border-radius: 7px; font-size: .85rem; font-family: inherit; }
-    .profile-add-row input:focus { border-color: #457b9d; outline: none; }
-    .profile-add-row .btn-sm { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: .78rem; font-family: inherit; }
-    .profile-add-row .btn-sm:hover { background: #2a2a2a; }
+    .pm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .pm-head h3 { font-size: .78rem; color: #888; text-transform: uppercase; letter-spacing: 1.5px; }
+    .pm-head h3 span { color: #555; letter-spacing: 0; }
+    .btn-sm { background: #1e1e1e; border: 1px solid #2a2a2a; color: #ddd; padding: 6px 12px; border-radius: 7px; cursor: pointer; font-size: .8rem; font-family: inherit; }
+    .btn-sm:hover { background: #2a2a2a; }
+    .btn-sm:disabled { opacity: .5; cursor: default; }
+    .btn-danger { background: transparent; border-color: #5a1f24; color: #ff6b6b; }
+    .btn-danger:hover { background: #2a1214; }
+    .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+    .profile-card { display: flex; align-items: center; gap: 10px; background: #0d0d0d; border: 1px solid #242424; border-radius: 10px; padding: 8px 10px; cursor: pointer; color: inherit; font-family: inherit; text-align: left; transition: border-color .15s, background .15s; }
+    .profile-card:hover { border-color: #444; background: #121212; }
+    .profile-card.dup { border-color: #7a5a12; }
+    .p-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem; color: #fff; text-shadow: 0 1px 2px #0009; flex-shrink: 0; }
+    .p-text { display: flex; flex-direction: column; min-width: 0; }
+    .p-name { font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .p-sub { font-size: .68rem; color: #555; }
+    .p-sub.warn { color: #f0b429; }
+    .profile-empty { color: #444; font-size: .82rem; }
+
+    /* Profil-Editor */
+    .pd-overlay { position: fixed; inset: 0; background: #000b; display: none; align-items: center; justify-content: center; z-index: 900; padding: 16px; }
+    .pd-overlay.open { display: flex; }
+    .pd-box { background: #151515; border: 1px solid #2a2a2a; border-radius: 14px; width: 100%; max-width: 400px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .pd-box h3 { font-size: .95rem; }
+    .pd-preview { display: flex; align-items: center; gap: 12px; background: #0d0d0d; border-radius: 10px; padding: 12px; border-left: 4px solid var(--pc, #e63946); }
+    .pd-preview .p-avatar { width: 40px; height: 40px; font-size: 1.05rem; }
+    .pd-preview strong { font-size: 1rem; }
+    .pd-label { font-size: .68rem; color: #777; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 5px; }
+    .pd-input { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 8px 10px; border-radius: 7px; font-size: .9rem; font-family: inherit; width: 100%; outline: none; }
+    .pd-input:focus { border-color: #457b9d; }
+    .pd-tabs { display: grid; grid-template-columns: 1fr 1fr; background: #0d0d0d; border: 1px solid #242424; border-radius: 8px; padding: 3px; gap: 3px; }
+    .pd-tabs button { background: none; border: none; color: #777; padding: 7px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: .82rem; }
+    .pd-tabs button.on { background: #262626; color: #f1f1f1; }
+    .pd-pane { display: flex; flex-direction: column; gap: 10px; }
+    .pd-row { display: flex; align-items: center; gap: 10px; }
+    .pd-row .pd-input { flex: 1; font-family: ui-monospace, Consolas, monospace; }
+    .pd-color { width: 56px; height: 40px; border: 2px solid #333; border-radius: 8px; padding: 0; background: none; cursor: pointer; flex-shrink: 0; }
+    .pd-color::-webkit-color-swatch-wrapper { padding: 0; }
+    .pd-color::-webkit-color-swatch { border: none; border-radius: 6px; }
+    .pd-color::-moz-color-swatch { border: none; border-radius: 6px; }
+    .pd-mix-bar { position: relative; height: 18px; border-radius: 9px; }
+    .pd-mix-bar input[type="range"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+    .pd-mix-bar input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--mix, #fff); border: 3px solid #fff; box-shadow: 0 0 0 1px #000a; }
+    .pd-mix-bar input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--mix, #fff); border: 3px solid #fff; }
+    .pd-mix-ends { display: flex; justify-content: space-between; align-items: center; }
+    .pd-mix-ends .pd-color { width: 44px; height: 32px; }
+    .pd-mix-result { font-size: .78rem; color: #888; font-family: ui-monospace, Consolas, monospace; }
+    .pd-error { color: #ff6b6b; font-size: .78rem; min-height: 1em; }
+    .pd-actions { display: flex; gap: 8px; align-items: center; }
+    .pd-actions .spacer { flex: 1; }
+    .pd-actions .btn-save { padding: 8px 18px; }
 
     .slot-name-row { display: flex; gap: 6px; align-items: center; }
     .slot-name-row select { background: #0d0d0d; border: 1px solid #2a2a2a; color: #f1f1f1; padding: 5px 8px; border-radius: 6px; font-size: .82rem; font-family: inherit; flex: 1; cursor: pointer; }
@@ -175,20 +205,18 @@
     <div class="page-header">
       <div class="page-header-left">
         <h2>Spieler-Slots – HB8</h2>
-        <p>Gib jedem Slot einen Namen und aktiviere ihn, damit Scores korrekt zugeordnet werden.</p>
+        <p>Profil wählen, Slot aktivieren, speichern. Farben und Namen werden im Profil bearbeitet.</p>
       </div>
       <button class="btn-save" id="saveBtn" onclick="saveAll()">💾 Speichern</button>
     </div>
 
     <!-- PROFILE MANAGER -->
     <div class="profile-manager">
-      <h3>Stammspieler-Profile</h3>
-      <div class="profile-list" id="profileList"></div>
-      <div class="profile-add-row">
-        <input type="text" id="profileNameInput" placeholder="Neuer Spielername..." maxlength="24" />
-        <button class="btn-sm" onclick="addProfile()">+ Hinzufügen</button>
-        <button class="btn-sm primary" id="saveProfilesBtn" onclick="saveProfiles()">Profile speichern</button>
+      <div class="pm-head">
+        <h3>Stammspieler-Profile <span id="profileCount"></span></h3>
+        <button class="btn-sm" onclick="openProfileEditor()">+ Neues Profil</button>
       </div>
+      <div class="profile-grid" id="profileList"></div>
     </div>
 
     <!-- ACTIVE SUMMARY -->
@@ -210,6 +238,50 @@
   <footer>Löwen Dart Club – HB8 Spieler-Verwaltung</footer>
   <div class="toast" id="toast"></div>
 
+  <div class="pd-overlay" id="profileDialog" onclick="if (event.target === this) closeProfileEditor()">
+    <form class="pd-box" onsubmit="event.preventDefault(); saveProfileFromEditor()">
+      <h3 id="pdTitle">Profil bearbeiten</h3>
+      <div class="pd-preview" id="pdPreview">
+        <span class="p-avatar" id="pdAvatar">?</span>
+        <strong id="pdPreviewName">Neues Profil</strong>
+      </div>
+      <div>
+        <label class="pd-label" for="pdName">Name</label>
+        <input class="pd-input" id="pdName" maxlength="24" autocomplete="off" oninput="updateEditorPreview()" />
+      </div>
+      <div>
+        <span class="pd-label">Farbe</span>
+        <div class="pd-tabs">
+          <button type="button" id="pdTabPick" onclick="setEditorMode('pick')">🎨 Farbauswahl</button>
+          <button type="button" id="pdTabMix" onclick="setEditorMode('mix')">🧪 Mischer</button>
+        </div>
+      </div>
+      <div class="pd-pane" id="pdPanePick">
+        <div class="pd-row">
+          <input class="pd-color" type="color" id="pdColor" oninput="setEditorColor(this.value)" aria-label="Farbe wählen" />
+          <input class="pd-input" id="pdHex" maxlength="7" placeholder="#rrggbb" oninput="onHexInput(this.value)" aria-label="Farbcode" />
+        </div>
+      </div>
+      <div class="pd-pane" id="pdPaneMix">
+        <div class="pd-mix-ends">
+          <input class="pd-color" type="color" id="pdMixA" oninput="updateMix()" aria-label="Mischfarbe A" />
+          <span class="pd-mix-result" id="pdMixResult"></span>
+          <input class="pd-color" type="color" id="pdMixB" oninput="updateMix()" aria-label="Mischfarbe B" />
+        </div>
+        <div class="pd-mix-bar" id="pdMixBar">
+          <input type="range" id="pdMixRatio" min="0" max="100" value="50" oninput="updateMix()" aria-label="Mischverhältnis" />
+        </div>
+      </div>
+      <div class="pd-error" id="pdError"></div>
+      <div class="pd-actions">
+        <button type="button" class="btn-sm btn-danger" id="pdDelete" onclick="deleteProfileFromEditor()">Löschen</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn-sm" onclick="closeProfileEditor()">Abbrechen</button>
+        <button type="submit" class="btn-save" id="pdSave">Speichern</button>
+      </div>
+    </form>
+  </div>
+
   <script>
     const COLORS = [
       '#e63946','#f4a261','#2a9d8f','#457b9d',
@@ -221,7 +293,6 @@
     let players = [];
     let profiles = [];
     let dirty = false;
-    let profilesDirty = false;
 
     updateClock();
     setInterval(updateClock, 1000);
@@ -247,18 +318,19 @@
       grid.innerHTML = '';
       players.forEach((p, idx) => {
         const color = p.color || COLORS[idx];
+        const profile = findProfile(p.profileId);
         const card = document.createElement('div');
-        card.className = 'slot-card' + (p.active ? ' active' : '');
+        card.className = 'slot-card' + (p.active ? ' active' : '') + (profile ? ' has-profile' : '');
         card.style.setProperty('--sc', color);
         card.dataset.slot = p.slot;
 
-        const colorDots = COLORS.map((c, ci) =>
-          `<span class="color-dot${c === color ? ' selected' : ''}" style="background:${c}" data-ci="${ci}" title="${c}" onclick="pickColor(${idx},${ci},event)"></span>`
+        const profileOpts = profiles.map(pr =>
+          `<option value="${pr.id}"${Number(pr.id) === Number(p.profileId) ? ' selected' : ''}>${escHtml(profileLabel(pr))}</option>`
         ).join('');
 
-        const profileOpts = profiles.map(pr =>
-          `<option value="${pr.id}"${Number(pr.id) === Number(p.profileId) ? ' selected' : ''}>${escHtml(pr.name)}</option>`
-        ).join('');
+        const swatch = profile
+          ? `<button type="button" class="swatch" style="background:${escAttr(color)}" title="Farbe im Profil bearbeiten" onclick="openProfileEditor(${Number(profile.id)})"></button>`
+          : `<input class="swatch" type="color" value="${escAttr(normalizeColor(color, '#e63946'))}" title="Farbe wählen" aria-label="Farbe für Spieler ${p.slot}" onchange="pickCustomColor(${idx},this.value,event)" />`;
 
         card.innerHTML = `
           <div class="slot-head">
@@ -279,13 +351,8 @@
               value="${escHtml(p.name || '')}"
               maxlength="24"
               oninput="setName(${idx},this.value)" />
+            ${swatch}
           </div>
-          <div class="slot-colors">
-            <span>Farbe</span>
-            ${colorDots}
-            <input class="custom-color" type="color" value="${escAttr(normalizeColor(color, '#e63946'))}" aria-label="Eigene Farbe für Spieler ${p.slot}" title="Eigene Farbe" onchange="pickCustomColor(${idx},this.value,event)" />
-          </div>
-          <div class="slot-info" id="info-${idx}">${p.name ? `Slot ${p.slot}: ${escHtml(p.name)}` : 'Kein Name'}</div>
         `;
         grid.appendChild(card);
       });
@@ -311,8 +378,6 @@
     function setName(idx, val) {
       players[idx].name = val;
       players[idx].profileId = null;
-      const info = document.getElementById(`info-${idx}`);
-      if (info) info.textContent = val ? `Slot ${players[idx].slot}: ${val}` : 'Kein Name';
       renderSummary();
       markDirty();
     }
@@ -325,28 +390,11 @@
       markDirty();
     }
 
-    function pickColor(playerIdx, colorIdx, e) {
-      // Update all dots in this card
-      const card = e.target.closest('.slot-card');
-      card.querySelectorAll('.color-dot').forEach((d, i) =>
-        d.classList.toggle('selected', i === colorIdx)
-      );
-      const color = COLORS[colorIdx];
-      card.style.setProperty('--sc', color);
-      if (players[playerIdx].active) {
-        card.querySelector('.slot-num').style.background = color;
-      }
-      players[playerIdx].color = color;
-      markDirty();
-    }
-
     function pickCustomColor(playerIdx, color, e) {
       const normalized = normalizeColor(color, '#e63946');
-      const card = e.target.closest('.slot-card');
-      card.querySelectorAll('.color-dot').forEach(dot => dot.classList.remove('selected'));
-      card.style.setProperty('--sc', normalized);
-      if (players[playerIdx].active) card.querySelector('.slot-num').style.background = normalized;
+      e.target.closest('.slot-card').style.setProperty('--sc', normalized);
       players[playerIdx].color = normalized;
+      renderSummary();
       markDirty();
     }
 
@@ -394,73 +442,47 @@
     }
 
     // ── Profile ──
+    let editor = null;
+
+    function findProfile(id) {
+      const profileId = Number(id || 0);
+      return profileId > 0 ? profiles.find(pr => Number(pr.id) === profileId) || null : null;
+    }
+
+    function nameKey(name) {
+      return String(name || '').trim().toLowerCase();
+    }
+
+    function isDuplicateProfile(profile) {
+      return profiles.filter(pr => nameKey(pr.name) === nameKey(profile.name)).length > 1;
+    }
+
+    function profileLabel(profile) {
+      return isDuplicateProfile(profile) ? profile.name + ' (#' + profile.id + ')' : profile.name;
+    }
+
+    function initials(name) {
+      return String(name || '?').trim().charAt(0).toUpperCase() || '?';
+    }
+
     function renderProfiles() {
       const list = document.getElementById('profileList');
+      document.getElementById('profileCount').textContent = profiles.length ? '(' + profiles.length + ')' : '';
       if (!profiles.length) {
-        list.innerHTML = '<span style="color:#444;font-size:.82rem">Noch keine Profile. Lege Stammspieler an, die du den Slots zuweisen kannst.</span>';
+        list.innerHTML = '<span class="profile-empty">Noch keine Profile. Lege Stammspieler an, die du den Slots zuweisen kannst.</span>';
         return;
       }
-      list.innerHTML = profiles.map((pr, i) =>
-        '<div class="profile-chip">' +
-          '<span class="p-dot" style="background:' + escAttr(pr.gradient || pr.color || '#555') + '"></span>' +
-          '<span class="p-name">' + escHtml(pr.name) + '</span>' +
-          '<div class="profile-color-options" aria-label="Farbe für ' + escAttr(pr.name) + '">' +
-            COLORS.map((color, colorIdx) => '<span class="profile-color-dot' + (color === pr.color ? ' selected' : '') + '" style="background:' + color + '" title="' + color + '" onclick="pickProfileColor(' + i + ',' + colorIdx + ',event)"></span>').join('') +
-            '<input class="profile-custom-color" type="color" value="' + escAttr(normalizeColor(pr.color, '#e63946')) + '" aria-label="Eigene Farbe für ' + escAttr(pr.name) + '" title="Eigene Farbe" onchange="pickCustomProfileColor(' + i + ',this.value,event)" />' +
-          '</div>' +
-          '<div class="profile-gradient" title="Mehrfarbiger Verlauf für das Profil">' +
-            '<input type="color" value="' + escAttr(getGradientColor(pr, 0)) + '" aria-label="Verlaufsfarbe 1" onchange="pickProfileGradient(' + i + ',0,this.value,event)" />' +
-            '<input type="color" value="' + escAttr(getGradientColor(pr, 1)) + '" aria-label="Verlaufsfarbe 2" onchange="pickProfileGradient(' + i + ',1,this.value,event)" />' +
-          '</div>' +
-          '<span class="p-del" onclick="removeProfile(' + i + ')">✕</span>' +
-        '</div>'
-      ).join('');
-    }
-
-    function pickProfileColor(profileIdx, colorIdx, event) {
-      const profile = profiles[profileIdx];
-      const color = COLORS[colorIdx];
-      if (!profile || !color) return;
-      profile.color = color;
-      players.forEach(player => {
-        if (Number(player.profileId) === Number(profile.id)) player.color = color;
-      });
-      profilesDirty = true;
-      dirty = true;
-      document.getElementById('saveBtn').disabled = false;
-      renderProfiles();
-      renderSlots();
-      renderSummary();
-      event.stopPropagation();
-    }
-
-    function pickCustomProfileColor(profileIdx, color, event) {
-      const profile = profiles[profileIdx];
-      const normalized = normalizeColor(color, '#e63946');
-      if (!profile) return;
-      profile.color = normalized;
-      players.forEach(player => {
-        if (Number(player.profileId) === Number(profile.id)) player.color = normalized;
-      });
-      profilesDirty = true;
-      dirty = true;
-      document.getElementById('saveBtn').disabled = false;
-      renderProfiles();
-      renderSlots();
-      renderSummary();
-      event.stopPropagation();
-    }
-
-    function pickProfileGradient(profileIdx, colorIdx, color, event) {
-      const profile = profiles[profileIdx];
-      if (!profile) return;
-      const normalized = normalizeColor(color, colorIdx === 0 ? (profile.color || '#e63946') : '#2ec4b6');
-      profile.gradientStart = colorIdx === 0 ? normalized : normalizeColor(profile.gradientStart, profile.color || '#e63946');
-      profile.gradientEnd = colorIdx === 1 ? normalized : normalizeColor(profile.gradientEnd, '#2ec4b6');
-      profile.gradient = 'linear-gradient(135deg,' + profile.gradientStart + ',' + profile.gradientEnd + ')';
-      profilesDirty = true;
-      renderProfiles();
-      event.stopPropagation();
+      list.innerHTML = profiles.map(pr => {
+        const slots = players.filter(pl => Number(pl.profileId) === Number(pr.id)).map(pl => 'Slot ' + pl.slot);
+        const duplicate = isDuplicateProfile(pr);
+        const sub = duplicate
+          ? '<span class="p-sub warn">⚠ doppelt · #' + pr.id + (slots.length ? ' · ' + slots.join(', ') : ' · unbenutzt') + '</span>'
+          : '<span class="p-sub">' + (slots.length ? slots.join(', ') : 'kein Slot') + '</span>';
+        return '<button type="button" class="profile-card' + (duplicate ? ' dup' : '') + '" onclick="openProfileEditor(' + Number(pr.id) + ')" title="Profil bearbeiten">' +
+          '<span class="p-avatar" style="background:' + escAttr(normalizeColor(pr.color, '#555555')) + '">' + escHtml(initials(pr.name)) + '</span>' +
+          '<span class="p-text"><span class="p-name">' + escHtml(pr.name) + '</span>' + sub + '</span>' +
+        '</button>';
+      }).join('');
     }
 
     function normalizeColor(value, fallback) {
@@ -468,79 +490,212 @@
       return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : fallback;
     }
 
-    function getGradientColor(profile, index) {
-      const fallback = index === 0 ? (profile.color || '#e63946') : '#2ec4b6';
-      const matches = String(profile.gradient || '').match(/#[0-9a-f]{6}/gi);
-      return normalizeColor(matches && matches[index], fallback);
+    function hexToRgb(hex) {
+      const value = normalizeColor(hex, '#000000');
+      return [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16));
     }
 
-    function addProfile() {
-      const input = document.getElementById('profileNameInput');
-      const name = input.value.trim();
-      if (!name) return;
-      profiles.push({ name, color: COLORS[profiles.length % COLORS.length] });
-      input.value = '';
-      profilesDirty = true;
-      renderProfiles();
-      renderSlots();
-      showToast('Profil "' + name + '" hinzugefügt (noch nicht gespeichert)');
+    function rgbToHex(rgb) {
+      return '#' + rgb.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
     }
 
-    function removeProfile(idx) {
-      const removed = profiles.splice(idx, 1)[0];
-      profilesDirty = true;
-      if (removed) {
-        const removedName = String(removed.name || '').trim().toLowerCase();
-        players.forEach(player => {
-          if (String(player.name || '').trim().toLowerCase() === removedName) {
-            player.name = '';
-            player.active = false;
-          }
-        });
-        dirty = true;
-        document.getElementById('saveBtn').disabled = false;
+    function mixColors(a, b, ratio) {
+      const ca = hexToRgb(a);
+      const cb = hexToRgb(b);
+      return rgbToHex(ca.map((v, i) => v + (cb[i] - v) * ratio));
+    }
+
+    // Liefert das Mischverhältnis, das der Farbe c auf der Linie a→b am nächsten kommt.
+    function estimateRatio(a, b, c) {
+      const ca = hexToRgb(a), cb = hexToRgb(b), cc = hexToRgb(c);
+      const d = cb.map((v, i) => v - ca[i]);
+      const len = d.reduce((s, v) => s + v * v, 0);
+      if (!len) return 0;
+      const t = cc.reduce((s, v, i) => s + (v - ca[i]) * d[i], 0) / len;
+      return Math.max(0, Math.min(1, t));
+    }
+
+    function getGradientColors(profile) {
+      const matches = String(profile && profile.gradient || '').match(/#[0-9a-f]{6}/gi);
+      return matches && matches.length >= 2 ? [normalizeColor(matches[0], ''), normalizeColor(matches[1], '')] : null;
+    }
+
+    function openProfileEditor(id) {
+      const profile = findProfile(id);
+      const color = normalizeColor(profile && profile.color, COLORS[profiles.length % COLORS.length]);
+      const gradient = getGradientColors(profile);
+      editor = {
+        id: profile ? Number(profile.id) : null,
+        originalName: profile ? profile.name : '',
+        color,
+        mode: gradient ? 'mix' : 'pick',
+        mixA: gradient ? gradient[0] : color,
+        mixB: gradient ? gradient[1] : '#ffffff'
+      };
+      document.getElementById('pdTitle').textContent = profile ? 'Profil bearbeiten' : 'Neues Profil';
+      document.getElementById('pdName').value = profile ? profile.name : '';
+      document.getElementById('pdDelete').style.display = profile ? '' : 'none';
+      document.getElementById('pdError').textContent = '';
+      document.getElementById('pdMixA').value = editor.mixA;
+      document.getElementById('pdMixB').value = editor.mixB;
+      document.getElementById('pdMixRatio').value = Math.round(estimateRatio(editor.mixA, editor.mixB, color) * 100);
+      setEditorMode(editor.mode, true);
+      setEditorColor(color);
+      document.getElementById('profileDialog').classList.add('open');
+      setTimeout(() => document.getElementById('pdName').focus(), 30);
+    }
+
+    function closeProfileEditor() {
+      document.getElementById('profileDialog').classList.remove('open');
+      editor = null;
+    }
+
+    function setEditorMode(mode, keepColor) {
+      if (!editor) return;
+      editor.mode = mode;
+      document.getElementById('pdTabPick').classList.toggle('on', mode === 'pick');
+      document.getElementById('pdTabMix').classList.toggle('on', mode === 'mix');
+      document.getElementById('pdPanePick').style.display = mode === 'pick' ? '' : 'none';
+      document.getElementById('pdPaneMix').style.display = mode === 'mix' ? '' : 'none';
+      if (mode === 'mix') {
+        if (!keepColor) updateMix();
+        else renderMixBar();
       }
-      renderProfiles();
-      renderSlots();
-      if (removed) showToast('Profil "' + removed.name + '" entfernt');
     }
 
-    async function saveProfiles() {
-      const btn = document.getElementById('saveProfilesBtn');
+    function setEditorColor(color) {
+      if (!editor) return;
+      editor.color = normalizeColor(color, editor.color);
+      document.getElementById('pdColor').value = editor.color;
+      const hex = document.getElementById('pdHex');
+      if (document.activeElement !== hex) hex.value = editor.color;
+      updateEditorPreview();
+    }
+
+    function onHexInput(value) {
+      let hex = String(value || '').trim();
+      if (hex && hex[0] !== '#') hex = '#' + hex;
+      if (/^#[0-9a-f]{6}$/i.test(hex)) setEditorColor(hex);
+    }
+
+    function renderMixBar() {
+      const a = document.getElementById('pdMixA').value;
+      const b = document.getElementById('pdMixB').value;
+      document.getElementById('pdMixBar').style.background = 'linear-gradient(90deg,' + a + ',' + b + ')';
+      document.getElementById('pdMixBar').style.setProperty('--mix', editor ? editor.color : a);
+      document.getElementById('pdMixResult').textContent = (editor ? editor.color : a) + ' · ' + document.getElementById('pdMixRatio').value + ' %';
+    }
+
+    function updateMix() {
+      if (!editor) return;
+      editor.mixA = normalizeColor(document.getElementById('pdMixA').value, editor.mixA);
+      editor.mixB = normalizeColor(document.getElementById('pdMixB').value, editor.mixB);
+      const ratio = Number(document.getElementById('pdMixRatio').value) / 100;
+      setEditorColor(mixColors(editor.mixA, editor.mixB, ratio));
+      renderMixBar();
+    }
+
+    function updateEditorPreview() {
+      if (!editor) return;
+      const name = document.getElementById('pdName').value.trim();
+      document.getElementById('pdPreviewName').textContent = name || 'Neues Profil';
+      const avatar = document.getElementById('pdAvatar');
+      avatar.textContent = initials(name);
+      avatar.style.background = editor.color;
+      document.getElementById('pdPreview').style.setProperty('--pc', editor.color);
+      if (editor.mode === 'mix') renderMixBar();
+    }
+
+    async function profileRequest(url, options) {
+      const response = await fetch(url, options);
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
+      return result;
+    }
+
+    async function saveProfileFromEditor() {
+      if (!editor) return;
+      const error = document.getElementById('pdError');
+      const name = document.getElementById('pdName').value.trim();
+      if (!name) { error.textContent = 'Bitte einen Namen eingeben.'; return; }
+      const nameChanged = nameKey(name) !== nameKey(editor.originalName);
+      const clash = nameChanged && profiles.find(pr => nameKey(pr.name) === nameKey(name) && Number(pr.id) !== Number(editor.id));
+      if (clash && !confirm('Es gibt schon ein Profil "' + clash.name + '" (#' + clash.id + ').\n\nTrotzdem speichern? Beide Profile bleiben getrennt bestehen.')) return;
+
+      const payload = {
+        name,
+        color: editor.color,
+        gradient: editor.mode === 'mix' ? 'linear-gradient(135deg,' + editor.mixA + ',' + editor.mixB + ')' : null
+      };
+      if (editor.id) payload.id = editor.id;
+      const editedId = editor.id;
+      const btn = document.getElementById('pdSave');
       btn.disabled = true;
-      btn.textContent = '…';
       try {
-        const response = await fetch('/api/profiles', {
+        const result = await profileRequest('/api/profiles', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(profiles)
+          body: JSON.stringify([payload])
         });
-        if (!response.ok) {
-          const result = await response.json().catch(() => ({}));
-          throw new Error(result.error || 'HTTP ' + response.status);
+        profiles = Array.isArray(result.profiles) ? result.profiles : profiles;
+        const savedId = editedId || (Array.isArray(result.savedIds) ? Number(result.savedIds[0]) : 0);
+        const saved = findProfile(savedId);
+        let slotsChanged = false;
+        if (saved) {
+          players.forEach(pl => {
+            if (Number(pl.profileId) !== Number(saved.id)) return;
+            if (pl.name !== saved.name || pl.color !== saved.color) slotsChanged = true;
+            pl.name = saved.name;
+            pl.color = saved.color;
+          });
         }
-        profilesDirty = false;
-        if (dirty) await saveAll();
-        showToast('Profile gespeichert ✓');
-      } catch (error) {
-        showToast('Profile nicht gespeichert: ' + error.message);
+        closeProfileEditor();
+        renderProfiles();
+        renderSlots();
+        renderSummary();
+        if (slotsChanged) await saveAll();
+        showToast('Profil "' + name + '" gespeichert ✓');
+      } catch (err) {
+        error.textContent = 'Nicht gespeichert: ' + err.message;
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Profile speichern';
       }
     }
 
+    async function deleteProfileFromEditor() {
+      const profile = editor && findProfile(editor.id);
+      if (!profile) return;
+      const usedIn = players.filter(pl => Number(pl.profileId) === Number(profile.id)).map(pl => 'Slot ' + pl.slot);
+      const question = 'Profil "' + profile.name + '" löschen?' +
+        (usedIn.length ? '\n\nEs ist ' + usedIn.join(', ') + ' zugewiesen; der Slot behält Name und Farbe als manuellen Eintrag.' : '') +
+        '\n\nStatistiken und Highscores bleiben erhalten.';
+      if (!confirm(question)) return;
+      try {
+        const result = await profileRequest('/api/profiles/' + Number(profile.id), { method: 'DELETE' });
+        profiles = Array.isArray(result.profiles) ? result.profiles : profiles.filter(pr => Number(pr.id) !== Number(profile.id));
+        players.forEach(pl => { if (Number(pl.profileId) === Number(profile.id)) pl.profileId = null; });
+        closeProfileEditor();
+        renderProfiles();
+        renderSlots();
+        renderSummary();
+        showToast('Profil "' + profile.name + '" gelöscht');
+      } catch (err) {
+        document.getElementById('pdError').textContent = 'Nicht gelöscht: ' + err.message;
+      }
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && editor) closeProfileEditor();
+    });
+
     function applyProfile(idx, sel) {
-      const profile = profiles.find(pr => Number(pr.id) === Number(sel.value));
+      const profile = findProfile(sel.value);
       players[idx].profileId = profile ? Number(profile.id) : null;
       players[idx].name = profile ? profile.name : '';
-      if (profile) {
-        if (profile && profile.color) {
-          players[idx].color = profile.color;
-        }
-      }
+      if (profile && profile.color) players[idx].color = profile.color;
       renderSlots();
       renderSummary();
+      renderProfiles();
       markDirty();
     }
 

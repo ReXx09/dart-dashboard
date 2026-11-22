@@ -178,3 +178,38 @@ test('Highscore-Verwaltung ändert Spielerzuordnung und löscht nur manuelle Ein
     assert.equal(remaining[0].player, 'Claudia');
   });
 });
+
+test('Profile: gleiche Namen bleiben getrennt, Speichern per ID legt kein Duplikat an, Löschen entfernt das Profil', async () => {
+  await withStore(async store => {
+    const [tobiasId] = await store.saveProfiles([{ name: 'Tobias', color: '#e63946' }]);
+    assert.ok(tobiasId > 0);
+    const ids = await store.saveProfiles([{ id: tobiasId, name: 'Tobias', color: '#ff9f1c' }, { name: 'tobias', color: '#2ec4b6' }, { name: '  ' }]);
+    assert.equal(ids.length, 2);
+    assert.equal(ids[0], tobiasId);
+    assert.notEqual(ids[1], tobiasId);
+    const profiles = await store.getProfiles();
+    assert.equal(profiles.length, 2);
+    assert.equal(profiles.find(profile => Number(profile.id) === tobiasId).color, '#ff9f1c');
+
+    await store.savePlayers([{ slot: 1, name: 'Tobias', active: true, color: '#ff9f1c', profileId: tobiasId }]);
+    assert.equal(await store.deleteProfile(tobiasId), true);
+    assert.deepEqual((await store.getProfiles()).map(profile => Number(profile.id)), [ids[1]]);
+    const slot = (await store.getPlayers()).find(player => Number(player.slot) === 1);
+    assert.equal(slot.profileId ?? null, null);
+    assert.equal(await store.deleteProfile(tobiasId), false);
+  });
+});
+
+test('Highscores ab Zeitpunkt filtern vor dem Limit, damit kleine Tages-Checkouts nicht verdrängt werden', async () => {
+  await withStore(async store => {
+    const todayStart = 1_000_000;
+    for (let index = 0; index < 5; index++) {
+      await store.addHighscore({ player: 'Alt', score: 180, kind: '180er', ts: todayStart - 1000 - index });
+    }
+    await store.addHighscore({ player: 'Moni', score: 3, kind: 'checkout', legWin: true, ts: todayStart + 10 });
+
+    assert.equal((await store.getHighscores(5, '', true)).some(entry => entry.player === 'Moni'), false);
+    const today = await store.getHighscores(5, '', true, todayStart);
+    assert.deepEqual(today.map(entry => [entry.player, entry.score, entry.kind]), [['Moni', 3, 'checkout']]);
+  });
+});
