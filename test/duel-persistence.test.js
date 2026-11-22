@@ -179,11 +179,14 @@ test('Highscore-Verwaltung ändert Spielerzuordnung und löscht nur manuelle Ein
   });
 });
 
-test('Profile: gleiche Namen bleiben getrennt, Speichern per ID legt kein Duplikat an, Löschen entfernt das Profil', async () => {
+test('Profile: Namenssperre, Speichern per ID ohne Duplikat, Nutzungszähler und Löschen', async () => {
   await withStore(async store => {
     const [tobiasId] = await store.saveProfiles([{ name: 'Tobias', color: '#e63946' }]);
     assert.ok(tobiasId > 0);
-    const ids = await store.saveProfiles([{ id: tobiasId, name: 'Tobias', color: '#ff9f1c' }, { name: 'tobias', color: '#2ec4b6' }, { name: '  ' }]);
+    await assert.rejects(store.saveProfiles([{ name: ' tobias ', color: '#2ec4b6' }]), { code: 'PROFILE_NAME_EXISTS' });
+    assert.equal((await store.getProfiles()).length, 1);
+
+    const ids = await store.saveProfiles([{ id: tobiasId, name: 'Tobias', color: '#ff9f1c' }, { name: 'tobias', color: '#2ec4b6', allowDuplicateName: true }, { name: '  ' }]);
     assert.equal(ids.length, 2);
     assert.equal(ids[0], tobiasId);
     assert.notEqual(ids[1], tobiasId);
@@ -192,6 +195,14 @@ test('Profile: gleiche Namen bleiben getrennt, Speichern per ID legt kein Duplik
     assert.equal(profiles.find(profile => Number(profile.id) === tobiasId).color, '#ff9f1c');
 
     await store.savePlayers([{ slot: 1, name: 'Tobias', active: true, color: '#ff9f1c', profileId: tobiasId }]);
+    await store.createDuel({ mode: '501', matchType: 'direct', players: [{ slot: 1, name: 'Tobias', profileId: tobiasId }, { slot: 2, name: 'Gast' }] });
+    await store.addHighscore({ player: 'Tobias', score: 140, kind: '140er', playerSlot: 1, profileId: tobiasId });
+    const usage = await store.getProfileUsage();
+    assert.equal(usage.get(tobiasId).duels, 1);
+    assert.equal(usage.get(tobiasId).highscores, 1);
+    assert.deepEqual(usage.get(tobiasId).slots, [1]);
+    assert.equal(usage.has(ids[1]), false);
+
     assert.equal(await store.deleteProfile(tobiasId), true);
     assert.deepEqual((await store.getProfiles()).map(profile => Number(profile.id)), [ids[1]]);
     const slot = (await store.getPlayers()).find(player => Number(player.slot) === 1);

@@ -133,7 +133,7 @@
     .btn-sm:disabled { opacity: .5; cursor: default; }
     .btn-danger { background: transparent; border-color: #5a1f24; color: #ff6b6b; }
     .btn-danger:hover { background: #2a1214; }
-    .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+    .profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
     .profile-card { display: flex; align-items: center; gap: 10px; background: #0d0d0d; border: 1px solid #242424; border-radius: 10px; padding: 8px 10px; cursor: pointer; color: inherit; font-family: inherit; text-align: left; transition: border-color .15s, background .15s; }
     .profile-card:hover { border-color: #444; background: #121212; }
     .profile-card.dup { border-color: #7a5a12; }
@@ -142,6 +142,13 @@
     .p-name { font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .p-sub { font-size: .68rem; color: #555; }
     .p-sub.warn { color: #f0b429; }
+    .p-name-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+    .p-id { font-size: .62rem; color: #555; font-family: ui-monospace, Consolas, monospace; flex-shrink: 0; }
+    .p-stats { display: flex; gap: 8px; font-size: .66rem; color: #888; margin-top: 2px; }
+    .p-stats.none { color: #444; font-style: italic; }
+    .pd-usage { background: #0d0d0d; border: 1px solid #242424; border-radius: 8px; padding: 8px 10px; font-size: .76rem; color: #aaa; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; }
+    .pd-usage dt { color: #666; }
+    .pd-usage dd { color: #ddd; }
     .profile-empty { color: #444; font-size: .82rem; }
 
     /* Profil-Editor */
@@ -193,7 +200,14 @@
   </script>
 
   <div class="topbar">
-    <a href="/">← Zurück</a>
+    <a href="/" id="backLink">← Zurück</a>
+    <script>
+      if (new URLSearchParams(location.search).get('return') === 'live') {
+        const backLink = document.getElementById('backLink');
+        backLink.href = '/panels/live-spielstand.html?openMatch=1' + (new URLSearchParams(location.search).get('tv') === 'compact' ? '&tv=compact' : '');
+        backLink.textContent = '← Zurück zu „Begegnung starten“';
+      }
+    </script>
     <span class="sep">›</span>
     <h1>👤 Spieler-Verwaltung</h1>
     <div class="status-badge">HB8 — max. <span>8</span> Spieler</div>
@@ -245,6 +259,7 @@
         <span class="p-avatar" id="pdAvatar">?</span>
         <strong id="pdPreviewName">Neues Profil</strong>
       </div>
+      <dl class="pd-usage" id="pdUsage"></dl>
       <div>
         <label class="pd-label" for="pdName">Name</label>
         <input class="pd-input" id="pdName" maxlength="24" autocomplete="off" oninput="updateEditorPreview()" />
@@ -292,6 +307,7 @@
 
     let players = [];
     let profiles = [];
+    let profileUsage = {};
     let dirty = false;
 
     updateClock();
@@ -311,6 +327,21 @@
       renderSlots();
       renderSummary();
       renderProfiles();
+      loadProfileUsage();
+    }
+
+    async function loadProfileUsage() {
+      try {
+        const response = await fetch('/api/profiles/usage', { cache: 'no-store' });
+        if (!response.ok) return;
+        profileUsage = await response.json() || {};
+        renderProfiles();
+      } catch (_) { /* Zähler sind optional */ }
+    }
+
+    function usageOf(id) {
+      const u = profileUsage[Number(id)] || {};
+      return { duels: Number(u.duels || 0), highscores: Number(u.highscores || 0), lastPlayed: Number(u.lastPlayed || 0) || null };
     }
 
     function renderSlots() {
@@ -324,9 +355,11 @@
         card.style.setProperty('--sc', color);
         card.dataset.slot = p.slot;
 
-        const profileOpts = profiles.map(pr =>
-          `<option value="${pr.id}"${Number(pr.id) === Number(p.profileId) ? ' selected' : ''}>${escHtml(profileLabel(pr))}</option>`
-        ).join('');
+        const profileOpts = profiles.map(pr => {
+          const usedBy = players.find(other => other !== p && Number(other.profileId) === Number(pr.id));
+          const suffix = usedBy ? ` · Slot ${usedBy.slot}` : '';
+          return `<option value="${pr.id}"${Number(pr.id) === Number(p.profileId) ? ' selected' : ''}>${escHtml(profileLabel(pr) + suffix)}</option>`;
+        }).join('');
 
         const swatch = profile
           ? `<button type="button" class="swatch" style="background:${escAttr(color)}" title="Farbe im Profil bearbeiten" onclick="openProfileEditor(${Number(profile.id)})"></button>`
@@ -475,12 +508,16 @@
       list.innerHTML = profiles.map(pr => {
         const slots = players.filter(pl => Number(pl.profileId) === Number(pr.id)).map(pl => 'Slot ' + pl.slot);
         const duplicate = isDuplicateProfile(pr);
+        const u = usageOf(pr.id);
         const sub = duplicate
-          ? '<span class="p-sub warn">⚠ doppelt · #' + pr.id + (slots.length ? ' · ' + slots.join(', ') : ' · unbenutzt') + '</span>'
+          ? '<span class="p-sub warn">⚠ doppelt' + (slots.length ? ' · ' + slots.join(', ') : ' · kein Slot') + '</span>'
           : '<span class="p-sub">' + (slots.length ? slots.join(', ') : 'kein Slot') + '</span>';
+        const stats = u.duels || u.highscores
+          ? '<span class="p-stats" title="Verknüpfte Datenbankeinträge"><span>🎯 ' + u.duels + ' Beg.</span><span>🏆 ' + u.highscores + ' HS</span></span>'
+          : '<span class="p-stats none">keine Spieldaten</span>';
         return '<button type="button" class="profile-card' + (duplicate ? ' dup' : '') + '" onclick="openProfileEditor(' + Number(pr.id) + ')" title="Profil bearbeiten">' +
           '<span class="p-avatar" style="background:' + escAttr(normalizeColor(pr.color, '#555555')) + '">' + escHtml(initials(pr.name)) + '</span>' +
-          '<span class="p-text"><span class="p-name">' + escHtml(pr.name) + '</span>' + sub + '</span>' +
+          '<span class="p-text"><span class="p-name-row"><span class="p-name">' + escHtml(pr.name) + '</span><span class="p-id">#' + Number(pr.id) + '</span></span>' + sub + stats + '</span>' +
         '</button>';
       }).join('');
     }
@@ -535,6 +572,7 @@
       document.getElementById('pdTitle').textContent = profile ? 'Profil bearbeiten' : 'Neues Profil';
       document.getElementById('pdName').value = profile ? profile.name : '';
       document.getElementById('pdDelete').style.display = profile ? '' : 'none';
+      renderEditorUsage(profile);
       document.getElementById('pdError').textContent = '';
       document.getElementById('pdMixA').value = editor.mixA;
       document.getElementById('pdMixB').value = editor.mixB;
@@ -543,6 +581,23 @@
       setEditorColor(color);
       document.getElementById('profileDialog').classList.add('open');
       setTimeout(() => document.getElementById('pdName').focus(), 30);
+    }
+
+    function renderEditorUsage(profile) {
+      const box = document.getElementById('pdUsage');
+      if (!profile) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      const u = usageOf(profile.id);
+      const slots = players.filter(pl => Number(pl.profileId) === Number(profile.id)).map(pl => pl.slot);
+      const same = profiles.filter(pr => nameKey(pr.name) === nameKey(profile.name) && Number(pr.id) !== Number(profile.id)).map(pr => '#' + pr.id);
+      const rows = [
+        ['Profil-ID', '#' + Number(profile.id)],
+        ['Begegnungen', u.duels + (u.lastPlayed ? ' (zuletzt ' + new Date(u.lastPlayed).toLocaleDateString('de-DE') + ')' : '')],
+        ['Highscores', String(u.highscores)],
+        ['Slot', slots.length ? slots.join(', ') : '–']
+      ];
+      if (same.length) rows.push(['⚠ Gleicher Name', same.join(', ')]);
+      box.innerHTML = rows.map(([k, v]) => '<dt>' + escHtml(k) + '</dt><dd>' + escHtml(v) + '</dd>').join('');
+      box.style.display = '';
     }
 
     function closeProfileEditor() {
@@ -628,6 +683,7 @@
         gradient: editor.mode === 'mix' ? 'linear-gradient(135deg,' + editor.mixA + ',' + editor.mixB + ')' : null
       };
       if (editor.id) payload.id = editor.id;
+      else if (clash) payload.allowDuplicateName = true;
       const editedId = editor.id;
       const btn = document.getElementById('pdSave');
       btn.disabled = true;
@@ -654,6 +710,7 @@
         renderSlots();
         renderSummary();
         if (slotsChanged) await saveAll();
+        loadProfileUsage();
         showToast('Profil "' + name + '" gespeichert ✓');
       } catch (err) {
         error.textContent = 'Nicht gespeichert: ' + err.message;
@@ -666,9 +723,12 @@
       const profile = editor && findProfile(editor.id);
       if (!profile) return;
       const usedIn = players.filter(pl => Number(pl.profileId) === Number(profile.id)).map(pl => 'Slot ' + pl.slot);
-      const question = 'Profil "' + profile.name + '" löschen?' +
+      const u = usageOf(profile.id);
+      const question = 'Profil "' + profile.name + '" (#' + profile.id + ') löschen?' +
         (usedIn.length ? '\n\nEs ist ' + usedIn.join(', ') + ' zugewiesen; der Slot behält Name und Farbe als manuellen Eintrag.' : '') +
-        '\n\nStatistiken und Highscores bleiben erhalten.';
+        (u.duels || u.highscores
+          ? '\n\n⚠ Mit diesem Profil sind ' + u.duels + ' Begegnungen und ' + u.highscores + ' Highscores verknüpft. Die Einträge bleiben erhalten, verlieren aber die Profilzuordnung.'
+          : '\n\nKeine verknüpften Spieldaten – gefahrlos löschbar.');
       if (!confirm(question)) return;
       try {
         const result = await profileRequest('/api/profiles/' + Number(profile.id), { method: 'DELETE' });
@@ -678,6 +738,7 @@
         renderProfiles();
         renderSlots();
         renderSummary();
+        loadProfileUsage();
         showToast('Profil "' + profile.name + '" gelöscht');
       } catch (err) {
         document.getElementById('pdError').textContent = 'Nicht gelöscht: ' + err.message;
@@ -690,6 +751,17 @@
 
     function applyProfile(idx, sel) {
       const profile = findProfile(sel.value);
+      const otherSlot = profile ? players.find((pl, i) => i !== idx && Number(pl.profileId) === Number(profile.id)) : null;
+      if (otherSlot) {
+        if (!confirm(`„${profile.name}“ ist bereits Slot ${otherSlot.slot} zugewiesen.\nEin Profil kann nur in einem Slot stehen.\n\nProfil aus Slot ${otherSlot.slot} entfernen und in Slot ${players[idx].slot} setzen?`)) {
+          sel.value = players[idx].profileId ? String(players[idx].profileId) : '';
+          return;
+        }
+        if (otherSlot.active) players[idx].active = true;
+        otherSlot.profileId = null;
+        otherSlot.name = '';
+        otherSlot.active = false;
+      }
       players[idx].profileId = profile ? Number(profile.id) : null;
       players[idx].name = profile ? profile.name : '';
       if (profile && profile.color) players[idx].color = profile.color;

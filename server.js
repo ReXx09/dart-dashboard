@@ -6,8 +6,9 @@ const http = require('http');
 const crypto = require('crypto');
 const { DataStore } = require('./db');
 const { aggregateDuelStats } = require('./lib/duel-stats');
-const { addDerivedMetrics, percentage, resolvePlayerIdentity } = require('./lib/highscore-overview');
+const { addDerivedMetrics, resolvePlayerIdentity } = require('./lib/highscore-overview');
 const { removeLatestThrow, correctLatestThrow, summarizePlayerThrows } = require('./lib/live-throws');
+const { assignParticipantSlots } = require('./lib/match-participants');
 const {
   GAME_MODES,
   CHECKOUT_RULES,
@@ -2936,19 +2937,25 @@ function chooseStartingPlayer(players) {
   return { index, slot: Number(players[index].slot) };
 }
 
-async function defaultLiveState(mode, selectedPlayerSlots = null) {
+async function defaultLiveState(mode, selectedPlayerSlots = null, options = {}) {
   const m = mode || DEFAULT_MODE;
   const active = await getActivePlayersForLive();
   const selected = Array.isArray(selectedPlayerSlots)
     ? active.filter(player => selectedPlayerSlots.includes(Number(player.slot)))
     : active;
+  if (options.keepOrder && Array.isArray(selectedPlayerSlots)) {
+    const position = slot => selectedPlayerSlots.map(Number).indexOf(Number(slot));
+    selected.sort((a, b) => position(a.slot) - position(b.slot));
+  }
   const fallbackPlayers = selected.length > 0
     ? selected
     : active.length > 0
       ? active
       : [{ slot: 1, name: 'Spieler 1', color: '#e63946' }, { slot: 2, name: 'Spieler 2', color: '#f4a261' }];
   const startScore = getStartScoreForMode(m);
-  const startingPlayer = chooseStartingPlayer(fallbackPlayers);
+  const startingPlayer = options.keepOrder && selected.length > 0
+    ? { index: 0, slot: Number(fallbackPlayers[0].slot) }
+    : chooseStartingPlayer(fallbackPlayers);
 
   return {
     game: { mode: m, checkoutRule: DEFAULT_CHECKOUT_RULE, status: 'idle', startedAt: null, updatedAt: Date.now(), activePlayer: startingPlayer.index, startingPlayerSlot: startingPlayer.slot, throwRound: 1, currentThrow: 0, duelId: null, selectedPlayerSlots: fallbackPlayers.map(player => Number(player.slot)) },
@@ -3181,7 +3188,13 @@ function resetLiveState(carryLegs = false, modeOverride, sourceState = null) {
     currentRoundPoints: [],
     ...defaultPlayerCricketState(mode)
   }));
-  const startingPlayer = chooseStartingPlayer(players);
+  let startingPlayer = chooseStartingPlayer(players);
+  // Feste Wurfreihenfolge: Anwurf wechselt pro Leg reihum.
+  if (carryLegs && sourceState?.game?.playerOrder === 'fixed' && players.length > 0) {
+    const previousIndex = players.findIndex(player => Number(player.slot) === Number(sourceState.game.startingPlayerSlot));
+    const index = previousIndex >= 0 ? (previousIndex + 1) % players.length : 0;
+    startingPlayer = { index, slot: Number(players[index].slot) };
+  }
 
   return {
     game: {
@@ -3255,7 +3268,11 @@ async function getLiveState() {
       mergedPlayers.push(sanitizePlayerState(player, player));
   });
 
-  mergedPlayers.sort((a, b) => Number(a.slot || 0) - Number(b.slot || 0));
+  const orderIndex = slot => {
+    const index = selectedPlayerSlots.indexOf(Number(slot));
+    return index >= 0 ? index : 1000 + Number(slot || 0);
+  };
+  mergedPlayers.sort((a, b) => orderIndex(a.slot) - orderIndex(b.slot));
 
   const state = {
     game: {
@@ -3272,6 +3289,7 @@ async function getLiveState() {
       duelId: Number(saved.game?.duelId || 0) || null,
       selectedPlayerSlots: mergedPlayers.map(player => Number(player.slot)),
       matchType: String(saved.game?.matchType || ''),
+      playerOrder: saved.game?.playerOrder === 'fixed' ? 'fixed' : '',
       bestOf: Math.max(1, Number(saved.game?.bestOf || 1)),
       legsToWin: Math.max(1, Number(saved.game?.legsToWin || 1)),
       tournamentName: String(saved.game?.tournamentName || ''),
@@ -3559,6 +3577,21 @@ app.get('/api/seasons', async (_req, res) => {
 
 app.put('/api/players', requireLocalNetwork, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
+  // Ein Profil darf nur in einem Slot stehen, sonst landen Würfe zweier Slots auf demselben Profil.
+  const slotByProfile = new Map();
+  for (const player of req.body) {
+    const profileId = Number(player?.profileId || 0);
+    if (profileId <= 0) continue;
+    if (slotByProfile.has(profileId)) {
+      return res.status(409).json({
+        error: `Das Profil „${String(player.name || profileId)}“ ist bereits Slot ${slotByProfile.get(profileId)} zugewiesen.`,
+        code: 'PROFILE_IN_MULTIPLE_SLOTS',
+        profileId,
+        slots: [slotByProfile.get(profileId), Number(player.slot || 0)]
+      });
+    }
+    slotByProfile.set(profileId, Number(player.slot || 0));
+  }
   try {
     await savePlayers(req.body);
     broadcastReload();
@@ -3591,12 +3624,18 @@ app.get('/api/profiles', async (_req, res) => {
   catch (err) { res.status(500).json({ error: 'Profile konnten nicht geladen werden: ' + err.message }); }
 });
 
+app.get('/api/profiles/usage', async (_req, res) => {
+  try { res.json(Object.fromEntries(await dataStore.getProfileUsage())); }
+  catch (err) { res.status(500).json({ error: 'Profil-Daten konnten nicht geladen werden: ' + err.message }); }
+});
+
 app.put('/api/profiles', requireLocalNetwork, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array erwartet' });
   try {
     const savedIds = await dataStore.saveProfiles(req.body);
     res.json({ ok: true, savedIds, profiles: await dataStore.getProfiles() });
   } catch (err) {
+    if (err.code === 'PROFILE_NAME_EXISTS') return res.status(409).json({ error: err.message, code: err.code });
     res.status(500).json({ error: 'Profile konnten nicht gespeichert werden: ' + err.message });
   }
 });
@@ -3898,15 +3937,29 @@ app.post('/api/duels/start', async (req, res) => {
     const mode = String(req.body?.mode || '501');
     const checkoutRule = String(req.body?.checkoutRule || 'double');
     const bestOf = Number(req.body?.bestOf || 1);
-    const slots = [...new Set((Array.isArray(req.body?.playerSlots) ? req.body.playerSlots : []).map(Number).filter(Number.isInteger))];
+    const keepOrder = req.body?.keepOrder === true;
+    let slots = [...new Set((Array.isArray(req.body?.playerSlots) ? req.body.playerSlots : []).map(Number).filter(Number.isInteger))];
+    let configuredPlayers = null;
+    let slotAssignment = null;
+    if (Array.isArray(req.body?.participants) && req.body.participants.length > 0) {
+      try {
+        slotAssignment = assignParticipantSlots(await getPlayers(), req.body.participants, await dataStore.getProfiles());
+      } catch (err) {
+        if (err.code === 'PARTICIPANTS_INVALID') return res.status(400).json({ error: err.message });
+        throw err;
+      }
+      slots = slotAssignment.slots;
+      configuredPlayers = slotAssignment.players;
+    }
     if (!GAME_MODES[mode]) return res.status(400).json({ error: 'Unbekannter Spielmodus für die Begegnung.' });
     if (!CHECKOUT_RULES[checkoutRule]) return res.status(400).json({ error: `Unbekannte Finish-Regel: ${checkoutRule}` });
     if (!Number.isInteger(bestOf) || bestOf < 1 || bestOf > 15 || bestOf % 2 === 0) return res.status(400).json({ error: 'Best-of muss eine ungerade Zahl zwischen 1 und 15 sein.' });
     if ((matchType === 'single' && slots.length < 1) || (matchType === 'direct' && slots.length !== 2) || (matchType !== 'single' && slots.length < 2) || slots.length > (matchType === 'tournament' ? 16 : 8)) return res.status(400).json({ error: matchType === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : 'Bitte 2 bis 16 Spieler auswählen; ein Direktduell benötigt genau 2.' });
     if (matchType === 'tournament' && ![2, 4, 8, 16].includes(slots.length)) return res.status(400).json({ error: 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.' });
-    const configuredPlayers = await getPlayers();
+    if (!configuredPlayers) configuredPlayers = await getPlayers();
     const selectedPlayers = slots.map(slot => configuredPlayers.find(player => Number(player.slot) === slot)).filter(player => player && String(player.name || '').trim());
     if (selectedPlayers.length !== slots.length) return res.status(400).json({ error: 'Alle ausgewählten Slots müssen einen Spielernamen haben.' });
+    if (slotAssignment?.changed) await dataStore.savePlayers(slotAssignment.players);
     const currentState = await getLiveState();
     invalidateLiveLifecycle();
     await liveCompletionQueue;
@@ -3922,12 +3975,14 @@ app.post('/api/duels/start', async (req, res) => {
       : null;
     const duel = tournament ? tournament.duel : await dataStore.createDuel({ mode, matchType, tournamentName, checkoutRule, players: tournamentPlayers });
     const activeSlots = tournament ? duel.players.map(player => Number(player.player_slot)) : slots;
-    const fresh = await defaultLiveState(mode, activeSlots);
+    const useFixedOrder = keepOrder && !tournament;
+    const fresh = await defaultLiveState(mode, activeSlots, { keepOrder: useFixedOrder });
     fresh.game.status = 'running';
     fresh.game.duelId = duel.id;
     fresh.game.checkoutRule = checkoutRule;
-    fresh.game.selectedPlayerSlots = activeSlots;
+    fresh.game.selectedPlayerSlots = fresh.players.map(player => Number(player.slot));
     fresh.game.matchType = matchType;
+    fresh.game.playerOrder = useFixedOrder ? 'fixed' : '';
     fresh.game.bestOf = bestOf;
     fresh.game.legsToWin = Math.ceil(bestOf / 2);
     fresh.game.tournamentName = tournamentName;
@@ -4060,7 +4115,7 @@ app.post('/api/duels/:id/cancel', async (req, res) => {
     await liveCompletionQueue;
     await flushLiveDetailWrites();
     const duel = await dataStore.cancelDuel(duelId);
-    const fresh = await defaultLiveState(String(state.game.mode || DEFAULT_MODE), state.game.selectedPlayerSlots);
+    const fresh = await defaultLiveState(String(state.game.mode || DEFAULT_MODE), state.game.selectedPlayerSlots, { keepOrder: state.game.playerOrder === 'fixed' });
     savedLiveMode = String(state.game.mode || DEFAULT_MODE);
     await saveLiveState(fresh, { immediate: true });
     broadcastReload();
@@ -4086,6 +4141,7 @@ app.post('/api/live/reset', async (req, res) => {
     if (carryLegs && Number(current.game?.duelId || 0) > 0) {
       fresh.game.duelId = Number(current.game.duelId);
       fresh.game.matchType = String(current.game.matchType || 'direct');
+      fresh.game.playerOrder = current.game.playerOrder === 'fixed' ? 'fixed' : '';
       fresh.game.bestOf = Math.max(1, Number(current.game.bestOf || 1));
       fresh.game.legsToWin = Math.max(1, Number(current.game.legsToWin || 1));
       fresh.game.checkoutRule = String(current.game.checkoutRule || savedCheckoutRule || DEFAULT_CHECKOUT_RULE);
@@ -4633,68 +4689,9 @@ app.get('/api/highscores/daily', async (_req, res) => {
 app.get('/api/highscores/overview', async (_req, res) => {
   try {
     res.set('Cache-Control', 'no-store');
-    const players = await dataStore.getPlayers();
     const profiles = await dataStore.getProfiles();
     const profileIdsByName = new Map(profiles.map(profile => [String(profile.name || '').trim().toLowerCase(), Number(profile.id)]));
     const profilesById = new Map(profiles.map(profile => [Number(profile.id), profile]));
-    const entries = [];
-    for (const player of players) {
-      if (!player.name) continue;
-      const stats = await dataStore.getPlayerStats(player.slot) || {};
-      const darts = Number(stats.total_darts || 0);
-      const totalScored = Number(stats.total_scored || 0);
-      const checkoutAttempts = Number(stats.checkout_attempts || 0);
-      const checkoutSuccess = Number(stats.checkout_success || 0);
-      const checkoutByRule = {};
-      for (const rule of ['single', 'double', 'master']) {
-        const attempts = Number(stats[`checkout_${rule}_attempts`] || 0);
-        const success = Number(stats[`checkout_${rule}_success`] || 0);
-        checkoutByRule[rule] = {
-          attempts,
-          success,
-          rate: attempts > 0 ? Number((success / attempts * 100).toFixed(1)) : 0,
-          highest: Math.min(170, Number(stats[`checkout_${rule}_highest`] || 0))
-        };
-      }
-      entries.push({
-        profileId: resolvePlayerIdentity({ profileId: player.profileId ?? player.profile_id, name: player.name, slot: player.slot }, profileIdsByName),
-        player: player.name,
-        mode: 'gesamt',
-        category: 'all',
-        count180: Number(stats.count_180 || 0),
-        count171Plus: Number(stats.count_171plus || 0),
-        count140Plus: Number(stats.count_140plus || 0),
-        count100Plus: Number(stats.count_100plus || 0),
-        threeDartAverage: darts > 0 ? Number((totalScored / darts * 3).toFixed(1)) : 0,
-        firstNineAverage: Number(stats.avg_first9 || 0),
-        firstNineSamples: Number(stats.first_nine_samples || 0),
-        firstNineLegacy: Boolean(Number(stats.first_nine_legacy || 0)),
-        checkoutRate: checkoutAttempts > 0 ? Number((checkoutSuccess / checkoutAttempts * 100).toFixed(1)) : 0,
-        checkoutAttempts,
-        checkoutSuccess,
-        checkoutByRule,
-        highestCheckout: Number(stats.highest_checkout || 0),
-        matchesPlayed: Number(stats.games_played || 0),
-        matchesWon: Number(stats.games_won || 0),
-        gamesPlayed: Number(stats.games_played || 0),
-        gamesWon: Number(stats.games_won || 0),
-        legsPlayed: Number(stats.legs_played || 0),
-        legsWon: Number(stats.legs_won || 0),
-        legWinRate: percentage(stats.legs_won, stats.legs_played),
-        matchWinRate: percentage(stats.games_won, stats.games_played),
-        checkoutStatsVersion: Number(stats.checkout_stats_version || 1),
-        trackingSince: stats.checkout_tracking_since ? Number(stats.checkout_tracking_since) : null
-      });
-    }
-
-    // Legacy databases may have profiles but no backfilled players.profile_id.
-    // Resolve those slot entries by the profile name before building totals.
-    for (const entry of entries) {
-      const profileId = Number(entry.profileId || 0);
-      if (profileId > 0 && profilesById.has(profileId)) continue;
-      const profileIdByName = Number(profileIdsByName.get(String(entry.player || '').trim().toLowerCase()) || 0);
-      if (profileIdByName > 0) entry.profileId = profileIdByName;
-    }
 
     const grouped = new Map();
     const duels = await dataStore.listFinishedDuelsForStats();
@@ -4703,7 +4700,8 @@ app.get('/api/highscores/overview', async (_req, res) => {
       const mode = String(duel.mode || '501');
       for (const player of duel.players || []) {
         const slot = Number(player.player_slot);
-        const profileId = resolvePlayerIdentity({ profileId: player.profile_id, name: player.player_name, slot }, profileIdsByName);
+        const storedProfileId = Number(player.profile_id || 0);
+        const profileId = resolvePlayerIdentity({ profileId: profilesById.has(storedProfileId) ? storedProfileId : null, name: player.player_name, slot }, profileIdsByName);
         const key = category + ':' + mode + ':' + profileId;
         if (!grouped.has(key)) grouped.set(key, {
           profileId,
@@ -4857,22 +4855,11 @@ app.get('/api/highscores/overview', async (_req, res) => {
       gamesWon: entry.gamesWon,
       trackingSince: null
     }));
-    for (const entry of entries) {
-      const categoriesForPlayer = categoryEntries.filter(categoryEntry => categoryEntry.profileId === entry.profileId);
-      entry.soloMatchesPlayed = categoriesForPlayer.reduce((sum, item) => sum + Number(item.soloMatchesPlayed || 0), 0);
-      entry.duelsPlayed = categoriesForPlayer.reduce((sum, item) => sum + Number(item.duelsPlayed || 0), 0);
-      entry.groupMatchesPlayed = categoriesForPlayer.reduce((sum, item) => sum + Number(item.groupMatchesPlayed || 0), 0);
-      entry.tournamentMatchesPlayed = categoriesForPlayer.reduce((sum, item) => sum + Number(item.tournamentMatchesPlayed || 0), 0);
-    }
-    const overviewEntries = entries.concat(groupedEntries, categoryEntries);
-    const ranked = (field, predicate = value => value > 0) => overviewEntries
-      .filter(entry => predicate(entry[field], entry))
-      .sort((a, b) => b[field] - a[field]);
-    const modes = ['gesamt', ...new Set(groupedEntries.map(entry => entry.mode))];
-    const categories = ['all', ...new Set(groupedEntries.map(entry => entry.category))];
-    const profileStatsById = new Map(profiles.map(profile => [Number(profile.id), {
-      profileId: Number(profile.id),
-      player: profile.name,
+    // Gesamtwerte je Profil kommen ausschliesslich aus den gespeicherten Begegnungen (duel_players.profile_id).
+    // player_stats haengt an der Slot-Nummer und wuerde bei Slot-Wechseln Werte dem falschen Profil zuordnen.
+    const emptyTotal = (profileId, player) => ({
+      profileId,
+      player,
       mode: 'gesamt',
       category: 'all',
       count180: 0, count171Plus: 0, count140Plus: 0, count100Plus: 0,
@@ -4884,46 +4871,11 @@ app.get('/api/highscores/overview', async (_req, res) => {
         master: { attempts: 0, success: 0, highest: 0 }
       },
       gamesPlayed: 0, gamesWon: 0, legsPlayed: 0, legsWon: 0
-    }]));
-    for (const entry of entries) {
-      const profileId = Number(entry.profileId || 0);
-      if (profileId <= 0 || profileStatsById.has(profileId)) continue;
-      profileStatsById.set(profileId, {
-        profileId,
-        player: entry.player,
-        mode: 'gesamt',
-        category: 'all',
-        count180: 0, count171Plus: 0, count140Plus: 0, count100Plus: 0,
-        darts: 0, totalScored: 0, firstNineTotal: 0, firstNineCount: 0,
-        checkoutAttempts: 0, checkoutSuccess: 0, highestCheckout: 0,
-        checkoutByRule: {
-          single: { attempts: 0, success: 0, highest: 0 },
-          double: { attempts: 0, success: 0, highest: 0 },
-          master: { attempts: 0, success: 0, highest: 0 }
-        },
-        gamesPlayed: 0, gamesWon: 0, legsPlayed: 0, legsWon: 0
-      });
-    }
-    const profileStatsFromSlots = new Set();
-    for (const entry of entries) {
-      const total = profileStatsById.get(Number(entry.profileId));
-      if (!total) continue;
-      const hasStats = Number(entry.gamesPlayed || 0) > 0 || Number(entry.legsPlayed || 0) > 0 || Number(entry.darts || 0) > 0;
-      if (!hasStats) continue;
-      profileStatsFromSlots.add(Number(entry.profileId));
-      for (const field of ['count180', 'count171Plus', 'count140Plus', 'count100Plus', 'darts', 'totalScored', 'firstNineSamples', 'checkoutAttempts', 'checkoutSuccess', 'gamesPlayed', 'gamesWon', 'legsPlayed', 'legsWon']) total[field] += Number(entry[field] || 0);
-      total.firstNineTotal += Number(entry.firstNineAverage || 0) * Number(entry.firstNineSamples || 0);
-      total.highestCheckout = Math.max(total.highestCheckout, Number(entry.highestCheckout || 0));
-      for (const rule of ['single', 'double', 'master']) {
-        total.checkoutByRule[rule].attempts += Number(entry.checkoutByRule?.[rule]?.attempts || 0);
-        total.checkoutByRule[rule].success += Number(entry.checkoutByRule?.[rule]?.success || 0);
-        total.checkoutByRule[rule].highest = Math.max(total.checkoutByRule[rule].highest, Number(entry.checkoutByRule?.[rule]?.highest || 0));
-      }
-    }
+    });
+    const totalsById = new Map(profiles.map(profile => [Number(profile.id), emptyTotal(Number(profile.id), profile.name)]));
     for (const entry of groupedEntries) {
-      const total = profileStatsById.get(Number(entry.profileId));
-      if (!total) continue;
-      if (profileStatsFromSlots.has(Number(entry.profileId))) continue;
+      if (!totalsById.has(entry.profileId)) totalsById.set(entry.profileId, emptyTotal(entry.profileId, entry.player));
+      const total = totalsById.get(entry.profileId);
       for (const field of ['count180', 'count171Plus', 'count140Plus', 'count100Plus', 'darts', 'totalScored', 'firstNineCount', 'checkoutAttempts', 'checkoutSuccess', 'gamesPlayed', 'gamesWon', 'legsPlayed', 'legsWon']) total[field] += Number(entry[field] || 0);
       total.firstNineTotal += Number(entry.firstNineAverage || 0) * Number(entry.firstNineCount || 0);
       total.highestCheckout = Math.max(total.highestCheckout, Number(entry.highestCheckout || 0));
@@ -4933,17 +4885,33 @@ app.get('/api/highscores/overview', async (_req, res) => {
         total.checkoutByRule[rule].highest = Math.max(total.checkoutByRule[rule].highest, Number(entry.checkoutByRule?.[rule]?.highest || 0));
       }
     }
-    const profileStats = Array.from(profileStatsById.values()).map(entry => addDerivedMetrics({
-      ...entry,
-      firstNineSamples: entry.firstNineCount,
-      matchesPlayed: entry.gamesPlayed,
-      matchesWon: entry.gamesWon,
-      checkoutRate: entry.checkoutAttempts > 0 ? Number((entry.checkoutSuccess / entry.checkoutAttempts * 100).toFixed(1)) : 0,
-      checkoutByRule: Object.fromEntries(['single', 'double', 'master'].map(rule => {
-        const value = entry.checkoutByRule[rule];
-        return [rule, { ...value, rate: value.attempts > 0 ? Number((value.success / value.attempts * 100).toFixed(1)) : 0, highest: Math.min(170, value.highest) }];
-      }))
-    }));
+    const totalEntries = Array.from(totalsById.values()).map(entry => {
+      const categoriesForPlayer = categoryEntries.filter(categoryEntry => categoryEntry.profileId === entry.profileId);
+      const sumCategory = field => categoriesForPlayer.reduce((sum, item) => sum + Number(item[field] || 0), 0);
+      return addDerivedMetrics({
+        ...entry,
+        firstNineSamples: entry.firstNineCount,
+        matchesPlayed: entry.gamesPlayed,
+        matchesWon: entry.gamesWon,
+        checkoutRate: entry.checkoutAttempts > 0 ? Number((entry.checkoutSuccess / entry.checkoutAttempts * 100).toFixed(1)) : 0,
+        checkoutByRule: Object.fromEntries(['single', 'double', 'master'].map(rule => {
+          const value = entry.checkoutByRule[rule];
+          return [rule, { ...value, rate: value.attempts > 0 ? Number((value.success / value.attempts * 100).toFixed(1)) : 0, highest: Math.min(170, value.highest) }];
+        })),
+        soloMatchesPlayed: sumCategory('soloMatchesPlayed'),
+        duelsPlayed: sumCategory('duelsPlayed'),
+        groupMatchesPlayed: sumCategory('groupMatchesPlayed'),
+        tournamentMatchesPlayed: sumCategory('tournamentMatchesPlayed'),
+        trackingSince: null
+      });
+    });
+    const profileStats = totalEntries.filter(entry => profilesById.has(Number(entry.profileId)));
+    const overviewEntries = totalEntries.filter(entry => entry.gamesPlayed > 0).concat(groupedEntries, categoryEntries);
+    const ranked = (field, predicate = value => value > 0) => overviewEntries
+      .filter(entry => predicate(entry[field], entry))
+      .sort((a, b) => b[field] - a[field]);
+    const modes = ['gesamt', ...new Set(groupedEntries.map(entry => entry.mode))];
+    const categories = ['all', ...new Set(groupedEntries.map(entry => entry.category))];
     const eliminationLeaderboard = await dataStore.getEliminationLeaderboard();
     const eliminationMade = eliminationLeaderboard.made.map(entry => ({
       ...entry,
@@ -4993,6 +4961,151 @@ app.get('/api/highscores/overview', async (_req, res) => {
     }});
   } catch (err) {
     res.status(500).json({ error: 'Highscore-Übersicht konnte nicht geladen werden: ' + err.message });
+  }
+});
+
+// ── Profile Statistics ──
+// Profilstatistiken werden aus den abgeschlossenen Begegnungen (duel_players.profile_id) berechnet.
+// So bleiben sie korrekt, auch wenn ein Slot spaeter von einem anderen Profil belegt wird.
+async function buildProfileStats(profileId, season) {
+  const profiles = await dataStore.getProfiles();
+  const profile = profiles.find(item => Number(item.id) === profileId);
+  if (!profile) return null;
+  const profileIdsByName = new Map(profiles.map(item => [String(item.name || '').trim().toLowerCase(), Number(item.id)]));
+  const profilesById = new Map(profiles.map(item => [Number(item.id), item]));
+  const stats = {
+    profile_id: profileId, player_name: profile.name, season,
+    games_played: 0, games_won: 0, legs_played: 0, legs_won: 0,
+    total_darts: 0, total_scored: 0, highest_leg_avg: 0, avg_first9: 0, first_nine_samples: 0,
+    max_score: 0, count_180: 0, count_171plus: 0, count_140plus: 0, count_100plus: 0,
+    checkout_attempts: 0, checkout_success: 0, highest_checkout: 0,
+    checkout_100plus: 0, checkout_120plus: 0, checkout_160plus: 0,
+    checkout_single_attempts: 0, checkout_single_success: 0, checkout_single_highest: 0,
+    checkout_double_attempts: 0, checkout_double_success: 0, checkout_double_highest: 0,
+    checkout_master_attempts: 0, checkout_master_success: 0, checkout_master_highest: 0,
+    cricket_legs: 0, cricket_won: 0,
+    eliminations_made: 0, eliminations_taken: 0
+  };
+  const history = [];
+  let firstNineTotal = 0;
+  for (const duel of await dataStore.listFinishedDuelsForStats()) {
+    if (!duel || seasonFromTimestamp(duel.started_at) !== season) continue;
+    const checkoutRule = Number(duel.checkout_stats_version || 1) >= 2 && ['single', 'double', 'master'].includes(String(duel.checkout_rule || '').toLowerCase())
+      ? String(duel.checkout_rule).toLowerCase()
+      : null;
+    for (const player of duel.players || []) {
+      const slot = Number(player.player_slot);
+      const storedProfileId = Number(player.profile_id || 0);
+      const identity = resolvePlayerIdentity({ profileId: profilesById.has(storedProfileId) ? storedProfileId : null, name: player.player_name, slot }, profileIdsByName);
+      if (identity !== profileId) continue;
+      stats.games_played += 1;
+      if (Number(duel.winner_slot) === slot) stats.games_won += 1;
+      for (const leg of duel.legs || []) {
+        const legPlayer = (leg.players || []).find(item => Number(item.player_slot) === slot);
+        if (!legPlayer) continue;
+        const legMode = String(leg.mode || duel.mode || '');
+        const isCricket = (GAME_MODES[legMode] || {}).type === 'cricket';
+        const won = Number(legPlayer.won || 0) > 0;
+        const legAverage = Number(legPlayer.average || 0);
+        const checkoutSuccess = Number(legPlayer.checkout_success || 0);
+        const checkout = won && checkoutSuccess > 0 ? Math.min(170, Number(legPlayer.checkout_highest || 0)) : 0;
+        stats.legs_played += 1;
+        if (won) stats.legs_won += 1;
+        stats.total_darts += Number(legPlayer.darts || 0);
+        stats.total_scored += Number(legPlayer.scored || 0);
+        stats.highest_leg_avg = Math.max(stats.highest_leg_avg, legAverage);
+        stats.max_score = Math.max(stats.max_score, Number(legPlayer.best_turn || 0));
+        stats.count_180 += Number(legPlayer.count_180 || 0);
+        stats.count_171plus += Number(legPlayer.count_171plus || 0);
+        stats.count_140plus += Number(legPlayer.count_140plus || 0);
+        stats.count_100plus += Number(legPlayer.count_100plus || 0);
+        if (Number(legPlayer.first_nine_avg || 0) > 0) {
+          firstNineTotal += Number(legPlayer.first_nine_avg);
+          stats.first_nine_samples += 1;
+        }
+        if (isCricket) {
+          stats.cricket_legs += 1;
+          if (won) stats.cricket_won += 1;
+        } else {
+          stats.checkout_attempts += Number(legPlayer.checkout_attempts || 0);
+          stats.checkout_success += checkoutSuccess;
+          stats.highest_checkout = Math.max(stats.highest_checkout, checkout);
+          if (checkout >= 100) stats.checkout_100plus += 1;
+          if (checkout >= 120) stats.checkout_120plus += 1;
+          if (checkout >= 160) stats.checkout_160plus += 1;
+          if (checkoutRule) {
+            stats[`checkout_${checkoutRule}_attempts`] += Number(legPlayer.checkout_attempts || 0);
+            stats[`checkout_${checkoutRule}_success`] += checkoutSuccess;
+            stats[`checkout_${checkoutRule}_highest`] = Math.max(stats[`checkout_${checkoutRule}_highest`], checkout);
+          }
+        }
+        history.push({
+          duel_id: Number(duel.id),
+          player_id: slot,
+          profile_id: profileId,
+          season,
+          mode: legMode,
+          leg_avg: legAverage,
+          checkout,
+          won: won ? 1 : 0,
+          darts_thrown: Number(legPlayer.darts || 0),
+          ts: Number(leg.ended_at || leg.started_at || duel.ended_at || duel.started_at || 0)
+        });
+      }
+    }
+  }
+  stats.avg_first9 = stats.first_nine_samples > 0 ? Number((firstNineTotal / stats.first_nine_samples).toFixed(2)) : 0;
+  const nameKey = String(profile.name || '').trim().toLowerCase();
+  const eliminationLeaderboard = await dataStore.getEliminationLeaderboard();
+  stats.eliminations_made = Number(eliminationLeaderboard.made.find(entry => String(entry.player || '').trim().toLowerCase() === nameKey)?.made || 0);
+  stats.eliminations_taken = Number(eliminationLeaderboard.taken.find(entry => String(entry.player || '').trim().toLowerCase() === nameKey)?.taken || 0);
+  history.sort((a, b) => b.ts - a.ts);
+  return { stats, history };
+}
+
+function parseProfileStatsRequest(req, res) {
+  const profileId = Number(req.params.id);
+  const season = String(req.query.season || DEFAULT_STATS_SEASON).trim();
+  if (!Number.isInteger(profileId) || profileId < 1) { res.status(400).json({ error: 'Invalid profile ID' }); return null; }
+  if (!/^\d{4}$/.test(season)) { res.status(400).json({ error: 'Invalid season' }); return null; }
+  return { profileId, season };
+}
+
+app.get('/api/profiles/:id/stats', async (req, res) => {
+  const params = parseProfileStatsRequest(req, res);
+  if (!params) return;
+  try {
+    res.set('Cache-Control', 'no-store');
+    const result = await buildProfileStats(params.profileId, params.season);
+    if (!result) return res.status(404).json({ error: 'Profil nicht gefunden' });
+    res.json(result.stats);
+  } catch (err) {
+    res.status(500).json({ error: 'Profilstatistik konnte nicht geladen werden: ' + err.message });
+  }
+});
+
+app.get('/api/profiles/:id/history', async (req, res) => {
+  const params = parseProfileStatsRequest(req, res);
+  if (!params) return;
+  try {
+    res.set('Cache-Control', 'no-store');
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit || 50) || 50));
+    const result = await buildProfileStats(params.profileId, params.season);
+    if (!result) return res.status(404).json({ error: 'Profil nicht gefunden' });
+    res.json(result.history.slice(0, limit));
+  } catch (err) {
+    res.status(500).json({ error: 'Profilverlauf konnte nicht geladen werden: ' + err.message });
+  }
+});
+
+app.get('/api/profiles/:id/segment-analysis', async (req, res) => {
+  const params = parseProfileStatsRequest(req, res);
+  if (!params) return;
+  try {
+    const mode = String(req.query.mode || '').trim();
+    res.json(await dataStore.getSegmentAnalysis(null, mode, null, params.season, null, params.profileId));
+  } catch (err) {
+    res.status(500).json({ error: 'Segmentanalyse konnte nicht geladen werden: ' + err.message });
   }
 });
 

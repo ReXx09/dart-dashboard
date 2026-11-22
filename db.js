@@ -1306,9 +1306,40 @@ class DataStore {
     return rows;
   }
 
+  // Zählt pro Profil-ID die verknüpften Datenbankeinträge (Begegnungen, Highscores, Slots).
+  async getProfileUsage() {
+    const all = async sql => {
+      if (this.isSQLite()) return this.sqlite.all(sql);
+      if (this.isPostgres()) return (await this.pg.query(sql)).rows;
+      return (await this.my.query(sql))[0];
+    };
+    const [duelRows, highscoreRows, slotRows] = await Promise.all([
+      all('SELECT dp.profile_id AS pid, COUNT(DISTINCT dp.duel_id) AS duels, MAX(d.created_at) AS last_played FROM duel_players dp LEFT JOIN duels d ON d.id = dp.duel_id WHERE dp.profile_id IS NOT NULL GROUP BY dp.profile_id'),
+      all('SELECT profile_id AS pid, COUNT(*) AS highscores FROM highscores WHERE profile_id IS NOT NULL GROUP BY profile_id'),
+      all('SELECT profile_id AS pid, slot FROM players WHERE profile_id IS NOT NULL ORDER BY slot ASC')
+    ]);
+    const usage = new Map();
+    const entry = pid => {
+      const id = Number(pid);
+      if (!usage.has(id)) usage.set(id, { duels: 0, highscores: 0, lastPlayed: null, slots: [] });
+      return usage.get(id);
+    };
+    duelRows.forEach(row => {
+      const item = entry(row.pid);
+      item.duels = Number(row.duels || 0);
+      item.lastPlayed = Number(row.last_played || 0) || null;
+    });
+    highscoreRows.forEach(row => { entry(row.pid).highscores = Number(row.highscores || 0); });
+    slotRows.forEach(row => { entry(row.pid).slots.push(Number(row.slot)); });
+    return usage;
+  }
+
   // Liefert die IDs in Eingabereihenfolge, damit Clients neue Profile per ID weiterbearbeiten
-  // statt sie beim nächsten Speichern erneut anzulegen. Gleiche Namen sind erlaubt (verschiedene Spieler).
+  // statt sie beim nächsten Speichern erneut anzulegen. Ein neues Profil mit bereits vergebenem Namen
+  // wird nur mit allowDuplicateName angelegt (bewusst zweiter Spieler gleichen Namens).
   async saveProfiles(list) {
+    const nameKey = name => String(name || '').trim().toLowerCase();
+    const existingNames = new Set((await this.getProfiles()).map(profile => nameKey(profile.name)));
     const seenIds = new Set();
     const safeList = [];
     for (const entry of Array.isArray(list) ? list : []) {
@@ -1318,6 +1349,12 @@ class DataStore {
       if (id > 0) {
         if (seenIds.has(id)) continue;
         seenIds.add(id);
+      } else if (existingNames.has(nameKey(name)) && entry.allowDuplicateName !== true) {
+        const err = new Error('Ein Profil "' + name + '" gibt es schon.');
+        err.code = 'PROFILE_NAME_EXISTS';
+        throw err;
+      } else {
+        existingNames.add(nameKey(name));
       }
       safeList.push({ id, name, color: entry.color || null, gradient: entry.gradient || null });
     }
@@ -1789,22 +1826,22 @@ class DataStore {
   }
 
   async getSegmentAnalysis(playerSlot, mode = '', duelId = null, season = DEFAULT_STATS_SEASON, duelLegId = null, profileId = null) {
-    const slot = Number(playerSlot);
+    const slot = Number(playerSlot) > 0 ? Number(playerSlot) : null;
     const encounterId = Number(duelId) > 0 ? Number(duelId) : null;
     const legId = Number(duelLegId) > 0 ? Number(duelLegId) : null;
     const identityProfileId = Number(profileId) > 0 ? Number(profileId) : null;
     let rows;
     if (this.isSQLite()) rows = await this.sqlite.all(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) AND (? IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = ?)) ORDER BY thrown_at ASC',
-      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId, identityProfileId, identityProfileId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE (? IS NULL OR player_slot = ?) AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) AND (? IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = ?)) ORDER BY thrown_at ASC',
+      [slot, slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId, identityProfileId, identityProfileId]
     );
     else if (this.isPostgres()) rows = (await this.pg.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = $1 AND season = $2 AND ($3 = \'\' OR mode = $3) AND ($4 IS NULL OR duel_id = $4) AND ($5 IS NULL OR duel_leg_id = $5) AND ($6 IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = $6)) ORDER BY thrown_at ASC',
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE ($1::int IS NULL OR player_slot = $1) AND season = $2 AND ($3 = \'\' OR mode = $3) AND ($4 IS NULL OR duel_id = $4) AND ($5 IS NULL OR duel_leg_id = $5) AND ($6 IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = $6)) ORDER BY thrown_at ASC',
       [slot, season, String(mode || ''), encounterId, legId, identityProfileId]
     )).rows;
     else rows = (await this.my.query(
-      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE player_slot = ? AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) AND (? IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = ?)) ORDER BY thrown_at ASC',
-      [slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId, identityProfileId, identityProfileId]
+      'SELECT segment, points, mode, bust FROM player_throw_segments WHERE (? IS NULL OR player_slot = ?) AND season = ? AND (? = \'\' OR mode = ?) AND (? IS NULL OR duel_id = ?) AND (? IS NULL OR duel_leg_id = ?) AND (? IS NULL OR EXISTS (SELECT 1 FROM duel_players WHERE duel_players.duel_id = player_throw_segments.duel_id AND duel_players.player_slot = player_throw_segments.player_slot AND duel_players.profile_id = ?)) ORDER BY thrown_at ASC',
+      [slot, slot, season, String(mode || ''), String(mode || ''), encounterId, encounterId, legId, legId, identityProfileId, identityProfileId]
     ))[0];
 
     const bySegment = new Map();

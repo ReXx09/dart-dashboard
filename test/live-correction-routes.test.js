@@ -243,3 +243,132 @@ test('Korrektur des letzten Darts ersetzt den gespeicherten Turn-Highscore (180 
     assert.deepEqual(loweredRows.map(row => ({ score: row.score, kind: row.kind })), [{ score: 120, kind: '100+' }]);
   });
 });
+
+test('Gesamtstatistik folgt dem Profil statt dem Slot und ein Profil darf nicht in zwei Slots stehen', async () => {
+  await withApp(async call => {
+    const [annaId, benId] = await dataStore.saveProfiles([{ name: 'Anna' }, { name: 'Ben' }]);
+    const playDuel = async (slotOfAnna, slotOfBen, winnerSlot) => {
+      const players = [{ slot: slotOfAnna, name: 'Anna', profileId: annaId }, { slot: slotOfBen, name: 'Ben', profileId: benId }];
+      const duel = await dataStore.createDuel({ mode: '501', matchType: 'direct', players });
+      await dataStore.recordDuelLeg({ duelId: duel.id, mode: '501', winnerSlot, startedAt: Date.now() - 1000, players });
+      await dataStore.sqlite.run("UPDATE duels SET status = 'finished' WHERE id = ?", [duel.id]);
+    };
+    await playDuel(1, 2, 1);
+    await playDuel(2, 1, 2);
+    await playDuel(2, 1, 2);
+    // Slot-Statistik, die nach dem Wechsel sonst dem aktuellen Slot-Profil zugeschlagen würde.
+    await dataStore.initPlayerStats(1);
+    await dataStore.sqlite.run('UPDATE player_stats SET games_played = 50, games_won = 40 WHERE player_id = 1');
+
+    const conflict = await call('PUT', '/api/players', [
+      { slot: 1, name: 'Ben', active: true, profileId: benId },
+      { slot: 2, name: 'Ben', active: true, profileId: benId }
+    ]);
+    assert.equal(conflict.status, 409);
+    assert.equal(conflict.body.code, 'PROFILE_IN_MULTIPLE_SLOTS');
+    assert.equal((await call('PUT', '/api/players', [
+      { slot: 1, name: 'Ben', active: true, profileId: benId },
+      { slot: 2, name: 'Anna', active: true, profileId: annaId }
+    ])).status, 200);
+
+    const { body } = await call('GET', '/api/highscores/overview');
+    const anna = body.profileStats.find(entry => entry.profileId === annaId);
+    const ben = body.profileStats.find(entry => entry.profileId === benId);
+    assert.equal(anna.gamesPlayed, 3);
+    assert.equal(anna.gamesWon, 3);
+    assert.equal(ben.gamesPlayed, 3);
+    assert.equal(ben.gamesWon, 0);
+    const totals = body.metrics.gamesPlayed.filter(entry => entry.mode === 'gesamt' && entry.category === 'all');
+    assert.deepEqual(totals.map(entry => [entry.player, entry.gamesPlayed]).sort(), [['Anna', 3], ['Ben', 3]]);
+  });
+});
+
+test('Startdialog: Profile und Gäste bekommen freie Slots, Wurfreihenfolge und Anwurf-Wechsel bleiben erhalten', async () => {
+  await withApp(async call => {
+    const [doraId] = await dataStore.saveProfiles([{ name: 'Dora', color: '#123456' }]);
+    const started = await call('POST', '/api/duels/start', {
+      matchType: 'group', mode: '501', checkoutRule: 'double', bestOf: 3, keepOrder: true,
+      participants: [{ name: 'Gast Max' }, { profileId: doraId }, { slot: 2 }]
+    });
+    assert.equal(started.status, 200, JSON.stringify(started.body));
+    assert.deepEqual(started.body.players.map(player => [player.slot, player.name]), [[4, 'Gast Max'], [5, 'Dora'], [2, 'Bob']]);
+    assert.equal(started.body.game.activePlayer, 0);
+    assert.equal(started.body.game.startingPlayerSlot, 4);
+
+    const slots = (await call('GET', '/api/players')).body;
+    const slotList = Array.isArray(slots) ? slots : slots.players;
+    assert.deepEqual(slotList.find(player => player.slot === 5), { slot: 5, name: 'Dora', active: true, color: '#123456', profileId: doraId });
+    assert.equal(slotList.find(player => player.slot === 4).active, true);
+
+    const state = (await call('GET', '/api/live/state')).body;
+    assert.deepEqual(state.players.map(player => player.slot), [4, 5, 2]);
+
+    const nextLeg = await call('POST', '/api/live/reset', { carryLegs: true });
+    assert.deepEqual(nextLeg.body.players.map(player => player.slot), [4, 5, 2]);
+    assert.equal(nextLeg.body.game.startingPlayerSlot, 5);
+    assert.equal(nextLeg.body.game.activePlayer, 1);
+
+    const tooMany = await call('POST', '/api/duels/start', {
+      matchType: 'group', mode: '501', checkoutRule: 'double', bestOf: 1,
+      participants: ['A', 'B', 'C', 'D', 'E', 'F'].map(name => ({ name: 'Neu ' + name }))
+    });
+    assert.equal(tooMany.status, 400);
+    assert.match(tooMany.body.error, /Nicht genug freie Slots/);
+  });
+});
+
+test('Slot-Vergabe überschreibt inaktive Gast-Slots vor inaktiven Profil-Slots', () => {
+  const { assignParticipantSlots } = require('../lib/match-participants');
+  const players = [
+    { slot: 1, name: 'Miche', active: false, profileId: 7 },
+    { slot: 2, name: 'Gast Alt', active: false, profileId: null },
+    { slot: 3, name: 'Bob', active: true, profileId: null }
+  ];
+  const result = assignParticipantSlots(players, [{ name: 'Neu' }, { slot: 3 }], []);
+  assert.deepEqual(result.slots, [2, 3]);
+  assert.equal(result.players.find(player => player.slot === 1).name, 'Miche');
+});
+
+test('Profilstatistik, Verlauf und Segmente bleiben getrennt, wenn ein anderes Profil den Slot übernimmt', async () => {
+  await withApp(async call => {
+    const [annaId, benId] = await dataStore.saveProfiles([{ name: 'Anna' }, { name: 'Ben' }]);
+    const season = String(new Date().getFullYear());
+    const playLeg = async (slotOneProfile, slotOneName, segment, points, slotOneWins) => {
+      const players = [
+        { slot: 1, name: slotOneName, profileId: slotOneProfile, turns: 15, totalScored: 501, average: 100.2, bestTurn: points, lastCheckoutValue: 81, checkoutAttempts: 2, checkoutSuccess: slotOneWins ? 1 : 0 },
+        { slot: 2, name: 'Gast', profileId: null, turns: 15, totalScored: 300, average: 60, bestTurn: 60 }
+      ];
+      const duel = await dataStore.createDuel({ mode: '501', matchType: 'direct', players });
+      const now = Date.now();
+      await dataStore.sqlite.run(
+        'INSERT INTO player_throw_segments (player_slot, segment, points, mode, bust, thrown_at, duel_id, season) VALUES (1, ?, ?, ?, 0, ?, ?, ?)',
+        [segment, points, '501', now - 500, duel.id, season]
+      );
+      await dataStore.recordDuelLeg({ duelId: duel.id, mode: '501', winnerSlot: slotOneWins ? 1 : 2, startedAt: now - 1000, players });
+      await dataStore.sqlite.run("UPDATE duels SET status = 'finished', winner_slot = ? WHERE id = ?", [slotOneWins ? 1 : 2, duel.id]);
+    };
+    await playLeg(annaId, 'Anna', 'T20', 60, true);
+    // Ben übernimmt Slot 1 (z. B. über den Start-Dialog), Annas Werte dürfen nicht zu ihm wandern.
+    await dataStore.savePlayers([{ slot: 1, name: 'Ben', active: true, profileId: benId }]);
+    await playLeg(benId, 'Ben', 'S5', 5, false);
+    await playLeg(benId, 'Ben', 'S1', 1, false);
+
+    const anna = (await call('GET', `/api/profiles/${annaId}/stats?season=${season}`)).body;
+    const ben = (await call('GET', `/api/profiles/${benId}/stats?season=${season}`)).body;
+    assert.deepEqual([anna.games_played, anna.games_won, anna.legs_played, anna.legs_won, anna.highest_checkout, anna.max_score], [1, 1, 1, 1, 81, 60]);
+    assert.deepEqual([ben.games_played, ben.games_won, ben.legs_played, ben.legs_won, ben.highest_checkout, ben.max_score], [2, 0, 2, 0, 0, 5]);
+
+    const annaHistory = (await call('GET', `/api/profiles/${annaId}/history?season=${season}`)).body;
+    const benHistory = (await call('GET', `/api/profiles/${benId}/history?season=${season}`)).body;
+    assert.deepEqual(annaHistory.map(leg => [leg.won, leg.checkout]), [[1, 81]]);
+    assert.deepEqual(benHistory.map(leg => [leg.won, leg.checkout]), [[0, 0], [0, 0]]);
+
+    const annaSegments = (await call('GET', `/api/profiles/${annaId}/segment-analysis?season=${season}`)).body;
+    const benSegments = (await call('GET', `/api/profiles/${benId}/segment-analysis?season=${season}`)).body;
+    assert.deepEqual(annaSegments.segments.map(item => item.segment), ['T20']);
+    assert.deepEqual(benSegments.segments.map(item => item.segment).sort(), ['S1', 'S5']);
+
+    assert.equal((await call('GET', '/api/profiles/9999/stats')).status, 404);
+    assert.equal((await call('GET', `/api/profiles/${annaId}/stats?season=abc`)).status, 400);
+  });
+});

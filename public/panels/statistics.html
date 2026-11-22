@@ -841,51 +841,43 @@
       if (!currentPlayerId && !currentProfileId) return;
       document.getElementById('overviewTitle').textContent = 'Allgemein';
       if (currentProfileId) {
-        const assignedPlayer = availablePlayers.find(player => Number(player.profileId || 0) === currentProfileId);
-        if (assignedPlayer) {
-          currentPlayerId = Number(assignedPlayer.slot);
-          try {
-            const [statsRes, historyRes, segmentRes, highscoresRes] = await Promise.all([
-              fetch(`${API_BASE}/players/${currentPlayerId}/stats?season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' }),
-              fetch(`${API_BASE}/players/${currentPlayerId}/history?limit=10&season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' }),
-              fetch(`${API_BASE}/players/${currentPlayerId}/segment-analysis?mode=${encodeURIComponent(currentStatsMode)}&season=${encodeURIComponent(currentSeason)}&profileId=${currentProfileId}`, { cache: 'no-store' }),
-              fetch('/api/highscores', { cache: 'no-store' })
-            ]);
-            const stats = await statsRes.json();
-            const history = await historyRes.json();
-            currentStats = stats;
-            segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
-            const highscores = highscoresRes.ok ? await highscoresRes.json() : [];
-            const maxHighscore = highscores
-              .filter(entry => Number(entry.profileId || 0) === currentProfileId || Number(entry.playerSlot || 0) === currentPlayerId)
-              .filter(entry => entry.kind !== 'checkout' && entry.kind !== 'cricket' && entry.kind !== 'elimination')
-              .reduce((max, entry) => Math.max(max, Number(entry.score || 0)), 0);
-            stats.max_score = maxHighscore > 0 ? maxHighscore : Number(stats.max_score || 0);
-            renderSummary(stats);
-            renderOverview(stats);
-            renderAvg(stats);
-            renderScoring(stats);
-            renderSegmentAnalysis();
-            renderCheckout(stats);
-            renderHistory(history);
-            loadEncounterStats();
-            return;
-          } catch (error) {
-            console.error('Failed to load assigned profile stats:', error);
-          }
+        // Profile werden immer über ihre Begegnungen ausgewertet – nie über den (wechselnden) Slot.
+        currentPlayerId = null;
+        try {
+          const profileBase = `${API_BASE}/profiles/${currentProfileId}`;
+          const seasonQuery = `season=${encodeURIComponent(currentSeason)}`;
+          const [statsRes, historyRes, segmentRes, highscoresRes] = await Promise.all([
+            fetch(`${profileBase}/stats?${seasonQuery}`, { cache: 'no-store' }),
+            fetch(`${profileBase}/history?limit=10&${seasonQuery}`, { cache: 'no-store' }),
+            fetch(`${profileBase}/segment-analysis?mode=${encodeURIComponent(currentStatsMode)}&${seasonQuery}`, { cache: 'no-store' }),
+            fetch('/api/highscores', { cache: 'no-store' })
+          ]);
+          if (!statsRes.ok) throw new Error('HTTP ' + statsRes.status);
+          const stats = await statsRes.json();
+          const history = historyRes.ok ? await historyRes.json() : [];
+          currentStats = stats;
+          segmentAnalysis = segmentRes.ok ? await segmentRes.json() : null;
+          if (segmentComparison) await loadSegmentComparison();
+          const highscores = highscoresRes.ok ? await highscoresRes.json() : [];
+          const profileName = String(stats.player_name || '').trim().toLowerCase();
+          const maxHighscore = highscores
+            .filter(entry => Number(entry.profileId || 0) > 0
+              ? Number(entry.profileId) === currentProfileId
+              : String(entry.player || '').trim().toLowerCase() === profileName)
+            .filter(entry => entry.kind !== 'checkout' && entry.kind !== 'cricket' && entry.kind !== 'elimination')
+            .reduce((max, entry) => Math.max(max, Number(entry.score || 0)), 0);
+          stats.max_score = Math.max(maxHighscore, Number(stats.max_score || 0));
+          renderSummary(stats);
+          renderOverview(stats);
+          renderAvg(stats);
+          renderScoring(stats);
+          renderSegmentAnalysis();
+          renderCheckout(stats);
+          renderHistory(history);
+          loadEncounterStats();
+        } catch (error) {
+          console.error('Failed to load profile stats:', error);
         }
-        const response = await fetch(`${API_BASE}/highscores/overview`, { cache: 'no-store' });
-        const overview = response.ok ? await response.json() : null;
-        const profileEntry = overview?.profileStats?.find(item => Number(item.profileId) === currentProfileId) || {};
-        currentStats = profileEntry;
-        segmentAnalysis = null;
-        renderSummary(profileEntry);
-        renderOverview(profileEntry);
-        renderAvg(profileEntry);
-        renderScoring(profileEntry);
-        renderCheckout(profileEntry);
-        renderHistory([]);
-        renderEncounterStats(profileEntry);
         return;
       }
       try {
@@ -1414,7 +1406,11 @@
         .map(slot => availablePlayers.find(player => String(player.slot) === slot))
         .filter(Boolean);
       segmentComparisonData = await Promise.all(selectedPlayers.map(async player => {
-        const response = await fetch(`${API_BASE}/players/${player.slot}/segment-analysis?mode=${encodeURIComponent(currentStatsMode)}&season=${encodeURIComponent(currentSeason)}`, { cache: 'no-store' });
+        const query = `mode=${encodeURIComponent(currentStatsMode)}&season=${encodeURIComponent(currentSeason)}`;
+        const url = Number(player.profileId || 0) > 0
+          ? `${API_BASE}/profiles/${Number(player.profileId)}/segment-analysis?${query}`
+          : `${API_BASE}/players/${player.slot}/segment-analysis?${query}`;
+        const response = await fetch(url, { cache: 'no-store' });
         return { name: player.name, slot: player.slot, analysis: response.ok ? await response.json() : null };
       }));
       renderSegmentAnalysis();
@@ -1550,8 +1546,10 @@
         leaveStatsEditor();
       } else if (!currentPlayerId) {
         editStatus.hidden = false;
-        editStatus.textContent = 'Bitte zuerst einen Spieler auswählen.';
-        setTimeout(() => { if (!statsEditEnabled) editStatus.hidden = true; }, 3000);
+        editStatus.textContent = currentProfileId
+          ? 'Profilstatistiken werden aus den gespeicherten Begegnungen berechnet und können hier nicht bearbeitet werden.'
+          : 'Bitte zuerst einen Spieler auswählen.';
+        setTimeout(() => { if (!statsEditEnabled) editStatus.hidden = true; }, currentProfileId ? 5000 : 3000);
       } else {
         showPinDialog();
       }

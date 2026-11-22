@@ -1206,10 +1206,35 @@
     .match-menu-field.full { grid-column: 1 / -1; }
     .match-menu-field[hidden] { display: none; }
     .match-menu-field select, .match-menu-field input { width: 100%; box-sizing: border-box; padding: 9px 10px; background: #101112; color: #f1f1f1; border: 1px solid #3d4448; border-radius: 7px; font: inherit; }
-    .match-player-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 4px; min-width: 0; }
-    .match-player-option { display: flex; align-items: center; gap: 7px; min-width: 0; box-sizing: border-box; padding: 8px; background: #111315; border: 1px solid #2d3337; border-radius: 6px; color: #e6eaec; overflow: hidden; }
-    .match-player-option input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: #f4a261; }
-    .match-player-option span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+    .match-player-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 7px; margin-top: 4px; min-width: 0; }
+    .match-player-option { display: flex; align-items: center; gap: 8px; min-width: 0; box-sizing: border-box; padding: 8px 10px; background: #111315; border: 1px solid #2d3337; border-radius: 8px; color: #e6eaec; overflow: hidden; font: inherit; text-align: left; cursor: pointer; }
+    .match-player-option.selected { border-color: #f4a261; background: #2a1f16; }
+    .match-player-option .dot { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; background: var(--pc, #666); }
+    .match-player-option .name { min-width: 0; flex: 1; overflow-wrap: anywhere; word-break: break-word; }
+    .match-player-option .badge { flex: 0 0 auto; min-width: 20px; height: 20px; border-radius: 10px; background: #f4a261; color: #171717; font-size: .72rem; font-weight: 800; display: none; align-items: center; justify-content: center; }
+    .match-player-option.selected .badge { display: inline-flex; }
+    .match-player-option .meta { display: block; color: #7d878c; font-size: .66rem; }
+    .match-player-loading { color: #9aa3a8; font-size: .8rem; }
+    .match-menu-section { margin-bottom: 14px; }
+    .match-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: #cfd6da; font-size: .8rem; }
+    .match-link-button { border: 1px solid #4d555a; border-radius: 6px; padding: 6px 10px; color: #f1f1f1; background: #25292c; font: inherit; font-size: .78rem; cursor: pointer; }
+    .match-link-button:disabled { opacity: .4; cursor: default; }
+    .match-guest-row { display: flex; gap: 7px; margin-top: 7px; }
+    .match-guest-row input { flex: 1; min-width: 0; padding: 8px 10px; background: #101112; color: #f1f1f1; border: 1px dashed #3d4448; border-radius: 7px; font: inherit; }
+    .match-guest-row button { width: 44px; border: 1px solid #4d555a; border-radius: 7px; background: #25292c; color: #f4a261; font: inherit; font-size: 1.1rem; font-weight: 800; cursor: pointer; }
+    .match-order-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+    .match-order-list li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #111315; border: 1px solid #2d3337; border-left: 4px solid var(--pc, #666); border-radius: 7px; color: #e6eaec; }
+    .match-order-list li .pos { width: 24px; color: #f4a261; font-weight: 800; }
+    .match-order-list li .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .match-order-list li .hint { color: #7d878c; font-size: .68rem; }
+    .match-order-list li button { width: 34px; height: 30px; border: 1px solid #3d4448; border-radius: 6px; background: #1d2023; color: #e6eaec; font: inherit; cursor: pointer; }
+    .match-order-list li button:disabled { opacity: .3; cursor: default; }
+    .match-order-list .empty { color: #7d878c; font-size: .8rem; border-style: dashed; border-left-width: 1px; }
+    .match-toggle-field .match-toggle { display: flex; align-items: center; gap: 8px; min-height: 38px; color: #e6eaec; }
+    .match-toggle input { width: 18px; height: 18px; margin: 0; accent-color: #f4a261; }
+    .match-summary { margin-top: 12px; padding: 10px 12px; background: #111315; border: 1px solid #2d3337; border-radius: 8px; color: #f1f1f1; font-size: .86rem; line-height: 1.4; }
+    .match-summary.invalid { border-color: #e63946; color: #ff9aa2; }
+    .match-summary .type { color: #f4a261; font-weight: 800; }
     .match-menu-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
     .match-menu-actions button { border: 1px solid #4d555a; border-radius: 7px; padding: 9px 15px; color: #f1f1f1; background: #25292c; font: inherit; cursor: pointer; }
     .match-menu-actions .primary { background: #f4a261; border-color: #f4a261; color: #171717; font-weight: 800; }
@@ -1296,6 +1321,8 @@
       .match-menu-field { font-size: .82rem; }
       .match-menu-field select, .match-menu-field input:not([type="checkbox"]) { min-height: var(--tablet-menu-control-height); padding: 13px 12px; font-size: .9rem; }
       .match-player-option { min-height: var(--tablet-player-tile-height); }
+      .match-guest-row input, .match-guest-row button, .match-order-list li button { min-height: 46px; }
+      .match-order-list li button { width: 46px; }
     }
 
     /* Fallback für alle Touch-Geräte */
@@ -1308,6 +1335,8 @@
       .match-menu-field { font-size: .82rem; }
       .match-menu-field select, .match-menu-field input:not([type="checkbox"]) { min-height: var(--tablet-menu-control-height, 52px); padding: 13px 12px; font-size: .9rem; }
       .match-player-option { min-height: var(--tablet-player-tile-height, 52px); }
+      .match-guest-row input, .match-guest-row button, .match-order-list li button { min-height: 46px; }
+      .match-order-list li button { width: 46px; }
       .focus-controls-card { height: 236px !important; }
       .focus-controls-card .ctrl-btn { min-height: 52px !important; padding: 24px 8px !important; height: 100% !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .82rem; }
     }
@@ -1389,40 +1418,48 @@
   <div class="match-menu-overlay" id="matchMenuOverlay" role="dialog" aria-modal="true" aria-labelledby="matchMenuTitle">
     <div class="match-menu-card">
       <h3 id="matchMenuTitle">Begegnung starten</h3>
-      <p id="matchMenuDescription">Wähle Begegnungstyp, Best-of, Finish und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.</p>
-      <div class="match-menu-grid">
-        <label class="match-menu-field full">Startart
-          <select id="matchStartKind" onchange="updateMatchStartKind()"><option value="encounter">Begegnung mit Statistik</option><option value="single">Solospiel mit Statistik</option></select>
-        </label>
-        <label class="match-menu-field encounter-only">Typ
-          <select id="matchTypeSelect" onchange="updateMatchMenuType()"><option value="single">Solospiel</option><option value="direct">Direktes Duell</option><option value="group">Mehrspielerbegegnung</option><option value="tournament">K.-o.-Turnier</option></select>
-        </label>
-        <label class="match-menu-field encounter-only" id="matchBestOfField">Best-of
-          <select id="matchBestOf"><option value="1">Einzelleg</option><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option><option value="9">Best of 9</option></select>
-        </label>
-        <label class="match-menu-field">Spiel
-          <select id="matchMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option><option value="cricket">Cricket</option><option value="elimination">301-Elimination</option><option value="shanghai">Shanghai</option><option value="atc">Around the Clock</option><option value="split">Split</option></select>
-        </label>
-        <label class="match-menu-field encounter-only" id="matchCheckoutField">Finish
-          <select id="matchCheckoutRule"><option value="double">Double Out</option><option value="single">Single Out</option><option value="master">Master Out</option></select>
-        </label>
-        <label class="match-menu-field encounter-only" id="tournamentNameField" hidden>Turniername
-          <input id="matchTournamentName" type="text" maxlength="80" placeholder="z. B. Freitagsturnier" />
-        </label>
-        <div class="match-menu-field full">
-          <div class="match-presets" aria-label="Spiel-Presets">
-            <strong>Presets</strong>
-            <button type="button" onclick="loadMatchPreset(0)">1 laden</button>
-            <button type="button" onclick="loadMatchPreset(1)">2 laden</button>
-            <button type="button" onclick="loadMatchPreset(2)">3 laden</button>
-            <select id="matchPresetSaveSlot" aria-label="Preset-Speicherplatz"><option value="0">Preset 1</option><option value="1">Preset 2</option><option value="2">Preset 3</option></select>
-            <button type="button" onclick="saveMatchPreset()">Auswahl speichern</button>
-          </div>
-        </div>
-        <div class="match-menu-field full">Teilnehmer
-          <div class="match-player-list" id="matchPlayerList"></div>
+      <p id="matchMenuDescription">Spieler antippen, Reihenfolge festlegen, starten. Der Typ ergibt sich aus der Spielerzahl: 1 = Solo, 2 = Duell, ab 3 = Mehrspieler.</p>
+      <div class="match-menu-section">
+        <div class="match-section-head"><strong>1. Spieler</strong><button type="button" class="match-link-button" onclick="openPlayerManagement()">👤 Spieler verwalten</button></div>
+        <div class="match-player-list" id="matchPlayerList"></div>
+        <div class="match-guest-row">
+          <input id="matchGuestName" type="text" maxlength="24" placeholder="Gast hinzufügen (Name)" enterkeyhint="done" />
+          <button type="button" onclick="addMatchGuest()" aria-label="Gast hinzufügen">＋</button>
         </div>
       </div>
+      <div class="match-menu-section">
+        <div class="match-section-head"><strong>2. Wurfreihenfolge</strong><button type="button" class="match-link-button" id="matchShuffleButton" onclick="shuffleMatchOrder()">🎲 Zufall</button></div>
+        <ol class="match-order-list" id="matchOrderList"></ol>
+      </div>
+      <div class="match-menu-section">
+        <div class="match-section-head"><strong>3. Spiel</strong></div>
+        <div class="match-menu-grid">
+          <label class="match-menu-field">Spiel
+            <select id="matchMode"><option value="501">501</option><option value="301">301</option><option value="701">701</option><option value="cricket">Cricket</option><option value="elimination">301-Elimination</option><option value="shanghai">Shanghai</option><option value="atc">Around the Clock</option><option value="split">Split</option></select>
+          </label>
+          <label class="match-menu-field" id="matchCheckoutField">Finish
+            <select id="matchCheckoutRule"><option value="double">Double Out</option><option value="single">Single Out</option><option value="master">Master Out</option></select>
+          </label>
+          <label class="match-menu-field" id="matchBestOfField">Best-of
+            <select id="matchBestOf"><option value="1">Einzelleg</option><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option><option value="9">Best of 9</option></select>
+          </label>
+          <label class="match-menu-field match-toggle-field" id="matchTournamentField"><span>K.-o.-Turnier</span>
+            <span class="match-toggle"><input id="matchTournamentToggle" type="checkbox" /><span>Turnierbaum statt Begegnung</span></span>
+          </label>
+          <label class="match-menu-field full" id="tournamentNameField" hidden>Turniername
+            <input id="matchTournamentName" type="text" maxlength="80" placeholder="z. B. Freitagsturnier" />
+          </label>
+        </div>
+      </div>
+      <div class="match-presets" aria-label="Spiel-Presets">
+        <strong>Presets</strong>
+        <button type="button" onclick="loadMatchPreset(0)">1 laden</button>
+        <button type="button" onclick="loadMatchPreset(1)">2 laden</button>
+        <button type="button" onclick="loadMatchPreset(2)">3 laden</button>
+        <select id="matchPresetSaveSlot" aria-label="Preset-Speicherplatz"><option value="0">Preset 1</option><option value="1">Preset 2</option><option value="2">Preset 3</option></select>
+        <button type="button" onclick="saveMatchPreset()">Auswahl speichern</button>
+      </div>
+      <div class="match-summary" id="matchSummary" aria-live="polite"></div>
       <div class="match-menu-actions"><button type="button" onclick="closeMatchMenu()">Abbrechen</button><button class="primary" id="matchStartButton" type="button" onclick="startConfiguredMatch()">Begegnung starten</button></div>
     </div>
   </div>
@@ -1764,40 +1801,76 @@
       const checkoutSelect = document.getElementById('matchCheckoutRule');
       if (modeSelect && liveState && liveState.game) modeSelect.value = liveState.game.mode || '501';
       if (checkoutSelect && liveState && liveState.game) checkoutSelect.value = liveState.game.checkoutRule || 'double';
-      document.getElementById('matchStartKind').value = 'encounter';
-      document.getElementById('matchTypeSelect').value = 'direct';
-      updateMatchStartKind();
+      document.getElementById('matchTournamentToggle').checked = false;
+      document.getElementById('matchGuestName').value = '';
       document.getElementById('matchMenuOverlay').classList.add('open');
       loadMatchPlayers();
     }
 
-    function updateMatchStartKind() {
-      const isSingleGame = document.getElementById('matchStartKind').value === 'single';
-      const typeSelect = document.getElementById('matchTypeSelect');
-      if (typeSelect) typeSelect.value = isSingleGame ? 'single' : (typeSelect.value === 'single' ? 'direct' : typeSelect.value);
-      document.querySelectorAll('.encounter-only').forEach(field => {
-        if (field.querySelector('#matchTypeSelect')) return;
-        field.hidden = isSingleGame;
-      });
-      updateMatchModeAvailability();
-      document.getElementById('matchMenuDescription').textContent = isSingleGame
-        ? 'Starte ein Solospiel mit einem beliebigen Modus. Die Spiel- und Leg-Statistik wird unter Solospiel gespeichert.'
-        : 'Wähle Begegnungstyp, Spielmodus, Best-of, Finish und Teilnehmer. Die Duellstatistik und Heatmap werden für alle Legs und Spieler geführt.';
-      document.getElementById('matchStartButton').textContent = isSingleGame ? 'Solospiel starten' : 'Begegnung starten';
+    let matchCandidates = [];
+    let matchSelection = [];
+
+    function getMatchType() {
+      if (document.getElementById('matchTournamentToggle').checked) return 'tournament';
+      if (matchSelection.length === 1) return 'single';
+      return matchSelection.length === 2 ? 'direct' : 'group';
     }
 
     function updateMatchModeAvailability() {
-      const startKind = document.getElementById('matchStartKind').value;
       const modeSelect = document.getElementById('matchMode');
-      const checkoutField = document.getElementById('matchCheckoutField');
-      const bestOfField = document.getElementById('matchBestOfField');
-      const isEncounter = startKind === 'encounter';
-      Array.from(modeSelect.options).forEach(option => {
-        option.hidden = false;
-      });
-      const finishAvailable = ['301', '501', '701'].includes(modeSelect.value);
-      checkoutField.hidden = !finishAvailable;
-      bestOfField.hidden = !isEncounter;
+      document.getElementById('matchCheckoutField').hidden = !['301', '501', '701'].includes(modeSelect.value);
+      updateMatchMenu();
+    }
+
+    function updateMatchMenu() {
+      const type = getMatchType();
+      const tournament = type === 'tournament';
+      document.getElementById('tournamentNameField').hidden = !tournament;
+      document.getElementById('matchBestOfField').hidden = type === 'single';
+      document.getElementById('matchShuffleButton').disabled = matchSelection.length < 2;
+      renderMatchPlayerList();
+      renderMatchOrder();
+      renderMatchSummary();
+    }
+
+    function getMatchValidationError() {
+      const type = getMatchType();
+      const count = matchSelection.length;
+      if (count === 0) return 'Bitte mindestens einen Spieler antippen.';
+      if (type === 'tournament' && ![2, 4, 8, 16].includes(count)) return 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler (aktuell ' + count + ').';
+      if (type !== 'tournament' && count > 8) return 'Maximal 8 Spieler pro Begegnung.';
+      return '';
+    }
+
+    function renderMatchSummary() {
+      const box = document.getElementById('matchSummary');
+      const startButton = document.getElementById('matchStartButton');
+      const type = getMatchType();
+      const error = getMatchValidationError();
+      const modeSelect = document.getElementById('matchMode');
+      const parts = [modeSelect.options[modeSelect.selectedIndex].text];
+      if (!document.getElementById('matchCheckoutField').hidden) {
+        const rule = document.getElementById('matchCheckoutRule');
+        parts.push(rule.options[rule.selectedIndex].text);
+      }
+      if (type !== 'single') {
+        const bestOf = document.getElementById('matchBestOf');
+        parts.push(bestOf.options[bestOf.selectedIndex].text);
+      }
+      const typeLabel = { single: 'Solospiel', direct: 'Duell', group: 'Mehrspieler', tournament: 'K.-o.-Turnier' }[type];
+      const names = matchSelection.map(entry => escapeHtml(entry.name));
+      const players = type === 'direct' ? names.join(' vs. ') : type === 'tournament' ? names.length + ' Spieler, Paarungen werden ausgelost' : names.join(' → ');
+      box.classList.toggle('invalid', !!error);
+      box.innerHTML = error
+        ? escapeHtml(error)
+        : '<span class="type">' + typeLabel + '</span> · ' + parts.map(escapeHtml).join(' · ') + '<br>' + players
+          + (type !== 'tournament' && matchSelection.length > 1 ? '<br><small>Anwurf: ' + names[0] + (Number(document.getElementById('matchBestOf').value) > 1 ? ', danach reihum pro Leg' : '') + '</small>' : '');
+      startButton.disabled = !!error;
+      startButton.textContent = type === 'single' ? 'Solospiel starten' : type === 'tournament' ? 'Turnier starten' : 'Begegnung starten';
+    }
+
+    function openPlayerManagement() {
+      location.href = '/panels/spieler.html?return=live' + (new URLSearchParams(location.search).get('tv') === 'compact' ? '&tv=compact' : '');
     }
 
     function getMatchActionPresentation(state) {
@@ -1814,24 +1887,126 @@
       const list = document.getElementById('matchPlayerList');
       if (!list) return;
       list.innerHTML = '<div class="match-player-loading">Spieler werden geladen ...</div>';
+      matchSelection = [];
       try {
-        const response = await fetch('/api/players', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Spieler konnten nicht geladen werden');
-        const players = (await response.json()).filter(player => player && player.active !== false && String(player.name || '').trim());
-        const hasRunningGame = String(liveState && liveState.game && liveState.game.status || '') === 'running';
-        const stateSlots = Array.isArray(liveState && liveState.game && liveState.game.selectedPlayerSlots)
-          ? liveState.game.selectedPlayerSlots.map(Number)
-          : (Array.isArray(liveState && liveState.players) ? liveState.players.map(player => Number(player.slot)) : []);
-        const selectedSlots = hasRunningGame
-          ? stateSlots
-          : players.slice(0, 2).map(player => Number(player.slot));
-        list.innerHTML = players.map(player => '<label class="match-player-option"><input type="checkbox" value="' + Number(player.slot) + '"' + (selectedSlots.includes(Number(player.slot)) ? ' checked' : '') + ' /><span>' + escapeHtml(player.name) + '</span></label>').join('');
-        document.getElementById('matchTypeSelect').value = selectedSlots.length === 2 ? 'direct' : 'group';
-        updateMatchMenuType();
+        const [playersResponse, profilesResponse] = await Promise.all([
+          fetch('/api/players', { cache: 'no-store' }),
+          fetch('/api/profiles', { cache: 'no-store' })
+        ]);
+        if (!playersResponse.ok) throw new Error('Spieler konnten nicht geladen werden');
+        const players = (await playersResponse.json()).filter(player => player && String(player.name || '').trim());
+        const profiles = profilesResponse.ok ? await profilesResponse.json() : [];
+        const palette = ['#e63946', '#f4a261', '#2a9d8f', '#457b9d', '#9b5de5', '#2ec4b6', '#f0b429', '#52b788'];
+        matchCandidates = [];
+        (Array.isArray(profiles) ? profiles : []).forEach(profile => {
+          const slotPlayer = players.find(player => Number(player.profileId) === Number(profile.id));
+          matchCandidates.push({
+            key: 'p' + profile.id, name: String(profile.name), profileId: Number(profile.id),
+            slot: slotPlayer ? Number(slotPlayer.slot) : null,
+            color: profile.color || (slotPlayer && slotPlayer.color) || palette[matchCandidates.length % palette.length],
+            meta: slotPlayer ? 'Slot ' + slotPlayer.slot + (slotPlayer.active ? '' : ' · inaktiv') : 'Profil #' + profile.id
+          });
+        });
+        players.filter(player => !player.profileId || !matchCandidates.some(candidate => candidate.profileId === Number(player.profileId))).forEach(player => {
+          matchCandidates.push({
+            key: 's' + player.slot, name: String(player.name).trim(), profileId: null, slot: Number(player.slot),
+            color: player.color || palette[(Number(player.slot) - 1) % palette.length],
+            meta: 'Slot ' + player.slot + ' · ohne Profil' + (player.active ? '' : ' · inaktiv')
+          });
+        });
+        const stateSlots = Array.isArray(liveState && liveState.players) ? liveState.players.map(player => Number(player.slot)) : [];
+        const lastPlayers = stateSlots.map(slot => matchCandidates.find(candidate => candidate.slot === slot)).filter(Boolean);
+        const activeSlots = players.filter(player => player.active).map(player => Number(player.slot));
+        matchSelection = lastPlayers.length > 0
+          ? lastPlayers
+          : activeSlots.slice(0, 2).map(slot => matchCandidates.find(candidate => candidate.slot === slot)).filter(Boolean);
+        updateMatchModeAvailability();
       } catch (error) {
         list.innerHTML = '<div class="match-player-loading">Spieler konnten nicht geladen werden.</div>';
         showToast(error.message, true);
       }
+    }
+
+    function renderMatchPlayerList() {
+      const list = document.getElementById('matchPlayerList');
+      const guests = matchSelection.filter(entry => entry.guest);
+      const all = matchCandidates.concat(guests);
+      if (all.length === 0) {
+        list.innerHTML = '<div class="match-player-loading">Noch keine Spieler angelegt – Gast hinzufügen oder „Spieler verwalten“ öffnen.</div>';
+        return;
+      }
+      list.innerHTML = all.map(candidate => {
+        const position = matchSelection.findIndex(entry => entry.key === candidate.key);
+        return '<button type="button" class="match-player-option' + (position >= 0 ? ' selected' : '') + '" style="--pc:' + escapeHtml(candidate.color || '#666') + '" aria-pressed="' + (position >= 0) + '" data-key="' + escapeHtml(candidate.key) + '" onclick="toggleMatchPlayer(this.dataset.key)">'
+          + '<span class="dot"></span><span class="name">' + escapeHtml(candidate.name) + '<span class="meta">' + escapeHtml(candidate.meta) + '</span></span>'
+          + '<span class="badge">' + (position + 1) + '</span></button>';
+      }).join('');
+    }
+
+    function renderMatchOrder() {
+      const list = document.getElementById('matchOrderList');
+      if (matchSelection.length === 0) { list.innerHTML = '<li class="empty">Oben Spieler antippen – die Reihenfolge entspricht der Wurfreihenfolge.</li>'; return; }
+      const tournament = getMatchType() === 'tournament';
+      list.innerHTML = matchSelection.map((entry, index) => '<li style="--pc:' + escapeHtml(entry.color || '#666') + '">'
+        + '<span class="pos">' + (index + 1) + '.</span><span class="name">' + escapeHtml(entry.name)
+        + (index === 0 && !tournament && matchSelection.length > 1 ? ' <span class="hint">wirft an</span>' : '') + '</span>'
+        + '<button type="button" aria-label="Nach oben" onclick="moveMatchPlayer(' + index + ', -1)"' + (index === 0 ? ' disabled' : '') + '>↑</button>'
+        + '<button type="button" aria-label="Nach unten" onclick="moveMatchPlayer(' + index + ', 1)"' + (index === matchSelection.length - 1 ? ' disabled' : '') + '>↓</button>'
+        + '<button type="button" aria-label="Entfernen" data-key="' + escapeHtml(entry.key) + '" onclick="toggleMatchPlayer(this.dataset.key)">✕</button></li>').join('');
+    }
+
+    function toggleMatchPlayer(key) {
+      const index = matchSelection.findIndex(entry => entry.key === key);
+      if (index >= 0) matchSelection.splice(index, 1);
+      else {
+        const candidate = matchCandidates.find(entry => entry.key === key);
+        if (candidate) matchSelection.push(candidate);
+      }
+      updateMatchMenu();
+    }
+
+    function moveMatchPlayer(index, direction) {
+      const target = index + direction;
+      if (target < 0 || target >= matchSelection.length) return;
+      const [entry] = matchSelection.splice(index, 1);
+      matchSelection.splice(target, 0, entry);
+      updateMatchMenu();
+    }
+
+    function shuffleMatchOrder() {
+      for (let i = matchSelection.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [matchSelection[i], matchSelection[j]] = [matchSelection[j], matchSelection[i]];
+      }
+      updateMatchMenu();
+    }
+
+    function findMatchCandidateByName(name) {
+      const lower = String(name || '').trim().toLowerCase();
+      return matchCandidates.find(entry => entry.name.toLowerCase() === lower)
+        || matchSelection.find(entry => entry.guest && entry.name.toLowerCase() === lower)
+        || null;
+    }
+
+    function addMatchGuest(nameOverride) {
+      const input = document.getElementById('matchGuestName');
+      const name = String(nameOverride !== undefined ? nameOverride : input.value).trim().slice(0, 24);
+      if (!name) { input.focus(); return; }
+      const existing = findMatchCandidateByName(name);
+      if (existing) {
+        if (!matchSelection.some(entry => entry.key === existing.key)) matchSelection.push(existing);
+        else if (nameOverride === undefined) showToast(existing.name + ' ist bereits ausgewählt.');
+      } else {
+        matchSelection.push({ key: 'g' + name.toLowerCase(), name, guest: true, profileId: null, slot: null, color: '#8d99ae', meta: 'Gast · bekommt freien Slot' });
+      }
+      if (nameOverride === undefined) input.value = '';
+      updateMatchMenu();
+    }
+
+    function toMatchParticipant(entry) {
+      if (entry.slot) return { slot: entry.slot };
+      if (entry.profileId) return { profileId: entry.profileId };
+      return { name: entry.name };
     }
 
     function closeMatchMenu() { document.getElementById('matchMenuOverlay').classList.remove('open'); }
@@ -1848,27 +2023,36 @@
     function loadMatchPreset(index) {
       const preset = readMatchPreset(index);
       if (!preset) { showToast('Preset ' + (Number(index) + 1) + ' ist noch leer.', true); return; }
-      document.getElementById('matchStartKind').value = preset.matchType === 'single' ? 'single' : 'encounter';
-      document.getElementById('matchTypeSelect').value = preset.matchType || 'direct';
+      document.getElementById('matchTournamentToggle').checked = preset.matchType === 'tournament';
       document.getElementById('matchMode').value = preset.mode || '501';
       document.getElementById('matchCheckoutRule').value = preset.checkoutRule || 'double';
       document.getElementById('matchBestOf').value = String(preset.bestOf || 1);
       document.getElementById('matchTournamentName').value = preset.tournamentName || '';
-      document.querySelectorAll('#matchPlayerList input').forEach(input => { input.checked = (preset.playerSlots || []).includes(Number(input.value)); });
-      updateMatchMenuType();
+      matchSelection = [];
+      const entries = Array.isArray(preset.participants)
+        ? preset.participants
+        : (preset.playerSlots || []).map(slot => ({ slot: Number(slot) }));
+      entries.forEach(entry => {
+        const candidate = (entry.profileId && matchCandidates.find(item => item.profileId === Number(entry.profileId)))
+          || (entry.slot && !entry.profileId && matchCandidates.find(item => item.slot === Number(entry.slot)))
+          || null;
+        if (candidate) { if (!matchSelection.includes(candidate)) matchSelection.push(candidate); }
+        else if (entry.name) addMatchGuest(entry.name);
+      });
+      updateMatchModeAvailability();
       showToast('Preset ' + (Number(index) + 1) + ' geladen');
     }
 
     function saveMatchPreset() {
       const index = Number(document.getElementById('matchPresetSaveSlot').value || 0);
-      const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
       const preset = {
-        matchType: document.getElementById('matchTypeSelect').value,
+        matchType: getMatchType(),
         mode: document.getElementById('matchMode').value,
         checkoutRule: document.getElementById('matchCheckoutRule').value,
         bestOf: Number(document.getElementById('matchBestOf').value),
         tournamentName: document.getElementById('matchTournamentName').value.trim(),
-        playerSlots
+        participants: matchSelection.map(entry => ({ profileId: entry.profileId || null, slot: entry.slot || null, name: entry.name })),
+        playerSlots: matchSelection.filter(entry => entry.slot).map(entry => entry.slot)
       };
       localStorage.setItem(getMatchPresetKey(index), JSON.stringify(preset));
       showToast('Auswahl als Preset ' + (index + 1) + ' gespeichert');
@@ -1894,25 +2078,23 @@
       }
     }
 
-    function updateMatchMenuType() {
-      const type = document.getElementById('matchTypeSelect').value;
-      const isSingleGame = type === 'single';
-      document.getElementById('matchStartKind').value = isSingleGame ? 'single' : 'encounter';
-      updateMatchStartKind();
-      document.getElementById('tournamentNameField').hidden = isSingleGame || type !== 'tournament';
-      updateMatchModeAvailability();
-      document.querySelectorAll('#matchPlayerList input').forEach(input => { input.disabled = false; });
-    }
-
     async function startConfiguredMatch() {
-      const type = document.getElementById('matchTypeSelect').value;
-      const startKind = type === 'single' ? 'single' : document.getElementById('matchStartKind').value;
-      const playerSlots = Array.from(document.querySelectorAll('#matchPlayerList input:checked')).map(input => Number(input.value));
-      if ((startKind === 'encounter' && ((type === 'direct' && playerSlots.length !== 2) || (type === 'tournament' && ![2, 4, 8, 16].includes(playerSlots.length)) || playerSlots.length < 2)) || (startKind === 'single' && playerSlots.length < 1)) { showToast(startKind === 'single' ? 'Bitte mindestens einen Spieler auswählen.' : type === 'tournament' ? 'Ein K.-o.-Turnier benötigt 2, 4, 8 oder 16 Spieler.' : 'Bitte die passende Anzahl Spieler auswählen.', true); return; }
+      const type = getMatchType();
+      const error = getMatchValidationError();
+      if (error) { showToast(error, true); return; }
+      const startButton = document.getElementById('matchStartButton');
+      startButton.disabled = true;
       try {
-        const endpoint = '/api/duels/start';
-        const body = { matchType: startKind === 'single' ? 'single' : type, mode: document.getElementById('matchMode').value, checkoutRule: document.getElementById('matchCheckoutRule').value, bestOf: Number(document.getElementById('matchBestOf').value), playerSlots, tournamentName: document.getElementById('matchTournamentName').value.trim() };
-        const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const body = {
+          matchType: type,
+          mode: document.getElementById('matchMode').value,
+          checkoutRule: document.getElementById('matchCheckoutRule').value,
+          bestOf: type === 'single' ? 1 : Number(document.getElementById('matchBestOf').value),
+          participants: matchSelection.map(toMatchParticipant),
+          keepOrder: type !== 'tournament',
+          tournamentName: document.getElementById('matchTournamentName').value.trim()
+        };
+        const response = await fetch('/api/duels/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'HTTP ' + response.status);
         closeMatchMenu();
@@ -1927,8 +2109,12 @@
           tournamentBracketRequest = null;
           renderTournamentBracket(liveState, true);
         }
-        showToast(startKind === 'single' ? 'Solospiel gestartet' : 'Begegnung gestartet');
-      } catch (error) { showToast('Begegnung konnte nicht gestartet werden: ' + error.message, true); }
+        showToast(type === 'single' ? 'Solospiel gestartet' : type === 'tournament' ? 'Turnier gestartet' : 'Begegnung gestartet');
+      } catch (error) {
+        showToast('Begegnung konnte nicht gestartet werden: ' + error.message, true);
+      } finally {
+        renderMatchSummary();
+      }
     }
 
     function getDuelStatsKey(state) {
@@ -3586,6 +3772,12 @@
         liveState = state;
         isFirstLoad = false;
         renderState(state);
+        const params = new URLSearchParams(location.search);
+        if (params.get('openMatch') === '1') {
+          params.delete('openMatch');
+          history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : ''));
+          if (!hasActiveMatch(state)) openMatchMenu();
+        }
       } catch(e) {
         console.error('[Live-State] Laden fehlgeschlagen', e);
         if (retryAttempt < 3) {
@@ -3599,8 +3791,9 @@
       loadDailyHighscore();
     }
 
-    document.getElementById('matchTypeSelect').addEventListener('change', updateMatchMenuType);
     document.getElementById('matchMode').addEventListener('change', updateMatchModeAvailability);
+    ['matchCheckoutRule', 'matchBestOf', 'matchTournamentToggle'].forEach(id => document.getElementById(id).addEventListener('change', updateMatchMenu));
+    document.getElementById('matchGuestName').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); addMatchGuest(); } });
 
     (function() {
       let sse = null;
